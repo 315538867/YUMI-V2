@@ -10,8 +10,8 @@
 
 - 为六份 capability spec 提供可测试的行为、输入、输出、拒绝条件和状态约束。
 - 为每项业务能力冻结 HTTP 方法、路径、认证、幂等键、请求/响应重点、成功状态和错误码。
-- 为每个阶段冻结页面/路由/操作入口，明确订单内部组件不得被误建成顶级模块。
-- 保持共同数量 Q/E、库存领用一次扣减、生产核验等式、订单关闭条件和售后独立台账不变。
+- 为每个阶段冻结页面/路由/操作入口，明确订单内部组件不得被误建成顶级模块；订单详情采用一组订单内多 Tab，视觉基线为常规 Ant Design 后台管理布局、全页白色底、浅色侧栏与顶部面包屑，使用现成组件并通过按钮层级、Tag 样式、间距、边框和主题 token 表达层次，不并排展示 A/B 方案或重复订单页签。
+- 保持共同数量 Q/E、库存领用一次扣减、生产核验等式、订单关闭条件和售后独立台账；已确认发货后即可受理对应已发部分售后。
 - 让实现任务同时指向 Requirement/Scenario、正式文档章节、后端包/Flyway、API、前端、自动化测试和人工验收。
 - 以 Java 21、Spring Boot 3.5.x、Spring Modulith、Spring Data JPA、Flyway、Maven、MySQL 8.x、JUnit 5、Testcontainers 为实现基线。
 
@@ -64,17 +64,17 @@
 | 返工/重做 | `POST /api/rework-sources`、`POST /api/remake-sources` | 管理员/必须幂等 | 来源余额与计划入口 | `REWORK_TARGET_INVALID`, `REMAKE_REASON_REQUIRED` |
 | 超额 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify` | 管理员/必须幂等 | 预占或计划调整提醒 | `OVERTIME_DATE_INVALID`, `OVERTIME_RESERVATION_EXCEEDED` |
 | 发货 | `GET/POST /api/orders/{id}/shipments`、`POST /api/orders/{id}/shipments/{shipmentId}/confirm` | 管理员/必须幂等 | 冻结发货快照 | `SHIPMENT_EXCEEDS_AVAILABLE`, `SHIPMENT_EXCEEDS_DEMAND` |
-| 发货作废/更正 | `POST .../void`、`POST .../corrections`、`PATCH .../logistics` | 管理员/必须幂等 | 反向事实或等量替代 | `STATE_CLOSED_REQUIRES_CORRECTION`, `CORRECTION_REPLACEMENT_REQUIRED` |
-| 收款/退款 | `POST /api/orders/{id}/payments`、`POST /api/orders/{id}/refunds` | 管理员/必须幂等 | 不可变资金事实 | `PAYMENT_DRAFT_FORBIDDEN`, `REFUND_EXCEEDS_RECEIPTS`, `REFUND_REFERENCE_REQUIRED` |
+| 发货作废/更正 | `POST .../void`、`POST .../corrections`、`PATCH .../logistics` | 管理员/必须幂等 | 反向事实或等量替代 | `STATE_CLOSED_REQUIRES_CORRECTION`, `CORRECTION_REPLACEMENT_REQUIRED`, `SHIPMENT_AFTER_SALES_LINKED` |
+| 收款/退款 | `POST /api/orders/{id}/payments`、`POST /api/orders/{id}/refunds` | 管理员/必须幂等 | 不可变资金事实；售后退款单列于订单结清 | `PAYMENT_DRAFT_FORBIDDEN`, `REFUND_EXCEEDS_RECEIPTS`, `REFUND_REFERENCE_REQUIRED` |
 | 关闭 | `POST /api/orders/{id}/close` | 管理员/必须幂等 | 已关闭或条件明细 | `CLOSE_FULFILLMENT_PENDING`, `CLOSE_SETTLEMENT_PENDING`, `CLOSE_REFUND_PENDING` |
-| 售后 | `POST /api/orders/{id}/after-sales`、`POST .../{caseId}/verify-return` | 管理员/必须幂等 | 独立售后台账 | `AFTER_SALES_ORDER_NOT_CLOSED`, `AFTER_SALES_EQUATION_INVALID` |
+| 售后 | `POST /api/orders/{id}/after-sales`、`POST .../{caseId}/verify-return` | 管理员/必须幂等 | 关联有效已确认发货批次明细的独立售后台账 | `AFTER_SALES_SOURCE_INVALID`, `AFTER_SALES_QUANTITY_EXCEEDED`, `AFTER_SALES_EQUATION_INVALID` |
 | 售后补发 | `POST .../{caseId}/replacement-shipments`、`POST .../confirm` | 管理员/必须幂等 | 售后已补发增加，原订单不变 | `AFTER_SALES_REPLACEMENT_INSUFFICIENT` |
 | 查询导出 | `GET /api/reports/{type}`、`GET .../export` | 管理员/否 | 服务端事实导出 | `REPORT_TYPE_INVALID` |
 | 健康/迁移 | `GET /actuator/health/liveness|readiness` | 受保护运维 | 健康结果 | `MIGRATION_INVALID` |
 
 ### 7. 前端页面、路由和操作矩阵
 
-React 页面必须由业务入口驱动，Electron 复用相同路由和 API；物流字段只在发货详情/打印/PDF显示，业务导出隐藏物流字段。
+React 页面必须由业务入口驱动，Electron 复用相同路由和 API；物流字段只在发货详情/打印/PDF显示，业务导出隐藏物流字段。`/orders/:id` 使用订单内一组多 Tab 承载只读事实，Tab 切换不创建详情路由；新建、编辑、确认和处理必须由显式入口进入独立操作状态，不在详情预置表单。订单详情使用常规 Ant Design 后台管理布局：全页白色底、浅色侧栏、顶部面包屑和单组订单页签；使用 Ant Design 现成组件，通过按钮层级、Tag 样式、间距、边框和主题 token 表达视觉层次，不在同一页面并排展示 A/B 方案或重复订单页签。`.superpowers/brainstorm/39592-1790147910/content/order-detail-antd-admin-v1.html` 是当前视觉基线草图；结构与业务分组可作为实现和人工验收参考，具体尺寸可在不改变上述基线的前提下调整。
 
 | 路由 | 页面 | 关键操作 | 验收观察点 |
 | --- | --- | --- | --- |
@@ -82,16 +82,21 @@ React 页面必须由业务入口驱动，Electron 复用相同路由和 API；�
 | `/catalog/products` | 商品 | 新建、编辑、启停、历史 | 停用商品不能进入新订单 |
 | `/catalog/customers` | 客户 | 新建、重复提示、编辑、详情汇总 | 不自动合并重复客户 |
 | `/catalog/employees` | 员工 | 工种、离职、重新入职、历史 | 离职或无资格员工不能新排班 |
-| `/orders` | 订单列表 | 筛选、新建、打开工作区 | 主状态/生产/发货进度分列 |
+| `/orders` | 订单列表 | 筛选、新建、打开订单 | 主状态/生产/发货进度分列 |
 | `/orders/new` | 订单步骤工作区 | 客户、明细、Q/E、金额、收货、确认 | 服务端金额和快照权威 |
-| `/orders/:id` | 订单详情 | 变更、取消、履约、发货、收退款、关闭 | 发货/收退款/售后为订单内页签 |
-| `/orders/:id/changes/:changeId` | 变更确认 | 变更前后、超出处理、确认 | 减单必须逐项处理余量 |
-| `/inventory` | 库存工作区 | 批次、流水、调整、领用 | 领用扣一次，发货不二扣 |
+| `/orders/:id` | 订单详情 | 总览、商品与履约、发货与售后、资金与利润、资料与变更 Tab；显式进入变更、取消、发货、收退款、售后、关闭操作 | 总览可核对 12+ 明细；履约按阶段看事实；只读与操作分离；已确认发货可受理售后 |
+| `/orders/:id/changes/:changeId` | 变更确认操作 | 变更前后、超出处理、确认 | 减单必须逐项处理余量；确认后回到订单只读详情 |
+| `/inventory` | 库存工作区 | 批次、流水、调整、领用 | 领用扣一次，发货不二扣；订单内低频领用就近进入 |
 | `/production` | 生产工作台 | 排班、等待上游、核验、提醒 | 未完成和超额提醒独立可处理 |
-| `/production/plans/:id/verify` | 核验页 | 完成/合格/返工/报废 | 等式与一次核验错误可见 |
-| `/shipments` | 发货工作区 | 草稿、确认、物流修改、作废/更正、打印 | 物流修改不改数量 |
+| `/production/plans/:id/verify` | 核验操作 | 完成/合格/返工/报废 | 等式与一次核验错误可见 |
 | `/reports` | 台账与导出 | 查询、导出、打印/PDF | 导出无物流字段 |
 | Electron shell | 桌面壳 | 打印、文件选择、窗口 | 不直连数据库、不复制业务规则 |
+
+订单内发货批次、售后单、资金流水和变更事实均从相应 Tab 查看，不设 `/shipments` 顶级工作区；需要复杂录入时可使用订单上下文的独立操作页，但不为只读事实逐级叠加路由。
+
+### 7.1 售后来源和结清口径
+
+创建售后必须引用已确认且有效的发货批次明细，并在事务内锁定该明细的有效已发余额与售后已占用量；新受理量不能超过剩余可受理量。售后可在订单仍部分履约时并行进行；原发货已被有效售后引用时，不得直接作废或更正为无效来源。订单结清净额为累计订单收款减累计订单变更退款，订单待退款为 `max(累计订单收款 - 当前有效应收 - 累计订单变更退款, 0)`；售后退款独立关联售后单，进入累计实际净收，不冲减结清净额、不产生新的订单待收/待退。全部退款仍不得超过累计订单收款。订单关闭重验只使用订单结清口径，售后占用和售后退款不改变原订单履约、应收或主状态。
 
 ### 8. 数据库与 Flyway 设计
 

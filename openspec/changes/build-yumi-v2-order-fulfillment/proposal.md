@@ -7,10 +7,11 @@ YUMI V2 是绿地重建，现有统一 change 已确定业务边界，但当前�
 - **BREAKING** 将本 change 的实施入口从粗粒度模块任务改为“需求/场景 → API → 后端与迁移 → 前端 → 自动化测试 → 人工验收 → 完成证据”的可追踪任务。
 - 补齐管理员认证、统一错误响应、幂等键、审计、健康检查、Flyway 和浏览器/Electron 边界契约。
 - 补齐商品、客户、员工、工种、变更审计和订单确认快照行为。
-- 补齐订单草稿、确认、共同数量、订单变更、减单/取消、收退款、发货、关闭及关闭后售后的完整行为。
+- 补齐订单草稿、确认、共同数量、订单变更、减单/取消、收退款、分批发货、关闭及发货后独立售后的完整行为。
 - 补齐库存批次、不可变流水、期初/盘点、库存领用、取消领用和“库存领用只扣一次、发货不再扣库存”规则。
 - 补齐生产计划、执行条件、一次性核验、返工目标矩阵、报废重做、未完成提醒、超额预占与计划调整、其他排班工时核验。
-- 补齐订单模块内部发货、收退款、关闭和售后补发台账的 API、页面入口、状态派生和错误码。
+- 将售后受理时点改为已确认发货后，按有效发货明细限制售后占用；区分订单结清净额与售后退款，并补齐发货、收退款、关闭和售后补发台账的 API、页面入口、状态派生和错误码。
+- 订单详情采用订单内只读多 Tab 与显式操作入口；前端先按常规 Ant Design 后台管理布局落地：全页白色底、单组订单页签、浅色侧栏与顶部面包屑，使用 Ant Design 现成组件，通过按钮层级、Tag 样式、间距、边框和主题 token 表达视觉层次；不在同一页面并排展示两套 A/B 方案或重复订单页签。
 - 补齐查询、导出、打印/PDF、发布门禁、备份恢复和人工视觉验收证据要求。
 - 明确 Java 21、Spring Boot 3.5.x、Spring Modulith、Spring Data JPA、Flyway、Maven、MySQL 8.x、React、TypeScript、Electron 的目标实现边界；不实现应用代码。
 
@@ -31,7 +32,7 @@ YUMI V2 是绿地重建，现有统一 change 已确定业务边界，但当前�
 
 ## Impact
 
-- 影响 `openspec/changes/build-yumi-v2-order-fulfillment/` 下 proposal、design、六份规格和 tasks；本次不新增应用代码。
+- 影响 `docs/requirements/order-fulfillment-requirements.md` 与相关架构、路线图文档，以及 `openspec/changes/build-yumi-v2-order-fulfillment/` 下 proposal、design、订单生命周期规格和 tasks；本次不新增应用代码。
 - 实现阶段将新增 Java/Maven 后端、React/TypeScript 前端、Electron 薄壳、Flyway SQL、MySQL 约束和测试工程。
 - API 为 HTTPS JSON 业务命令与查询；金额使用十进制字符串；所有写命令要求认证、审计和幂等键。
 - 顶级模块为 `identity`、`catalog`、`orders`、`inventory`、`production`、`files`；发货、履约、收退款、售后和关闭属于 `orders` 内部组件。

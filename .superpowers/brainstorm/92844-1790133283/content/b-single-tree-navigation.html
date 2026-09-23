@@ -1,0 +1,75 @@
+<style>
+  .page-note{margin:0 0 16px;color:#667085;font-size:12px;line-height:1.65}
+  .layout-grid{display:grid;grid-template-columns:minmax(620px,1.7fr) minmax(300px,.8fr);gap:18px;align-items:start}
+  .demo-card{background:#fff;border:1px solid #e7e2d9;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(58,50,38,.07)}
+  .demo-head{padding:14px 16px;border-bottom:1px solid #ece8e1;display:flex;align-items:center;justify-content:space-between}
+  .demo-head h3{margin:0;font-size:15px}.demo-head span{font-size:10px;color:#7a7d75}
+  .app{height:580px;display:grid;grid-template-columns:196px 1fr;background:#f6f4ef;color:#2d302c;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  .side{background:#fff;border-right:1px solid #e7e2d9;padding:13px 10px 10px;display:flex;flex-direction:column;min-width:0}
+  .brand{height:38px;display:flex;align-items:center;gap:8px;padding:0 7px 10px;font-weight:800;font-size:13px}.brand-mark{width:25px;height:25px;border-radius:8px;background:#4d6250;color:#fff;display:grid;place-items:center;font-size:11px}.collapse{margin-left:auto;color:#8b8d86;font-size:13px}
+  .nav-scroll{flex:1;overflow:hidden}.nav-item{height:32px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:7px;font-size:10px;color:#555a53;margin:2px 0}.nav-item .icon{width:17px;text-align:center;font-size:12px;color:#737870}.nav-item .arrow{margin-left:auto;color:#969990}.nav-item.parent{font-weight:650;color:#343934}.nav-item.parent.open{background:#f1f3ee;color:#405844}.nav-item.leaf{height:29px;padding-left:34px;font-size:9px;color:#6c706a}.nav-item.leaf.active{background:#e8eee5;color:#3e5942;font-weight:750}.nav-item:hover{background:#f3f2ee}.nav-sep{height:1px;background:#eeebe5;margin:8px 5px}.nav-count{margin-left:auto;min-width:17px;padding:2px 5px;text-align:center;background:#eee6d5;color:#805f23;border-radius:10px;font-size:8px}.user{border-top:1px solid #ede9e2;padding:10px 6px 0;display:flex;align-items:center;gap:7px;font-size:9px}.avatar{width:25px;height:25px;border-radius:50%;background:#dce5d8;color:#405844;display:grid;place-items:center;font-weight:700}.user b{display:block;font-size:9px}.user small{color:#8b8d86;font-size:8px}
+  .main{min-width:0;display:grid;grid-template-rows:48px 1fr}.top{background:#fff;border-bottom:1px solid #e7e2d9;padding:0 16px;display:flex;align-items:center;justify-content:space-between}.crumb{font-size:9px;color:#858880}.crumb b{color:#3e5942}.top-actions{display:flex;gap:6px;align-items:center}.search{width:126px;border:1px solid #dcd8cf;border-radius:7px;background:#faf9f7;padding:6px 8px;font-size:8px;color:#888b84}.bell{width:27px;height:27px;border:1px solid #dfdbd3;border-radius:7px;display:grid;place-items:center;font-size:11px;background:#fff}
+  .content{padding:15px;overflow:hidden}.title-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:13px}.title-row h4{margin:0 0 3px;font-size:18px}.title-row p{margin:0;font-size:9px;color:#7d8079}.primary{background:#405844;color:#fff;border-radius:8px;padding:8px 11px;font-size:9px;font-weight:650}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.stat{background:#fff;border:1px solid #e8e4dc;border-radius:10px;padding:9px 10px}.stat small{display:block;color:#83867f;font-size:8px;margin-bottom:4px}.stat b{font-size:16px}.stat em{font-style:normal;font-size:8px;color:#99702e;margin-left:3px}
+  .panel{background:#fff;border:1px solid #e8e4dc;border-radius:11px;overflow:hidden}.toolbar{display:flex;gap:6px;align-items:center;padding:8px;border-bottom:1px solid #ece9e3}.field{border:1px solid #ddd9d1;border-radius:7px;padding:6px 8px;font-size:8px;color:#747870;background:#fff}.toolbar .field:first-child{width:108px}.reset{font-size:8px;color:#68726a}.table{font-size:8px}.row{display:grid;grid-template-columns:60px 1.3fr 54px 56px 61px 42px;gap:6px;align-items:center;min-height:34px;padding:0 9px;border-bottom:1px solid #f0ede8}.row.header{min-height:29px;background:#faf9f7;color:#72766f;font-weight:700}.row:last-child{border:0}.customer b{display:block;font-size:9px}.customer small{font-size:7px;color:#8c8e88}.status{border-radius:10px;padding:3px 5px;text-align:center;background:#f3ead8;color:#866329}.status.green{background:#e7efe4;color:#47634a}.status.gray{background:#eeefec;color:#686d66}.op{color:#405f47;font-weight:700;text-align:right}
+  .side-column{display:grid;gap:18px}.mini-card{background:#fff;border:1px solid #e7e2d9;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(58,50,38,.06)}.mini-title{padding:13px 15px;border-bottom:1px solid #ece8e1}.mini-title h3{font-size:14px;margin:0 0 3px}.mini-title p{margin:0;font-size:10px;color:#7d8079}.collapsed{height:250px;display:grid;grid-template-columns:54px 1fr;background:#f6f4ef;font-family:Inter,-apple-system,sans-serif}.collapsed-side{background:#fff;border-right:1px solid #e7e2d9;padding:11px 6px}.collapsed-logo{width:29px;height:29px;border-radius:8px;background:#4d6250;color:#fff;display:grid;place-items:center;margin:0 auto 12px;font-size:11px;font-weight:800}.c-icon{width:38px;height:34px;border-radius:8px;display:grid;place-items:center;margin:3px auto;color:#747970;font-size:14px;position:relative}.c-icon.active{background:#e8eee5;color:#405844}.c-icon i{position:absolute;right:2px;top:2px;width:6px;height:6px;background:#ba772e;border:2px solid #fff;border-radius:50%}.collapsed-main{padding:12px}.ghost-head{height:18px;width:42%;background:#dedfd9;border-radius:5px;margin-bottom:11px}.ghost-card{height:55px;background:#fff;border:1px solid #e7e2d9;border-radius:9px;margin-bottom:8px}
+  .detail{height:265px;background:#f6f4ef;padding:12px;font-family:Inter,-apple-system,sans-serif}.detail-head{display:flex;justify-content:space-between;align-items:start}.detail-head h4{font-size:14px;margin:0 0 3px}.detail-head p{font-size:8px;color:#7d8079;margin:0}.detail-chip{font-size:8px;background:#e7efe4;color:#47634a;border-radius:9px;padding:4px 7px}.tabs{display:flex;gap:2px;margin-top:13px;border-bottom:1px solid #dedbd4}.tab{font-size:8px;color:#767a73;padding:7px 8px}.tab.active{color:#405844;font-weight:750;border-bottom:2px solid #58705b}.detail-body{display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:9px}.detail-panel{background:#fff;border:1px solid #e7e2d9;border-radius:9px;padding:9px}.detail-panel b{font-size:9px}.kv{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}.kv span{display:block;background:#f7f6f2;border-radius:6px;padding:6px;font-size:7px;color:#7b7e77}.kv strong{display:block;font-size:9px;color:#343934;margin-top:2px}.history{font-size:7px;color:#6f746d;line-height:1.8;margin-top:6px}
+  .decision{padding:15px 16px}.decision h3{font-size:14px;margin:0 0 9px}.decision ul{padding-left:18px;margin:0;color:#475467;font-size:11px;line-height:1.75}.decision strong{color:#344054}.token{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px}.sw{height:24px;border-radius:7px;border:1px solid rgba(0,0,0,.06)}
+  @media(max-width:1050px){.layout-grid{grid-template-columns:1fr}.app{height:560px}}
+</style>
+
+<h2>B 方案重构：单栏折叠树形导航</h2>
+<p class="page-note">一级与二级菜单回到同一个导航体系；状态型入口回归工作台和筛选器；订单详情内部再使用页签表达概览、商品履约、变更、发货、款项和售后。</p>
+
+<div class="layout-grid">
+  <section class="demo-card">
+    <div class="demo-head"><h3>展开态 · 订单列表工作区</h3><span>侧栏 196px，可折叠</span></div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand"><span class="brand-mark">Y</span>YUMI Studio <span class="collapse">‹</span></div>
+        <div class="nav-scroll">
+          <div class="nav-item"><span class="icon">⌂</span>工作台<span class="nav-count">9</span></div>
+          <div class="nav-sep"></div>
+          <div class="nav-item parent open"><span class="icon">▤</span>订单履约<span class="arrow">⌄</span></div>
+          <div class="nav-item leaf active">订单列表</div>
+          <div class="nav-item leaf">订单变更</div>
+          <div class="nav-item leaf">发货管理<span class="nav-count">16</span></div>
+          <div class="nav-item leaf">收退款<span class="nav-count">2</span></div>
+          <div class="nav-item leaf">售后管理</div>
+          <div class="nav-item parent"><span class="icon">▦</span>库存管理<span class="arrow">›</span></div>
+          <div class="nav-item parent"><span class="icon">⚙</span>生产管理<span class="nav-count">6</span><span class="arrow">›</span></div>
+          <div class="nav-item parent"><span class="icon">◇</span>基础资料<span class="arrow">›</span></div>
+          <div class="nav-item parent"><span class="icon">▥</span>报表中心<span class="arrow">›</span></div>
+        </div>
+        <div class="user"><span class="avatar">C</span><span><b>chen</b><small>系统管理员</small></span><span class="arrow">⋯</span></div>
+      </aside>
+      <main class="main">
+        <header class="top"><div class="crumb">订单履约　/　<b>订单列表</b></div><div class="top-actions"><span class="search">搜索订单、客户…</span><span class="bell">◌</span></div></header>
+        <div class="content">
+          <div class="title-row"><div><h4>订单列表</h4><p>查看订单当前有效数据与履约进度</p></div><span class="primary">＋ 新建订单</span></div>
+          <div class="stats"><div class="stat"><small>进行中订单</small><b>28</b></div><div class="stat"><small>临近交期</small><b>3</b><em>需关注</em></div><div class="stat"><small>可发货订单</small><b>16</b></div><div class="stat"><small>待处理退款</small><b>2</b></div></div>
+          <div class="panel">
+            <div class="toolbar"><span class="field">订单号 / 客户</span><span class="field">主状态：全部⌄</span><span class="field">履约进度⌄</span><span class="field">交期⌄</span><span class="reset">重置</span></div>
+            <div class="table"><div class="row header"><span>订单</span><span>客户 / 商品</span><span>应收</span><span>交期</span><span>当前状态</span><span></span></div><div class="row"><b>YM00128</b><span class="customer"><b>青禾设计</b><small>森林兔 120 · 缝边 40</small></span><span>¥8,240</span><span>09-24</span><span class="status">生产中</span><span class="op">查看</span></div><div class="row"><b>YM00127</b><span class="customer"><b>乐屿商贸</b><small>云朵熊 80 · 不缝边</small></span><span>¥5,680</span><span>09-25</span><span class="status green">可发货</span><span class="op">发货</span></div><div class="row"><b>YM00126</b><span class="customer"><b>山里工作室</b><small>围巾猫 60 · 缝边 60</small></span><span>¥3,960</span><span>09-27</span><span class="status">等待上游</span><span class="op">查看</span></div><div class="row"><b>YM00125</b><span class="customer"><b>拾光礼品</b><small>星星狗 200 · 缝边 80</small></span><span>¥12,480</span><span>09-28</span><span class="status gray">待核验</span><span class="op">核验</span></div><div class="row"><b>YM00124</b><span class="customer"><b>木棉生活</b><small>小象 100 · 不缝边</small></span><span>¥6,120</span><span>09-30</span><span class="status">生产中</span><span class="op">查看</span></div></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <aside class="side-column">
+    <section class="mini-card">
+      <div class="mini-title"><h3>收起态</h3><p>仅显示一级业务域图标；悬停显示名称，点击展开侧栏。</p></div>
+      <div class="collapsed"><aside class="collapsed-side"><div class="collapsed-logo">Y</div><div class="c-icon">⌂<i></i></div><div class="c-icon active">▤</div><div class="c-icon">▦</div><div class="c-icon">⚙<i></i></div><div class="c-icon">◇</div><div class="c-icon">▥</div></aside><main class="collapsed-main"><div class="ghost-head"></div><div class="ghost-card"></div><div class="ghost-card"></div><div class="ghost-card"></div></main></div>
+    </section>
+
+    <section class="mini-card">
+      <div class="mini-title"><h3>订单详情内部层级</h3><p>菜单负责去哪里；页签负责同一订单内查看什么。</p></div>
+      <div class="detail"><div class="detail-head"><div><h4>YM00128 · 青禾设计</h4><p>森林兔 120 件 · 当前应收 ¥8,240</p></div><span class="detail-chip">已确认</span></div><div class="tabs"><span class="tab active">概览</span><span class="tab">商品履约</span><span class="tab">变更</span><span class="tab">发货</span><span class="tab">款项</span><span class="tab">售后</span></div><div class="detail-body"><div class="detail-panel"><b>履约概览</b><div class="kv"><span>制作<strong>120 / 120</strong></span><span>捏毛装袋<strong>90 / 120</strong></span><span>缝边裁剪<strong>0 / 40</strong></span><span>可发货<strong>30</strong></span></div></div><aside class="detail-panel"><b>最近记录</b><div class="history">09:40 生产核验<br>昨天 收款 ¥4,000<br>09-20 订单确认</div></aside></div></div>
+    </section>
+  </aside>
+</div>
+
+<section class="demo-card" style="margin-top:18px">
+  <div class="decision"><h3>这一版冻结的导航规则</h3><ul><li><strong>同一套树形菜单：</strong>不再设置顶部一级导航、双侧栏或页面内伪二级菜单。</li><li><strong>只展开当前业务域：</strong>订单、库存、生产、资料、报表之间切换时，上一组自动收起。</li><li><strong>状态不是页面层级：</strong>待生产、等待上游、待核验、临近交期等通过工作台待办、数量徽标和列表筛选表达。</li><li><strong>详情页采用页签：</strong>订单变更、发货、款项、售后既有独立管理入口，也能从具体订单详情进入关联记录。</li><li><strong>视觉收敛：</strong>保留 B 的暖灰与苔绿，圆角收敛到 7–11px，减少大面积装饰卡片。</li></ul><div class="token"><i class="sw" style="background:#405844"></i><i class="sw" style="background:#6e7961"></i><i class="sw" style="background:#f6f4ef"></i><i class="sw" style="background:#e8eee5"></i><i class="sw" style="background:#f3ead8"></i></div></div>
+</section>

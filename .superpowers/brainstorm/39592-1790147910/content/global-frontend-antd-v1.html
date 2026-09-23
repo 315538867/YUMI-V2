@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YUMI V2 · 全局前端骨架草图（Ant Design）</title>
+<link rel="stylesheet" href="https://unpkg.com/antd@5.26.2/dist/reset.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #eef1f4; color: #243246; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #root { min-height: 100vh; }
+  .frame { min-width: 1120px; max-width: 1600px; margin: auto; min-height: 100vh; border-left: 1px solid #dce2e9; border-right: 1px solid #dce2e9; background: #f4f6f8; }
+  .app-shell { min-height: 100vh; }
+  .sidebar { background: #fff !important; border-right: 1px solid #e8ebf0; }
+  .brand { height: 68px; padding: 19px 21px; border-bottom: 1px solid #edf0f3; font-size: 19px; font-weight: 750; letter-spacing: .02em; color: #253a58; }
+  .brand span { font-size: 10px; color: #8494a9; font-weight: 500; margin-left: 8px; letter-spacing: .08em; }
+  .nav-caption { color: #99a5b4; font-size: 11px; padding: 18px 22px 5px; }
+  .sidebar .ant-menu { border-inline-end: 0 !important; padding: 0 8px; }
+  .sidebar .ant-menu-item, .sidebar .ant-menu-submenu-title { margin: 2px 0 !important; width: 100% !important; }
+  .topbar { height: 68px; background: #fff; padding: 0 30px; border-bottom: 1px solid #e8ebf0; display: flex; align-items: center; justify-content: space-between; }
+  .topbar-note { color: #8090a2; font-size: 12px; }
+  .work-area { padding: 27px 30px 48px; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin: 11px 0 22px; }
+  .page-head h1 { font-size: 24px; line-height: 1.3; margin: 0 0 5px; font-weight: 650; }
+  .subtle { color: #7f8b9a; font-size: 12px; }
+  .page-head .ant-space { flex-wrap: wrap; justify-content: flex-end; }
+  .ant-card { box-shadow: none; }
+  .section-title { margin: 0 0 16px; font-size: 16px; font-weight: 650; }
+  .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .filter-row .ant-input-affix-wrapper { width: 260px; }
+  .filter-row .ant-select { width: 145px; }
+  .table-head { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 12px; }
+  .table-head strong { font-size: 15px; }
+  .table-head span { font-size: 12px; color: #8b99a9; }
+  .ant-table-wrapper .ant-table { font-size: 13px; }
+  .ant-table-wrapper .ant-table-thead > tr > th { background: #f7f9fb; color: #66768a; font-weight: 600; }
+  .ant-table-wrapper .ant-table-tbody > tr > td { padding-top: 12px; padding-bottom: 12px; }
+  .text-link { padding: 0 !important; height: auto !important; }
+  .metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .metric-strip .ant-card-body { padding: 17px 19px; }
+  .metric-label { color: #7f8b9a; font-size: 12px; }
+  .metric-number { display: block; font-size: 28px; font-weight: 650; line-height: 1.25; margin: 6px 0; }
+  .metric-extra { color: #8492a3; font-size: 11px; }
+  .task-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; }
+  .task-side .ant-card + .ant-card { margin-top: 16px; }
+  .task-side .ant-card-body { padding: 18px; }
+  .side-fact { padding: 10px 0; border-top: 1px solid #eef0f2; font-size: 12px; display: flex; justify-content: space-between; gap: 10px; }
+  .side-fact:first-of-type { border-top: 0; }
+  .order-facts { display: flex; gap: 32px; flex-wrap: wrap; margin: 3px 0 18px; font-size: 13px; color: #596b80; }
+  .order-facts b { color: #263b56; }
+  .detail-tabs .ant-tabs-nav { margin-bottom: 18px; }
+  .detail-card .ant-card-body { padding: 18px 20px; }
+  .overview-table { margin-top: 16px; }
+  .inline-detail { margin-top: 12px; background: #f8fafd; border: 1px solid #dce6f3; border-radius: 7px; padding: 15px 18px; font-size: 13px; }
+  .stage-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .stage-title { font-weight: 650; margin: 0 0 12px; }
+  .stage-card { border: 1px solid #ecf0f4; border-radius: 7px; padding: 12px; margin-bottom: 9px; font-size: 12px; background: #fff; }
+  .stage-card:last-child { margin-bottom: 0; }
+  .stage-card b { display: block; margin-bottom: 5px; }
+  .stage-card small { color: #8290a0; }
+  .draft-note { font-size: 12px; color: #8190a0; margin: 22px 0 0; }
+  @media (max-width: 1250px) { .task-layout { grid-template-columns: 1fr; } .task-side { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } .task-side .ant-card + .ant-card { margin-top: 0; } }
+  body { background: #e8ebe8; }
+  .frame { max-width: none; background: #fbfbf8; border: 0; }
+  .sidebar { background: #f3f4f0 !important; border-right: 1px solid #e2e5df; }
+  .brand { height: 81px; padding: 27px 23px; border-color: #e3e5e0; letter-spacing: -.035em; font-size: 22px; }
+  .brand span { letter-spacing: 0; font-size: 11px; }
+  .sidebar .ant-menu { background: transparent; }
+  .sidebar .ant-menu-item-selected { background: #e3e9e1 !important; color: #2c543c !important; }
+  .topbar { height: 54px; padding: 0 46px; background: #fbfbf8; border-bottom: 1px solid #e8eae5; }
+  .topbar-note { display: none; }
+  .work-area { max-width: 1580px; width: 100%; margin: 0 auto; padding: 38px 46px 55px; background: #fbfbf8; }
+  .page-head { margin: 5px 0 31px; align-items: center; }
+  .page-head h1 { font-size: 30px; font-weight: 650; letter-spacing: -.03em; margin-bottom: 5px; }
+  .page-head .subtle { font-size: 13px; }
+  .workspace-sheet { background: #fff; border: 1px solid #e4e8e3; border-radius: 12px; padding: 24px 27px 16px; }
+  .workspace-sheet .ant-table-wrapper { margin-top: 12px; }
+  .workspace-sheet .ant-table-container { border-top: 1px solid #e7eae6; }
+  .workspace-sheet .ant-table-wrapper .ant-table-thead > tr > th { background: #fff; }
+  .workspace-sheet .ant-table-wrapper .ant-table-tbody > tr > td { padding-top: 17px; padding-bottom: 17px; }
+  .workspace-sheet .ant-table-wrapper .ant-table-tbody > tr:hover > td { background: #f6f8f5; }
+  .table-head { margin: 26px 0 8px; }
+  .table-head strong { font-size: 18px; }
+  .metric-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+  .work-tab { border: 1px solid #dce4db; border-radius: 7px; background: #fff; padding: 11px 16px; color: #3b5244; cursor: pointer; font: inherit; text-align: left; }
+  .work-tab.on { border-color: #315f47; background: #eaf0e9; color: #214d36; }
+  .work-tab strong { margin-left: 9px; font-size: 15px; }
+  .task-layout { display: block; }
+  .task-side { display: none; }
+  .detail-card { border: 1px solid #e4e8e3; border-radius: 12px; }
+  .detail-card > .ant-card-body { padding: 14px 27px 24px; }
+  .detail-tabs .ant-tabs-nav { margin: 0 0 24px; }
+  .order-facts { border-bottom: 1px solid #e7ebe7; padding-bottom: 24px; margin-bottom: 26px; gap: 42px; }
+  .order-facts span { display: grid; gap: 3px; color: #829085; font-size: 12px; }
+  .order-facts b { font-size: 19px; color: #234b36; }
+  .stage-columns > .ant-card { border-color: #e2e8df; }
+  .stage-card { background: #fafbf8; }
+  .draft-note { border-top: 1px solid #e7eae5; padding-top: 16px; }
+  .topbar { display: none; }
+  .work-area { padding-top: 44px; }
+  .task-rows { border-top: 1px solid #e5eae4; margin-top: 10px; }
+  .task-row { display: grid; grid-template-columns: minmax(205px, 1.35fr) minmax(190px, 1fr) 100px 70px 105px 80px; align-items: center; gap: 16px; padding: 19px 4px; border-bottom: 1px solid #e9ede8; font-size: 13px; }
+  .task-row:hover { background: #f8faf7; }
+  .task-row b { display: block; font-size: 14px; margin-bottom: 3px; }
+  .task-row small { display: block; font-size: 11px; color: #829084; margin-top: 4px; }
+  .task-row .task-number { color: #637969; font-size: 12px; }
+  .task-row .task-quantity { font-size: 20px; font-weight: 600; color: #294c38; }
+  .task-row .ant-tag { width: fit-content; }
+  .task-row .task-action { justify-self: end; }
+  .task-intro { display: flex; gap: 26px; align-items: baseline; margin-bottom: 15px; }
+  .task-intro .section-title { margin: 0; }
+  .task-intro .subtle { flex: 1; }
+  @media (max-width: 1350px) { .task-row { grid-template-columns: 1.3fr 1fr 75px 75px 100px; } .task-row .task-date { display: none; } }
+</style>
+</head>
+<body><div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/dayjs@1.11.13/dayjs.min.js"></script>
+<script src="https://unpkg.com/antd@5.26.2/dist/antd.min.js"></script>
+<script>
+const h = React.createElement;
+const { ConfigProvider, Layout, Menu, Breadcrumb, Card, Table, Tag, Button, Input, Select, Space, Tabs, Typography, Badge, Descriptions, notification, message, Form, InputNumber, Modal } = antd;
+const { Sider, Content } = Layout;
+const { Text } = Typography;
+const orders = [
+  {key:'1',number:'YD-2026-0923-018',customer:'云汐酒店',date:'10-12',products:12,quantity:'542 / 178',production:'生产中',shipping:'部分发货',settlement:'待收 8,420',status:'已确认'},
+  {key:'2',number:'YD-2026-0922-017',customer:'清禾民宿',date:'10-06',products:8,quantity:'236 / 0',production:'待核验',shipping:'未发货',settlement:'部分收款',status:'已确认'},
+  {key:'3',number:'YD-2026-0920-016',customer:'南川酒店',date:'09-30',products:14,quantity:'680 / 520',production:'生产中',shipping:'部分发货',settlement:'已结清',status:'已确认'},
+  {key:'4',number:'YD-2026-0919-015',customer:'青林旅宿',date:'10-18',products:4,quantity:'96 / 0',production:'待安排',shipping:'未发货',settlement:'未收款',status:'草稿'},
+  {key:'5',number:'YD-2026-0918-014',customer:'山海酒店',date:'09-25',products:11,quantity:'420 / 420',production:'已完成',shipping:'已发货',settlement:'已结清',status:'已关闭'},
+  {key:'6',number:'YD-2026-0917-013',customer:'木屋民宿',date:'10-08',products:6,quantity:'154 / 36',production:'生产中',shipping:'部分发货',settlement:'待退款',status:'已确认'},
+  {key:'7',number:'YD-2026-0916-012',customer:'湖畔度假村',date:'10-22',products:15,quantity:'728 / 0',production:'待安排',shipping:'未发货',settlement:'未收款',status:'已确认'},
+  {key:'8',number:'YD-2026-0915-011',customer:'云汐酒店',date:'09-28',products:9,quantity:'318 / 218',production:'待核验',shipping:'部分发货',settlement:'部分收款',status:'已确认'}
+];
+const tasks = [
+  {key:'1',plan:'SC-0923-016',order:'YD-2026-0923-018',product:'定制枕芯 A',stage:'制作',employee:'陈师傅',quantity:40,date:'09-23',status:'待核验'},
+  {key:'2',plan:'SC-0923-015',order:'YD-2026-0922-017',product:'护颈枕 C',stage:'捏毛装袋',employee:'林师傅',quantity:24,date:'09-23',status:'待核验'},
+  {key:'3',plan:'SC-0923-014',order:'YD-2026-0920-016',product:'酒店套枕 D',stage:'缝边裁剪',employee:'周师傅',quantity:32,date:'09-23',status:'待核验'},
+  {key:'4',plan:'SC-0922-013',order:'YD-2026-0916-012',product:'标准枕芯 B',stage:'制作',employee:'—',quantity:70,date:'09-24',status:'待安排'},
+  {key:'5',plan:'SC-0922-012',order:'YD-2026-0923-018',product:'靠垫芯 E',stage:'捏毛装袋',employee:'吴师傅',quantity:28,date:'09-23',status:'等待上游'},
+  {key:'6',plan:'SC-0921-011',order:'YD-2026-0915-011',product:'长条枕 L',stage:'缝边裁剪',employee:'李师傅',quantity:36,date:'09-22',status:'未完成提醒'},
+  {key:'7',plan:'SC-0921-010',order:'YD-2026-0917-013',product:'定制枕芯 A',stage:'制作返工',employee:'黄师傅',quantity:12,date:'09-23',status:'待核验'}
+];
+const products = [
+  ['定制枕芯 A','48 × 74 · 米白 · 缝边',80,30,'生产中'],['标准枕芯 B','45 × 70 · 浅灰',40,10,'可发 20'],
+  ['护颈枕 C','45 × 68 · 米灰',24,12,'已发'],['酒店套枕 D','50 × 70 · 白色 · 缝边',60,6,'生产中'],
+  ['靠垫芯 E','45 × 45 · 灰蓝',48,20,'生产中'],['组合枕 F','48 × 74 · 象牙白',30,22,'可发 8'],
+  ['软枕 G','45 × 70 · 米灰 · 缝边',72,12,'生产中'],['护颈枕 H','45 × 68 · 深灰',20,10,'已发'],
+  ['靠背垫 I','45 × 45 · 深灰',70,16,'可发 14'],['方形垫 J','40 × 40 · 杏色',28,8,'已发'],
+  ['抱枕 K','42 × 42 · 奶白',14,0,'待安排'],['长条枕 L','40 × 90 · 米白 · 缝边',56,32,'生产中']
+];
+function statusTag(text) {
+  const colors = {'待核验':'orange','未完成提醒':'red','等待上游':'default','待安排':'default','生产中':'processing','部分发货':'blue','已发货':'green','已完成':'green','待退款':'red','已结清':'green','已确认':'blue','已关闭':'default','草稿':'default'};
+  return h(Tag,{color:colors[text] || 'default',bordered:false},text);
+}
+function App() {
+  const [page,setPage] = React.useState('orders');
+  const [tab,setTab] = React.useState('overview');
+  const [selected,setSelected] = React.useState(null);
+  const [query,setQuery] = React.useState('');
+  const [filter,setFilter] = React.useState('all');
+  const [workFilter,setWorkFilter] = React.useState('all');
+  const [action,setAction] = React.useState(null);
+  const [notice,noticeHolder] = notification.useNotification();
+  const [toast,toastHolder] = message.useMessage();
+  const [form] = Form.useForm();
+  function navigate(next) { setPage(next); setSelected(null); setAction(null); window.scrollTo(0,0); }
+  function openOrder() { navigate('detail'); setTab('overview'); }
+  function openAction(title,kind) { setAction({title,kind}); form.resetFields(); window.scrollTo(0,0); }
+  const menuItems = [
+    {key:'home',label:'工作台',onClick:()=>navigate('home')},
+    {key:'orders',label:'订单',children:[{key:'orders',label:'订单列表',onClick:()=>navigate('orders')}]},
+    {key:'catalog',label:'基础资料',children:[{key:'products',label:'商品',onClick:()=>navigate('products')},{key:'customers',label:'客户',onClick:()=>navigate('customers')},{key:'employees',label:'员工',onClick:()=>navigate('employees')}]},
+    {key:'inventory',label:'库存',onClick:()=>navigate('inventory')},
+    {key:'production',label:'生产',onClick:()=>navigate('production')},
+    {key:'reports',label:'报表',onClick:()=>navigate('reports')}
+  ];
+  const orderColumns = [
+    {title:'订单号',dataIndex:'number',width:170,render:(value)=>h(Button,{type:'link',className:'text-link',onClick:openOrder},value)},
+    {title:'客户',dataIndex:'customer',width:115},
+    {title:'交期',dataIndex:'date',width:80},
+    {title:'商品',dataIndex:'products',width:65,align:'right'},
+    {title:'订购 / 已发',dataIndex:'quantity',width:115,align:'right'},
+    {title:'生产',dataIndex:'production',width:100,render:statusTag},
+    {title:'发货',dataIndex:'shipping',width:100,render:statusTag},
+    {title:'资金',dataIndex:'settlement',width:105,render:statusTag},
+    {title:'状态',dataIndex:'status',width:84,render:statusTag}
+  ];
+  const taskColumns = [
+    {title:'计划号',dataIndex:'plan',width:125},
+    {title:'订单 / 商品',width:220,render:(_,row)=>h('div',null,h(Button,{type:'link',className:'text-link',onClick:openOrder},row.order),h('div',{className:'subtle'},row.product))},
+    {title:'工序',dataIndex:'stage',width:105},
+    {title:'员工',dataIndex:'employee',width:80},
+    {title:'数量',dataIndex:'quantity',width:65,align:'right'},
+    {title:'计划日',dataIndex:'date',width:76},
+    {title:'状态',dataIndex:'status',width:112,render:statusTag},
+    {title:'操作',width:75,render:(_,row)=>row.status==='待核验'?h(Button,{type:'link',className:'text-link',onClick:()=>openAction('核验 '+row.plan,'verify')},'核验'):h(Button,{type:'link',className:'text-link',onClick:()=>setSelected(row.plan)},'查看')}
+  ];
+  const productColumns = [
+    {title:'商品',width:220,render:(_,row)=>h(Button,{type:'link',className:'text-link',onClick:()=>setSelected(row[0])},row[0])},
+    {title:'确认规格',render:(_,row)=>row[1]},
+    {title:'订购',width:85,align:'right',render:(_,row)=>row[2]},
+    {title:'已发',width:85,align:'right',render:(_,row)=>row[3]},
+    {title:'剩余需求',width:105,align:'right',render:(_,row)=>row[2]-row[3]},
+    {title:'当前进度',width:120,render:(_,row)=>statusTag(row[4])}
+  ];
+  function header(title,subtitle,actions) { return h('div',{className:'page-head'},h('div',null,h('h1',null,title),h('div',{className:'subtle'},subtitle)),h(Space,null,actions)); }
+  function ordersPage() {
+    const list = orders.filter(row=>(row.number.includes(query)||row.customer.includes(query))&&(filter==='all'||row.status===filter));
+    return h(React.Fragment,null,
+      header('订单列表','查找订单并进入只读详情；生产、发货、资金状态分开查看。',h(Button,{type:'primary',onClick:()=>openAction('新建订单','order')},'新建订单')),
+      h('section',{className:'workspace-sheet'},
+        h('div',{className:'filter-row'},h(Input,{placeholder:'查找订单号或客户',allowClear:true,value:query,onChange:e=>setQuery(e.target.value)}),h(Select,{value:filter,onChange:setFilter,options:[{value:'all',label:'全部状态'},{value:'草稿',label:'草稿'},{value:'已确认',label:'已确认'},{value:'已关闭',label:'已关闭'}]}),h(Button,{onClick:()=>{setQuery('');setFilter('all')}},'重置')),
+        h('div',{className:'table-head'},h('strong',null,'进行中的订单'),h('span',null,`当前显示 ${list.length} 条 · 演示数据`)),
+        h(Table,{columns:orderColumns,dataSource:list,size:'middle',scroll:{x:1050},pagination:{pageSize:7,showSizeChanger:false}})
+      )
+    );
+  }
+  function workPage() {
+    const filtered=tasks.filter(t=>workFilter==='all'||t.status===workFilter);
+    return h(React.Fragment,null,
+      header('生产工作台','先看需要处理的任务，再进入具体核验；不会在列表中预置表单。',h(Button,{onClick:()=>openAction('新建生产计划','plan')},'新建计划')),
+      h('section',{className:'workspace-sheet'},
+        h('div',{className:'task-intro'},h('div',{className:'section-title'},'今天的生产事项'),h('span',{className:'subtle'},'按状态定位具体计划和商品，不把工序数量相加'),h(Button,{size:'small',onClick:()=>setWorkFilter('all')},workFilter==='all'?'查看全部':'清除筛选 · '+workFilter)),
+        h('div',{className:'metric-strip'},...[["待核验","7"],["等待上游","4"],["未完成提醒","2"],["待安排","12"]].map(([label,count])=>h('button',{type:'button',className:'work-tab'+(workFilter===label?' on':''),key:label,onClick:()=>setWorkFilter(label)},label,h('strong',null,count)))),
+        h('div',{className:'task-rows'},...filtered.map(row=>h('div',{className:'task-row',key:row.key},
+          h('div',null,h('b',null,row.product),h('span',{className:'task-number'},row.plan,' · ',row.stage)),
+          h('div',null,h(Button,{type:'link',className:'text-link',onClick:openOrder},row.order),h('small',null,'关联订单 · 查看履约')),
+          h('div',null,row.employee),
+          h('div',{className:'task-quantity'},row.quantity),
+          h('div',null,statusTag(row.status),h('small',{className:'task-date'},row.date)),
+          h('div',{className:'task-action'},h(Button,{type:'link',className:'text-link',onClick:()=>row.status==='待核验'?openAction('核验 '+row.plan,'verify'):setSelected(row.plan)},row.status==='待核验'?'核验':'查看'))
+        ))),
+        selected&&h('div',{className:'inline-detail'},`计划 ${selected} · 这里只展示只读来源与工序信息；处理从明确操作进入。`)
+      )
+    );
+  }
+  function detailsPage() {
+    const tabs=[
+      {key:'overview',label:'总览',children:h(React.Fragment,null,
+        h('div',{className:'order-facts'},h('span',null,'订购 ',h('b',null,'542 件')),h('span',null,'有效已发 ',h('b',null,'178 件')),h('span',null,'当前可发 ',h('b',null,'112 件')),h('span',null,'有效应收 ',h('b',null,'68,420.0000'))),
+        h('div',{className:'table-head'},h('strong',null,'本单商品 · 12 条'),h(Button,{type:'link',className:'text-link',onClick:()=>setTab('lines')},'查看阶段履约 →')),
+        h(Table,{className:'overview-table',columns:productColumns,dataSource:products.map((p,i)=>Object.assign([...p],{key:i})),pagination:false,size:'middle',scroll:{x:850}}),
+        selected&&h('div',{className:'inline-detail'},h('b',null,selected),h('p',null,'只读明细：订购、当前有效已发与剩余需求由服务端事实计算。'),h(Button,{size:'small',onClick:()=>setSelected(null)},'收起'))
+      )},
+      {key:'lines',label:'商品与履约',children:h('div',{className:'stage-columns'},
+        ...[["生产与核验",['定制枕芯 A · 制作 72 / 80','酒店套枕 D · 缝边 24 / 60','抱枕 K · 待安排 14']],["可安排发货",['标准枕芯 B · 当前可发 20','组合枕 F · 当前可发 8','靠背垫 I · 当前可发 14']],["已发与售后",['FH-01 · 已确认 56 件','FH-02 · 已确认 90 件','SH-01 · 来源 FH-01 的 5 件']]].map(([title,rows])=>h(Card,{size:'small',key:title},h('div',{className:'stage-title'},title),...rows.map(value=>h('div',{className:'stage-card',key:value},h('b',null,value),h('small',null,'点击查看业务事实，不会自动进入操作表单')))))
+      )},
+      {key:'delivery',label:'发货与售后',children:h(Space,{direction:'vertical',style:{width:'100%'},size:14},h(Card,{size:'small',title:'原订单发货批次',extra:h(Button,{type:'primary',size:'small',onClick:()=>openAction('创建发货草稿','shipment')},'创建发货草稿')},h('p',null,'FH-01 · 已确认 56 件 · 其中 5 件已关联 SH-01'),h('p',null,'FH-02 · 已确认 90 件'),h('p',null,'FH-03 · 已确认 32 件'),h('p',{className:'subtle'},'草稿不增加已发，也不能作为售后来源。')),h(Card,{size:'small',title:'售后单'},'SH-01 · 来源 FH-01 的有效已发商品 5 件 · 处理中'))},
+      {key:'finance',label:'资金与利润',children:h(Card,{size:'small',title:'订单结清与资金事实',extra:h(Button,{size:'small',onClick:()=>openAction('登记收款','payment')},'登记收款')},h(Descriptions,{column:2,size:'small',items:[{key:'1',label:'当前有效应收',children:'68,420.0000'},{key:'2',label:'订单收款',children:'62,000.0000'},{key:'3',label:'订单变更退款',children:'0.0000'},{key:'4',label:'售后退款',children:'2,000.0000'},{key:'5',label:'订单待收',children:'6,420.0000'},{key:'6',label:'累计实际净收',children:'60,000.0000'}]}),h('p',{className:'subtle'},'售后退款不改变原订单结清净额；金额仅供排版演示。'))},
+      {key:'history',label:'订单资料与变更',children:h(Card,{size:'small',title:'确认快照与变更记录'},h('p',null,'客户、收货、商品、数量和价格使用确认时的历史快照。'),h('p',null,'BG-01 · 已确认订单变更 · 原始事实不覆盖。'))}
+    ];
+    return h(React.Fragment,null,
+      header('云汐酒店 · 定制寝具',h(React.Fragment,null,'YD-2026-0923-018 · 交期 10 月 12 日 · 12 条商品明细 · ',statusTag('已确认')),h(Button,{onClick:()=>openAction('发起订单变更','change')},'发起订单变更')),
+      h(Card,{className:'detail-card'},h(Tabs,{className:'detail-tabs',activeKey:tab,onChange:(key)=>{setTab(key);setSelected(null)},items:tabs}))
+    );
+  }
+  function actionPage() {
+    return h(React.Fragment,null,
+      header(action.title,'独立操作草图；仅演示组件、验证和反馈方式，不提交或改变业务事实。',h(Button,{onClick:()=>setAction(null)},'返回查看')),
+      h(Card,{style:{maxWidth:850}},
+        h('div',{className:'section-title'},'业务输入'),
+        h(Form,{form,layout:'vertical',onFinish:()=>toast.success('草图演示：表单验证通过，未保存业务数据'),initialValues:{quantity:undefined}},
+          h(Form.Item,{name:'reference',label:'关联编号',rules:[{required:true,message:'请选择关联编号'}]},h(Select,{placeholder:'选择关联业务对象',options:[{value:'YD-2026-0923-018',label:'YD-2026-0923-018 · 云汐酒店'}]})),
+          h(Form.Item,{name:'quantity',label:'数量',rules:[{required:true,message:'请输入数量'},{type:'number',min:1,message:'数量必须大于 0'}]},h(InputNumber,{min:1,precision:0,style:{width:220},placeholder:'输入数量'})),
+          h(Form.Item,{name:'note',label:'说明'},h(Input.TextArea,{rows:3,placeholder:'根据具体业务操作填写'})),
+          h(Space,null,h(Button,{type:'primary',htmlType:'submit'},'演示表单验证'),h(Button,{onClick:()=>notice.error({message:'操作未完成',description:'这是非字段级业务错误的消息通知示例；草图未发送请求。',placement:'topRight'})},'演示操作失败通知'),h(Button,{onClick:()=>toast.success('草图操作已完成')},'演示轻提示'))
+        )
+      )
+    );
+  }
+  function placeholder(title) { return h(React.Fragment,null,header(title,'此页只用于检验全局导航和应用壳；详细业务页面仍待评审。'),h(Card,{style:{minHeight:360}},h('h3',null,title+' · 页面类型占位'),h('p',{className:'subtle'},'本轮聚焦订单列表、生产工作台和订单详情三种不同页面骨架，不将占位内容作为定稿。'))); }
+  return h(ConfigProvider,{theme:{token:{colorPrimary:'#315f47',borderRadius:6},components:{Menu:{itemHeight:42}}}},noticeHolder,toastHolder,
+    h('div',{className:'frame'},h(Layout,{className:'app-shell'},
+      h(Sider,{width:210,theme:'light',className:'sidebar'},h('div',{className:'brand'},'YUMI',h('span',null,'V2 · 工作区')),h('div',{className:'nav-caption'},'业务导航'),h(Menu,{mode:'inline',selectedKeys:[page==='detail'?'orders':page],defaultOpenKeys:['orders'],items:menuItems})),
+      h(Layout,null,h('div',{className:'topbar'},h(Breadcrumb,{items:[{title:'业务工作区'},{title:action?action.title:page==='detail'?'订单详情':page==='production'?'生产工作台':page==='orders'?'订单列表':page}]}),h(Space,{size:20},h('span',{className:'topbar-note'},'结构草图 · Ant Design'),h(Text,{type:'secondary'},'管理员 chen'))),
+        h(Content,{className:'work-area'},action?actionPage():page==='orders'?ordersPage():page==='production'?workPage():page==='detail'?detailsPage():placeholder(page==='home'?'工作台':page==='inventory'?'库存工作区':page==='reports'?'报表与台账':page==='products'?'商品':page==='customers'?'客户':'员工'),h('p',{className:'draft-note'},'设计评审稿 · 1600px 基准 · 演示数据与交互不代表业务实现；页面结构、导航与视觉细节均可调整。')))
+      )
+    ));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script></body></html>

@@ -1,0 +1,70 @@
+<style>
+  .compare { display:grid; grid-template-columns:repeat(3,minmax(280px,1fr)); gap:16px; align-items:start; }
+  .variant { background:#f7f5f1; border:1px solid #e8e3da; border-radius:16px; overflow:hidden; box-shadow:0 6px 20px rgba(60,52,39,.06); }
+  .variant-head { padding:15px 16px; background:#fff; border-bottom:1px solid #ebe7df; }
+  .variant-head h3 { margin:0 0 4px; font-size:15px; }
+  .variant-head p { margin:0; color:#777a72; font-size:11px; line-height:1.5; }
+  .mini { margin:12px; background:#f7f5f1; border:1px solid #e6e1d7; border-radius:12px; min-height:355px; overflow:hidden; font-family:ui-rounded,"SF Pro Rounded",Inter,sans-serif; color:#30332f; }
+  .mini-top { height:42px; display:flex; align-items:center; justify-content:space-between; padding:0 12px; background:#fff; border-bottom:1px solid #ebe7df; font-size:9px; }
+  .mini-brand { font-weight:800; }.mini-brand i { display:inline-block;width:8px;height:8px;border-radius:50%;background:#6e7961;margin-right:5px; }
+  .mini-avatar { width:20px;height:20px;border-radius:50%;background:#d8ded3;display:grid;place-items:center;font-size:8px;color:#4d6049; }
+  .top-nav { display:flex; gap:2px; padding:5px 9px; background:#fff; border-bottom:1px solid #ebe7df; font-size:8px; }
+  .top-nav span { padding:5px 7px; border-radius:7px; }.top-nav .active { background:#e6eee4;color:#466040;font-weight:700; }
+  .workspace { display:grid; grid-template-columns:82px 1fr; min-height:307px; }
+  .subnav { padding:9px 6px; background:#f1efe9; border-right:1px solid #e3ded4; font-size:8px; }
+  .subnav small { display:block; color:#898a82; font-size:7px; padding:3px 6px 6px; }.subnav div { padding:6px 7px; border-radius:6px;margin:2px 0; }.subnav .active { background:#fff; color:#466040; font-weight:700; box-shadow:0 1px 4px rgba(50,45,35,.06); }
+  .main { padding:12px; background:#fcfbf9; }
+  .crumb { color:#8a8c84;font-size:8px;margin-bottom:8px; }.crumb b { color:#3f5943; }
+  .main h4 { margin:0 0 3px;font-size:14px; }.main p { margin:0;color:#85877f;font-size:8px; }
+  .work-card { margin-top:12px;background:#fff;border:1px solid #ebe7df;border-radius:10px;padding:9px; }.line { height:8px;background:#eceee9;border-radius:4px;margin:5px 0; }.line.short{width:58%}.line.tiny{width:32%}.pill { display:inline-block;margin-top:6px;background:#e6eee4;color:#466040;border-radius:10px;padding:3px 6px;font-size:8px; }
+  .rail { min-height:307px; display:grid;grid-template-columns:46px 116px 1fr;background:#f4f2ee; }
+  .rail-one { padding:9px 5px; background:#32463a; color:#e1e9df; font-size:8px;text-align:center; }.rail-one div { padding:8px 2px;border-radius:7px;margin:3px 0; }.rail-one .active{background:#58705b;color:#fff;}.rail-one b{display:block;font-size:14px;margin-bottom:3px;}
+  .rail-two { padding:9px 7px;background:#eeeae2;border-right:1px solid #ded8cd;font-size:8px; }.rail-two h5{margin:0 5px 6px;font-size:9px;color:#666b62;}.rail-two div{padding:6px;border-radius:6px;margin:2px 0;}.rail-two .active{background:#fff;color:#466040;font-weight:700;}.rail-two .group{color:#8b8d84;font-size:7px;margin-top:8px;padding-bottom:2px;}
+  .bottomnav { display:flex; height:42px; background:#fff; border-top:1px solid #ebe7df; align-items:center;justify-content:space-around;font-size:8px; }.bottomnav span{text-align:center;color:#83867d;}.bottomnav .active{color:#466040;font-weight:700;}.bottomnav b{display:block;font-size:14px;margin-bottom:2px;}
+  .notes { padding:0 16px 16px; }.notes h3{margin:18px 0 8px;font-size:15px;}.notes ul{margin:0;padding-left:20px;color:#475467;font-size:12px;line-height:1.7;}.notes strong{color:#344054;}
+  .recommend { margin-top:14px;padding:12px 14px;background:#e9f0e7;color:#3f5943;border-radius:10px;font-size:12px;line-height:1.6; }
+  @media(max-width:1000px){.compare{grid-template-columns:1fr;}}
+</style>
+
+<h2>B 方案的二级菜单承载方式</h2>
+<p class="subtitle">B 的“卡片工作室”只是视觉语言，不等于只能有一级菜单。下面比较三种二级菜单组织方式；业务域仍保持订单、库存、生产、资料、报表，发货/收退款/售后继续属于订单履约内部。</p>
+
+<div class="compare cards">
+  <div class="variant card" data-choice="b1" onclick="toggleSelect(this)">
+    <div class="variant-head"><h3>B1：顶部一级 + 左侧二级</h3><p>一级业务域放顶部，进入业务域后在左侧展开工作区。最适合桌面宽屏和多页面业务。</p></div>
+    <div class="mini">
+      <div class="mini-top"><div class="mini-brand"><i></i>YUMI Studio</div><div class="mini-avatar">C</div></div>
+      <div class="top-nav"><span>工作台</span><span class="active">订单履约</span><span>库存</span><span>生产</span><span>资料</span><span>报表</span></div>
+      <div class="workspace"><aside class="subnav"><small>订单履约</small><div class="active">订单总览</div><div>待生产</div><div>待发货</div><div>收退款</div><div>售后处理</div></aside><main class="main"><div class="crumb">订单履约 / <b>订单总览</b></div><h4>订单履约工作区</h4><p>聚合当前订单、生产、发货和款项待办</p><div class="work-card"><div class="line"></div><div class="line short"></div><div class="line tiny"></div><span class="pill">6 项待核验</span></div><div class="work-card"><div class="line"></div><div class="line short"></div><div class="line"></div></div></main></div>
+    </div>
+  </div>
+
+  <div class="variant card" data-choice="b2" onclick="toggleSelect(this)">
+    <div class="variant-head"><h3>B2：双栏树形导航</h3><p>左侧窄栏只放一级业务域，第二栏显示当前业务域的子菜单。页面空间利用率高，路径稳定。</p></div>
+    <div class="mini">
+      <div class="mini-top"><div class="mini-brand"><i></i>YUMI Studio</div><div class="mini-avatar">C</div></div>
+      <div class="rail"><aside class="rail-one"><div><b>⌂</b>工作台</div><div class="active"><b>▤</b>订单</div><div><b>▦</b>库存</div><div><b>⚙</b>生产</div><div><b>◇</b>资料</div><div><b>▥</b>报表</div></aside><aside class="rail-two"><h5>订单履约</h5><div class="active">订单总览</div><div>待生产</div><div>待发货</div><div>收退款</div><div>售后处理</div><div class="group">快捷入口</div><div>新建订单</div></aside><main class="main"><div class="crumb">订单履约 / <b>订单总览</b></div><h4>订单履约工作区</h4><p>聚合当前订单、生产、发货和款项待办</p><div class="work-card"><div class="line"></div><div class="line short"></div><span class="pill">6 项待核验</span></div><div class="work-card"><div class="line"></div><div class="line"></div><div class="line tiny"></div></div></main></div>
+    </div>
+  </div>
+
+  <div class="variant card" data-choice="b3" onclick="toggleSelect(this)">
+    <div class="variant-head"><h3>B3：顶部一级 + 页面内二级</h3><p>导航最轻，二级菜单作为当前页面的分段标签。适合业务域内工作区少、流程连续的模块。</p></div>
+    <div class="mini">
+      <div class="mini-top"><div class="mini-brand"><i></i>YUMI Studio</div><div class="mini-avatar">C</div></div>
+      <div class="top-nav"><span>工作台</span><span class="active">订单</span><span>库存</span><span>生产</span><span>资料</span><span>报表</span></div>
+      <div class="main" style="min-height:265px"><div class="crumb">订单 / <b>订单履约</b></div><h4>订单履约工作区</h4><p>聚合当前订单、生产、发货和款项待办</p><div class="top-nav" style="margin:12px -12px 0;border-top:1px solid #ebe7df;border-bottom:1px solid #ebe7df;padding-left:12px"><span class="active">订单总览</span><span>待生产</span><span>待发货</span><span>收退款</span><span>售后处理</span></div><div class="work-card"><div class="line"></div><div class="line short"></div><span class="pill">6 项待核验</span></div><div class="work-card"><div class="line"></div><div class="line tiny"></div></div></div><div class="bottomnav"><span class="active"><b>⌂</b>概览</span><span><b>＋</b>新建</span><span><b>⋯</b>更多</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <h3>YUMI 的二级菜单建议</h3>
+  <ul>
+    <li><strong>订单履约：</strong>订单总览、待生产、待发货、收退款、售后处理、变更/更正记录。</li>
+    <li><strong>库存：</strong>库存总览、库存流水、领用记录、盘点调整。</li>
+    <li><strong>生产：</strong>生产工作台、计划列表、待核验、未完成待处理、超额任务、其他排班。</li>
+    <li><strong>资料：</strong>商品、客户、员工、工种/成本参数。</li>
+    <li><strong>报表：</strong>订单履约、库存台账、生产台账、发货、收退款、售后。</li>
+  </ul>
+  <div class="recommend"><b>推荐 B2：</b>既保留 B 的柔和卡片风格，又能稳定承载当前已确认的多个二级工作区；窄一级栏不会抢空间，二级栏可根据业务域固定展开。长表单仍进入全页流程，二级菜单只负责工作区切换。</div>
+</div>

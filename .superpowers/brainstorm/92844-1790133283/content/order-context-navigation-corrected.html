@@ -1,0 +1,45 @@
+<style>
+  .correction{display:grid;grid-template-columns:minmax(620px,1.55fr) minmax(320px,.75fr);gap:18px;align-items:start}
+  .cardx{background:#fff;border:1px solid #e7e2d9;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(58,50,38,.07)}
+  .headx{padding:14px 16px;border-bottom:1px solid #ece8e1}.headx h3{margin:0 0 4px;font-size:15px}.headx p{margin:0;color:#7b7e77;font-size:11px;line-height:1.5}
+  .appx{height:520px;display:grid;grid-template-columns:184px 1fr;background:#f6f4ef;color:#2d302c;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  .sidex{background:#fff;border-right:1px solid #e7e2d9;padding:13px 10px;display:flex;flex-direction:column}.brandx{display:flex;align-items:center;gap:8px;padding:0 7px 12px;font-size:13px;font-weight:800}.markx{width:25px;height:25px;border-radius:8px;background:#405844;color:#fff;display:grid;place-items:center;font-size:11px}.navx{height:34px;display:flex;align-items:center;gap:8px;padding:0 9px;border-radius:8px;margin:2px 0;font-size:10px;color:#555a53}.navx.active{background:#e8eee5;color:#3f5943;font-weight:750}.navx .ico{width:17px;text-align:center;font-size:13px}.sep{height:1px;background:#eeeae3;margin:8px 5px}.userx{margin-top:auto;border-top:1px solid #eeeae3;padding:10px 7px 0;font-size:9px;color:#666b64}
+  .mainx{min-width:0;display:grid;grid-template-rows:46px 1fr}.topx{background:#fff;border-bottom:1px solid #e7e2d9;padding:0 15px;display:flex;align-items:center;justify-content:space-between;font-size:9px}.crumbx{color:#888b84}.crumbx b{color:#405844}.backx{border:1px solid #dedad2;border-radius:7px;padding:6px 8px;background:#fff;color:#62675f}
+  .contentx{padding:14px;overflow:hidden}.orderhead{display:flex;justify-content:space-between;align-items:start}.orderhead h4{font-size:18px;margin:0 0 4px}.orderhead p{font-size:9px;color:#7d8079;margin:0}.badge{background:#e7efe4;color:#47634a;border-radius:12px;padding:5px 8px;font-size:8px}.tabsx{display:flex;gap:2px;margin-top:14px;border-bottom:1px solid #ddd9d1}.tabx{padding:8px 9px;font-size:9px;color:#777b73}.tabx.active{color:#405844;font-weight:750;border-bottom:2px solid #58705b}.workspace{display:grid;grid-template-columns:1fr 140px;gap:9px;margin-top:10px}.panelx{background:#fff;border:1px solid #e7e2d9;border-radius:10px;padding:10px}.panelx h5{font-size:10px;margin:0 0 8px}.statsx{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.statx{background:#f7f6f2;border-radius:7px;padding:7px;font-size:7px;color:#777b73}.statx b{display:block;font-size:12px;color:#343934;margin-top:3px}.flowx{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:9px}.stepx{border:1px solid #e5e1da;border-radius:7px;padding:7px;text-align:center;font-size:7px;color:#72766f}.stepx.done{background:#e8eee5;color:#405844}.stepx.live{background:#f3ead8;color:#825f25}.actionx{display:block;background:#405844;color:#fff;text-align:center;border-radius:7px;padding:7px;margin-bottom:6px;font-size:8px}.actionx.secondary{background:#fff;color:#405844;border:1px solid #d6ddd3}.historyx{font-size:7px;color:#71766e;line-height:2}
+  .rulebox{padding:15px 16px}.rulebox h3{font-size:14px;margin:0 0 10px}.tree{background:#f7f6f2;border-radius:10px;padding:12px;font:11px/1.9 ui-monospace,SFMono-Regular,Menlo,monospace;color:#454a44;white-space:pre}.yes{color:#3f6546;font-weight:700}.no{color:#aa4d4d;text-decoration:line-through}.rulebox ul{padding-left:18px;margin:12px 0 0;color:#475467;font-size:11px;line-height:1.75}.route{margin-top:14px;padding:11px 12px;background:#eef2ec;border-radius:9px;font:10px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#405844}.notice{margin:0 0 16px;padding:12px 14px;background:#fff4e5;border:1px solid #f0dfc2;border-radius:10px;color:#785927;font-size:12px;line-height:1.6}
+  @media(max-width:1000px){.correction{grid-template-columns:1fr}}
+</style>
+
+<h2>订单上下文导航修正版</h2>
+<div class="notice"><b>修正：</b>订单变更、发货、收退款和售后不是全局导航项。它们是具体订单的业务事实与操作，必须先选择订单，再进入该订单内部处理。</div>
+
+<div class="correction">
+  <section class="cardx">
+    <div class="headx"><h3>具体订单详情工作区</h3><p>左侧导航只负责进入订单列表；订单内部能力由详情页页签和上下文操作承载。</p></div>
+    <div class="appx">
+      <aside class="sidex"><div class="brandx"><span class="markx">Y</span>YUMI Studio</div><div class="navx"><span class="ico">⌂</span>工作台</div><div class="navx active"><span class="ico">▤</span>订单</div><div class="navx"><span class="ico">▦</span>库存</div><div class="navx"><span class="ico">⚙</span>生产</div><div class="navx"><span class="ico">◇</span>基础资料</div><div class="navx"><span class="ico">▥</span>报表</div><div class="sep"></div><div class="userx">chen · 系统管理员</div></aside>
+      <main class="mainx"><header class="topx"><div class="crumbx">订单　/　订单列表　/　<b>YM00128</b></div><span class="backx">‹ 返回订单列表</span></header><div class="contentx"><div class="orderhead"><div><h4>YM00128 · 青禾设计</h4><p>森林兔 120 件 · 缝边 40 件 · 期望交付 2026-09-24</p></div><span class="badge">已确认 · 生产中</span></div><div class="tabsx"><span class="tabx active">概览</span><span class="tabx">商品与履约</span><span class="tabx">订单变更</span><span class="tabx">发货</span><span class="tabx">收退款</span><span class="tabx">售后</span><span class="tabx">操作记录</span></div><div class="workspace"><section><div class="panelx"><h5>订单与履约概览</h5><div class="statsx"><div class="statx">当前有效订购<b>120</b></div><div class="statx">累计有效发货<b>0</b></div><div class="statx">未交付需求<b>120</b></div></div><div class="flowx"><div class="stepx done">制作<br>120 / 120</div><div class="stepx live">捏毛装袋<br>90 / 120</div><div class="stepx">缝边裁剪<br>0 / 40</div></div></div><div class="panelx" style="margin-top:8px"><h5>最近业务事实</h5><div class="historyx">09-23　生产计划 PT000084 核验完成<br>09-22　登记收款 ¥4,000.0000<br>09-20　订单确认，冻结客户与商品快照</div></div></section><aside class="panelx"><h5>订单操作</h5><span class="actionx">创建订单变更</span><span class="actionx secondary">新建发货批次</span><span class="actionx secondary">登记收款</span><span class="actionx secondary">登记退款</span><div style="font-size:7px;color:#8a8d86;line-height:1.6;margin-top:7px">售后仅在订单关闭后开放。操作是否可用由订单状态和业务余额决定。</div></aside></div></div></main>
+    </div>
+  </section>
+
+  <aside class="cardx"><div class="headx"><h3>正确的信息架构</h3><p>模块归属、导航入口和 URL 层级保持一致。</p></div><div class="rulebox"><div class="tree"><span class="yes">订单</span>
+└─ 订单列表
+   └─ 具体订单 YM00128
+      ├─ 概览
+      ├─ 商品与履约
+      ├─ 订单变更
+      ├─ 发货
+      ├─ 收退款
+      ├─ 售后
+      └─ 操作记录
+
+<span class="no">发货管理（全局菜单）</span>
+<span class="no">收退款（全局菜单）</span>
+<span class="no">售后管理（全局菜单）</span></div><ul><li><b>订单列表</b>是唯一订单模块导航入口。</li><li>先定位具体订单，才能创建变更、发货、收退款或售后事实。</li><li>跨订单统计与查询进入<b>报表</b>，不反向制造全局业务入口。</li><li>待发货、待退款等聚合待办可在<b>工作台</b>显示，点击后仍定位到具体订单。</li></ul><div class="route">/orders
+/orders/:orderId
+/orders/:orderId/changes/:changeId
+/orders/:orderId/shipments/:shipmentId
+/orders/:orderId/payments
+/orders/:orderId/refunds
+/orders/:orderId/after-sales/:caseId</div></div></aside>
+</div>

@@ -1,0 +1,214 @@
+<style>
+  .direction-grid { display:grid; grid-template-columns:repeat(3,minmax(300px,1fr)); gap:18px; align-items:start; }
+  .direction { border:1px solid #d9dee8; border-radius:16px; overflow:hidden; background:#fff; cursor:pointer; transition:.18s ease; box-shadow:0 5px 20px rgba(16,24,40,.05); }
+  .direction:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(16,24,40,.10); }
+  .direction.selected { outline:3px solid #5271ff; outline-offset:2px; }
+  .direction-title { display:flex; gap:12px; padding:16px 17px; align-items:flex-start; border-bottom:1px solid #e9ecf2; }
+  .direction-title .letter { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; flex:none; font-weight:800; background:#eef2ff; color:#3451d1; }
+  .direction-title h3 { margin:0 0 4px; font-size:16px; }
+  .direction-title p { margin:0; color:#667085; font-size:12px; line-height:1.45; }
+  .screen { height:510px; overflow:hidden; position:relative; }
+  .token-strip { padding:13px 16px 15px; border-top:1px solid #e9ecf2; }
+  .token-strip strong { display:block; font-size:11px; margin-bottom:9px; color:#344054; }
+  .swatches { display:flex; gap:6px; }
+  .swatch { height:20px; flex:1; border-radius:6px; border:1px solid rgba(16,24,40,.08); }
+  .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:9px; font-size:10px; color:#667085; }
+  .metrics span { background:#f7f8fa; border-radius:5px; padding:5px 4px; text-align:center; }
+
+  /* A — compact enterprise */
+  .a-shell { height:100%; display:grid; grid-template-columns:72px 1fr; background:#f1f4f8; color:#172033; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .a-rail { background:#172033; color:#98a2b3; padding:12px 8px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .a-logo { width:38px;height:38px;border-radius:10px;background:#4e6cf0;color:#fff;display:grid;place-items:center;font-weight:800; }
+  .a-nav { width:48px; padding:7px 0; border-radius:9px; text-align:center; font-size:9px; line-height:1.25; }
+  .a-nav b { display:block; color:#fff; font-size:17px; margin-bottom:2px; }
+  .a-nav.active { background:#2d3b55; color:#fff; }
+  .a-main { min-width:0; }
+  .a-top { height:50px; background:#fff; border-bottom:1px solid #dfe4ec; display:flex; align-items:center; justify-content:space-between; padding:0 14px; font-size:11px; }
+  .a-top strong { font-size:15px; }
+  .a-body { padding:12px; }
+  .a-tabs { display:flex; gap:2px; border-bottom:1px solid #d7dde7; margin-bottom:10px; }
+  .a-tab { padding:8px 9px; font-size:10px; color:#667085; }
+  .a-tab.active { color:#3153d4; border-bottom:2px solid #3153d4; font-weight:700; }
+  .a-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-bottom:9px; }
+  .a-stat { background:#fff; border:1px solid #dfe4ec; padding:9px; border-radius:7px; }
+  .a-stat small { display:block; color:#667085; font-size:9px; }
+  .a-stat b { font-size:17px; }
+  .a-toolbar { height:34px; display:flex; gap:6px; align-items:center; background:#fff; border:1px solid #dfe4ec; border-bottom:0; padding:0 8px; font-size:9px; }
+  .a-field { border:1px solid #cfd6e2; background:#fff; border-radius:5px; padding:5px 7px; color:#667085; }
+  .a-action { margin-left:auto; background:#3153d4; color:#fff; border-radius:5px; padding:6px 9px; font-weight:700; }
+  .a-table { background:#fff; border:1px solid #dfe4ec; font-size:9px; }
+  .a-row { display:grid; grid-template-columns:66px 1fr 54px 54px 55px 46px; min-height:31px; align-items:center; border-bottom:1px solid #edf0f4; padding:0 7px; gap:5px; }
+  .a-row.header { background:#f7f8fb; font-weight:700; color:#475467; min-height:28px; }
+  .a-badge { border-radius:12px; padding:3px 5px; text-align:center; background:#fff3dc; color:#935414; }
+  .a-badge.ok { background:#e8f7ef; color:#147451; }
+  .a-progress { height:5px; background:#e8ebf1; border-radius:4px; overflow:hidden; }
+  .a-progress i { display:block;height:100%;background:#4e6cf0; }
+
+  /* B — calm card studio */
+  .b-shell { height:100%; background:#f7f5f1; color:#262724; font-family:ui-rounded,"SF Pro Rounded",Inter,sans-serif; padding:13px; }
+  .b-top { height:42px; display:flex; align-items:center; justify-content:space-between; }
+  .b-brand { font-weight:800; letter-spacing:.2px; }
+  .b-brand i { display:inline-block;width:10px;height:10px;border-radius:50%;background:#6e7961;margin-right:7px; }
+  .b-nav { display:flex; gap:4px; background:#ebe8e1; padding:3px; border-radius:10px; font-size:9px; }
+  .b-nav span { padding:6px 8px; border-radius:8px; }
+  .b-nav .active { background:#fff; box-shadow:0 1px 4px rgba(50,45,35,.08); }
+  .b-heading { display:flex; justify-content:space-between; align-items:end; margin:14px 1px 12px; }
+  .b-heading h4 { margin:0 0 3px; font-size:19px; }
+  .b-heading p { margin:0; font-size:9px; color:#7b7d75; }
+  .b-button { background:#33463b; color:#fff; padding:8px 11px; border-radius:10px; font-size:9px; }
+  .b-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:9px; }
+  .b-card { background:#fff; border:1px solid #ebe7df; border-radius:14px; padding:11px; box-shadow:0 5px 16px rgba(60,52,39,.04); }
+  .b-card h5 { font-size:11px; margin:0 0 9px; }
+  .b-order { border:1px solid #ece9e2; border-radius:11px; padding:9px; margin-bottom:7px; }
+  .b-order-top { display:flex; justify-content:space-between; font-size:9px; }
+  .b-order-top b { font-size:11px; }
+  .b-person { color:#74776f; margin-top:4px; font-size:9px; }
+  .b-flow { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-top:8px; }
+  .b-step { border-radius:7px; background:#f0f1ed; padding:6px 3px; font-size:8px; text-align:center; color:#70746c; }
+  .b-step.done { background:#e6eee4; color:#466040; }
+  .b-step.live { background:#f4ead4; color:#805f23; }
+  .b-kpi { display:flex; align-items:baseline; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eeeae3; }
+  .b-kpi:last-child { border:0; }
+  .b-kpi span { font-size:9px; color:#777a72; }
+  .b-kpi b { font-size:17px; }
+  .b-alert { background:#f5ede0; color:#755a2f; border-radius:11px; padding:10px; margin-top:9px; font-size:9px; line-height:1.5; }
+  .b-bottom { margin-top:9px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .b-mini { background:#fff; border:1px solid #ebe7df; border-radius:12px; padding:10px; font-size:8px; color:#74776f; }
+  .b-mini b { display:block;font-size:13px;color:#2e302c;margin-top:4px; }
+
+  /* C — native desktop console */
+  .c-shell { height:100%; display:grid; grid-template-rows:32px 1fr 24px; background:#e9eaec; color:#1f2328; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .c-menubar { background:linear-gradient(#f8f8f9,#e7e8ea); border-bottom:1px solid #bbbfc5; display:flex;align-items:center;padding:0 9px;font-size:9px; gap:13px; }
+  .c-menubar b { font-size:11px; margin-right:4px; }
+  .c-body { display:grid; grid-template-columns:138px 1fr 126px; min-height:0; }
+  .c-tree { background:#f4f5f6; border-right:1px solid #c8cbd0; padding:8px 5px; font-size:9px; }
+  .c-tree strong { display:block; padding:5px 6px; font-size:9px; color:#5a6069; }
+  .c-tree div { padding:5px 7px; border-radius:5px; margin:1px 0; }
+  .c-tree .active { background:#2f6fbe; color:#fff; }
+  .c-work { min-width:0;background:#fff; }
+  .c-tools { height:36px; display:flex; align-items:center; gap:5px; padding:0 7px; border-bottom:1px solid #cfd2d7; background:#f7f7f8; }
+  .c-tool { border:1px solid #bfc4ca; border-radius:4px; background:linear-gradient(#fff,#e9eaec); padding:5px 7px; font-size:8px; }
+  .c-search { margin-left:auto; width:80px; border:1px solid #b9bec5; border-radius:5px; background:#fff; padding:5px 7px; font-size:8px;color:#737981; }
+  .c-table { font-size:8px; }
+  .c-row { display:grid; grid-template-columns:22px 58px 1fr 48px 48px 45px; min-height:25px; align-items:center; padding:0 5px; border-bottom:1px solid #e4e5e7; gap:4px; }
+  .c-row.header { background:#eceef0; border-bottom:1px solid #c3c7cc; font-weight:700; min-height:24px; }
+  .c-row.selected { background:#dcecff; }
+  .c-dot { width:7px;height:7px;border-radius:50%;background:#e39d31;margin:auto; }
+  .c-dot.green { background:#45a36d; }
+  .c-inspector { background:#f4f5f6; border-left:1px solid #c8cbd0; padding:8px; font-size:8px; }
+  .c-inspector h5 { font-size:10px; margin:0 0 8px; }
+  .c-property { display:grid; grid-template-columns:47px 1fr; padding:5px 0; border-bottom:1px solid #dddfe2; gap:3px; }
+  .c-property span { color:#70767e; }
+  .c-status { background:#e1e3e6; border-top:1px solid #c1c5ca; display:flex;align-items:center;justify-content:space-between;padding:0 7px;font-size:8px;color:#5f656e; }
+
+  .note { margin-top:18px; padding:13px 15px; border-radius:12px; background:#f7f8fb; color:#475467; font-size:12px; line-height:1.65; }
+  @media(max-width:1100px){ .direction-grid{grid-template-columns:1fr;} .screen{height:470px;} }
+</style>
+
+<h2>YUMI V2 前端视觉方向</h2>
+<p class="subtitle">三套方案使用相同业务内容，但在导航、密度、层级和控件语言上刻意拉开差异。点击卡片选择；也可以在终端回复组合意见。</p>
+
+<div class="direction-grid cards">
+  <div class="direction card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="direction-title">
+      <div class="letter">A</div>
+      <div><h3>紧凑企业作业台</h3><p>固定图标侧栏、页内业务标签、高密度表格。适合订单量大、重复操作多的管理员。</p></div>
+    </div>
+    <div class="screen">
+      <div class="a-shell">
+        <aside class="a-rail">
+          <div class="a-logo">Y</div>
+          <div class="a-nav"><b>⌂</b>工作台</div>
+          <div class="a-nav active"><b>▤</b>订单</div>
+          <div class="a-nav"><b>▦</b>库存</div>
+          <div class="a-nav"><b>⚙</b>生产</div>
+          <div class="a-nav"><b>◇</b>资料</div>
+          <div class="a-nav"><b>▥</b>报表</div>
+        </aside>
+        <main class="a-main">
+          <div class="a-top"><strong>订单履约</strong><span>管理员 chen　⌄</span></div>
+          <div class="a-body">
+            <div class="a-tabs"><div class="a-tab active">订单总览</div><div class="a-tab">待生产</div><div class="a-tab">待发货</div><div class="a-tab">收退款</div><div class="a-tab">售后</div></div>
+            <div class="a-summary">
+              <div class="a-stat"><small>进行中订单</small><b>28</b></div>
+              <div class="a-stat"><small>等待上游</small><b>9</b></div>
+              <div class="a-stat"><small>可发货</small><b>16</b></div>
+              <div class="a-stat"><small>待退款</small><b>2</b></div>
+            </div>
+            <div class="a-toolbar"><span class="a-field">订单号 / 客户</span><span class="a-field">状态：全部⌄</span><span class="a-field">交期⌄</span><span class="a-action">＋ 新建订单</span></div>
+            <div class="a-table">
+              <div class="a-row header"><span>订单</span><span>客户 / 商品</span><span>金额</span><span>履约</span><span>状态</span><span>操作</span></div>
+              <div class="a-row"><b>YM00128</b><span>青禾设计 · 森林兔</span><span>¥8,240</span><div><div class="a-progress"><i style="width:75%"></i></div>75%</div><span class="a-badge">生产中</span><b>查看</b></div>
+              <div class="a-row"><b>YM00127</b><span>乐屿商贸 · 云朵熊</span><span>¥5,680</span><div><div class="a-progress"><i style="width:100%"></i></div>100%</div><span class="a-badge ok">可发货</span><b>发货</b></div>
+              <div class="a-row"><b>YM00126</b><span>山里工作室 · 围巾猫</span><span>¥3,960</span><div><div class="a-progress"><i style="width:40%"></i></div>40%</div><span class="a-badge">等上游</span><b>查看</b></div>
+              <div class="a-row"><b>YM00125</b><span>拾光礼品 · 星星狗</span><span>¥12,480</span><div><div class="a-progress"><i style="width:88%"></i></div>88%</div><span class="a-badge">待核验</span><b>核验</b></div>
+              <div class="a-row"><b>YM00124</b><span>木棉生活 · 小象</span><span>¥6,120</span><div><div class="a-progress"><i style="width:60%"></i></div>60%</div><span class="a-badge">生产中</span><b>查看</b></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <div class="token-strip"><strong>Token 倾向：冷灰底 + 靛蓝主色 + 7px 小圆角</strong><div class="swatches"><i class="swatch" style="background:#172033"></i><i class="swatch" style="background:#3153d4"></i><i class="swatch" style="background:#f1f4f8"></i><i class="swatch" style="background:#17875d"></i><i class="swatch" style="background:#c43b44"></i></div><div class="metrics"><span>表格行 36px</span><span>控件高 32px</span><span>间距 4/8/12/16</span></div></div>
+  </div>
+
+  <div class="direction card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="direction-title">
+      <div class="letter">B</div>
+      <div><h3>轻盈卡片工作室</h3><p>顶部模块导航、柔和暖灰背景、任务卡片与流程块。更亲和，更强调业务进度阅读。</p></div>
+    </div>
+    <div class="screen">
+      <div class="b-shell">
+        <div class="b-top"><div class="b-brand"><i></i>YUMI Studio</div><div class="b-nav"><span>工作台</span><span class="active">订单</span><span>库存</span><span>生产</span><span>资料</span><span>报表</span></div><span style="font-size:9px">chen　●</span></div>
+        <div class="b-heading"><div><h4>订单履约工作区</h4><p>今天有 9 项任务需要处理，2 张订单临近交期</p></div><div class="b-button">新建订单</div></div>
+        <div class="b-grid">
+          <section class="b-card">
+            <h5>优先处理</h5>
+            <div class="b-order"><div class="b-order-top"><b>YM00128 · 青禾设计</b><span style="color:#9a632a">明天交付</span></div><div class="b-person">森林兔 120 件 · 缝边 40 件</div><div class="b-flow"><span class="b-step done">制作 120/120</span><span class="b-step live">捏毛装袋 90/120</span><span class="b-step">缝边裁剪 0/40</span></div></div>
+            <div class="b-order"><div class="b-order-top"><b>YM00127 · 乐屿商贸</b><span style="color:#4d7351">可发货</span></div><div class="b-person">云朵熊 80 件 · 不缝边</div><div class="b-flow"><span class="b-step done">制作 80/80</span><span class="b-step done">捏毛装袋 80/80</span><span class="b-step done">可发货 80</span></div></div>
+            <div class="b-order"><div class="b-order-top"><b>YM00126 · 山里工作室</b><span style="color:#9a632a">等待上游</span></div><div class="b-person">围巾猫 60 件 · 缝边 60 件</div><div class="b-flow"><span class="b-step live">制作 24/60</span><span class="b-step">捏毛装袋 0/60</span><span class="b-step">缝边裁剪 0/60</span></div></div>
+          </section>
+          <aside>
+            <div class="b-card"><h5>今日概览</h5><div class="b-kpi"><span>待核验计划</span><b>6</b></div><div class="b-kpi"><span>可确认发货</span><b>16</b></div><div class="b-kpi"><span>待处理退款</span><b>2</b></div></div>
+            <div class="b-alert"><b>未完成待处理</b><br>PT000084 剩余 12 件尚未重新安排。</div>
+          </aside>
+        </div>
+        <div class="b-bottom"><div class="b-mini">本周确认订单<b>18</b></div><div class="b-mini">平均履约进度<b>72%</b></div><div class="b-mini">本周发货数量<b>436</b></div></div>
+      </div>
+    </div>
+    <div class="token-strip"><strong>Token 倾向：暖灰底 + 苔绿主色 + 12–14px 圆角</strong><div class="swatches"><i class="swatch" style="background:#33463b"></i><i class="swatch" style="background:#6e7961"></i><i class="swatch" style="background:#f7f5f1"></i><i class="swatch" style="background:#f4ead4"></i><i class="swatch" style="background:#b65d55"></i></div><div class="metrics"><span>卡片驱动</span><span>控件高 36px</span><span>间距 6/10/16/24</span></div></div>
+  </div>
+
+  <div class="direction card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="direction-title">
+      <div class="letter">C</div>
+      <div><h3>桌面原生控制台</h3><p>树形导航、工具栏、超密表格与右侧检查器。像专业桌面软件，适合键鼠高频操作。</p></div>
+    </div>
+    <div class="screen">
+      <div class="c-shell">
+        <div class="c-menubar"><b>YUMI V2</b><span>文件</span><span>订单</span><span>生产</span><span>库存</span><span>窗口</span><span>帮助</span></div>
+        <div class="c-body">
+          <aside class="c-tree"><strong>业务导航</strong><div>▾ 订单履约</div><div class="active">　订单列表</div><div>　待生产</div><div>　待发货</div><div>　收退款</div><div>　售后处理</div><div>▸ 库存管理</div><div>▸ 生产管理</div><div>▸ 基础资料</div><div>▸ 报表中心</div></aside>
+          <main class="c-work">
+            <div class="c-tools"><span class="c-tool">＋ 新建</span><span class="c-tool">↻ 刷新</span><span class="c-tool">▦ 筛选</span><span class="c-tool">⇩ 导出</span><span class="c-search">搜索订单…</span></div>
+            <div class="c-table">
+              <div class="c-row header"><span></span><span>订单号</span><span>客户 / 商品</span><span>交期</span><span>金额</span><span>状态</span></div>
+              <div class="c-row selected"><i class="c-dot"></i><b>YM00128</b><span>青禾设计 / 森林兔</span><span>09-24</span><span>8,240</span><span>生产中</span></div>
+              <div class="c-row"><i class="c-dot green"></i><b>YM00127</b><span>乐屿商贸 / 云朵熊</span><span>09-25</span><span>5,680</span><span>可发货</span></div>
+              <div class="c-row"><i class="c-dot"></i><b>YM00126</b><span>山里工作室 / 围巾猫</span><span>09-27</span><span>3,960</span><span>等上游</span></div>
+              <div class="c-row"><i class="c-dot"></i><b>YM00125</b><span>拾光礼品 / 星星狗</span><span>09-28</span><span>12,480</span><span>待核验</span></div>
+              <div class="c-row"><i class="c-dot green"></i><b>YM00124</b><span>木棉生活 / 小象</span><span>09-30</span><span>6,120</span><span>生产中</span></div>
+              <div class="c-row"><i class="c-dot green"></i><b>YM00123</b><span>一间礼物 / 月亮兔</span><span>10-02</span><span>9,880</span><span>已确认</span></div>
+              <div class="c-row"><i class="c-dot"></i><b>YM00122</b><span>白露商店 / 奶油熊</span><span>10-03</span><span>4,360</span><span>待排产</span></div>
+              <div class="c-row"><i class="c-dot green"></i><b>YM00121</b><span>拾野工作室 / 森林兔</span><span>10-05</span><span>7,240</span><span>生产中</span></div>
+            </div>
+          </main>
+          <aside class="c-inspector"><h5>订单检查器</h5><div class="c-property"><span>订单号</span><b>YM00128</b></div><div class="c-property"><span>客户</span><b>青禾设计</b></div><div class="c-property"><span>商品</span><b>森林兔</b></div><div class="c-property"><span>订购</span><b>120</b></div><div class="c-property"><span>缝边</span><b>40</b></div><div class="c-property"><span>已发货</span><b>0</b></div><div class="c-property"><span>可发货</span><b>30</b></div><div class="c-property"><span>实收净额</span><b>¥4,000</b></div><div style="margin-top:9px" class="c-tool">打开订单详情</div></aside>
+        </div>
+        <div class="c-status"><span>共 28 张进行中订单 · 已选择 YM00128</span><span>数据库已连接　09:42</span></div>
+      </div>
+    </div>
+    <div class="token-strip"><strong>Token 倾向：系统灰 + 原生蓝 + 4–5px 小圆角</strong><div class="swatches"><i class="swatch" style="background:#1f2328"></i><i class="swatch" style="background:#2f6fbe"></i><i class="swatch" style="background:#e9eaec"></i><i class="swatch" style="background:#45a36d"></i><i class="swatch" style="background:#d94b4b"></i></div><div class="metrics"><span>表格行 28px</span><span>控件高 26px</span><span>间距 2/4/8/12</span></div></div>
+  </div>
+</div>
+
+<div class="note"><b>共同边界：</b>三套方案都把发货、收退款、关闭和售后放在“订单履约”内部，不作为顶级业务模块；长表单后续均采用全页编号步骤，不用抽屉承载主流程。当前只选整体方向，下一轮再细化所选方向的应用骨架与 token。</div>
