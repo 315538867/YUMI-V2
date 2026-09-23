@@ -1,0 +1,46 @@
+digraph YumiQuantityFlow {
+  graph [rankdir=TB, fontname="Arial", label="YUMI V2 target quantity flow", labelloc=t];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F9FC", fontname="Arial"];
+  edge [fontname="Arial"];
+
+  orderDemand [label="Current order-item demand\n(single shared quantity)"];
+  make [label="制作"];
+  bag [label="捏毛装袋"];
+  edgeWork [label="缝边裁剪"];
+  shippable [label="Order-item shippable quantity"];
+  shipment [label="Confirmed original-order shipment"];
+  customer [label="Original-order delivered quantity"];
+
+  inventory [label="Compatible inventory batch"];
+  inventoryAllocation [label="Inventory allocation\n(stock deducted once)"];
+  rework [label="Rework source"];
+  remake [label="Scrap-remake source"];
+
+  surplus [label="Surplus inventory\nremoved from order demand"];
+  afterSales [label="After-sales replacement demand\n(separate ledger)"];
+  replacement [label="Confirmed replacement shipment"];
+
+  orderDemand -> make [label="production gap"];
+  make -> bag [label="qualified"];
+  bag -> shippable [label="qualified, no edge service"];
+  bag -> edgeWork [label="qualified, edge-service portion"];
+  edgeWork -> shippable [label="qualified"];
+  shippable -> shipment [label="consume shippable"];
+  shipment -> customer [label="increase original delivery"];
+
+  inventory -> inventoryAllocation [label="allocate"];
+  inventoryAllocation -> bag [label="制作-qualified stock"];
+  inventoryAllocation -> edgeWork [label="捏毛装袋-qualified stock"];
+  inventoryAllocation -> shippable [label="final-stage stock"];
+
+  rework -> make [style=dashed, label="target 制作"];
+  rework -> bag [style=dashed, label="target 捏毛装袋"];
+  rework -> edgeWork [style=dashed, label="target 缝边裁剪"];
+  remake -> make [style=dashed, label="remake start"];
+  remake -> bag [style=dashed, label="allowed start"];
+  remake -> edgeWork [style=dashed, label="allowed start"];
+
+  shippable -> surplus [label="confirmed order reduction"];
+  customer -> afterSales [style=dotted, label="issue after closure; no rollback"];
+  afterSales -> replacement [label="consume after-sales shippable"];
+}

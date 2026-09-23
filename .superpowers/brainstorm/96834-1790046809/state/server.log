@@ -1,0 +1,9 @@
+{"type":"server-started","port":55296,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:55296/?key=10423aaa9ce21be6e0d129b2d40e9e13fe1677a13e827aab933c8249051560de","screen_dir":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content","state_dir":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/state","idle_timeout_ms":14400000}
+{"type":"screen-added","file":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content/order-fulfillment-workspace.html"}
+{"type":"screen-added","file":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content/order-fulfillment-workspace-v2.html"}
+{"type":"screen-updated","file":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content/order-fulfillment-workspace-v2.html"}
+{"type":"screen-updated","file":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content/order-fulfillment-workspace-v2.html"}
+{"type":"screen-updated","file":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content/order-fulfillment-workspace-v2.html"}
+{"type":"screen-updated","file":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content/order-fulfillment-workspace-v2.html"}
+{"type":"screen-updated","file":"/Volumes/code/YUMIV2/.superpowers/brainstorm/96834-1790046809/content/order-fulfillment-workspace-v2.html"}
+{"type":"server-stopped","reason":"idle timeout"}

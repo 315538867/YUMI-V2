@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YUMI V2 订单履约交互草案</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --line: #e4e7ec;
+      --text: #182230;
+      --muted: #667085;
+      --primary: #3b6df6;
+      --primary-soft: #edf2ff;
+      --success: #17875d;
+      --success-soft: #eaf7f1;
+      --warning: #a55b08;
+      --warning-soft: #fff5e8;
+      --danger: #c43b44;
+      --danger-soft: #fff0f1;
+      --shadow: 0 8px 28px rgba(16, 24, 40, .07);
+    }
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--text); background: var(--bg); }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 208px 1fr; }
+    .sidebar { background: #111827; color: #d0d5dd; padding: 22px 14px; }
+    .brand { color: white; font-weight: 760; font-size: 18px; padding: 0 10px 24px; letter-spacing: .02em; }
+    .nav-label { padding: 14px 10px 7px; color: #7f8a9b; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .nav-item { width: 100%; border: 0; background: transparent; color: #cdd5df; border-radius: 8px; padding: 10px 12px; text-align: left; margin: 2px 0; }
+    .nav-item:hover { background: #1f2937; }
+    .nav-item.active { background: #263551; color: white; }
+    .main { min-width: 0; }
+    .topbar { height: 58px; background: white; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 26px; position: sticky; top: 0; z-index: 5; }
+    .crumb { font-size: 13px; color: var(--muted); }
+    .user { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; background: #dfe7ff; display: grid; place-items: center; color: #3159ca; font-weight: 700; }
+    .page { padding: 24px 28px 42px; max-width: 1560px; margin: 0 auto; }
+    .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+    h1 { font-size: 24px; margin: 0 0 6px; }
+    .sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .head-actions, .filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn { border: 1px solid var(--line); background: white; color: var(--text); border-radius: 7px; padding: 8px 13px; font-size: 13px; }
+    .btn:hover { border-color: #b9c0cb; background: #fafafa; }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color: white; }
+    .btn.small { padding: 6px 10px; font-size: 12px; }
+    .segmented { display: inline-flex; border: 1px solid var(--line); padding: 3px; border-radius: 9px; background: #f8f9fb; }
+    .segmented button { border: 0; background: transparent; padding: 7px 13px; border-radius: 6px; color: var(--muted); font-size: 13px; }
+    .segmented button.active { background: white; color: var(--text); box-shadow: 0 1px 3px rgba(16,24,40,.1); }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .control { height: 34px; border: 1px solid var(--line); background: white; border-radius: 7px; padding: 0 10px; color: var(--text); min-width: 130px; }
+    .search { min-width: 220px; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 18px; }
+    .stat { background: white; padding: 14px 16px; }
+    .stat-label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .stat-value { font-size: 21px; font-weight: 720; }
+    .stat-note { color: var(--muted); font-size: 11px; margin-left: 5px; font-weight: 400; }
+    .board { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 10px; }
+    .column { background: #eef0f3; border: 1px solid #e1e4e8; border-radius: 11px; min-height: 475px; padding: 11px; }
+    .column-head { display: flex; align-items: center; justify-content: space-between; padding: 3px 4px 11px; }
+    .column-title { font-size: 14px; font-weight: 700; }
+    .count { color: var(--muted); font-size: 12px; background: white; border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; }
+    .task { background: white; border: 1px solid var(--line); border-radius: 9px; padding: 12px; margin-bottom: 9px; box-shadow: 0 1px 2px rgba(16,24,40,.03); }
+    .task:hover { border-color: #a9bdf8; box-shadow: 0 3px 9px rgba(59,109,246,.09); }
+    .task-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+    .order-no { color: var(--primary); font-size: 12px; font-weight: 650; }
+    .due { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .task-name { font-size: 14px; font-weight: 680; margin: 7px 0 4px; }
+    .task-meta { color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .progress { height: 5px; background: #edf0f4; border-radius: 99px; margin: 11px 0 8px; overflow: hidden; }
+    .progress > i { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
+    .task-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: 11px; background: var(--primary-soft); color: #3159ca; }
+    .tag.warn { background: var(--warning-soft); color: var(--warning); }
+    .tag.success { background: var(--success-soft); color: var(--success); }
+    .tag.danger { background: var(--danger-soft); color: var(--danger); }
+    .order-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+    .panel { background: white; border: 1px solid var(--line); border-radius: 11px; box-shadow: 0 1px 2px rgba(16,24,40,.03); }
+    .panel-head { padding: 15px 17px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+    .panel-title { font-size: 14px; font-weight: 720; }
+    .panel-body { padding: 16px 17px; }
+    .order-banner { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+    .banner-cell { background: white; padding: 14px 16px; }
+    .banner-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+    .banner-value { font-size: 13px; font-weight: 650; }
+    .tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+    .tab { border: 0; background: transparent; padding: 0 1px 11px; color: var(--muted); font-size: 13px; }
+    .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); font-weight: 650; }
+    .item { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+    .item-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 15px; background: #fafbfc; border-bottom: 1px solid var(--line); }
+    .item-name { font-weight: 720; font-size: 14px; }
+    .item-sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .flow { padding: 18px 15px 15px; display: flex; align-items: flex-start; gap: 0; overflow-x: auto; }
+    .step { min-width: 125px; position: relative; text-align: center; }
+    .step:not(:last-child)::after { content: ""; position: absolute; height: 2px; background: #d8deea; top: 13px; left: calc(50% + 14px); right: calc(-50% + 14px); }
+    .step.done:not(:last-child)::after { background: #7aa0ff; }
+    .dot { width: 27px; height: 27px; border: 2px solid #cfd5df; border-radius: 50%; background: white; margin: 0 auto 8px; display: grid; place-items: center; font-size: 11px; color: var(--muted); position: relative; z-index: 1; }
+    .step.done .dot { background: var(--primary); border-color: var(--primary); color: white; }
+    .step.current .dot { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+    .step-title { font-size: 12px; font-weight: 650; }
+    .step-num { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .item-actions { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px; border-top: 1px solid var(--line); }
+    .activity { list-style: none; margin: 0; padding: 0; }
+    .activity li { position: relative; padding: 0 0 17px 18px; border-left: 1px solid #dfe3e8; margin-left: 4px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .activity li::before { content: ""; width: 7px; height: 7px; background: #9badcf; border-radius: 50%; position: absolute; left: -4px; top: 3px; }
+    .activity strong { color: var(--text); font-weight: 650; }
+    .drawer { position: fixed; inset: 0; background: rgba(17,24,39,.28); display: none; align-items: stretch; justify-content: flex-end; z-index: 20; }
+    .drawer.open { display: flex; }
+    .drawer-panel { width: 430px; max-width: 92vw; background: white; box-shadow: -12px 0 40px rgba(16,24,40,.16); padding: 22px; overflow: auto; }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+    .drawer-head h2 { margin: 0; font-size: 18px; }
+    .close { border: 0; background: transparent; font-size: 22px; color: var(--muted); }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 650; margin-bottom: 7px; }
+    .field input, .field select, .field textarea { width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px; background: white; }
+    .field textarea { min-height: 76px; resize: vertical; }
+    .hint { background: #f7f9fc; border: 1px solid var(--line); border-radius: 8px; padding: 11px; color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 18px; }
+    .drawer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .note { margin-top: 18px; color: var(--muted); font-size: 12px; text-align: center; }
+    .production-mode-view { display: none; }
+    .production-mode-view.active { display: block; }
+    .schedule-list, .person-list { display: grid; gap: 12px; }
+    .schedule-group, .person-group { background: white; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+    .schedule-head, .person-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; background: #fafbfc; border-bottom: 1px solid var(--line); }
+    .schedule-date, .person-name { font-size: 14px; font-weight: 720; }
+    .schedule-date span, .person-role { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 7px; }
+    .schedule-items, .person-items { display: grid; gap: 0; }
+    .schedule-row, .person-row { display: grid; grid-template-columns: 120px minmax(180px, 1fr) minmax(190px, 1.2fr) auto; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid #eef0f3; }
+    .schedule-row:last-child, .person-row:last-child { border-bottom: 0; }
+    .schedule-time { color: var(--primary); font-size: 12px; font-weight: 650; }
+    .schedule-order, .person-order { color: var(--primary); font-size: 12px; font-weight: 650; }
+    .schedule-product, .person-product { font-size: 13px; font-weight: 650; }
+    .schedule-meta, .person-meta { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .person-summary { color: var(--muted); font-size: 12px; }
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 70px 1fr; }
+      .brand { font-size: 0; text-align: center; }
+      .brand::after { content: "Y"; font-size: 18px; }
+      .nav-label { display: none; }
+      .nav-item { font-size: 0; height: 40px; text-align: center; }
+      .nav-item::after { content: "•"; font-size: 20px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .order-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">YUMI Studio</div>
+      <div class="nav-label">业务</div>
+      <button class="nav-item">工作台</button>
+      <button class="nav-item" onclick="showView('orders')">订单</button>
+      <button class="nav-item active" id="productionNav" onclick="showView('production')">生产履约</button>
+      <button class="nav-item">发货</button>
+      <div class="nav-label">资料</div>
+      <button class="nav-item">客户</button>
+      <button class="nav-item">商品</button>
+      <button class="nav-item">工序模板</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="crumb" id="crumb">生产履约 / 生产工作台</div>
+        <div class="user"><div class="avatar">管</div>管理员</div>
+      </header>
+
+      <section id="production" class="view active">
+        <div class="page">
+          <div class="page-head">
+            <div>
+              <h1>生产工作台</h1>
+              <p class="sub">跨订单查看各工序可处理数量，集中完成派工、完成登记与质检。</p>
+            </div>
+            <div class="head-actions">
+              <button class="btn">查看生产异常</button>
+              <button class="btn primary" onclick="openDrawer('assign')">批量派工</button>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="stat-label">待派工</div><div class="stat-value">18 <span class="stat-note">批</span></div></div>
+            <div class="stat"><div class="stat-label">进行中</div><div class="stat-value">27 <span class="stat-note">项任务</span></div></div>
+            <div class="stat"><div class="stat-label">待质检</div><div class="stat-value">6 <span class="stat-note">批</span></div></div>
+            <div class="stat"><div class="stat-label">交期预警</div><div class="stat-value" style="color:var(--warning)">3 <span class="stat-note">个订单</span></div></div>
+          </div>
+
+          <div class="toolbar">
+            <div class="segmented">
+              <button class="active" data-production-mode="process" onclick="switchProductionMode('process')">按工序</button>
+              <button data-production-mode="date" onclick="switchProductionMode('date')">按日期</button>
+              <button data-production-mode="person" onclick="switchProductionMode('person')">按人员</button>
+            </div>
+            <div class="filters">
+              <input class="control search" placeholder="搜索订单 / 客户 / 商品" />
+              <select class="control"><option>全部日期</option><option>今天</option><option>本周</option></select>
+              <select class="control"><option>全部人员</option><option>小林</option><option>阿星</option></select>
+              <select class="control"><option>全部状态</option><option>待派工</option><option>进行中</option><option>待质检</option></select>
+            </div>
+          </div>
+
+          <div id="production-process" class="production-mode-view active">
+          <div class="board">
+            <div class="column">
+              <div class="column-head"><span class="column-title">制作</span><span class="count">8</span></div>
+              <div class="task">
+                <div class="task-top"><span class="order-no" onclick="showView('orders')">YS-2026-0182</span><span class="due">交付 09-28</span></div>
+                <div class="task-name">云朵捏捏 · 奶油白</div>
+                <div class="task-meta">客户：陈小姐 · 需求 40 · 可派工 24</div>
+                <div class="progress"><i style="width:40%"></i></div>
+                <div class="task-bottom"><span class="tag">待派工 24</span><button class="btn small" onclick="openDrawer('assign')">派工</button></div>
+              </div>
+              <div class="task">
+                <div class="task-top"><span class="order-no">YS-2026-0179</span><span class="due">交付 09-25</span></div>
+                <div class="task-name">小熊捏捏 · 焦糖色</div>
+                <div class="task-meta">客户：林小姐 · 需求 20 · 已派工 20</div>
+                <div class="progress"><i style="width:75%"></i></div>
+                <div class="task-bottom"><span class="tag success">进行中</span><button class="btn small" onclick="openDrawer('complete')">登记完成</button></div>
+              </div>
+            </div>
+
+            <div class="column">
+              <div class="column-head"><span class="column-title">填充整形</span><span class="count">11</span></div>
+              <div class="task">
+                <div class="task-top"><span class="order-no">YS-2026-0176</span><span class="due">交付 09-24</span></div>
+                <div class="task-name">水果塔捏捏 · 草莓</div>
+                <div class="task-meta">客户：Momo · 可流转 12 · 已派工 8</div>
+                <div class="progress"><i style="width:67%"></i></div>
+                <div class="task-bottom"><span class="tag warn">余 4 可派工</span><button class="btn small" onclick="openDrawer('assign')">继续派工</button></div>
+              </div>
+              <div class="task">
+                <div class="task-top"><span class="order-no">YS-2026-0180</span><span class="due">交付 09-29</span></div>
+                <div class="task-name">方糖捏捏 · 蓝莓</div>
+                <div class="task-meta">客户：乔乔 · 本批提交 16</div>
+                <div class="progress"><i style="width:100%"></i></div>
+                <div class="task-bottom"><span class="tag danger">待质检</span><button class="btn small primary" onclick="openDrawer('inspect')">质检</button></div>
+              </div>
+            </div>
+
+            <div class="column">
+              <div class="column-head"><span class="column-title">包装</span><span class="count">5</span></div>
+              <div class="task">
+                <div class="task-top"><span class="order-no">YS-2026-0174</span><span class="due">交付 09-23</span></div>
+                <div class="task-name">甜甜圈捏捏 · 抹茶</div>
+                <div class="task-meta">客户：小鹿 · 合格流入 30 · 待包装 10</div>
+                <div class="progress"><i style="width:66%"></i></div>
+                <div class="task-bottom"><span class="tag warn">交期预警</span><button class="btn small" onclick="openDrawer('assign')">派工</button></div>
+              </div>
+              <div class="task">
+                <div class="task-top"><span class="order-no">YS-2026-0181</span><span class="due">交付 10-02</span></div>
+                <div class="task-name">布丁捏捏 · 香草</div>
+                <div class="task-meta">客户：Rin · 返工流入 3 · 正常流入 12</div>
+                <div class="progress"><i style="width:20%"></i></div>
+                <div class="task-bottom"><span class="tag">含返工批次</span><button class="btn small">查看</button></div>
+              </div>
+            </div>
+
+            <div class="column">
+              <div class="column-head"><span class="column-title">待发货</span><span class="count">9</span></div>
+              <div class="task">
+                <div class="task-top"><span class="order-no" onclick="showView('orders')">YS-2026-0182</span><span class="due">交付 09-28</span></div>
+                <div class="task-name">云朵捏捏 · 奶油白</div>
+                <div class="task-meta">生产合格 12 · 库存分配 8 · 可发 20</div>
+                <div class="progress"><i style="width:50%"></i></div>
+                <div class="task-bottom"><span class="tag success">可发货 20</span><button class="btn small primary" onclick="openDrawer('ship')">登记发货</button></div>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <div id="production-date" class="production-mode-view">
+            <div class="schedule-list">
+              <div class="schedule-group">
+                <div class="schedule-head"><div class="schedule-date">今天 · 09 月 22 日<span>6 项任务</span></div><span class="tag warn">1 项交期预警</span></div>
+                <div class="schedule-items">
+                  <div class="schedule-row"><div><div class="schedule-time">09:00</div><div class="schedule-meta">制作</div></div><div><div class="schedule-order">YS-2026-0179</div><div class="schedule-product">小熊捏捏 · 焦糖色</div></div><div class="schedule-meta">小林 · 已派工 20 · 完成 15</div><button class="btn small" onclick="openDrawer('complete')">登记完成</button></div>
+                  <div class="schedule-row"><div><div class="schedule-time">11:30</div><div class="schedule-meta">填充整形</div></div><div><div class="schedule-order">YS-2026-0180</div><div class="schedule-product">方糖捏捏 · 蓝莓</div></div><div class="schedule-meta">阿星 · 本批提交 16 · 待质检</div><button class="btn small primary" onclick="openDrawer('inspect')">质检</button></div>
+                  <div class="schedule-row"><div><div class="schedule-time">待安排</div><div class="schedule-meta">包装</div></div><div><div class="schedule-order">YS-2026-0174</div><div class="schedule-product">甜甜圈捏捏 · 抹茶</div></div><div class="schedule-meta">可派工 10 · 交付 09-23</div><button class="btn small" onclick="openDrawer('assign')">派工</button></div>
+                </div>
+              </div>
+              <div class="schedule-group">
+                <div class="schedule-head"><div class="schedule-date">明天 · 09 月 23 日<span>4 项任务</span></div><span class="tag">计划中</span></div>
+                <div class="schedule-items">
+                  <div class="schedule-row"><div><div class="schedule-time">09:30</div><div class="schedule-meta">填充整形</div></div><div><div class="schedule-order">YS-2026-0176</div><div class="schedule-product">水果塔捏捏 · 草莓</div></div><div class="schedule-meta">已派工 8 · 余 4 可派工</div><button class="btn small" onclick="openDrawer('assign')">继续派工</button></div>
+                  <div class="schedule-row"><div><div class="schedule-time">15:00</div><div class="schedule-meta">待发货</div></div><div><div class="schedule-order" onclick="showView('orders')">YS-2026-0182</div><div class="schedule-product">云朵捏捏 · 奶油白</div></div><div class="schedule-meta">生产合格 12 · 库存分配 8 · 可发 20</div><button class="btn small primary" onclick="openDrawer('ship')">登记发货</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="production-person" class="production-mode-view">
+            <div class="person-list">
+              <div class="person-group">
+                <div class="person-head"><div><span class="person-name">小林</span><span class="person-role">今日 3 项 · 已完成 1 项</span></div><span class="tag success">进行中</span></div>
+                <div class="person-items">
+                  <div class="person-row"><div><div class="person-order">YS-2026-0179</div><div class="person-meta">制作</div></div><div><div class="person-product">小熊捏捏 · 焦糖色</div><div class="person-meta">计划 20 · 已完成 15</div></div><div class="person-summary">今天 09:00 · 剩余 5 件</div><button class="btn small" onclick="openDrawer('complete')">登记完成</button></div>
+                  <div class="person-row"><div><div class="person-order">YS-2026-0182</div><div class="person-meta">制作</div></div><div><div class="person-product">云朵捏捏 · 奶油白</div><div class="person-meta">待开始 · 计划 12</div></div><div class="person-summary">明天 10:00 · 交付 09-28</div><button class="btn small">查看任务</button></div>
+                </div>
+              </div>
+              <div class="person-group">
+                <div class="person-head"><div><span class="person-name">阿星</span><span class="person-role">今日 2 项 · 1 项待质检</span></div><span class="tag danger">待质检</span></div>
+                <div class="person-items">
+                  <div class="person-row"><div><div class="person-order">YS-2026-0180</div><div class="person-meta">填充整形</div></div><div><div class="person-product">方糖捏捏 · 蓝莓</div><div class="person-meta">本批提交 16</div></div><div class="person-summary">今天 11:30 · 等待质检</div><button class="btn small primary" onclick="openDrawer('inspect')">质检</button></div>
+                  <div class="person-row"><div><div class="person-order">YS-2026-0176</div><div class="person-meta">填充整形</div></div><div><div class="person-product">水果塔捏捏 · 草莓</div><div class="person-meta">已派工 8 · 余 4 可派工</div></div><div class="person-summary">明天 09:30 · 进行中</div><button class="btn small" onclick="openDrawer('assign')">继续派工</button></div>
+                </div>
+              </div>
+              <div class="person-group">
+                <div class="person-head"><div><span class="person-name">未分配</span><span class="person-role">5 项可立即派工</span></div><span class="tag warn">待派工</span></div>
+                <div class="person-items">
+                  <div class="person-row"><div><div class="person-order">YS-2026-0174</div><div class="person-meta">包装</div></div><div><div class="person-product">甜甜圈捏捏 · 抹茶</div><div class="person-meta">可派工 10 · 交期预警</div></div><div class="person-summary">交付 09-23</div><button class="btn small" onclick="openDrawer('assign')">派工</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="note" id="productionModeNote">交互要点：工序列展示“当前可行动数量”；筛选不会改变业务状态；点击订单号进入该订单的履约详情。</div>
+        </div>
+      </section>
+
+      <section id="orders" class="view">
+        <div class="page">
+          <div class="page-head">
+            <div>
+              <button class="btn small" style="margin-bottom:12px" onclick="showView('production')">← 返回生产工作台</button>
+              <h1>订单 YS-2026-0182</h1>
+              <p class="sub">陈小姐 · 已确认 · 预计交付 2026-09-28</p>
+            </div>
+            <div class="head-actions"><button class="btn">发起订单变更</button><button class="btn primary" onclick="openDrawer('ship')">新增发货批次</button></div>
+          </div>
+
+          <div class="order-banner">
+            <div class="banner-cell"><div class="banner-label">客户与收货信息</div><div class="banner-value">陈小姐 · 杭州市西湖区 · 138****8821</div></div>
+            <div class="banner-cell"><div class="banner-label">订单数量</div><div class="banner-value">60 件 / 2 个商品</div></div>
+            <div class="banner-cell"><div class="banner-label">已发货</div><div class="banner-value">16 件</div></div>
+            <div class="banner-cell"><div class="banner-label">整体状态</div><div class="banner-value" style="color:var(--primary)">生产中</div></div>
+          </div>
+
+          <div class="tabs"><button class="tab">概览</button><button class="tab active">履约进度</button><button class="tab">变更记录</button><button class="tab">发货批次</button></div>
+
+          <div class="order-layout">
+            <div>
+              <div class="item">
+                <div class="item-head">
+                  <div><div class="item-name">云朵捏捏 · 奶油白</div><div class="item-sub">订购 40 · 库存分配 8 · 需生产 32 · 已发 8</div></div>
+                  <div class="head-actions"><span class="tag warn">生产中</span><button class="btn small" onclick="openDrawer('assign')">派工</button></div>
+                </div>
+                <div class="flow">
+                  <div class="step done"><div class="dot">✓</div><div class="step-title">库存分配</div><div class="step-num">8 / 8</div></div>
+                  <div class="step done"><div class="dot">✓</div><div class="step-title">制作</div><div class="step-num">合格 24 / 32</div></div>
+                  <div class="step current"><div class="dot">3</div><div class="step-title">填充整形</div><div class="step-num">合格 12 / 24</div></div>
+                  <div class="step"><div class="dot">4</div><div class="step-title">包装</div><div class="step-num">完成 0 / 12</div></div>
+                  <div class="step"><div class="dot">5</div><div class="step-title">待发货</div><div class="step-num">可发 20</div></div>
+                </div>
+                <div class="item-actions"><span class="task-meta">返工 2 · 报废 1 · 在制 19</span><div class="head-actions"><button class="btn small" onclick="openDrawer('complete')">登记完成</button><button class="btn small primary" onclick="openDrawer('inspect')">质检</button></div></div>
+              </div>
+
+              <div class="item">
+                <div class="item-head">
+                  <div><div class="item-name">布丁捏捏 · 香草</div><div class="item-sub">订购 20 · 无库存分配 · 需生产 20 · 已发 8</div></div>
+                  <div class="head-actions"><span class="tag success">部分发货</span><button class="btn small" onclick="openDrawer('ship')">继续发货</button></div>
+                </div>
+                <div class="flow">
+                  <div class="step done"><div class="dot">✓</div><div class="step-title">制作</div><div class="step-num">合格 20 / 20</div></div>
+                  <div class="step done"><div class="dot">✓</div><div class="step-title">包装</div><div class="step-num">合格 20 / 20</div></div>
+                  <div class="step current"><div class="dot">3</div><div class="step-title">待发货</div><div class="step-num">剩余 12</div></div>
+                </div>
+                <div class="item-actions"><span class="task-meta">最近发货：09-21 · 圆通 8 件</span><button class="btn small">查看发货快照</button></div>
+              </div>
+            </div>
+
+            <aside class="panel">
+              <div class="panel-head"><span class="panel-title">履约动态</span><button class="btn small">全部记录</button></div>
+              <div class="panel-body">
+                <ul class="activity">
+                  <li><strong>填充整形质检完成</strong><br>合格 12，返工 2，报废 1<br>今天 14:20</li>
+                  <li><strong>制作任务登记完成</strong><br>小林提交 15 件<br>今天 10:42</li>
+                  <li><strong>创建发货批次</strong><br>布丁捏捏 8 件 · 圆通<br>09-21 17:08</li>
+                  <li><strong>订单确认</strong><br>冻结 2 个商品及工序快照<br>09-20 09:30</li>
+                </ul>
+              </div>
+            </aside>
+          </div>
+          <div class="note">交互要点：订单详情强调每个商品明细的数量流转和完整历史；跨订单批量处理仍回到生产工作台。</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="drawer" id="drawer" onclick="if(event.target===this) closeDrawer()">
+    <div class="drawer-panel">
+      <div class="drawer-head"><h2 id="drawerTitle">派工</h2><button class="close" onclick="closeDrawer()">×</button></div>
+      <div id="drawerContent"></div>
+    </div>
+  </div>
+
+  <script>
+    function switchProductionMode(mode) {
+      document.querySelectorAll('[data-production-mode]').forEach(button => {
+        button.classList.toggle('active', button.dataset.productionMode === mode);
+      });
+      document.querySelectorAll('.production-mode-view').forEach(view => {
+        view.classList.toggle('active', view.id === `production-${mode}`);
+      });
+      const notes = {
+        process: '交互要点：工序列展示“当前可行动数量”；筛选不会改变业务状态；点击订单号进入该订单的履约详情。',
+        date: '交互要点：按计划日期集中查看当天任务与待安排事项，便于平衡交期和当天工作量。',
+        person: '交互要点：按工作人员汇总已分配任务，未分配任务单独成组，便于补派工和跟进完成情况。'
+      };
+      document.getElementById('productionModeNote').textContent = notes[mode];
+    }
+
+    function showView(view) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(view).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(v => v.classList.remove('active'));
+      if (view === 'production') {
+        document.getElementById('productionNav').classList.add('active');
+        document.getElementById('crumb').textContent = '生产履约 / 生产工作台';
+      } else {
+        document.getElementById('crumb').textContent = '订单 / YS-2026-0182 / 履约进度';
+      }
+      window.scrollTo(0, 0);
+    }
+    function openDrawer(type) {
+      const title = document.getElementById('drawerTitle');
+      const content = document.getElementById('drawerContent');
+      const templates = {
+        assign: {
+          title: '派工',
+          html: `<div class="hint">当前工序可派工 24 件。本次派工不会超过上一工序累计合格流入量。</div>
+            <div class="field"><label>工作人员</label><select><option>请选择</option><option>小林</option><option>阿星</option></select></div>
+            <div class="field"><label>计划日期</label><input type="date" value="2026-09-23"></div>
+            <div class="field"><label>派工数量</label><input type="number" value="12"></div>
+            <div class="field"><label>备注</label><textarea placeholder="可选"></textarea></div>`
+        },
+        complete: {
+          title: '登记完成数量',
+          html: `<div class="hint">本次只登记任务提交数量，提交后进入待质检，不会直接流转到下一工序。</div>
+            <div class="field"><label>完成日期</label><input type="date" value="2026-09-23"></div>
+            <div class="field"><label>本次提交数量</label><input type="number" value="10"></div>
+            <div class="field"><label>备注</label><textarea placeholder="可选"></textarea></div>`
+        },
+        inspect: {
+          title: '质检登记',
+          html: `<div class="hint">本批待质检 16 件。合格、返工与报废数量之和必须等于 16。</div>
+            <div class="field"><label>合格数量</label><input type="number" value="12"></div>
+            <div class="field"><label>返工数量</label><input type="number" value="3"></div>
+            <div class="field"><label>返工目标工序</label><select><option>当前工序：填充整形</option><option>前序工序：制作</option></select></div>
+            <div class="field"><label>报废数量</label><input type="number" value="1"></div>
+            <div class="field"><label>质检原因与说明</label><textarea placeholder="返工或报废时必填"></textarea></div>`
+        },
+        ship: {
+          title: '新增发货批次',
+          html: `<div class="hint">本次保存后生成只读发货快照。如登记错误，需要作废本批次后重新登记。</div>
+            <div class="field"><label>发货日期</label><input type="date" value="2026-09-23"></div>
+            <div class="field"><label>云朵捏捏 · 可发 20</label><input type="number" value="12"></div>
+            <div class="field"><label>布丁捏捏 · 可发 12</label><input type="number" value="8"></div>
+            <div class="field"><label>快递公司</label><input value="圆通快递"></div>
+            <div class="field"><label>运单号</label><input placeholder="请输入"></div>
+            <div class="field"><label>收货信息快照</label><textarea>陈小姐 · 138****8821 · 杭州市西湖区</textarea></div>
+            <div class="field"><label>备注</label><textarea placeholder="可选"></textarea></div>`
+        }
+      };
+      const t = templates[type];
+      title.textContent = t.title;
+      content.innerHTML = t.html + `<div class="drawer-actions"><button class="btn" onclick="closeDrawer()">取消</button><button class="btn primary" onclick="closeDrawer()">确认保存</button></div>`;
+      document.getElementById('drawer').classList.add('open');
+    }
+    function closeDrawer() { document.getElementById('drawer').classList.remove('open'); }
+  </script>
+</body>
+</html>

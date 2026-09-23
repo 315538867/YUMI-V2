@@ -1,0 +1,382 @@
+## 全局完成定义
+
+以下条件适用于每一个任务编号；任一项缺失时不得勾选：
+
+1. 在该任务证据下记录对应 `specs/<capability>/spec.md` 的 Requirement/Scenario、正式 `docs` 章节和受影响 API/表/路由；无外部行为的纯工程任务须说明其支撑的场景。
+2. 先运行最小失败测试并保存实际命令、退出码和正确 RED 原文，再实现并保存 GREEN 命令、退出码、测试数和关键断言；阶段边界再运行全量门禁。
+3. 记录实际新增/修改文件、Flyway 版本、HTTP 方法/路径、错误码、事务拥有者、锁定对象和幂等键；不适用项须明确写“不适用”及理由。
+4. 前端任务记录正式可达路由、操作入口、浏览器验证和 Electron 复用结果；预览路由不能作为验收证据。
+5. 需要人眼判断时附 `humanVisualConclusion.checklist`，状态保持 `pending-user-signoff`；用户确认后补 `confirmedBy/confirmedOn/conclusion` 才能勾选。
+6. 完成证据统一回填在本任务条目下的“证据”子项或实现账本的同编号记录；阶段九双向追踪表只是汇总校验，不能替代前置任务逐项留证。
+
+## 1. 阶段一：工程、认证与实施门禁
+
+- [ ] 1.1 建立 Java 21 + Maven Wrapper + Spring Boot 3.5.x 工程和 `identity/catalog/orders/inventory/production/files/shared` 包；依据 `platform-foundation`“浏览器和 Electron 必须使用同一业务 API”及 `docs/architecture/system-architecture.md` 第 2、5 节创建启动测试；先记录缺少应用入口的 RED，再实现并附 `./mvnw test` 证据。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.2 使用 Spring Modulith 声明六个顶级模块并编写边界测试，禁止跨模块访问实体、Repository 和内部包；依据 `docs/architecture/system-architecture.md` 第 4-6 节，证明 `shipments/payments/refunds/after_sales_*` 仍归 `orders`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.3 配置 MySQL 8.x、HikariCP、Spring Data JPA、UTC/业务时区和 Hibernate `ddl-auto: validate`；使用 Testcontainers MySQL 编写空库启动 RED/GREEN，禁止 H2 替代。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.4 建立 Flyway 基线迁移目录 `src/main/resources/db/migration` 和 `V1__foundation.sql`，创建 `admin_accounts/number_sequences/file_metadata`、审计和幂等字段；依据 `platform-foundation`“版本化迁移”与 `docs/architecture/database-design.md` 第 2、12、15 节验证空库、重复校验和已执行脚本被改写失败。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.5 实现 `POST /api/session`、`DELETE /api/session` 和当前会话查询，密码安全哈希、会话安全属性及 `AUTH_REQUIRED/AUTH_INVALID`；前端建立 `/login` 和受保护路由，浏览器与 Electron 共用认证状态。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.6 实现统一错误 `{code,message,fieldErrors,requestId}`、请求 ID、`Idempotency-Key` 存储与重复请求返回；覆盖 `VALIDATION_*`、`STATE_*`、`CONFLICT_*`、`QUANTITY_*`、`SOURCE_*`、`FINANCE_*`，以 HTTP 黑盒测试固定 JSON 契约。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.7 实现当前管理员审计上下文和写命令审计，保存业务编号、请求 ID、幂等键、服务端时间、结果；验证失败事务不留下成功事实但保留允许的安全审计。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.8 建立 React + TypeScript 共享前端工程、类型安全 API 客户端、错误码映射和正式路由外壳；金额字段保持字符串，不允许客户端浮点结果覆盖服务端。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.9 建立 Electron 薄壳，仅暴露窗口、打印、文件选择和系统集成 IPC；增加测试证明主进程不包含数据库凭据、不直连 MySQL、不复制订单规则。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.10 配置 Actuator 存活/就绪端点和结构化日志脱敏；依据 `platform-foundation`“运行和恢复门禁”验证数据库不可用时 readiness 失败，日志不含密码、完整令牌或凭据。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.11 建立阶段通用 TDD/证据模板：每项先附失败测试命令、退出码和正确 RED 原文，再附 GREEN 命令、退出码、关键断言；需要人眼判断时写 `humanVisualConclusion.checklist` 并保持 `pending-user-signoff`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 1.12 阶段门禁：运行 Maven 全量、Modulith、Testcontainers Flyway、前端 typecheck/unit、Electron build；从浏览器和 Electron 正式 `/login` 登录并访问同一 API，证据回填到本阶段每项任务。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 2. 阶段二：商品、客户与员工基础资料（依赖 1.1-1.12）
+
+- [ ] 2.1 编写 Flyway 迁移创建 `products/customers/employees/employee_work_types/employee_employment_events/master_data_change_logs`，落实业务编号唯一、金额 `DECIMAL(19,4)`、比例 `DECIMAL(9,6)`、版本和审计字段；参考 `docs/architecture/database-design.md` 第 4、14 节。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.2 实现商品编号分配、创建、编辑、启停和查询 API：`GET/POST /api/products`、`GET/PATCH /api/products/{id}`、`POST .../enable|disable`；覆盖 `master-data-management`“管理商品、客户和员工资料”的有效商品和停用场景。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.3 实现商品星级、价格、材料/人工/其他成本、缝边参数和四位小数 `BigDecimal` 计算；依据 `docs/requirements/order-fulfillment-requirements.md` 第 5 节冻结公式，测试应收为零时利润率不除零。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.4 实现商品图片受控上传/读取和文件元数据关联，验证 MIME/大小边界、鉴权、历史订单仅引用快照而非当前文件值。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.5 实现客户 API `GET/POST /api/customers`、`GET/PATCH /api/customers/{id}`，字段覆盖一组默认收货信息；名称/电话重复仅返回候选提示，明确确认后仍创建独立编号，不提供删除/自动合并。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.6 实现客户详情只读汇总查询，金额由订单、收款、退款事实计算，不把汇总余额保存为可编辑客户字段；在订单能力未完成前以契约测试和空汇总完成接口骨架。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.7 实现员工 API `GET/POST /api/employees`、`GET/PATCH /api/employees/{id}`、`POST .../leave|rehire`，保存首次入职、离职/重入职事件和不可复用 `E00001` 编号。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.8 实现员工工作类型“制作/捏毛装袋/缝边裁剪/其他”管理和资格查询；验证离职或缺少对应类型返回 `EMPLOYEE_NOT_ELIGIBLE`，历史计划所需姓名快照不受改名影响。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.9 实现基础资料变更日志，保存修改前后结构化快照、原因、管理员和时间；普通编辑不得覆盖历史，停用/离职使用独立命令。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.10 实现 `/catalog/products`、`/catalog/customers`、`/catalog/employees` 正式页面，采用紧凑列表/筛选和全页创建编辑流程；员工页分离普通编辑、离职和重新入职操作。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.11 编写 HTTP、Repository 和 MySQL 集成测试，覆盖唯一编号并发、四位精度、重复提示、停用商品、员工资格、变更审计和文件鉴权。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 2.12 阶段人工验收：在正式路由创建/修改/停用商品，创建重复客户并确认保存，办理员工离职/重入职；记录 `humanVisualConclusion.checklist`，用户确认前本项保持未勾选。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 3. 阶段三：订单草稿、确认、变更与共同数量（依赖阶段二）
+
+- [ ] 3.1 编写 Flyway 迁移创建 `orders/order_items/order_confirmation_snapshots/order_item_snapshots/order_change_orders/order_change_items/fulfillment_entries/order_item_fulfillment_balances`，落实 `@Version`、Q/E 检查、来源唯一消费和索引；参考 `docs/architecture/database-design.md` 第 5-6、13-14 节。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.2 实现订单编号 `YM00001`、草稿创建/查询/编辑 API：`GET/POST /api/orders`、`GET/PATCH /api/orders/{id}`；覆盖下单日期、可空交期、收货、整体备注、明细备注和仅草稿可编辑。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.3 实现订单明细 Q/E、商品/缝边成交价、整单优惠和全部金额/成本/利润公式；服务端使用 `BigDecimal`，JSON 金额均为四位小数字符串，优惠不得为负或超过原始金额。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.4 实现 `POST /api/orders/{id}/confirm` 的确认校验和单事务快照：客户、收货、商品、图片、价格、成本、数量、缝边、优惠、备注、流程、确认人/时间；确认不自动建生产计划。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.5 编写确认原子性测试：任一商品失效、Q/E 非法、交期非法、金额不一致或并发版本冲突时整笔回滚；重复幂等键返回同一订单，不重复生成快照/履约来源。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.6 实现共同数量初始化和 `GET /api/orders/{id}/fulfillment`：制作需求 Q、捏毛装袋需求 Q、缝边裁剪 E、最终需求 Q，禁止 Q+Q+E；派生排产/生产/需求处理/发货进度而非手工状态。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.7 实现订单变更草稿 API `POST /api/orders/{id}/change-orders`、查询/编辑和 `POST /api/order-changes/{id}/confirm`，覆盖明细增删、数量/价格/缝边/优惠/交期/收货/备注，保留前后值和原因。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.8 实现减单不变量：新有效数量不得低于累计有效发货；超出在制/合格数量必须逐项提交“继续完成转成品余量”或“立即报废”的数量和原因，确认后原子更新需求、金额和履约事实。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.9 实现订单取消 `POST /api/orders/{id}/cancel`：草稿可直接取消；已确认且无任何履约/款项事实时可取消；有事实返回 `STATE_CANCEL_NOT_ALLOWED` 并引导订单变更，不删除历史。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.10 实现订单多维只读状态：主状态、排产状态、执行条件、生产进度、需求处理状态、发货进度；验证生产报废、计划创建或余量本身不自动完成客户需求。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.11 实现 `/orders` 列表和 `/orders/new` 步骤化全页工作区，步骤至少为客户/收货、商品明细与 Q/E、金额优惠、确认复核；展示服务端金额，禁止客户端覆盖。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.12 实现 `/orders/:id` 工作区的概览、快照、履约、变更、发货、收退款、售后页签占位；发货/收退款/售后不得建立顶级业务导航。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.13 实现 `/orders/:id/changes/:changeId` 变更确认页，明确列出变更前后、已发货下限、在制/合格超出处理、待退款影响和确认后不可覆盖的历史。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.14 编写订单领域/HTTP/MySQL 测试，覆盖确认快照、Q/E 分流、金额字符串、并发确认、变更下限、余量处理、取消条件、事实投影重建和多维状态派生。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 3.15 阶段人工验收：在正式订单路由创建含缝边/不缝边的多明细订单，确认后修改基础资料，执行减单余量处理和取消拒绝；视觉结论待用户签字。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 4. 阶段四：库存批次、流水与订单领用（依赖阶段三）
+
+- [ ] 4.1 编写 Flyway 迁移创建 `inventory_batches/inventory_movements/inventory_movement_lines/inventory_allocations/inventory_allocation_lines`，落实 `IB000001/IM000001` 唯一编号、非负数量、来源/冲销关联和锁定索引。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.2 实现库存批次/汇总/流水查询 `GET /api/inventory/batches|movements|summary`，默认按商品+工序+缝边状态汇总并可展开来源，零库存默认隐藏但历史可查。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.3 实现期初库存 `POST /api/inventory/batches`，保存盘点日期、来源、操作人和备注，不伪造旧订单、生产或工资事实。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.4 实现盘点调整 `POST /api/inventory/adjustments`，由实际数量计算差异并生成盘盈/盘亏流水；数量一致不写记录，错误只能用新调整/冲销事实更正。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.5 实现库存推荐查询，按商品、接入工序、缝边兼容性和 FIFO 推荐；只推荐不自动提交，支持一次选择多个批次。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.6 实现 `POST /api/inventory-allocations`：稳定顺序悲观锁批次、重新校验余额/兼容性、生成出库流水、扣库存并在同一事务写订单履约接入。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.7 实现接入矩阵：制作合格库存→捏毛装袋；捏毛装袋合格库存→不缝边可发货或缝边裁剪；缝边裁剪合格库存→可发货；每笔来源只接入一次。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.8 实现草稿库存计划和确认时重验：草稿不占用；确认库存不足返回每批缺口，管理员明确重新选择或转生产，系统不得自动把缺口转生产。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.9 实现 `POST /api/inventory-allocations/{id}/cancel`，仅未被后续生产/核验/发货消费时生成反向库存和履约事实；已消费返回 `STATE_CANNOT_CANCEL`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.10 实现库存流水冲销命令和查询，未消费流水可关联冲销，已被后续事实消费时拒绝；原流水、冲销、重录永久保留。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.11 实现 `/inventory` 全页工作区：汇总、批次、流水、期初、盘点、订单领用和取消入口；展示出库前后数量、来源业务和订单明细追溯。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.12 编写 MySQL 并发测试：两个事务竞争同一批次只允许一个成功；失败事务无负库存、无部分流水、无履约接入；来源唯一约束拒绝重复领用。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.13 编写跨模块集成测试证明库存领用时已扣原库存，随后发货只消耗订单可发货，库存流水数量不因发货第二次减少。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 4.14 阶段人工验收：期初入库、盘点、多个批次领用到不同工序、取消未消费领用和拒绝已消费领用；视觉结论待用户签字。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 5. 阶段五：生产计划、核验、返工、重做与超额提醒（依赖阶段三；库存接入依赖阶段四）
+
+- [ ] 5.1 编写 Flyway 迁移创建 `production_plans/production_plan_adjustments/production_verifications/rework_sources/remake_sources/overtime_preemptions/production_reminders/other_schedules/other_schedule_verifications/other_schedule_time_corrections`，落实唯一核验和来源余额约束。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.2 实现生产计划查询/创建 `GET/POST /api/production-plans`，覆盖正常、返工、重做、超额、售后返工、售后补发类型及执行员工资格；核心归属字段创建后不可编辑。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.3 实现待安排/当前可执行/等待上游计算，允许计划数量使用尚需安排总需求但核验必须受当时可执行数量限制；计划创建不产生完成、库存或履约事实。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.4 实现 `POST /api/production-plans/{id}/verify` 一次性核验，校验完成=合格+返工+报废、未完成=计划-完成，事务内锁来源和履约余额后分流各结果。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.5 实现逐工序合格流转：制作→捏毛装袋；捏毛装袋按冻结 E 分为不缝边可发货与缝边裁剪；缝边裁剪→可发货；不得将各工序完成相加。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.6 实现返工来源查询/创建 `GET/POST /api/rework-sources` 和从来源创建计划 `POST /api/rework-sources/{id}/plans`，落实完整目标矩阵、原核验/上一返工关联、返工次数、原因及尚未安排余额；并发创建不得超过来源余额。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.7 实现报废重做来源查询/创建 `GET/POST /api/remake-sources` 和从来源创建计划 `POST /api/remake-sources/{id}/plans`，默认报废工序起始，从制作开始必须填写原因；原报废事实永久保留，重做不增加订单需求。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.8 实现 `POST /api/production-plans/{id}/cancel`，对应 `production-management`“待执行计划取消必须恢复来源”；仅待执行可取消，正常/返工/重做分别恢复来源，已核验返回 `STATE_NOT_CANCELABLE`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.9 实现未完成待处理 `GET /api/production-reminders/incomplete`、重新安排 `POST .../{id}/reschedule` 和暂不安排 `POST .../{id}/defer`；部分安排保留余量，暂不安排必须有原因且不删除待安排需求。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.10 实现超额任务创建 `POST /api/overtime-tasks`：仅执行当天创建，只能选择未来正常计划未预占数量，跨订单/商品时每条仍明确来源计划；预占不修改原计划数量或履约事实。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.11 实现超额任务核验 `POST /api/overtime-tasks/{id}/verify`：未完成释放预占；只有合格数量写正常履约并生成未来计划待调整提醒；返工/报废按独立来源处理，不作为计划减少依据。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.12 实现超额提醒查询/处理 `GET /api/production-reminders/overtime`、`POST .../{id}/adjust-plan`、`POST .../{id}/no-adjustment`；调整保存前后值/原因/来源，无需调整必须填原因，零合格自动结束提醒。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.13 实现其他排班创建、一次性总分钟核验、取消和工时更正；分钟 0-59、总分钟>0，确保不产生商品、库存或订单履约事实。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.14 实现 `/production` 正式工作台：日期/员工/订单/工序计划列表、等待上游、独立未完成区域、返工/重做来源、超额提醒附着未来排班行和行内调整操作。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.15 实现 `/production/plans/:id/verify` 核验页，清晰区分计划/可执行/等待数量与完成/合格/返工/报废/未完成，错误码定位对应字段。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.16 编写领域和 MySQL 集成测试覆盖唯一核验、等式、可执行上限、Q/E 流转、返工矩阵、重做原因、来源余额竞争、取消恢复、未完成提醒、超额预占竞争和零合格提醒。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 5.17 阶段人工验收：执行正常计划、等待上游、部分核验、返工、重做、取消、超额任务和其他排班；逐项确认来源/提醒/历史可追溯，视觉结论待签字。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 6. 阶段六：订单发货、物流与发货更正（依赖阶段四和五）
+
+- [ ] 6.1 编写 Flyway 迁移创建 `shipments/shipment_items/shipment_source_links/shipment_logistics_changes/shipment_corrections`，落实批次编号、状态、快照、来源关联和等量更正唯一约束；表归 `orders`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.2 实现订单发货查询/草稿 API `GET/POST /api/orders/{id}/shipments` 和草稿编辑，草稿不影响可发货/累计发货且可预览非正式清单。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.3 实现 `POST /api/orders/{id}/shipments/{shipmentId}/confirm`：锁定履约余额，校验订单状态、每明细可发货、当前有效需求和缝边状态，整批原子写确认快照、来源链接和累计发货。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.4 实现并验证确认上限：本次发货<=当前可发货，累计有效发货+本次<=当前有效订购；任一明细失败整批不生效。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.5 实现物流修改 `PATCH .../logistics`，只允许公司、单号、运费和备注，必须填写原因并保留前后值；不得修改订单、商品、数量、日期和来源。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.6 实现未关闭订单发货作废 `POST .../void`，写反向履约恢复可发货和累计发货，不恢复原库存；原确认快照保留，作废批次不可再次确认。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.7 实现已关闭订单发货更正 `POST .../corrections`，同一事务使原批次失效并创建等量替代；不能立即替代时返回 `CORRECTION_REPLACEMENT_REQUIRED` 并引导售后。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.8 实现 `/orders/:id` 发货页签和 `/shipments` 工作区：草稿、确认、来源追溯、物流修改、作废/更正、打印/PDF；普通操作不得出现编辑已确认业务数量。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.9 编写 HTTP/MySQL 并发测试覆盖超量、两个并发发货、整批回滚、领用后不二扣库存、作废恢复、关闭后等量更正和物流修改不影响数量。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 6.10 阶段人工验收：分别从生产和库存形成可发货、分批确认、修改物流、作废未关闭批次和执行等量更正；确认库存只在领用时扣一次，视觉结论待签字。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 7. 阶段七：收款、退款与订单关闭（依赖阶段六）
+
+- [ ] 7.1 编写 Flyway 迁移创建 `payments/refunds` 及订单款项投影/索引，金额 `DECIMAL(19,4)`、来源关联、幂等唯一和退款累计约束；表归 `orders`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.2 实现 `POST /api/orders/{id}/payments`，仅已确认/允许补录的业务状态可登记，保存金额、日期、方式、备注和管理员；草稿返回 `PAYMENT_DRAFT_FORBIDDEN`，事实不可编辑删除。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.3 实现 `POST /api/orders/{id}/refunds`，校验累计退款<=累计收款，保存方式、原因、备注；业务性退款必须关联订单变更或售后单，已取消/已关闭订单仅允许补录实际退款并填写原因，原收款不变。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.4 实现服务端资金公式：实收净额=累计收款-累计退款；待退款=max(累计收款-当前有效应收,0)；收款状态根据当前应收和实收净额派生。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.5 实现 `POST /api/orders/{id}/close`，同一事务锁订单及履约/款项投影并重验全部有效需求已发货或明确取消、应收结清、无待退款和无未处理差额。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.6 实现已取消/已关闭互斥终态和已关闭不重开；关闭后禁止新增原订单生产、发货和收款，允许独立物流修改、实际退款、更正和售后。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.7 实现 `/orders/:id` 收退款与关闭页签，展示不可变台账、实收净额、待退款、关闭条件逐项结果和对应错误码，不提供普通编辑/删除。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.8 编写领域/HTTP/MySQL 测试覆盖多次收款、退款上限、来源必填、变更待退款、草稿拒绝、生产完成但未交付拒绝关闭、并发关闭重验及终态互斥。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 7.9 阶段人工验收：执行未收/部分/全额收款、减单待退款、退款处理和关闭；确认报废、余量或生产完成不能单独关闭，视觉结论待签字。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 8. 阶段八：关闭后售后独立台账（依赖库存、生产、发货和退款）
+
+- [ ] 8.1 编写 Flyway 迁移创建 `after_sales_cases/after_sales_items/after_sales_return_verifications/after_sales_fulfillment_entries/after_sales_shipment_links` 及更正记录，落实退回等式和来源唯一约束；表归 `orders`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.2 实现 `POST /api/orders/{id}/after-sales`，仅已关闭订单可创建，关联原订单/明细和按需原发货，保存类型、问题、方案和补发需求；非关闭返回 `AFTER_SALES_ORDER_NOT_CLOSED`。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.3 实现 `POST .../{caseId}/verify-return`，校验客户退回=售后返工+售后报废，保存问题、原因、核验人/时间；退回不自动入库、不恢复原发货库存。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.4 实现售后返工来源并复用生产计划一次核验与返工矩阵；最终合格按售后用途进入可补发，不自动进入通用库存，转库存必须显式新建库存批次。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.5 实现售后报废事实和补发需求，报废不入库、不恢复库存、不计已补发；库存不足部分只能创建关联售后单和原订单明细的售后补发生产计划。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.6 实现售后库存领用，兼容批次扣库存后只增加售后可补发；生产合格同样只增加可补发，二者均不得直接增加已补发。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.7 实现 `POST .../{caseId}/replacement-shipments` 和确认命令，锁售后余额并校验本次<=可补发/待补发；确认后增加售后已补发，原订单订购、累计发货、未交付和应收不变。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.8 实现关联售后单的退款，更新订单累计退款/实收净额但保持已关闭；首期不支持售后补差价、补应收或补收款。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.9 实现售后更正记录，退回核验等不可覆盖事实出现错误时通过新更正事实处理，保留原值和来源链。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.10 实现 `/orders/:id` 售后页签：售后列表、退回核验、返工/报废、库存/生产补发来源、可补发/已补发、补发发货、退款和历史；不提供顶级售后业务模块。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.11 编写领域/HTTP/MySQL 测试覆盖关闭前拒绝、退回等式、退回不入库、来源独立、补发确认时点、原订单统计不变、售后退款不重开和并发补发上限。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 8.12 阶段人工验收：在已关闭订单执行退回返工、报废、库存补发、生产补发、补发发货和退款，确认售后与原订单履约台账分离；视觉结论待签字。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+
+## 9. 阶段九：查询导出、打印、发布与最终追踪（依赖阶段一至八）
+
+- [ ] 9.1 实现 `GET /api/reports/{type}` 查询订单履约、库存、生产、发货、收退款和售后台账，筛选和分页均由服务端执行；结果只读且来自事实/投影。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.2 实现 `GET /api/reports/{type}/export`，固定业务字段清单并验证不含物流公司、单号、运费、发货备注；金额保持字符串，历史资料使用快照。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.3 实现订单/发货/台账打印与 PDF 数据准备，历史客户/商品/收货使用确认快照，发货物流使用当前有效物流；Electron 调用薄壳打印而不复制业务计算。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.4 实现事实重建和投影一致性检查，至少覆盖履约余额、库存批次、售后可补发；不一致时产生失败证据而非静默覆盖。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.5 完成生产结构化日志、指标、慢查询、HTTP 5xx、磁盘、连接池、文件不可写和备份失败告警配置；执行秘密扫描并证明日志脱敏。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.6 建立发布流程：配置/磁盘/连接检查→MySQL+文件一致备份→临时 MySQL `flyway validate/migrate`→正式迁移→启动→Hibernate validate→健康检查→只读冒烟→恢复流量。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.7 建立 MySQL 全量/发布前备份、文件快照、异地加密保存和恢复脚本；在隔离环境完成一次同恢复点演练并验证迁移、事实投影和关键只读路径。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.8 建立 OpenAPI/契约清单，对 `design.md` API 矩阵逐项核对方法、路径、认证、幂等、状态、请求/响应金额字符串和错误码；缺少任何端点或场景时不得进入上线验收。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.9 建立前端路由清单，对 `design.md` 页面矩阵逐项核对正式路由、可达操作、错误处理和浏览器/Electron 共用；预览路由或不可达页面不得作为验收证据。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.10 建立双向追踪表，逐条连接六份 spec 的 Requirement/Scenario、API、Java 模块/应用服务、Flyway 表/约束、前端路由/操作、自动测试、人工验收和本任务编号；孤立规格或无规格实现均视为失败。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.11 运行完整自动化门禁：`./mvnw test`、Modulith、Testcontainers 空库与升级迁移、并发门禁、前端 typecheck/unit/browser、Electron build/print、OpenAPI 契约和 `openspec validate build-yumi-v2-order-fulfillment --strict`，记录命令、退出码和失败数。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.12 在正式路由执行基础资料→订单确认→库存或生产→发货→收退款→关闭→售后的完整人工路径；报告写逐项 `humanVisualConclusion.checklist`、已知偏差和取代关系，状态保持 `pending-user-signoff` 直到用户确认。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.13 用户确认人工视觉结论后，补 `confirmedBy`、`confirmedOn`、`conclusion`，再勾选相关人工验收和本项；未确认不得以截图、无重叠或自动化通过代替。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [ ] 9.14 最终范围审计：确认工资、完整财务、员工登录、复杂角色、离线同步、在线支付、原材料库存、自动批次合并、微服务、消息队列和 Kubernetes 未被提前实现，并列出后续 change 候选但不创建。
+  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
