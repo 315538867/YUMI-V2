@@ -6,7 +6,7 @@ digraph YumiQuantityFlow {
   orderDemand [label="Current order-item demand\n(single shared quantity)"];
   make [label="制作"];
   bag [label="捏毛装袋"];
-  edgeWork [label="缝边裁剪"];
+  edgeWork [label="缝边剪袋"];
   shippable [label="Order-item shippable quantity"];
   shipment [label="Confirmed original-order shipment"];
   customer [label="Original-order delivered quantity"];
@@ -35,7 +35,7 @@ digraph YumiQuantityFlow {
 
   rework -> make [style=dashed, label="target 制作"];
   rework -> bag [style=dashed, label="target 捏毛装袋"];
-  rework -> edgeWork [style=dashed, label="target 缝边裁剪"];
+  rework -> edgeWork [style=dashed, label="target 缝边剪袋"];
   remake -> make [style=dashed, label="remake start"];
   remake -> bag [style=dashed, label="allowed start"];
   remake -> edgeWork [style=dashed, label="allowed start"];

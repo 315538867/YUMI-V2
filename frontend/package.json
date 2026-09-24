@@ -1,0 +1,29 @@
+{
+  "name": "yumi-v2-frontend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "electron": "electron electron/main.cjs"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.x",
+    "@vitejs/plugin-react": "latest",
+    "antd": "^6.x",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "^7.18.4",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "electron": "^44.4.5",
+    "vitest": "^5.0.1"
+  }
+}

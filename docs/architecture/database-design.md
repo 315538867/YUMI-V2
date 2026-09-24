@@ -23,10 +23,11 @@
 | 顶级模块 | 主要表 |
 | --- | --- |
 | `identity` | `admin_accounts` |
-| `catalog` | `products`、`customers`、`employees`、`employee_work_types`、`employee_employment_events`、`master_data_change_logs` |
+| `catalog` | `products`、`customers`、`employees`、`employee_work_types`、`employee_employment_events`、`master_data_change_logs`、静态数据目录 `star_levels`/`packaging_tiers`/`seam_types`/`work_types` |
 | `orders` | `orders`、`order_items`、订单快照和变更表、履约表、发货表、收退款表、售后表 |
 | `inventory` | `inventory_batches`、库存流水表、库存领用表 |
 | `production` | `production_plans`、生产核验、返工、重做、超额任务和其他排班表 |
+| `calculation` | 无表（无持久化的集中计算支撑模块，只接收不可变数值输入并返回结果） |
 | 基础设施 | `number_sequences` 及文件元数据表（实现时定义） |
 
 `shipments`、`payments`、`refunds` 和 `after_sales_*` 使用独立表是为了保存独立事实和约束，不代表它们是独立顶级业务模块。它们的写入命令、状态和事务边界均由 `orders` 模块拥有。未来完整财务模块只能读取或订阅订单收退款事实，不在首期接管这些表。
@@ -41,9 +42,11 @@
 
 ### `products`
 
-当前商品资料、启停状态、销售单价、重量、损耗率、材料单价与成本、星级与制作成本快照、包装档位快照、缝边参数、其他单件成本和总成本。
+当前商品资料、启停状态、销售单价、重量、损耗率、材料单价与成本、星级与制作成本快照、包装档位快照、缝边默认值（默认缝边剪袋类型 id + 名称与成本单价快照 + 缝边价格）、其他单件成本和总成本。
 
 业务编号 `product_no` 唯一。
+
+商品**不保存缝边数量与缝边成本**：`total_cost`/`reference_price` 始终按**不缝边剪袋**口径落库；缝边剪袋变体预算（不缝边剪袋总成本 + 缝边种类成本单价）由 `calculation` 的 `FP-PROD-20/21` 读时派生，只出现在商品试算与详情响应里。`seam_type_id` 可空（空＝默认不缝边剪袋），非空时外键指向 `seam_types`。
 
 ### `customers`
 
@@ -57,7 +60,7 @@
 
 ### `employee_work_types`
 
-员工与制作、捏毛装袋、缝边裁剪、其他的多对多关系。
+员工与制作、捏毛装袋、缝边剪袋、其他的多对多关系。
 
 ### `employee_employment_events`
 
@@ -277,7 +280,7 @@
 
 ## 15. Flyway 迁移与测试门禁
 
-迁移文件位于 `src/main/resources/db/migration`，按 `V<版本>__<说明>.sql` 命名。已经在任何共享环境执行过的版本迁移不得修改；修正必须新增更高版本迁移。
+迁移文件位于 `backend/src/main/resources/db/migration`，按 `V<版本>__<说明>.sql` 命名。已经在任何共享环境执行过的版本迁移不得修改；修正必须新增更高版本迁移。**上线前**（开发期、未部署到任何共享环境）允许在清库重建的前提下改写早期迁移为最终结构（2026-09-24 已按此重写 `V4`/`V5`：新增 `seam_types`/`work_types`，`packaging_tiers` 去提成并预置 6 分钟档，`products` 去缝边数量/成本列并新增缝边默认值四列，`packaging_commission` 语义改为商品提成，`employee_work_types` 改 `work_type_id`），上线后该禁止条款立即生效。`V6` 为 2.23 追加的全局默认包装提成（`packaging_commission_default`）。
 
 每次数据库变更必须具备：
 

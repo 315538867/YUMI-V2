@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  结构化控制台日志（logstash JSON 行）+ 双通道脱敏：
+  1) 字段名路径掩码：MDC/结构化字段中的凭据键整体替换；
+  2) 消息值掩码：消息内 password/token/secret/authorization/cookie/credential 赋值右值掩码。
+-->
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <decorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <defaultMask>****</defaultMask>
+                <paths>password,pwd,token,accessToken,refreshToken,authorization,cookie,secret,credential,sessionToken</paths>
+                <valueMask>
+                    <value>(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+</value>
+                    <mask>$1****</mask>
+                </valueMask>
+                <valueMask>
+                    <value>(?i)(password|token|secret|authorization|cookie|credential)(["']?\s*[:=]\s*["']?)([^\s"',\x7D]+)</value>
+                    <mask>$1$2****</mask>
+                </valueMask>
+            </decorator>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

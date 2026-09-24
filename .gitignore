@@ -1,0 +1,7 @@
+backend/target/
+frontend/node_modules/
+frontend/dist/
+build/
+.superpowers/**/state/
+.superpowers/brainstorm/.last-port
+.superpowers/brainstorm/.last-token

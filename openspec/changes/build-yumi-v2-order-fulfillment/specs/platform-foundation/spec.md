@@ -16,9 +16,13 @@
 - **WHEN** 已成功的写命令使用相同幂等键再次提交相同请求
 - **THEN** 系统返回原业务结果且数据库只存在一份事实
 
-### Requirement: 系统必须提供统一错误契约
+### Requirement: 系统必须提供统一响应契约
 
-系统 SHALL 使用包含 `code`、`message`、`fieldErrors` 和 `requestId` 的错误响应；业务客户端 SHALL 依据稳定错误码而非文案判断下一步。
+系统 SHALL 对所有 API 响应（成功与失败）使用同一信封 `{code, message, fieldErrors, requestId, data}`：成功时 `code="OK"`、`message=""`、`fieldErrors=[]`、`data` 为业务负载；失败时 `code` 为稳定错误码、`message` 为可读描述、`fieldErrors` 携带字段定位、`data=null`。HTTP 状态码 SHALL 保持语义（200/201/204、400/401/404/409、500/503），`204` SHALL 无响应体。客户端 SHALL 只在 HTTP 封装层解析信封，依据稳定错误码而非文案判断下一步；每个响应 SHALL 携带 `X-Request-Id` 作为日志与审计的追踪入口。
+
+#### Scenario: 成功与失败响应形状一致
+- **WHEN** 客户端调用任一业务命令或查询，无论成功或失败
+- **THEN** 响应都包含 `code`、`message`、`fieldErrors`、`requestId`、`data` 五个字段且携带 `X-Request-Id`，`204` 响应无响应体
 
 #### Scenario: 数量边界错误
 - **WHEN** 管理员提交负数、超过需求或超过余额的数量

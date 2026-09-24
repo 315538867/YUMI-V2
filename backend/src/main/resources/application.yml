@@ -1,0 +1,46 @@
+spring:
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    validate-on-migrate: true
+  datasource:
+    url: ${YUMI_DB_URL:jdbc:mysql://localhost:3306/yumi_v2_test?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+    username: ${YUMI_DB_USERNAME:yumi_v2_test}
+    password: ${YUMI_DB_PASSWORD:}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-init-sql: SET time_zone = '+00:00'
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  jackson:
+    time-zone: Asia/Shanghai
+
+  sql:
+    init:
+      mode: never
+
+server:
+  timezone: Asia/Shanghai
+
+management:
+  endpoints:
+    web:
+      base-path: /api/actuator
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState

@@ -76,6 +76,10 @@ orders
 
 负责商品图片、受控下载、PDF/打印数据准备和表格导出。历史输出读取业务快照，不回读当前资料替换历史值。
 
+### 4.7 集中计算 `calculation`（无持久化支撑模块）
+
+负责商品及后续已建设业务的数值公式：金额与比例精度策略、商品计价链；订单、库存、生产的公式随对应业务接入，未建设业务不提前创建空分类。模块没有数据库表、Repository 或实体，不访问 HTTP、当前时间或登录上下文，只接收不可变数值输入并返回结果。业务模块通过公开命名接口单向调用；事务、引用选择、快照冻结、并发锁、事实入账与持久化仍属业务模块。公式清单与测试编号见 `formula-catalog.md`，方案与边界见 `formula-management-design.md`。
+
 ## 5. Java 包与模块边界
 
 ```text
@@ -93,10 +97,17 @@ com.yumi
 ├── inventory
 ├── production
 ├── files
+├── calculation
+│   ├── product
+│   ├── order（随业务接入）
+│   ├── inventory（随业务接入）
+│   ├── production（随业务接入）
+│   ├── payroll（业务确认后接入）
+│   └── finance（业务确认后接入）
 └── shared
 ```
 
-每个顶级模块公开应用服务和必要的公开 DTO；实体、Repository 和内部领域服务留在模块内部。Spring Modulith 边界测试必须阻止跨模块访问内部包。`shared` 只保存稳定的技术型值对象和基础能力，不承载业务流程，也不得成为通用杂物包。
+每个顶级模块公开应用服务和必要的公开 DTO；实体、Repository 和内部领域服务留在模块内部。Spring Modulith 边界测试必须阻止跨模块访问内部包。`shared` 只保存稳定的技术型值对象和基础能力，不承载业务流程，也不得成为通用杂物包。`calculation` 是唯一允许承载业务数值公式的位置，边界测试要求它没有任何出边（不依赖业务模块、Repository、实体或外部可变状态）。
 
 ## 6. 依赖与协作
 
@@ -109,13 +120,15 @@ production ─┼──> orders（履约、发货、收退款、售后、关闭�
 orders ─────┼──> inventory：库存领用、取消和售后库存补发
             └──> production：正常生产、返工、重做和售后生产
 orders ─────────> files：打印、PDF、导出和附件
+业务模块 ───────> calculation：商品及后续业务的数值公式（catalog/orders/inventory/production 单向调用）
+calculation ───> 无出边：不依赖任何业务模块、Repository、实体或外部可变状态
 ```
 
 模块只能通过公开应用服务或领域接口协作，禁止直接访问其他模块的 JPA Repository、实体或表。跨模块强一致写操作由发起业务命令的应用服务统一开启事务。
 
 ## 7. 数据访问与迁移
 
-Flyway SQL 是数据库结构唯一来源，迁移文件位于 `src/main/resources/db/migration`。Hibernate 配置为：
+Flyway SQL 是数据库结构唯一来源，迁移文件位于 `backend/src/main/resources/db/migration`。后端 Maven 工程位于 `backend/`，共享 React/TypeScript 前端位于 `frontend/`，Electron 薄壳位于 `frontend/electron/`。Hibernate 配置为：
 
 ```yaml
 spring:

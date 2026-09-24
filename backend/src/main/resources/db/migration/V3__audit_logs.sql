@@ -1,0 +1,20 @@
+CREATE TABLE audit_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    admin_username VARCHAR(100) NULL,
+    request_id VARCHAR(64) NOT NULL,
+    idempotency_key VARCHAR(128) NULL,
+    business_no VARCHAR(64) NULL,
+    http_method VARCHAR(10) NOT NULL,
+    path VARCHAR(255) NOT NULL,
+    result VARCHAR(16) NOT NULL,
+    response_status SMALLINT UNSIGNED NOT NULL,
+    error_code VARCHAR(64) NULL,
+    occurred_at DATETIME(6) NOT NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_audit_logs_request_id (request_id),
+    KEY idx_audit_logs_business_no (business_no),
+    KEY idx_audit_logs_occurred_at (occurred_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
