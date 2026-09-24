@@ -6,6 +6,10 @@ import { ProductsPage } from '../pages/catalog/ProductsPage';
 import { CustomersPage } from '../pages/catalog/CustomersPage';
 import { EmployeesPage } from '../pages/catalog/EmployeesPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
+import { OrdersPage } from '../pages/orders/OrdersPage';
+import { OrderCreatePage } from '../pages/orders/OrderCreatePage';
+import { OrderDetailPage } from '../pages/orders/OrderDetailPage';
+import { OrderChangePage } from '../pages/orders/OrderChangePage';
 import { ROUTE_PATHS } from './paths';
 
 function placeholder(path: string, title: string, task: string): RouteObject {
@@ -19,10 +23,10 @@ export const appRoutes: RouteObject[] = [
     element: <ProtectedLayout />,
     loader: sessionLoader,
     children: [
-      placeholder('/orders', '订单工作台', '3.11'),
-      placeholder('/orders/new', '新建订单', '3.11'),
-      placeholder('/orders/:id', '订单详情', '3.12'),
-      placeholder('/orders/:id/changes/:changeId', '订单变更确认', '3.13'),
+      { path: '/orders', element: <OrdersPage /> },
+      { path: '/orders/new', element: <OrderCreatePage /> },
+      { path: '/orders/:id', element: <OrderDetailPage /> },
+      { path: '/orders/:id/changes/:changeId', element: <OrderChangePage /> },
       { path: '/catalog/products', element: <ProductsPage /> },
       { path: '/catalog/customers', element: <CustomersPage /> },
       { path: '/catalog/employees', element: <EmployeesPage /> },

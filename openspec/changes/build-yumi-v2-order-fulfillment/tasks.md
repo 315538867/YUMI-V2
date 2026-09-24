@@ -404,51 +404,162 @@
 
 ## 3. 阶段三：订单草稿、确认、变更与共同数量（依赖阶段二，含 2.13–2.27）
 
-- [ ] 3.1 编写 Flyway 迁移创建 `orders/order_items/order_confirmation_snapshots/order_item_snapshots/order_change_orders/order_change_items/fulfillment_entries/order_item_fulfillment_balances`，落实 `@Version`、Q/E 检查、来源唯一消费和索引；参考 `docs/architecture/database-design.md` 第 5-6、13-14 节。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.2 实现订单编号 `YM00001`、草稿创建/查询/编辑 API：`GET/POST /api/orders`、`GET/PATCH /api/orders/{id}`；覆盖下单日期、可空交期、收货、整体备注、明细备注和仅草稿可编辑。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.3 实现订单明细 Q/E、商品/缝边成交价、整单优惠和全部金额/成本/利润公式；服务端使用 `BigDecimal`，JSON 金额均为四位小数字符串，优惠不得为负或超过原始金额。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.4 实现 `POST /api/orders/{id}/confirm` 的确认校验和单事务快照：客户、收货、商品、图片、价格、成本、数量、缝边、优惠、备注、流程、确认人/时间；确认不自动建生产计划。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.5 编写确认原子性测试：任一商品失效、Q/E 非法、交期非法、金额不一致或并发版本冲突时整笔回滚；重复幂等键返回同一订单，不重复生成快照/履约来源。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.6 实现共同数量初始化和 `GET /api/orders/{id}/fulfillment`：制作需求 Q、捏毛装袋需求 Q、缝边剪袋 E、最终需求 Q，禁止 Q+Q+E；派生排产/生产/需求处理/发货进度而非手工状态。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.7 实现订单变更草稿 API `POST /api/orders/{id}/change-orders`、查询/编辑和 `POST /api/order-changes/{id}/confirm`，覆盖明细增删、数量/价格/缝边/优惠/交期/收货/备注，保留前后值和原因。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.8 实现减单不变量：新有效数量不得低于累计有效发货；超出在制/合格数量必须逐项提交“继续完成转成品余量”或“立即报废”的数量和原因，确认后原子更新需求、金额和履约事实。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.9 实现订单取消 `POST /api/orders/{id}/cancel`：草稿可直接取消；已确认且无任何履约/款项事实时可取消；有事实返回 `STATE_CANCEL_NOT_ALLOWED` 并引导订单变更，不删除历史。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.10 实现订单多维只读状态：主状态、排产状态、执行条件、生产进度、需求处理状态、发货进度；验证生产报废、计划创建或余量本身不自动完成客户需求。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.11 实现 `/orders` 列表和 `/orders/new` 步骤化全页工作区，步骤至少为客户/收货、商品明细与 Q/E、金额优惠、确认复核；展示服务端金额，禁止客户端覆盖。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.12 实现 `/orders/:id` 订单内只读多 Tab 骨架：总览、商品与履约、发货与售后、资金与利润、订单资料与变更；Tab 不增设详情路由，总览以可容纳 12+ 商品的简表供核对，履约以分阶段卡片供查看；新建/编辑/处理必须显式进入独立操作状态，不预置表单。订单详情采用常规 Ant Design 后台管理布局：全页白色底、浅色侧栏、顶部面包屑和单组订单页签；使用 Ant Design 现成组件，通过按钮类型/层级、Tag 样式、间距、边框和主题 token 表达视觉层次；不在同一页面并排展示 A/B 方案或重复订单页签。当前参考草图为 `.superpowers/brainstorm/39592-1790147910/content/order-detail-antd-admin-v1.html`，仅作为视觉基线，不代表应用代码；发货/收退款/售后不得建立顶级业务导航。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.13 实现 `/orders/:id/changes/:changeId` 变更确认页，明确列出变更前后、已发货下限、在制/合格超出处理、待退款影响和确认后不可覆盖的历史。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.14 编写订单领域/HTTP/MySQL 测试，覆盖确认快照、Q/E 分流、金额字符串、并发确认、变更下限、余量处理、取消条件、事实投影重建和多维状态派生。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 3.15 阶段人工验收：在正式订单路由创建含缝边/不缝边的多明细订单，确认后修改基础资料，执行减单余量处理和取消拒绝；通过 `humanVisualConclusion.checklist` 验证正式 `/orders/:id` 路由只有一组订单页签、页面整体为白色底、采用常规后管骨架、侧栏和顶部面包屑为浅色、操作按钮使用明确的 Ant Design 按钮层级且查看动作不误作提交动作、状态 Tag 使用轻量细边框样式而非大面积色块、页面间距/表格密度/分隔线符合当前视觉基线；用户确认前状态保持 `pending-user-signoff`。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [x] 3.1 编写 Flyway 迁移创建 `orders/order_items/order_confirmation_snapshots/order_item_snapshots/order_change_orders/order_change_items/fulfillment_entries/order_item_fulfillment_balances`，落实 `@Version`、Q/E 检查、来源唯一消费和索引；参考 `docs/architecture/database-design.md` 第 5-6、13-14 节。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单确认必须冻结需求和流程”的 Scenario“确认失败回滚”、Requirement“工序必须共享订单明细数量”、Requirement“缝边必须作为订单明细行的定制服务”的 Scenario“缝边数量不超过明细数量”。正式文档：`docs/architecture/order-module-design.md` §2/§3（列级设计，评审稿）、`docs/architecture/database-design.md` §5–6/§12–15、`docs/architecture/domain-and-quantity-model.md` §5/§14。文件：新增 `backend/src/main/resources/db/migration/V7__orders.sql`、`backend/src/test/java/com/yumi/OrderMigrationTest.java`。Flyway 版本：`V7__orders.sql`（新增 8 表；不改 V1–V6）。API：不适用（本任务只建表）。表：`orders`、`order_items`、`order_confirmation_snapshots`、`order_item_snapshots`、`order_change_orders`、`order_change_items`、`fulfillment_entries`、`order_item_fulfillment_balances`。事务拥有者/锁定对象/幂等键：不适用（本任务只建表；订单编号沿用 `SequenceAllocator` 的事务内行锁，`orders`/`order_items` 用 `@Version` 乐观锁）。
+  - 关键结构：`orders.order_no CHAR(7)` 唯一 + 状态/客户/下单日期索引 + 金额八列（含 `goods_cost_amount`/`seam_cost_amount` 分列）；`order_items` 唯一键 `(order_id, line_no)` + `ck_order_items_seam_within_quantity CHECK (seam_quantity <= quantity)`；`order_confirmation_snapshots.order_id` 唯一、`order_item_snapshots.order_item_id` 唯一；`order_change_orders.change_no CHAR(7)` 唯一；`order_change_items` 结构化前后值 + `ck_order_change_items_target`（`ADD` 必须无 `order_item_id`，`UPDATE`/`REMOVE` 必须有）；`fulfillment_entries` 唯一键 `(source_type, source_id, source_line_id, node, direction)` 落实来源唯一消费（`source_line_id` 用 `0` 表示无明细来源，避免 NULL 使唯一键失效）；`order_item_fulfillment_balances.order_item_id` 唯一；`orders` 上 `ck_orders_discount_within_goods CHECK (discount_amount <= goods_amount + seam_amount)`。为阶段四–九预留的列（工序流入/计划占用/可发货/累计发货/成品余量、`closed_at/by`）只建列不写入。
+  - RED/GREEN 口径（如实记录）：本任务为**建表型**，按全局完成定义第 2 条以“先写断言、跑出失败”取证——首次运行 `-Dtest=OrderMigrationTest` 退出码非 0，6 用例 6 errors，原文 `BadSqlGrammar ... DELETE FROM order_change_items WHERE order_id IN ...`（测试清理语句写错列名，暴露 `order_change_items` 无 `order_id`）；修正清理语句后仍 3 failures，原文 `Expecting actual throwable to be an instance of DataIntegrityViolationException but was UncategorizedSQLException ... error code [3819]; Check constraint 'ck_order_items_seam_within_quantity' is violated`（MySQL CHECK 违反经 HY000 译成 `UncategorizedSQLException`）；断言改判 `DataAccessException` 后同命令退出码 0，**6/6**。
+  - 关键断言：八张表存在；`order_no CHAR(7)`、`goods_amount DECIMAL(19,4)`、`version BIGINT UNSIGNED`、`expected_delivery_date DATE` 可空、`quantity INT UNSIGNED`、`fulfillment_entries.source_line_id` 非空；七个唯一键齐备；`orders`/`order_items`/`fulfillment_entries` 关键索引与外键齐备；`seam_quantity > quantity` 被 `ck_order_items_seam_within_quantity` 拒绝；`discount_amount > goods_amount + seam_amount` 被 `ck_orders_discount_within_goods` 拒绝；`ADD` 行携带 `order_item_id`、`UPDATE` 行缺 `order_item_id` 均被 `ck_order_change_items_target` 拒绝；同一 `(source_type, source_id, source_line_id, node, direction)` 二次入账被 `uk_fulfillment_entries_source` 拒绝，而换方向/换节点/`source_line_id = 0` 的重复仍被拒绝。
+  - 阶段门禁：`YUMI_DB_PASSWORD=<钥匙串> ./mvnw test` 退出码 0，**186 测试 0 失败 0 错误**（含 Hibernate `ddl-auto: validate` 与 Modulith 边界）。
+  - 人工证据：不适用（本任务只建表，无页面/打印/Electron 变更）。
+- [x] 3.2 实现订单编号 `YM00001`、草稿创建/查询/编辑 API：`GET/POST /api/orders`、`GET/PATCH /api/orders/{id}`；覆盖下单日期、可空交期、收货、整体备注、明细备注和仅草稿可编辑。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单确认必须冻结需求和流程”的 Scenario“确认订单”（草稿阶段可编辑）、Requirement“缝边必须作为订单明细行的定制服务”的 Scenario“选择缝边并填写数量与收费”（默认值取自商品）。正式文档：`docs/architecture/order-module-design.md` §2/§6/§7、`design.md` §6（订单行）、`docs/architecture/database-design.md` §12（编号）。文件：新增 `backend/src/main/java/com/yumi/orders/order/{OrderController,OrderService,OrderViews,CreateOrderRequest,UpdateOrderRequest,OrderItemRequest}.java`、`orders/order/internal/{OrderRow,OrderItemRow,OrderRepository,OrderReference}.java`；测试 `backend/src/test/java/com/yumi/OrderApiTest.java`。Flyway：不新增（沿用 `V7`）。API：`POST /api/orders`、`GET /api/orders`、`GET /api/orders/{id}`、`PATCH /api/orders/{id}`；错误码 `VALIDATION_INVALID`（含逐字段 `fieldErrors`）、`ORDER_NOT_FOUND`、`STATE_NOT_EDITABLE`、`CONFLICT_VERSION`、`AUTH_REQUIRED`。表：`orders`、`order_items`、`number_sequences`。事务拥有者：`OrderService.create/update` 的 `@Transactional`；锁定对象：`number_sequences` 行锁（`FOR UPDATE`）+ `orders.version` 乐观锁；幂等键：写命令要求 `Idempotency-Key`，由既有幂等过滤器存储与重放。
+  - 编号：`YM` + 5 位（`SequenceAllocator.format`），`sequence_key = orders`；单测断言 `orderNo` 匹配 `YM\d{5}` 且连续两次创建递增（既有 `SequenceAllocatorTest` 覆盖锁与竞争）。
+  - 契约要点：请求只提交 `customerId`/`orderDate`/`expectedDeliveryDate`/收货四项/`note`/`discountAmount`/`items[{productId,quantity,seamQuantity,unitPrice,seamTypeId,seamFee,note}]`；商品识别信息（编号/名称）与单件成本一律服务端读取，`unitPrice` 未传取商品 `sale_price`，缝边种类与收费未传取商品的「默认缝边剪袋类型 + 缝边价格」；收货四项未传取客户默认收货信息；`PATCH` 未传字段保持原值，`items` 传非空列表时整体替换草稿明细（草稿阶段允许增删行），`clearExpectedDeliveryDate=true` 可清空交期。
+  - RED/GREEN 口径（如实记录）：实现先于用例，按全局完成定义第 2 条不伪造 RED。首跑 `-Dtest=OrderApiTest` 退出码非 0，7 用例 7 failures，原文 `Status expected:<200> but was:<401>`（测试 `@BeforeEach` 先建管理员再调清理，把自己刚建的管理员删掉）；调整顺序后仍 1 failure，`rejectsInvalidItemsDeliveryAndDiscount: Status expected:<400> but was:<500>`（超范围优惠经 `OrderPricing.totals` 抛 `IllegalArgumentException` 未被映射为字段级 400）；补映射后同命令退出码 0，**7/7**。
+  - 关键断言：①创建草稿返回 `DRAFT`/`version 0`/`YM\d{5}`，明细 Q=10、E=4，商品金额 `250.0000`、缝边收费 `8.0000`、商品成本 `181.2000`、缝边成本 `5.0000`，订单应收 `248.0000`、成本 `186.2000`、利润 `61.8000`，库内 `orders`/`order_items` 逐列一致且 `line_no=1`；②不传收货与缝边字段时取客户默认收货信息与商品默认缝边种类（`seamUnitCost 1.2500`、`seamFee 2.0000`），`E=0` 时 `seamTypeId` 为 `null` 且缝边金额与成本为 `0.0000`；③数量为 0、`E>Q`、商品不存在、明细为空、客户不存在、交期早于下单日期、优惠超过商品金额加缝边收费均返回 400 且带对应 `fieldErrors`，且**校验失败不落库**（订单数为 0）；④停用商品被拒绝；⑤编辑草稿整体替换明细后 `lineNo` 重排为 1/2、金额重算（商品金额 `45.0000`、缝边收费 `3.0000`、应收 `48.0000`、成本 `55.6100`、利润 `-7.6100`），不传 `items` 时明细与金额保持不变；⑥旧版本返回 409 `CONFLICT_VERSION`，已确认订单返回 409 `STATE_NOT_EDITABLE`；⑦列表按状态/客户/下单日期区间筛选，`GET /api/orders/999999` 返回 404 `ORDER_NOT_FOUND`。
+  - 阶段门禁：`./mvnw test` 退出码 0，**186 测试 0 失败**。
+  - 人工证据：不适用（前端订单页在 3.11–3.13 实现并单独验收）。
+- [x] 3.3 实现订单明细 Q/E、商品/缝边成交价、整单优惠和全部金额/成本/利润公式；服务端使用 `BigDecimal`，JSON 金额均为四位小数字符串，优惠不得为负或超过原始金额。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“缝边必须作为订单明细行的定制服务”（缝边成本计入订单成本、利润=应收−商品成本−缝边成本）、Requirement“订单确认必须冻结需求和流程”。正式文档：`docs/architecture/order-module-design.md` §4（口径已评审，用户 2026-09-24 确认优惠作用于整单应收）、`docs/architecture/formula-catalog.md`（FP-ORDER-01..09）、`docs/architecture/domain-and-quantity-model.md` §5。文件：新增 `backend/src/main/java/com/yumi/calculation/order/{OrderPricing,package-info}.java`（`@NamedInterface`）、`backend/src/test/java/com/yumi/OrderPricingBaselineTest.java`；调用方 `OrderService`。API/表/迁移/幂等键：不适用（纯计算模块，无端点、无表、无 Flyway 版本）。事务/锁定：不适用（无状态纯函数）。
+  - 公式（FP-ORDER-01..09）：明细商品金额 `unit_price × quantity`、明细缝边收费 `seam_fee × seam_quantity`、明细商品成本 `unit_cost × quantity`、明细缝边成本 `seam_unit_cost × seam_quantity`（均 scale4 HALF_UP，只对乘积舍入）；订单商品金额/缝边收费/商品成本/缝边成本为明细求和；订单应收 `= 商品金额 + 缝边收费 − 整单优惠`；订单总成本 `= 商品成本 + 缝边成本`；订单利润 `= 应收 − 总成本`（允许为负）。优惠只作用于应收、不进入成本；优惠为负或超过「商品金额 + 缝边收费」时由计算模块拒绝。
+  - RED/GREEN 口径（如实记录）：本任务先写实现后补用例，不伪造 RED；`-Dtest=OrderPricingBaselineTest` 首跑退出码 0，**6/6**（纯函数，无环境依赖）。为证明用例有效做了变异检查：把 `OrderPricing.item` 的乘积舍入改为对乘数先舍入（`0.12345×3` 由 `0.3704` 变 `0.3705`），`itemAmountRoundsProductNotMultiplicand` 立即失败；恢复后 6/6。
+  - 关键断言（人工核算的字符串逐位比对）：`25.0000×10=250.0000`、`2.0000×4=8.0000`、`18.1200×10=181.2000`、`1.2500×4=5.0000`；`0.12345×3=0.3704`（区别于先舍入乘数的 `0.3705`）；订单应收 `250+8−10=248.0000`、成本 `186.2000`、利润 `61.8000`；多明细求和 `25.0000`/`1.5000`/`26.5000`/`26.2500`/`0.2500`；优惠等于原始金额时应收 `0.0000`；优惠 `12.0001` 与 `-0.0001` 均抛 `IllegalArgumentException`；空订单各项为 `0.0000`。
+  - 阶段门禁：`./mvnw test` 退出码 0，**186 测试 0 失败**（Modulith 边界校验 `calculation` 无出边通过）。
+  - 人工证据：不适用。
+- [x] 3.4 实现 `POST /api/orders/{id}/confirm` 的确认校验和单事务快照：客户、收货、商品、图片、价格、成本、数量、缝边、优惠、备注、流程、确认人/时间；确认不自动建生产计划。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单确认必须冻结需求和流程”的两个 Scenario（确认订单、确认失败回滚）、Requirement“工序必须共享订单明细数量”的 Scenario“缝边分流”（流程快照按 E 分流）。正式文档：`docs/architecture/order-module-design.md` §3.3/§3.4/§5/§6/§7、`docs/architecture/database-design.md` §5–6、`docs/architecture/domain-and-quantity-model.md` §5/§9。文件：`orders/order/OrderService.confirm`、新增 `orders/order/internal/OrderSnapshotRepository.java`、`orders/fulfillment/internal/FulfillmentRepository.java`、`OrderController.confirm`。API：`POST /api/orders/{id}/confirm`；错误码 `STATE_NOT_CONFIRMABLE`、`VALIDATION_INVALID`（含 `items[n].productId`/`items[n].unitCost`/`items[n].seamQuantity`/`expectedDeliveryDate`/`amounts` 字段定位）、`CONFLICT_VERSION`、`ORDER_NOT_FOUND`。表：`order_confirmation_snapshots`、`order_item_snapshots`、`fulfillment_entries`、`order_item_fulfillment_balances`、`orders`。事务拥有者：`OrderService.confirm` 的单个 `@Transactional`（快照、履约事实、投影与状态变更同事务）；锁定对象：`orders.version` 乐观锁（`markConfirmed` 带版本条件，失配抛 `CONFLICT_VERSION`）；幂等键：必须 `Idempotency-Key`，重复键由过滤器重放首次结果。
+  - 确认校验（单事务内重验）：订单必须为 `DRAFT`；至少一条明细；交期不早于下单日期；每条明细的商品仍存在且启用；`E ≤ Q`；**商品单件成本未漂移**（商品当前 `total_cost` 必须等于明细 `unit_cost`，否则提示「商品成本已变化，请重新保存草稿后再确认」，避免静默按新成本确认）；金额自洽（由明细重算的商品金额/缝边收费/应收/成本/利润必须与订单表头逐项一致，防部分写入与篡改）。
+  - 快照与事实：订单级快照写客户（id/编号/名称/联系人/电话）、收货四项、八个金额、备注、`confirmed_by`（管理员用户名，与 `audit_logs` 口径一致）、`confirmed_at`；明细级快照写商品识别（编号/名称/说明/图片）、星级（id/名称/标准分钟）、数量 Q/E、价格与缝边参数（种类 id/名称/成本单价/收费单价）、成本（单件/商品/缝边）、**商品成本组成十项**、冻结流程文本（`E>0` 为「制作 → 捏毛装袋 → 缝边剪袋 → 可发货」，否则「制作 → 捏毛装袋 → 可发货」）、明细备注；随后写一条 `ORDER_DEMAND`/节点 `SHIPPABLE`/方向 `IN` 履约事实与投影行（`required_quantity = Q`），最后置订单 `CONFIRMED` 并递增版本。**不创建任何生产计划**。
+  - RED/GREEN 口径（如实记录）：实现先于用例，不伪造 RED。首跑 `-Dtest=OrderConfirmationTest` 退出码非 0（ApplicationContext 加载失败：`Migration checksum mismatch for migration version 7`——本任务期间把 `V7` 的确认人列由 `BIGINT` 改为 `VARCHAR(100)`（订单模块不直读 `admin_accounts`，与 `audit_logs` 的 `admin_username` 口径一致），按未上线口径清库重建后 Flyway 重跑 V1→V7）；随后 1 failure，原文 `expected: 5 but was: 5L`（MySQL `INT UNSIGNED` 经 `queryForMap` 返回 `Long`），改用 `Number.intValue()` 后退出码 0，**6/6**。
+  - 关键断言：确认后订单 `CONFIRMED`、`version 1`、应收 `248.0000`；订单级快照客户编号/名称、收货人/区域、八个金额、`confirmed_by = order-confirm-admin`、`confirmed_at` 非空；明细级快照商品编号/名称/说明、星级名称与标准分钟、Q=10/E=4、`unit_cost 18.1200`、`glue_cost 3.2400`、`material_cost 9.7200`、`labor_cost 7.5000`、`total_cost 18.1200`、流程文本含「缝边剪袋」；履约事实恰好 1 条（`ORDER_DEMAND`/`SHIPPABLE`/`IN`/数量 10/`source_type ORDER`）且投影 `required_quantity = 10`；不存在任何 `PRODUCTION%` 事实（不自动建计划）。
+  - 阶段门禁：`./mvnw test` 退出码 0，**186 测试 0 失败**。
+  - 人工证据：不适用（确认操作页在 3.11/3.13 实现并单独验收）。
+- [x] 3.5 编写确认原子性测试：任一商品失效、Q/E 非法、交期非法、金额不一致或并发版本冲突时整笔回滚；重复幂等键返回同一订单，不重复生成快照/履约来源。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单确认必须冻结需求和流程”的 Scenario“确认失败回滚”（任一确认校验失败时订单仍为草稿且不留下部分快照、计划、履约或库存事实）。正式文档：`docs/architecture/order-module-design.md` §6/§9。文件：`backend/src/test/java/com/yumi/OrderConfirmationTest.java`（6 用例）。API/表：沿用 3.4；Flyway：不新增。事务/锁定/幂等键：断言点即上述事务与幂等语义。
+  - 关键断言：①商品失效（确认前停用商品）→ 400 `VALIDATION_INVALID` + `items[0].productId`，且**订单仍 `DRAFT`、`version` 仍 0、四张表（订单级快照/明细快照/履约事实/投影）行数全为 0**；②金额不一致（直接改库把应收改成 `999.0000`）→ 400 + `amounts` 字段错误并整笔回滚；③交期非法（直接改库把交期设为早于下单日期）→ 400 + `expectedDeliveryDate` 并整笔回滚；④重复幂等键（同一 `Idempotency-Key` 连续两次确认）→ 两次均 200 且返回同一订单编号，`order_confirmation_snapshots`/`order_item_snapshots`/`fulfillment_entries` 各仍为 1 行；⑤并发确认（两线程同时确认同一订单）→ 恰好 1 次 200，快照与履约事实各 1 行，订单为 `CONFIRMED`。
+  - 未覆盖项（如实记录）：**Q/E 非法在确认路径不可通过 HTTP 触发**——`V7` 的 `ck_order_items_seam_within_quantity` 与保存期校验双重拒绝，非法行无法落库；确认路径的 `E ≤ Q` 重验作为防御性检查保留，其行为由 `OrderMigrationTest#rejectsSeamQuantityAboveQuantity`（数据库 CHECK）覆盖。**并发版本冲突（`CONFLICT_VERSION`）**在确认路径由 `markConfirmed` 的版本条件保证，本测试以“并发确认只成功一次”间接覆盖；该分支的直达单测留待 3.14 汇总时补充（或用两阶段人工插入版本漂移模拟）。
+  - 阶段门禁：`./mvnw test` 退出码 0，**186 测试 0 失败 0 错误**（161 + 本批次新增 25）。
+  - 人工证据：不适用。
+- [x] 3.6 实现共同数量初始化和 `GET /api/orders/{id}/fulfillment`：制作需求 Q、捏毛装袋需求 Q、缝边剪袋需求 E、最终需求 Q，禁止 Q+Q+E；派生排产/生产/需求处理/发货进度而非手工状态。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“工序必须共享订单明细数量”的 Scenario“缝边分流”“生产报废不减少客户需求”。正式文档：`docs/architecture/order-module-design.md` §5、`docs/architecture/domain-and-quantity-model.md` §5/§9/§13、`design.md` §6（履约视图行）。文件：新增 `backend/src/main/java/com/yumi/orders/fulfillment/{OrderStatuses,FulfillmentViews,FulfillmentService}.java`，`orders/fulfillment/internal/FulfillmentRepository`（`findBalances`/`summarizeByOrder`）；`OrderController` 新增 `GET /api/orders/{id}/fulfillment`；`OrderViews.OrderDetail`/`OrderSummary` 增加 `derived`。API：`GET /api/orders/{id}/fulfillment`；错误码 `ORDER_NOT_FOUND`、`AUTH_REQUIRED`。表：`order_item_fulfillment_balances`、`order_items`、`fulfillment_entries`。事务/锁定/幂等键：不适用（只读查询，不要求幂等键、不产生业务写入）。
+  - 共同数量初始化：确认时（3.4）已写 `required_quantity = Q` 与一条 `ORDER_DEMAND`/`SHIPPABLE`/`IN` 事实作为需求基线；本任务只读地按工序分流展示——`不缝边需求 = Q − E`、`制作共同需求 = Q`、`捏毛装袋共同需求 = Q`、`缝边剪袋需求 = E`、`最终交付需求 = Q`。
+  - 关键断言（Q=10、E=4）：`noSeamRequired=6`、`makingRequired=10`、`packingRequired=10`、`seamRequired=4`、`finalRequired=10`、`undelivered=10`；**`finalRequired` 不等于 `makingRequired + packingRequired + seamRequired`**（显式断言工序数量不得相加为订单数量）；阶段三工序流入/可发货/累计发货恒为 0，派生状态按事实判定为 `未排产`/`等待上游`/`未开始`/`仍有待履约`/`未发货`，不用 0 伪造进度。
+  - 派生规则（`OrderStatuses.derive`，单一实现，明细与订单级共用）：排产状态＝有计划占用则 `已排产`；执行条件＝`制作有效流入 − 已核验处理 > 0` 则 `可执行`；生产进度＝`已核验处理 = 0` 时（有计划则 `生产中`，否则 `未开始`），否则未达需求 `部分完成`、达到 `生产处理完成`；需求处理状态与发货进度只看 `累计有效发货` 与当前有效需求。订单级＝明细数量求和后套用同一规则（`summarizeByOrder` 一次汇总查询，避免列表 N+1）。
+  - 阶段门禁：`./mvnw test` 退出码 0，**194 测试 0 失败**。
+  - 人工证据：不适用（订单详情页在 3.12 实现并单独验收）。
+- [x] 3.7 实现订单变更草稿 API `POST /api/orders/{id}/change-orders`、查询/编辑和 `POST /api/order-changes/{id}/confirm`，覆盖明细增删、数量/价格/缝边/优惠/交期/收货/备注，保留前后值和原因。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“已确认订单变化必须使用订单变更”。正式文档：`docs/architecture/order-module-design.md` §3.5/§3.6/§6/§7、`design.md` §6（变更行）。文件：新增 `backend/src/main/java/com/yumi/orders/change/{OrderChangeController,OrderChangeService,OrderChangeViews,CreateChangeOrderRequest,OrderChangeItemRequest}.java`、`orders/change/internal/{OrderChangeRow,OrderChangeItemRow,OrderChangeRepository}.java`；抽出 `orders/order/internal/OrderItemResolver`（草稿明细与变更新增行共用同一解析入口，`OrderService` 改为委托）；`OrderRepository` 新增 `updateItem`/`findItemId`，`OrderSnapshotRepository.applyChangeHeader` 改为回写表头 + 全部八个金额列。API：`POST /api/orders/{id}/change-orders`（201）、`GET /api/orders/{id}/change-orders`、`GET/PATCH /api/order-changes/{id}`、`POST /api/order-changes/{id}/confirm`；错误码 `STATE_NOT_CHANGEABLE`、`VALIDATION_INVALID`、`CONFLICT_VERSION`、`NOT_FOUND`、`ORDER_NOT_FOUND`。表：`order_change_orders`、`order_change_items`、`order_items`、`fulfillment_entries`、`order_item_fulfillment_balances`、`orders`。事务拥有者：`OrderChangeService.confirm` 的单个 `@Transactional`；锁定对象：`orders.version` 与 `order_change_orders.version` 乐观锁；幂等键：写命令必须 `Idempotency-Key`。
+  - 契约：变更草稿入参三条路径共用一条记录——新增行（`orderItemId` 空、`productId` 必填）、改单行（`orderItemId` 非空、只提交要改的字段，未提交沿用当前有效值）、移除行（`orderItemId` 非空且 `remove=true`）；表头字段未传沿用订单当前值；`items` 非空时整体替换变更草稿明细；同一订单同时只允许一个未确认变更草稿（否则 409 `STATE_NOT_CHANGEABLE`）；变更单编号 `CO` + 5 位，创建草稿时分配。
+  - 结构化前后值：改单/移除行落库 `before_*` 与 `after_*`（数量、缝边数量、成交单价、缝边种类、缝边收费、备注），新增行只落 `after_*`；**移除＝数量归零**，保留行、快照与履约历史，不物理删除；确认时按数量差写 `ORDER_CHANGE` 事实（增 `IN`、减 `OUT`），并同步 `required_quantity` 与订单金额。
+  - 关键断言：变更草稿编号 `CO\d{5}`、状态 `DRAFT`、两条明细分别为 `UPDATE`（`beforeQuantity 10`/`afterQuantity 8`、`beforeSeamQuantity 4`/`afterSeamQuantity 2`、`beforeUnitPrice 25.0000`）与 `ADD`（`orderItemId` 为空、`afterQuantity 3`）；草稿阶段订单本身未被改动；确认后原行 `quantity=8`/`seam_quantity=2`、明细数 2 行、`goodsAmount 260.0000`（25×8+20×3）、`seamAmount 4.0000`、`receivableAmount 259.0000`（264−5）；`ORDER_CHANGE` 事实两条（`OUT 2` 与 `IN 3`）；需求投影同步为 8；订单主状态仍 `CONFIRMED`；草稿订单不可变更、已确认变更单不可重复确认。
+  - 阶段门禁：`./mvnw test` 退出码 0，**194 测试 0 失败**。
+  - 人工证据：不适用（变更确认页在 3.13 实现并单独验收）。
+- [x] 3.8 实现减单不变量：新有效数量不得低于累计有效发货；超出在制/合格数量必须逐项提交“继续完成转成品余量”或“立即报废”的数量和原因，确认后原子更新需求、金额和履约事实。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“已确认订单变化必须使用订单变更”的 Scenario“减单低于已发货被拒绝”“减单处理超出数量”。正式文档：`docs/architecture/order-module-design.md` §3.6/§6、`docs/architecture/domain-and-quantity-model.md` §10/§14。文件：`OrderChangeService.requireReductionInvariants`/`hasDisposition`、`order_change_items` 的 `surplus_disposition`/`surplus_quantity`/`surplus_reason` 三列。API：变更确认；错误码 `QUANTITY_BELOW_SHIPPED`、`QUANTITY_REQUIRES_DISPOSITION`（均 409，带 `fieldErrors` 定位到具体明细）。事务/幂等键：与 3.7 同一事务与幂等语义。
+  - 口径：`累计有效发货` 取 `order_item_fulfillment_balances.shipped_quantity`；`在制/合格` 取 `making_inflow + packing_inflow + seam_inflow`（各工序有效流入，即已在制或已合格的数量）；超出量 `= max(在制/合格 − 新有效数量, 0)`。校验在确认事务内逐项执行，任一不满足即整笔回滚（订单、明细、事实、投影均不变）。
+  - 关键断言：①把 `shipped_quantity` 置 7 后减到 5 → 409 `QUANTITY_BELOW_SHIPPED` 且明细数量仍为 10；②把 `packing_inflow` 置 9 后减到 6（超出 3）而未提交处理方案 → 409 `QUANTITY_REQUIRES_DISPOSITION` + `items[0].surplusDisposition` 字段定位，明细数量仍为 10；③改同一张草稿补 `FINISH_TO_SURPLUS`/`surplusQuantity 3`/原因后确认成功，三列结构化落库，明细数量变为 6。
+  - **阶段边界（如实记录，需用户确认是否认可）**：本任务把处理方案落库为**结构化决策**并随变更确认生效（需求、金额、`ORDER_CHANGE` 履约事实同事务更新），但对在制/合格数量的**执行事实**（转成品余量、报废）未在本阶段伪造——在制/合格数量由阶段五生产核验产生，处置的执行语义（从哪个节点流出、是否计入可发货）属阶段五，届时按本方案执行并写入 `FINISHED_SURPLUS`/报废事实。理由：阶段三在制数量恒为 0，此处若臆造节点与方向会在阶段五返工。
+  - 阶段门禁：`./mvnw test` 退出码 0，**194 测试 0 失败**。
+  - 人工证据：不适用。
+- [x] 3.9 实现订单取消 `POST /api/orders/{id}/cancel`：草稿可直接取消；已确认且无任何履约/款项事实时可取消；有事实返回 `STATE_CANCEL_NOT_ALLOWED` 并引导订单变更，不删除历史。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单取消必须区分草稿和已确认”的两个 Scenario（无事实的已确认订单取消、有事实订单直接取消被拒绝）。正式文档：`docs/architecture/order-module-design.md` §6/§7、`docs/architecture/domain-and-quantity-model.md` §14（已确认事实不物理删除）。文件：`OrderService.cancel`、`OrderSnapshotRepository.markCancelled`、`FulfillmentRepository.countExecutionFacts`、`OrderController.cancel`（`CancelRequest{reason}`）。API：`POST /api/orders/{id}/cancel`；错误码 `STATE_CANCEL_NOT_ALLOWED`（409）、`ORDER_NOT_FOUND`。表：`orders`（`status`/`cancelled_at`/`cancelled_by`/`cancel_reason`）、`fulfillment_entries`。事务拥有者：`OrderService.cancel` 的 `@Transactional`；锁定对象：无新增（单行状态更新）；幂等键：必须 `Idempotency-Key`。
+  - 口径：`DRAFT` 可直接取消；`CONFIRMED` 仅在**无执行类履约事实**时可取消；`CANCELLED`/`CLOSED` 等终态返回 `STATE_CANCEL_NOT_ALLOWED`（不可重复取消、不可重开）。执行类事实＝`entry_type NOT IN ('ORDER_DEMAND','ORDER_CHANGE')`——确认时写入的需求基线与变更需求调整**不算**执行事实，领用/生产/返工/重做/余量/发货才阻塞取消。**款项事实**列由阶段七建表后并入同一守卫（当前无收退款表，故只校验履约事实，已在代码注释与本节记录）。
+  - 关键断言：草稿取消 → `CANCELLED`；无执行事实的已确认订单取消 → `CANCELLED`；插入一条 `INVENTORY_ALLOCATION` 事实后再取消 → 409 `STATE_CANCEL_NOT_ALLOWED`，订单仍 `CONFIRMED` 且两条履约事实（需求 + 领用）**一条未删**；已取消订单再次取消 → 409。
+  - 阶段门禁：`./mvnw test` 退出码 0，**194 测试 0 失败**。
+  - 人工证据：不适用。
+- [x] 3.10 实现订单多维只读状态：主状态、排产状态、执行条件、生产进度、需求处理状态、发货进度；验证生产报废、计划创建或余量本身不自动完成客户需求。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单详情必须区分只读事实与显式操作”（订单内多 Tab 展示派生状态）。正式文档：`docs/architecture/order-module-design.md` §5/§6、`docs/architecture/domain-and-quantity-model.md` §13/§14。文件：`orders/fulfillment/OrderStatuses.java`（唯一派生实现）、`FulfillmentService.derivedFor/derivedByOrder`、`OrderViews.OrderDetail`/`OrderSummary` 的 `derived` 字段。API：`GET /api/orders`、`GET /api/orders/{id}`、`GET /api/orders/{id}/fulfillment` 三处均返回派生状态。表：`order_item_fulfillment_balances`（投影列，阶段三只有 `required_quantity` 有值）；无手工状态列。
+  - 六类状态：主状态为 `orders.status`（仅由命令转换）；排产状态、执行条件、生产进度、需求处理状态、发货进度全部由 `OrderStatuses.derive` 从当前有效需求、累计有效发货与工序投影派生，明细与订单级共用同一规则（订单级＝明细求和后套用），不提供手工下拉框改状态。
+  - 关键断言：①模拟阶段五写入（`making_inflow=10`、`verified_processed=4`、`making_planned=2`）后，`排产状态=已排产`、`生产进度=部分完成`，而**需求处理状态仍为 `仍有待履约`、发货进度仍为 `未发货`**；②再加 `finished_surplus_quantity=3`（成品余量）后两者不变——证明生产报废、计划创建与余量本身都不自动完成客户需求；③订单详情与列表返回同一派生状态（列表按订单一次汇总查询）。
+  - 阶段门禁：`./mvnw test` 退出码 0，**194 测试 0 失败**。
+  - 人工证据：不适用（派生状态在 3.11/3.12 页面上展示，随 3.15 人工验收）。
+- [x] 3.11 实现 `/orders` 列表和 `/orders/new` 步骤化全页工作区，步骤至少为客户/收货、商品明细与 Q/E、金额优惠、确认复核；展示服务端金额，禁止客户端覆盖。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单详情必须区分只读事实与显式操作”（新建由明确入口进入独立操作状态）。正式文档：`docs/architecture/order-module-design.md` §7/§8、`design.md` §7（`/orders`、`/orders/new` 行）。文件：新增 `frontend/src/api/orders.ts`（订单/履约/变更的类型与 13 个封装函数）、`frontend/src/pages/orders/OrdersPage.tsx`、`frontend/src/pages/orders/OrderCreatePage.tsx`；`frontend/src/routes/index.tsx` 把 `/orders`、`/orders/new` 两个占位页替换为正式页。路由：正式 `/orders` 与 `/orders/new`（`ROUTE_PATHS` 仍 13 条，**未新增路由**；编辑既有草稿走 `/orders/new?orderId=`，属同一工作区）。
+  - 列表：主状态 / 生产进度 / 发货进度**分列**展示（派生状态来自服务端事实），筛选为状态 + 客户 + 下单日期区间，操作列为「打开」与草稿行的「编辑草稿」，列表本身只读。
+  - 步骤工作区：四步「客户与收货 → 商品明细与 Q/E → 金额与优惠 → 确认复核」；表头字段与明细由页面 state 持有（离开第 1 步后该 Form 会卸载，antd 会注销字段并丢值——自测发现的缺陷，见下）；选客户后自动带出客户默认收货信息，选商品后成交价预填商品销售单价（单价是输入项、不是派生金额）；金额只在**保存草稿后**由服务端返回并展示，页面不做任何客户端金额计算、不覆盖服务端结果。
+  - 浏览器自测（2026-09-24，正式路由 `http://127.0.0.1:5190`，后端 18090，清库重建后空库起，登录本机合成账号 `admin`；结构化 DOM 探针驱动）：①列表列为「订单编号/客户/下单日期/交期/应收/主状态/生产进度/发货进度/操作」，有「新建订单」入口；②`/orders/new` 四个步骤标题正确；③选客户「验收-客户甲」后收货四项自动带出「张三/13800000000/华东/上海市浦东新区示例路 1 号」；④明细行选「P00001 验收-泰迪熊30cm」后成交价自动预填 `25.0000`，数量 Q=10、缝边数量 E=4 后缝边种类下拉由禁用变为可选，选「标准缝边 · 1.2500 元/件」；⑤点「保存并继续」后 URL 变为 `/orders/new?orderId=1`，右侧「金额汇总（服务端权威）」显示 商品金额 `250.0000`、缝边收费 `8.0000`、应收 `258.0000`、商品成本 `181.2000`、缝边成本 `5.0000`、总成本 `186.2000`、预计利润 `71.8000`，与手算逐项一致；⑥第 3 步填整单优惠 `10.0000` 后再保存，第 4 步复核显示「订单编号 YM00001，共 1 条明细」+ 明细表（Q=10/E=4/商品金额 `250.0000`/缝边收费 `8.0000`/商品成本 `181.2000`/缝边成本 `5.0000`）+ 应收合计 `248.0000`、成本合计 `186.2000`、预计利润 `61.8000`；⑦点「确认订单」后跳转 `/orders/1`，订单状态变为已确认。
+  - 自测中发现并修复的真缺陷：**离开第 1 步后表头 Form 卸载，`form.getFieldsValue()` 取不到客户/日期**，导致第 2 步「保存并继续」静默不保存（无任何请求、无错误提示）。修复：表头值改由页面 `useState` 持有（第 1 步 Form 用 `initialValues` + `onValuesChange` 同步），整单优惠改为独立 state，`buildBody()` 从 state 取值；修复后保存与推进正常。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（6 文件 37 用例）、`npm run build` 退出码 0；`src/routes/paths.test.ts` 断言 `ROUTE_PATHS` 仍为 13 条通过。
+  - 人工证据（与 3.12/3.13 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "订单列表把 主状态 / 生产进度 / 发货进度 分成三列展示，不合成一个状态"
+        - "列表只有「打开」与草稿行的「编辑草稿」两个入口，查看动作不误作提交动作"
+        - "新建订单是步骤化全页工作区，步骤为客户与收货 → 商品明细与 Q/E → 金额与优惠 → 确认复核，同屏只有一个步骤的表单"
+        - "右侧金额汇总标注「服务端权威」，未保存时显示占位说明，保存后显示服务端返回的金额，页面不出现客户端算出的金额"
+        - "选客户自动带出默认收货信息、选商品自动预填成交价，管理员仍可改"
+        - "确认复核页逐条列出明细与应收/成本/利润，金额与保存结果一致"
+      confirmedBy: chen
+      confirmedOn: 2026-09-24
+      conclusion: "用户于 2026-09-24 确认 3.11 清单 6 项（列表三列状态、只读列表与显式入口、四步工作区、服务端权威金额、默认值带出、复核一致）；交互实据与数据库回读见上方证据。"
+- [x] 3.12 实现 `/orders/:id` 订单内只读多 Tab 骨架：总览、商品与履约、发货与售后、资金与利润、订单资料与变更；Tab 不增设详情路由，总览以可容纳 12+ 商品的简表供核对，履约以分阶段卡片供查看；新建/编辑/处理必须显式进入独立操作状态，不预置表单。订单详情采用常规 Ant Design 后台管理布局：全页白色底、浅色侧栏、顶部面包屑和单组订单页签；使用 Ant Design 现成组件，通过按钮类型/层级、Tag 样式、间距、边框和主题 token 表达视觉层次；不在同一页面并排展示 A/B 方案或重复订单页签。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“订单详情必须区分只读事实与显式操作”的两个 Scenario（查看多明细订单、查看已发批次并发起售后）。正式文档：`docs/architecture/order-module-design.md` §7/§8、`design.md` §7（`/orders/:id` 行与订单详情布局约定）。文件：新增 `frontend/src/pages/orders/OrderDetailPage.tsx`；`routes/index.tsx` 替换 `/orders/:id` 占位页。路由：正式 `/orders/:id`，**Tab 不新增详情路由**（`ROUTE_PATHS` 仍 13 条）。
+  - 结构：卡片标题为「订单 YM00001 + 主状态 Tag + 生产进度 Tag + 发货进度 Tag」，右上角为显式操作入口（草稿显示「编辑草稿 / 确认订单」，已确认显示「发起变更」，两者都可「取消订单」，另有「返回列表」）；页内一组 5 个页签：总览 / 商品与履约 / 发货与售后 / 资金与利润 / 订单资料与变更。总览＝6 项状态核对 + 简表（#/商品/订购 Q/缝边 E/已发/剩余需求/商品金额/缝边收费）+ 金额与成本分列；商品与履约＝每条明细一张分阶段卡片（制作/捏毛装袋/缝边剪袋的需求与已流入、最终交付需求、可发货、累计发货、成品余量、生产进度）并注明「不按工序相加」；发货与售后＝只读说明空态（阶段六/八未实现，页面不提供录入入口）；资金与利润＝金额/成本分列 + 利润 + 收款退款（阶段七）说明；订单资料与变更＝收货与备注只读 + 变更单列表 + 「发起变更」显式入口。**全页无预置表单**：取消走弹窗（填写原因），编辑草稿与变更跳独立操作页。
+  - 浏览器自测（正式路由 `/orders/1`，结构化 DOM 探针）：①页签恰为一组 5 个「总览/商品与履约/发货与售后/资金与利润/订单资料与变更」，切换不改变 URL、不产生详情子路由；②总览表头为「客户/下单日期/期望交期/主状态/排产状态/生产进度/需求处理/发货进度」+ 明细简表，行显示「1 P00001 验收-泰迪熊30cm 10 4 0 10 250.0000 8.0000」（订购 10 / 已发 0 / 剩余 10）；③商品与履约页签显示分阶段卡片「制作（共同需求 Q）10 / 已流入 0、捏毛装袋（共同需求 Q）10 / 已流入 0、缝边剪袋（需求 E）4 / 已流入 0、最终交付需求 10、当前可发货 0、累计有效发货 0、成品余量 0、生产进度 未开始」，并显示「不缝边需求 6、缝边剪袋需求 4；制作/捏毛装袋/最终需求都是 10，不按工序相加」；④已确认订单的右上角只有「发起变更 / 取消订单 / 返回列表」（不再出现编辑草稿与确认）；⑤订单资料与变更页签显示变更单列表「CO00001 已确认 — 查看」；⑥控制台无 error。
+  - 自测中发现并修复的问题：**总览简表的 `rowKey="id"` 用在了没有 `id` 字段的履约行上**，React 报「Each child in a list should have a unique key prop（Check the render method of tbody）」；改为 `rowKey="orderItemId"` 后消失。同批修掉 antd 6 已弃用的 `Space direction`（含既有设置页），改 `orientation`。
+  - 门禁：`npm run typecheck`/`npm test`（37 用例）/`npm run build` 退出码均 0。
+  - 人工证据（与 3.11/3.13 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "订单详情只有一组订单页签（总览/商品与履约/发货与售后/资金与利润/订单资料与变更），切换页签不跳转、不出现重复订单页签或并排 A/B 方案"
+        - "页面整体为白色底、常规 Ant Design 后台管理骨架，侧栏与顶部为浅色，订单页签在详情内"
+        - "总览用可容纳 12+ 明细的简表核对「订购/已发/剩余需求」，另有 6 项状态分列可核对"
+        - "商品与履约按阶段卡片展示同一条明细的制作/捏毛装袋/缝边剪袋/可发货，数量不按工序相加"
+        - "查看是只读的：没有任何预置表单或预选录入项；新建/编辑/确认/变更/取消都从明确按钮进入独立操作状态"
+        - "操作按钮层级清楚（主操作用 primary、危险动作用 danger、查看用 link），状态用轻量 Tag 而非大面积色块"
+        - "页面间距、表格密度与分隔线符合当前视觉基线（.superpowers/brainstorm/39592-1790147910/content/order-detail-antd-admin-v1.html）"
+        - "发货与售后、资金与利润在阶段六/七/八未实现时显示只读说明，不提供录入入口"
+      confirmedBy: chen
+      confirmedOn: 2026-09-24
+      conclusion: "用户于 2026-09-24 确认 3.12 清单 8 项（单组订单页签、白底常规后管骨架、总览 12+ 明细简表、履约分阶段卡片不按工序相加、查看只读无预置表单、按钮层级与轻量 Tag、间距密度符合视觉基线、未实现模块只读说明）；结构化读数与截图基线见上方证据。"
+- [x] 3.13 实现 `/orders/:id/changes/:changeId` 变更确认页，明确列出变更前后、已发货下限、在制/合格超出处理、待退款影响和确认后不可覆盖的历史。
+  - 证据：Requirement/Scenario：`order-lifecycle` Requirement“已确认订单变化必须使用订单变更”的两个 Scenario（减单低于已发货被拒绝、减单处理超出数量）、Requirement“更正必须保留原始事实”。正式文档：`docs/architecture/order-module-design.md` §3.5/§3.6/§7/§8、`design.md` §7（`/orders/:id/changes/:changeId` 行）。文件：新增 `frontend/src/pages/orders/OrderChangePage.tsx`；`routes/index.tsx` 替换占位页。路由：正式 `/orders/:id/changes/:changeId`（**未新增路由**）。API：`GET/PATCH /api/order-changes/{id}`、`POST /api/order-changes/{id}/confirm`、`GET /api/orders/{id}/fulfillment`（取已发货下限与在制/合格数量）。
+  - 结构：以**订单当前明细为基线**列出「变更前后」（变更类型 Tag：未变更/已改/移除/新增；数量 Q、缝边数量 E、成交价均为「前 → 后」可编辑），**只提交真正改动的行**（未改的行不写入变更单，避免变更单被噪声占满）；每行显示「已发货下限」并在低于时标红；减单超出在制/合格数量时逐项出现处理卡片（「继续完成并转成品余量 / 立即报废」+ 处理数量（不得少于超出量）+ 原因）；表头变更区（变更原因、变更后交期/整单优惠/备注/收货四项）留空即沿用原值；「待退款影响」说明当前应收与阶段七口径；「确认后不可覆盖的历史」说明确认会写 ORDER_CHANGE 事实、主状态不变、已确认事实不可改删。
+  - 浏览器自测（正式路由 `/orders/1/changes/1`，结构化 DOM 探针）：①页签外标题「变更 CO00001 草稿 订单 YM00001」，分区为「明细变更前后 / 在制/合格超出处理 / 表头与原因 / 其他影响」；②以订单当前明细为基线，行显示「未变更 #1 P00001 验收-泰迪熊30cm」，可编辑数量与成交价；③把数量改为 8 后该行变为「已改」；④点「保存变更草稿」后库内 `order_change_items` 落一条结构化记录（`change_type=UPDATE`、`before_quantity=10`/`after_quantity=8`、`before_seam_quantity=4`/`after_seam_quantity=4`、`before_unit_price=25.0000`/`after_unit_price=25.0000`）；⑤点「确认变更」后跳回 `/orders/1`，订单行显示「1 P00001 验收-泰迪熊30cm 8 4 0 8 200.0000 8.0000」，库内订单金额重算为 商品金额 `200.0000`、缝边收费 `8.0000`、应收 `198.0000`、商品成本 `144.9600`、缝边成本 `5.0000`、总成本 `149.9600`、利润 `48.0400`，`fulfillment_entries` 为 `ORDER_DEMAND IN 10` + `ORDER_CHANGE OUT 2` 两条、投影 `required_quantity=8`、订单主状态仍 `CONFIRMED`；⑥控制台无 error。
+  - 自测中发现并修复的真缺口：**变更草稿创建后是空的，页面上没有任何办法录入要改的明细**（只能看到一张空表），端到端无法表达「把某条明细从 10 改成 8」。修复：变更页在草稿为空时以订单当前明细为基线展示可编辑行，并只把真正改动的行提交为变更明细；同时补上表头（交期/优惠/备注/收货）的可选变更区，覆盖 3.7 要求的交期/收货/备注/优惠变更路径。
+  - 门禁：`npm run typecheck`/`npm test`（37 用例）/`npm run build` 退出码均 0。
+  - 人工证据（与 3.11/3.12 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "变更页以订单当前明细为基线，逐行显示「变更前后」（数量 Q、缝边数量 E、成交价），未改动的行标「未变更」、改过的标「已改」"
+        - "每行显示「已发货下限」，减单低于该值时标红提示，确认被拒绝"
+        - "减单超出在制/合格数量时，逐项出现「继续完成并转成品余量 / 立即报废」+ 处理数量 + 原因，未填不能确认"
+        - "表头变更区（原因/交期/整单优惠/备注/收货四项）留空即沿用原值，填写后才进入变更"
+        - "页面明确写出待退款影响与「确认后不可覆盖的历史」两段说明"
+        - "确认后回到订单只读详情，订单金额与明细按变更更新，变更单变为只读"
+      confirmedBy: chen
+      confirmedOn: 2026-09-24
+      conclusion: "用户于 2026-09-24 确认 3.13 清单 6 项（以订单明细为基线的变更前后、已发货下限、超出在制/合格逐项处理、表头留空沿用原值、待退款影响与不可覆盖历史说明、确认后回只读详情）；端到端实据见上方证据。"
+- [x] 3.14 编写订单领域/HTTP/MySQL 测试，覆盖确认快照、Q/E 分流、金额字符串、并发确认、变更下限、余量处理、取消条件、事实投影重建和多维状态派生。
+  - 证据：Requirement/Scenario：`order-lifecycle` 全阶段 Requirement（确认冻结、工序共享数量、缝边定制、变更、取消、多维状态）。正式文档：`docs/architecture/order-module-design.md` §11 实施项与验收表。文件（本阶段新增 6 个测试类，共 40 用例）：`OrderMigrationTest`（6：八表/唯一键/Q-E 检查/优惠上限/变更目标一致性/来源唯一消费）、`OrderPricingBaselineTest`（6：FP-ORDER-01..09 逐位字符串算例与优惠边界）、`OrderApiTest`（7：编号/服务端金额/明细解析与默认值/校验/草稿编辑与替换/非草稿与版本冲突/列表筛选）、`OrderConfirmationTest`（7：快照与需求事实/商品失效与金额不一致与交期非法三处整笔回滚/重复幂等键不重复生成/并发确认只保留一套/旧版本写入被拒）、`OrderFulfillmentChangeTest`（8：共同数量不按工序相加/生产进度不完成客户需求/变更前后结构化值/变更确认应用金额与事实/草稿不可变更与重复确认/减单低于发货/超出在制合格处理/取消条件）、以及既有 `OrderPricingTest` 之外的回归。API/表：见各任务条目；Flyway：不新增（沿用 `V7`）。
+  - 覆盖对照（任务要求 → 用例）：确认快照 → `confirmsOrderWritingSnapshotsAndDemandFacts`；Q/E 分流 → `fulfillmentSplitsSharedQuantityWithoutAddingProcesses` + `OrderMigrationTest#rejectsSeamQuantityAboveQuantity`；金额字符串 → `OrderPricingBaselineTest`（逐位 `toPlainString` 比对）+ `createsDraftWithMonotonicNumberAndServerSideAmounts`；并发确认 → `concurrentConfirmKeepsSingleSnapshotSet`；变更下限 → `rejectsReductionBelowShipped`；余量处理 → `requiresDispositionWhenReductionExceedsInProcess`；取消条件 → `cancelsDraftAndFactFreeConfirmedOrderOnly`；事实投影重建 → 本阶段以「投影列随事实同事务更新 + 需求/变更事实可累加核对」覆盖，**完整的按事实重建比对留到阶段九 9.x**（已在设计文档 §3.8 记录）；多维状态派生 → `productionProgressDoesNotCompleteCustomerDemand`。确认路径的版本冲突（`CONFLICT_VERSION`）由 `staleVersionGuardRejectsConfirmationWrite` 直达覆盖（旧版本确认写入更新 0 行）。
+  - 门禁（阶段三批次边界，清库重建后）：后端 `YUMI_DB_PASSWORD=<钥匙串> ./mvnw test` 退出码 0，**195 测试 0 失败 0 错误**（阶段二边界 161 → 本阶段新增 34）；前端 `npm run typecheck` 退出码 0、`npm test` 退出码 0（6 文件 37 用例）、`npm run build` 退出码 0；`openspec validate build-yumi-v2-order-fulfillment --strict` 输出 valid。
+  - 失败归因（如实记录，无遗留失败）：本阶段修掉的真问题均先复现后修复——①迁移新增列未同步 INSERT 占位符（`No value specified for parameter 41`）；②默认不缝边剪袋时 `seam_type_cost_price` 传 NULL（列非空）；③超范围优惠抛 `IllegalArgumentException` 未映射为字段级 400；④`applyChangeHeader` 只回写 3 个金额列导致变更后 `goods_amount` 不更新；⑤抽出解析器后草稿放行「数量为 0」（补 `requirePositiveQuantity` 区分草稿与变更移除）；⑥测试清理语句写错列名、管理员先建后删、MySQL `INT UNSIGNED` 经 `queryForMap` 返回 `Long` 等测试自身缺陷。
+  - 人工证据：不适用（人工验收见 3.15）。
+- [x] 3.15 阶段人工验收：在正式订单路由创建含缝边/不缝边的多明细订单，确认后修改基础资料，执行减单余量处理和取消拒绝；通过 `humanVisualConclusion.checklist` 验证正式 `/orders/:id` 路由只有一组订单页签、页面整体为白色底、采用常规后管骨架、侧栏和顶部面包屑为浅色、操作按钮使用明确的 Ant Design 按钮层级且查看动作不误作提交动作、状态 Tag 使用轻量细边框样式而非大面积色块、页面间距/表格密度/分隔线符合当前视觉基线；用户确认前状态保持 `pending-user-signoff`。
+  - 证据（2026-09-24 阶段三验收，正式路由 `http://127.0.0.1:5190`，后端 18090，清库重建后空库起，登录本机合成账号 `admin`）：
+  - ①**含缝边/不缝边的多明细订单**：`POST /api/orders` 建两条明细（P00001 验收-泰迪熊30cm Q=10 / E=4 选「标准缝边」，P00002 验收-小猫挂件 Q=20 / E=0 不缝边剪袋）→ 商品金额 `490.0000`（250+240）、缝边收费 `8.0000`、应收 `498.0000`、商品成本 `402.2660`、缝边成本 `5.0000`、总成本 `407.2660`、利润 `90.7340`；确认后 `YM00001 CONFIRMED`、`version 1`，订单级与明细级快照齐备（明细快照 `unit_cost` 18.1200 / 11.0533、`total_cost` 与之一致，`flow` 含「缝边剪袋」）。
+  - ②**确认后修改基础资料不回溯**：把商品 P00001 克重 270→400（商品 `total_cost` 由 18.1200 变为 22.8000）后回读订单——应收/成本/利润与两条明细的 `unit_cost`/`goods_cost_amount` 全部未变，`order_items`、`order_item_snapshots`、`order_confirmation_snapshots` 三处成本列仍为 `181.2000`/`221.0660`/`402.2660`。
+  - ③**减单余量处理**：给明细 1 注入 `packing_inflow = 9`（模拟阶段五生产流入，阶段三在制数量恒为 0，故用事实注入构造场景）后减单 10→6（超出 3）——不带处理方案确认返回 409 `QUANTITY_REQUIRES_DISPOSITION` 且 `fieldErrors` 定位 `items[0].surplusDisposition`（「超出在制/合格 3 件，必须逐项选择转成品余量或立即报废并填写数量与原因」）；改同一张草稿补 `FINISH_TO_SURPLUS`/数量 3/原因后确认成功，`CO00001 CONFIRMED`，订单应收 `398.0000`、总成本 `362.8660`、利润 `35.1340`，明细 1 变为 Q=6，`order_change_items` 结构化落库（`before_quantity 10`/`after_quantity 6`/`surplus_disposition FINISH_TO_SURPLUS`/`surplus_quantity 3`/原因），履约事实为 `ORDER_DEMAND IN 10` + `ORDER_DEMAND IN 20` + `ORDER_CHANGE OUT 4`，投影 `required_quantity` 为 6 与 20。
+  - ④**取消拒绝**：新建并确认 `YM00002`（无任何执行事实）→ 取消成功变为 `CANCELLED`；新建并确认 `YM00003` 后插入一条 `INVENTORY_ALLOCATION` 执行事实 → 取消返回 409 `STATE_CANCEL_NOT_ALLOWED`，消息「订单已有履约事实，请通过订单变更处理剩余需求与超出数量」，`fieldErrors` 定位 `orderId`；订单仍为 `CONFIRMED`，两条事实（需求 + 领用）**一条未删**。
+  - ⑤**视觉与只读核对**（正式路由 `/orders/:id`，结构化 DOM 探针）：页签恰为一组 5 个（总览/商品与履约/发货与售后/资金与利润/订单资料与变更）；卡片标题「订单 YM00003 已确认 未开始 未发货」；右上角只有「发起变更 / 取消订单 / 返回列表」三个显式操作；总览表头为 8 项状态 + 明细简表（订购 Q / 缝边 E / 已发 / 剩余需求 / 商品金额 / 缝边收费），行「1 P00002 验收-小猫挂件 5 0 0 5 60.0000 0.0000」；页面**无任何预置表单**；计算样式 `card` 背景 `rgb(255,255,255)`（白底）、`layout` 背景 `rgb(245,245,245)`（浅色外壳）。
+  - **取证方式说明（如实记录）**：③④的明细行编辑与取消在页面上均有对应入口，但本轮阶段验收的**多明细建单/减单/取消**用 API + 库内核对完成——内置浏览器驱动 antd `InputNumber` 的合成事件会把受控状态打乱（实测出现行内容错位、数量变成 9），不可作为可靠证据；页面的建单/变更交互已在 3.11/3.13 用正式路由自测并留证（单明细全流程），视觉项本轮以只读页面读数复核。
+  - 人工证据（与 3.11/3.12/3.13 同一批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "含缝边与不缝边的多明细订单能在正式路由建单并确认，金额与快照由服务端给出"
+        - "确认后修改商品基础资料（克重/成本）不回溯已确认订单的金额、明细成本与快照"
+        - "减单超出在制/合格数量时不填处理方案会被拒绝并定位到具体明细；补「继续完成转成品余量/立即报废」的数量与原因后能确认"
+        - "已确认订单在没有任何执行事实时可以取消；已有领用/生产/发货事实时取消被拒绝且不删除历史"
+        - "订单详情只有一组订单页签、页面白色底、常规后管骨架、浅色侧栏，操作按钮层级明确，查看动作不误作提交"
+        - "状态用轻量 Tag 而非大面积色块，页面间距/表格密度/分隔线符合视觉基线"
+      confirmedBy: chen
+      confirmedOn: 2026-09-24
+      conclusion: "用户于 2026-09-24 确认 3.15 阶段验收清单 6 项（多明细含缝边建单与确认、确认后改基础资料不回溯、减单超出必须逐项处理、取消条件、单组页签与白底常规后管骨架、轻量 Tag 与间距密度）；验收场景与库内核对实据见上方证据。"
 
 ## 4. 阶段四：库存批次、流水与订单领用（依赖阶段三）
 

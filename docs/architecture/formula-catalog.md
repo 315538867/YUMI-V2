@@ -56,11 +56,32 @@
 
 上述标识在实现中的位置与测试编号见第 4 节。
 
+## 4. 订单公式目录
+
+依据 `docs/architecture/order-module-design.md` §4（2026-09-24 评审通过，用户确认「优惠作用于整单应收」）。实现在 `calculation/order/OrderPricing`，金额一律 scale4 HALF_UP，只对乘积舍入（入参由边界归一为 scale4）。
+
+| 标识 | 名称 | 输入与单位 | 表达式 | 舍入节点 | 结果含义 |
+| --- | --- | --- | --- | --- | --- |
+| FP-ORDER-01 | 明细商品金额 | 成交单价（元/件）、数量 Q | `unitPrice × quantity` | scale4 HALF_UP | 单条明细商品金额 |
+| FP-ORDER-02 | 明细缝边收费 | 缝边收费单价（元/件）、缝边数量 E | `seamFee × seamQuantity` | scale4 HALF_UP | 单条明细缝边应收 |
+| FP-ORDER-03 | 明细商品成本 | 商品单件成本（不缝边剪袋口径）、数量 Q | `unitCost × quantity` | scale4 HALF_UP | 单条明细商品成本 |
+| FP-ORDER-04 | 明细缝边成本 | 缝边种类成本单价（元/件，允许 0）、缝边数量 E | `seamUnitCost × seamQuantity` | scale4 HALF_UP | 单条明细缝边成本 |
+| FP-ORDER-05 | 订单商品金额 | 各明细商品金额 | Σ 明细商品金额 | scale4 HALF_UP | 订单商品应收 |
+| FP-ORDER-06 | 订单缝边收费 | 各明细缝边收费 | Σ 明细缝边收费 | scale4 HALF_UP | 订单缝边应收 |
+| FP-ORDER-07 | 订单应收 | 商品金额、缝边收费、整单优惠 | `goodsAmount + seamAmount − discountAmount` | scale4 HALF_UP | 客户应付；优惠只作用于应收 |
+| FP-ORDER-08 | 订单总成本 | 各明细商品成本与缝边成本 | Σ（明细商品成本 + 明细缝边成本） | scale4 HALF_UP | 商品成本与缝边成本分列可见 |
+| FP-ORDER-09 | 订单利润 | 订单应收、订单总成本 | `receivableAmount − costAmount` | scale4 HALF_UP | 允许为负 |
+
+口径约束：整单优惠必须非负且不超过「商品金额 + 缝边收费」（越界由计算模块拒绝并映射为字段级 400）；商品成本取**下单/编辑当时**的商品 `total_cost` 快照，确认时再冻结进明细快照；缝边数量 `E = 0` 视为不缝边剪袋，缝边单价与成本按 0 传入。
+
+上述标识在实现中的位置与测试编号见第 5 节。
+
+
 **编号不复用**：FP-PROD-09（缝边单件成本）与 FP-PROD-10（缝边参考收费）原属商品缝边，2026-09-24 起缝边**决策权移到订单**（商品只提供「默认缝边剪袋类型 + 缝边价格」默认值，不含缝边数量与成本），其编号保留不再使用；缝边的成本与收费公式随订单实现登记到 `calculation/order` 分类。商品包装人工费（FP-PROD-08）的提成来源由“档位提成”改为“商品包装提成（默认取全局 `packaging_commission_default`，商品可改）”。
 
 **FP-PROD-20/21 与 09/10 的区别**：09/10 是商品手填缝边分钟派生的**单件缝边成本与收费**（已废弃）；20/21 是商品侧**缝边剪袋变体预算**——用不缝边剪袋总成本加「缝边种类成本单价」得到变体成本，只在试算与详情单列展示，不进入商品快照、不参与商品自身成本与利润。
 
-## 4. 代码位置与测试编号
+## 5. 代码位置与测试编号
 
 | 标识 | 目标代码位置 | 测试编号 |
 | --- | --- | --- |
@@ -76,14 +97,16 @@
 | FP-PROD-18 | `calculation/DecimalPolicy.ratioToPercent` | `ProductPricingTest#pinnedExampleMatchesEveryFormula`（回显 `20.000000`） |
 | FP-PROD-19 | `calculation/DecimalPolicy.money` | `ProductPricingBaselineTest#highPrecisionUnitPricesRoundHalfUpAtMoneyNode` |
 | FP-PROD-20、21 | `calculation/product/ProductPricing.seamBudget` | `ProductPricingBaselineTest#seamBudgetAddsSeamUnitCostWithoutTouchingProductCost`、`#seamBudgetTreatsMissingSeamTypeCostAndFeeAsZero`、`ProductSeamDefaultApiTest#createStoresSeamDefaultAndReturnsBothBudgets` |
+| FP-ORDER-01、02、03、04 | `calculation/order/OrderPricing.item` | `OrderPricingBaselineTest#itemAmountsMultiplyAndRoundHalfUpAtMoneyNode`、`#itemAmountRoundsProductNotMultiplicand` |
+| FP-ORDER-05、06、07、08、09 | `calculation/order/OrderPricing.totals` | `OrderPricingBaselineTest#orderTotalsSubtractDiscountFromReceivableOnly`、`#orderTotalsSumMultipleItemsAndAllowNegativeProfit`、`#orderTotalsAllowZeroReceivableButRejectOutOfRangeDiscount`、`#emptyOrderHasZeroTotals`、`OrderApiTest#createsDraftWithMonotonicNumberAndServerSideAmounts` |
 
 端到端钉死算例（HTTP 全链）：`ProductPricingTest#pinnedExampleMatchesEveryFormula`、`#weightChangeCascadesThroughMaterialToTotalAndReferencePrice`、`#starChangeRecomputesQuantitiesAndLabor`、`#refreshMaterialPricesFlagReReadsGlobalUnitPrices`。
 
-## 5. 仍属业务模块的内容
+## 6. 仍属业务模块的内容
 
 输入校验与字段错误、星级/档位/材料价格的引用选择与快照读取、事务边界、并发锁、事实入账、幂等与结果持久化、变更日志。例如“可执行数量如何计算”属公式，“核验时锁定哪些记录、是否允许扣减、如何防重复核验”属生产领域服务。
 
-## 6. 未建设业务的接入位
+## 7. 未建设业务的接入位
 
 以下分类随对应业务实现加入 `calculation`，**不提前创建空实现**：
 
@@ -92,7 +115,7 @@
 - `calculation/production`：标准工作量与核验数量余额。
 - `calculation/payroll`、`calculation/finance`：计薪与财务汇总，业务确认后接入。
 
-## 7. 盘点发现的偏差
+## 8. 盘点发现的偏差
 
 1. **设置写入对超精度小数报 500**：`SettingsService.java:96` 用无 `RoundingMode` 的 `setScale(4)`（比例项为 `setScale(6)`），该重载按 `UNNECESSARY` 处理，需要进位时抛 `ArithmeticException`，被 `GlobalExceptionHandler` 的兜底分支转成 500。列定义为 `DECIMAL(19,6)`（如 `glue_unit_price`），管理员提交 `"0.012345"` 这类六位单价即触发，与 `formula-management-design.md` 第 5 节“金额 4 位 HALF_UP、比例 6 位 HALF_UP”不一致。任务 2.14 集中精度策略时改为 `DecimalPolicy`，先补 RED 用例再修。
 2. **前端只在展示时舍入，后端每个公式节点都舍入**：后端在 FP-PROD-03/04/11/12/14 各节点截断到 scale4；前端保留全精度、仅在输出时 `m4`。凡中间值超过四位小数，前端展示的分项与合计就可能与后端相差 0.0001。可达例：包装档位 `std_minutes` 列允许三位小数（`DECIMAL(9,3)`），取 8.333 → `8.333×0.25+0.3 = 2.38325`，后端 FP-PROD-08 得 `2.3833`，前端不截断该值即参与 `laborCost` 相加；材料侧同理，后端 FP-PROD-03/04 得 `0.1235`/`0.0346`、FP-PROD-11 得 `0.1581`，前端显示 `m4(0.12345+0.034567) = 0.1580`。任务 2.17 删除本地副本后该分歧消失。

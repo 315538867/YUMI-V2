@@ -416,7 +416,7 @@ function FormulaCatalogPanel({ groups }: { groups: FormulaGroup[] }) {
     return <Typography.Paragraph type="secondary">暂无已实现的公式。</Typography.Paragraph>;
   }
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
         公式由后端集中计算模块实现并发布，此页只读：不提供编辑、发布或生效时间设置，未建设的业务不显示空条目。
       </Typography.Paragraph>
