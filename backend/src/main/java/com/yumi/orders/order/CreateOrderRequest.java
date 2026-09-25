@@ -8,6 +8,7 @@ import java.util.List;
  * 新建订单草稿入参：至少一条明细。
  * 收货信息未传时取客户的默认收货信息；交期可空但不得早于下单日期；
  * 优惠作用于整单应收（0 ≤ 优惠 ≤ 商品金额 + 缝边收费）。
+ * {@code inventoryPlan} 为可选的草稿库存计划（任务 4.8），按 {@code lineNo} 引用明细，不占用库存。
  */
 public record CreateOrderRequest(
         Long customerId,
@@ -19,5 +20,6 @@ public record CreateOrderRequest(
         String address,
         String note,
         BigDecimal discountAmount,
-        List<OrderItemRequest> items) {
+        List<OrderItemRequest> items,
+        List<OrderPlanLineRequest> inventoryPlan) {
 }

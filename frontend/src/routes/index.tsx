@@ -6,6 +6,7 @@ import { ProductsPage } from '../pages/catalog/ProductsPage';
 import { CustomersPage } from '../pages/catalog/CustomersPage';
 import { EmployeesPage } from '../pages/catalog/EmployeesPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
+import { InventoryPage } from '../pages/inventory/InventoryPage';
 import { OrdersPage } from '../pages/orders/OrdersPage';
 import { OrderCreatePage } from '../pages/orders/OrderCreatePage';
 import { OrderDetailPage } from '../pages/orders/OrderDetailPage';
@@ -30,7 +31,7 @@ export const appRoutes: RouteObject[] = [
       { path: '/catalog/products', element: <ProductsPage /> },
       { path: '/catalog/customers', element: <CustomersPage /> },
       { path: '/catalog/employees', element: <EmployeesPage /> },
-      placeholder('/inventory', '库存', '4.11'),
+      { path: '/inventory', element: <InventoryPage /> },
       placeholder('/production', '生产工作台', '5.14'),
       placeholder('/production/plans/:id/verify', '计划核验', '5.15'),
       placeholder('/reports', '台账与导出', '9.1'),

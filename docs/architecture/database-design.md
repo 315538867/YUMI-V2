@@ -24,7 +24,7 @@
 | --- | --- |
 | `identity` | `admin_accounts` |
 | `catalog` | `products`、`customers`、`employees`、`employee_work_types`、`employee_employment_events`、`master_data_change_logs`、静态数据目录 `star_levels`/`packaging_tiers`/`seam_types`/`work_types` |
-| `orders` | `orders`、`order_items`、订单快照和变更表、履约表、发货表、收退款表、售后表 |
+| `orders` | `orders`、`order_items`、订单快照和变更表、履约表、草稿库存计划表、发货表、收退款表、售后表 |
 | `inventory` | `inventory_batches`、库存流水表、库存领用表 |
 | `production` | `production_plans`、生产核验、返工、重做、超额任务和其他排班表 |
 | `calculation` | 无表（无持久化的集中计算支撑模块，只接收不可变数值输入并返回结果） |
@@ -117,6 +117,12 @@
 订单明细当前投影：当前有效需求、各工序有效流入、有效计划占用、已核验处理、返工待安排、报废重做待安排、可发货、累计有效发货、成品余量和版本。
 
 此表只能由领域服务在写入 `fulfillment_entries` 的同一事务中更新，并定期与事件重建结果校验。
+
+### `order_inventory_plan_lines`
+
+草稿订单的库存计划行：订单明细、批次、计划数量。**计划只是参考、不占用库存**：本表不产生库存流水、不改批次当前数量；确认时按批次聚合重验余额，不足须管理员明确转生产。同一明细同一批次唯一。
+
+表归属 `orders`，因外键依赖 `inventory_batches` 而排在库存迁移之后建立。
 
 ## 7. 库存模块
 

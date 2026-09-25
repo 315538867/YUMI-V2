@@ -48,6 +48,11 @@ public class SequenceAllocator {
     }
 
     public static String format(String prefix, long value) {
-        return prefix + String.format("%05d", value);
+        return format(prefix, value, 5);
+    }
+
+    /** 编号格式为前缀 + 定宽递增序号（库存批次/流水用 6 位，其余沿用 5 位）。 */
+    public static String format(String prefix, long value, int width) {
+        return prefix + String.format("%0" + width + "d", value);
     }
 }

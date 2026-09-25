@@ -54,7 +54,8 @@ class OrderMigrationTest {
         var testOrders = "SELECT id FROM orders WHERE order_no LIKE 'T%'";
         jdbcTemplate.update("DELETE FROM order_change_items WHERE change_order_id IN "
                 + "(SELECT id FROM order_change_orders WHERE order_id IN (" + testOrders + "))");
-        for (var table : new String[]{"fulfillment_entries", "order_item_fulfillment_balances",
+        for (var table : new String[]{"order_inventory_plan_lines", "fulfillment_entries",
+                "order_item_fulfillment_balances",
                 "order_item_snapshots", "order_confirmation_snapshots", "order_change_orders", "order_items"}) {
             jdbcTemplate.update("DELETE FROM " + table + " WHERE order_id IN (" + testOrders + ")");
         }
@@ -70,6 +71,18 @@ class OrderMigrationTest {
                 "fulfillment_entries", "order_item_fulfillment_balances"}) {
             assertThat(tableExists(table)).as("缺少表 " + table).isTrue();
         }
+    }
+
+    @Test
+    void createsDraftInventoryPlanTable() {
+        assertThat(tableExists("order_inventory_plan_lines")).isTrue();
+        assertThat(columnType("order_inventory_plan_lines", "quantity")).isEqualTo("int unsigned");
+        assertThat(isNullable("order_inventory_plan_lines", "batch_id")).isFalse();
+        assertThat(uniqueKeys("order_inventory_plan_lines")).contains("uk_order_inventory_plan_lines_target");
+        assertThat(foreignKeys("order_inventory_plan_lines")).contains("fk_order_inventory_plan_lines_order",
+                "fk_order_inventory_plan_lines_item", "fk_order_inventory_plan_lines_batch");
+        // 计划不占用库存：批次当前数量只由库存流水改动，计划表没有库存余额列
+        assertThat(columnNames("order_inventory_plan_lines")).doesNotContain("allocated_quantity");
     }
 
     @Test
@@ -225,6 +238,13 @@ class OrderMigrationTest {
                 "SELECT is_nullable FROM information_schema.columns "
                         + "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
                 String.class, tableName, columnName));
+    }
+
+    private java.util.List<String> columnNames(String tableName) {
+        return jdbcTemplate.queryForList(
+                "SELECT column_name FROM information_schema.columns "
+                        + "WHERE table_schema = DATABASE() AND table_name = ?",
+                String.class, tableName);
     }
 
     private java.util.List<String> uniqueKeys(String tableName) {

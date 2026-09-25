@@ -34,6 +34,50 @@ public class FulfillmentRepository {
                 sourceType, sourceId, sourceLineId, Date.valueOf(businessDate), operatorUsername, note, requestId);
     }
 
+    /** 追加一条履约事实并返回其 id（供领用/生产登记来源关联）。 */
+    public long insertEntryReturningId(long orderId, long orderItemId, String entryType, String node,
+                                       String direction, int quantity, String sourceType, long sourceId,
+                                       long sourceLineId, LocalDate businessDate, String operatorUsername,
+                                       String note, String requestId) {
+        insertEntry(orderId, orderItemId, entryType, node, direction, quantity, sourceType, sourceId,
+                sourceLineId, businessDate, operatorUsername, note, requestId);
+        return jdbcTemplate.queryForObject("""
+                SELECT id FROM fulfillment_entries WHERE order_item_id = ? AND source_type = ? AND source_id = ?
+                    AND source_line_id = ? AND node = ? AND direction = ?
+                """, Long.class, orderItemId, sourceType, sourceId, sourceLineId, node, direction);
+    }
+
+    /**
+     * 按目标节点调整投影：工序流入（捏毛装袋/缝边剪袋/制作）或最终可发货。
+     * 只允许领域服务在写事实的同一事务内调用；数量不会为负（由调用方保证）。
+     */
+    public void applyInflow(long orderItemId, String node, int quantity, boolean increase, String requestId) {
+        var column = switch (node) {
+            case "MAKING" -> "making_inflow";
+            case "PACKING_BAG" -> "packing_inflow";
+            case "SEAM_CUTTING" -> "seam_inflow";
+            default -> "shippable_quantity";
+        };
+        var sign = increase ? "+" : "-";
+        jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET " + column + " = " + column + " "
+                + sign + " ?, version = version + 1, updated_at = UTC_TIMESTAMP(6), request_id = ? "
+                + "WHERE order_item_id = ?", quantity, requestId, orderItemId);
+    }
+
+    /**
+     * 该订单明细在指定履约事实之后是否存在下游消费事实（生产核验、返工、重做、成品余量、发货）。
+     * 领用取消与流水冲销据此判断“是否已被后续事实消费”。
+     */
+    public boolean hasDownstreamConsumption(long orderItemId, long afterEntryId) {
+        var count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fulfillment_entries
+                WHERE order_item_id = ? AND id > ?
+                  AND entry_type IN ('PRODUCTION_QUALIFIED', 'REWORK_IN', 'REMAKE_IN',
+                                     'FINISHED_SURPLUS', 'SHIPMENT_CONSUME')
+                """, Integer.class, orderItemId, afterEntryId);
+        return count != null && count > 0;
+    }
+
     /** 明细首次确认时建立投影行：只写当前有效需求，其余列由后续阶段写入。 */
     public void insertBalance(long orderId, long orderItemId, int requiredQuantity, String requestId) {
         jdbcTemplate.update("""

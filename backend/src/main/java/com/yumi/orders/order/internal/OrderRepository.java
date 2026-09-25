@@ -36,6 +36,7 @@ public class OrderRepository {
 
     private static final RowMapper<OrderRow> ORDER_MAPPER = OrderRepository::mapOrder;
     private static final RowMapper<OrderItemRow> ITEM_MAPPER = OrderRepository::mapItem;
+    private static final RowMapper<OrderPlanLineRow> PLAN_MAPPER = OrderRepository::mapPlanLine;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -129,6 +130,32 @@ public class OrderRepository {
         jdbcTemplate.update("DELETE FROM order_items WHERE order_id = ?", orderId);
     }
 
+    // ---------- 草稿库存计划（任务 4.8） ----------
+
+    /** 计划行按明细序号排序，便于与明细表逐行对照。 */
+    public List<OrderPlanLineRow> findPlanLines(long orderId) {
+        return jdbcTemplate.query("""
+                SELECT p.id, p.order_id, p.order_item_id, i.line_no, p.batch_id, p.quantity
+                FROM order_inventory_plan_lines p
+                JOIN order_items i ON i.id = p.order_item_id
+                WHERE p.order_id = ?
+                ORDER BY i.line_no, p.id
+                """, PLAN_MAPPER, orderId);
+    }
+
+    /** 计划行对明细有外键，整体替换明细前必须先调用本方法，否则删明细会被外键挡住。 */
+    public void deletePlanLines(long orderId) {
+        jdbcTemplate.update("DELETE FROM order_inventory_plan_lines WHERE order_id = ?", orderId);
+    }
+
+    public void insertPlanLine(long orderId, long orderItemId, long batchId, int quantity, String requestId) {
+        jdbcTemplate.update("""
+                INSERT INTO order_inventory_plan_lines (order_id, order_item_id, batch_id, quantity,
+                    version, created_at, updated_at, request_id)
+                VALUES (?, ?, ?, ?, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)
+                """, orderId, orderItemId, batchId, quantity, requestId);
+    }
+
     /** 变更确认后按 id 覆盖明细业务列（并发守卫是订单级 {@code version}）。 */
     public void updateItem(OrderItemRow row, String requestId) {
         jdbcTemplate.update("""
@@ -213,5 +240,15 @@ public class OrderRepository {
 
     private static LocalDate toLocalDate(Date date) {
         return date == null ? null : date.toLocalDate();
+    }
+
+    private static OrderPlanLineRow mapPlanLine(ResultSet rs, int rowNum) throws SQLException {
+        return new OrderPlanLineRow(
+                rs.getLong("id"),
+                rs.getLong("order_id"),
+                rs.getLong("order_item_id"),
+                rs.getInt("line_no"),
+                rs.getLong("batch_id"),
+                rs.getInt("quantity"));
     }
 }

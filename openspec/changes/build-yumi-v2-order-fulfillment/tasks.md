@@ -563,48 +563,130 @@
 
 ## 4. 阶段四：库存批次、流水与订单领用（依赖阶段三）
 
-- [ ] 4.1 编写 Flyway 迁移创建 `inventory_batches/inventory_movements/inventory_movement_lines/inventory_allocations/inventory_allocation_lines`，落实 `IB000001/IM000001` 唯一编号、非负数量、来源/冲销关联和锁定索引。
+- [x] 4.1 编写 Flyway 迁移创建 `inventory_batches/inventory_movements/inventory_movement_lines/inventory_allocations/inventory_allocation_lines`，落实 `IB000001/IM000001` 唯一编号、非负数量、来源/冲销关联和锁定索引。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“库存数量必须由不可变流水决定”的两个 Scenario（期初库存、盘点调整）。正式文档：`docs/architecture/database-design.md` §7/§12/§13–15、`docs/architecture/domain-and-quantity-model.md` §8、`design.md` §6（库存行）。文件：新增 `backend/src/main/resources/db/migration/V8__inventory.sql`、`backend/src/test/java/com/yumi/InventoryMigrationTest.java`；`SequenceAllocator` 新增定宽重载 `format(prefix, value, width)`（库存批次/流水为 6 位：`IB000001`/`IM000001`，其余沿用 5 位）。Flyway 版本：`V8__inventory.sql`（新增 5 表，不改 V1–V7）。API：不适用（本任务只建表）。表：`inventory_batches`、`inventory_movements`、`inventory_movement_lines`、`inventory_allocations`、`inventory_allocation_lines`。事务/锁定/幂等键：不适用（本任务只建表；领用锁见 4.6）。
+  - 关键结构：`inventory_batches.batch_no CHAR(8)` 唯一 + `uk_inventory_batches_source (source_type, source_id, source_line_id)`（同一来源只能形成一条批次，`source_line_id` 用 0 而非 NULL 以保证唯一键生效）+ `idx_inventory_batches_pick (product_id, node, seam_state, id)`（领用按商品+工序+缝边状态稳定顺序 `FOR UPDATE` 的锁定索引）+ `ck_inventory_batches_quantity_not_negative`；`inventory_movements.movement_no CHAR(8)` 唯一 + 自关联 `fk_inventory_movements_reverses`（冲销关联）；`inventory_movement_lines` 外键指向流水/批次/订单明细，`ck_inventory_movement_lines_quantity (quantity > 0)` 与 `ck_inventory_movement_lines_direction`（入库 `after = before + qty`、出库 `after + qty = before`）；`inventory_allocations` 关联订单并自关联冲销；`inventory_allocation_lines` 关联批次/订单明细/库存流水行/履约台账记录/被冲销行。
+  - RED/GREEN 口径（如实记录）：本任务为**建表型**，先写断言后建表——首跑 `-Dtest=InventoryMigrationTest` 退出码非 0（缺表与缺列断言失败），实现 `V8` 后同命令退出码 0，**5/5**；期间修掉一处测试自身缺陷（`keepsBatchQuantityEqualToEffectiveMovementLines` 只插流水行未回写批次数量，断言前后不一致）。
+  - 关键断言：五张表存在；`batch_no`/`movement_no` 为 `CHAR(8)`、`quantity` 为 `INT UNSIGNED`；两个唯一键与 `idx_inventory_batches_pick` 齐备；冲销自关联与领用明细的六个外键齐备；同一来源二次建批次被 `uk_inventory_batches_source` 拒绝；入库 `after ≠ before + qty`、出库 `after + qty ≠ before`、`quantity = 0` 三种非法流水行分别被对应 CHECK 拒绝；批次当前数量与有效流水行汇总一致（IN 10 / OUT 3 → 7）。
+  - 阶段门禁：`./mvnw test` 退出码 0，**206 测试 0 失败 0 错误**（含 Hibernate `ddl-auto: validate` 与 Modulith 边界）。
+  - 人工证据：不适用（只建表）。
+- [x] 4.2 实现库存批次/汇总/流水查询 `GET /api/inventory/batches|movements|summary`，默认按商品+工序+缝边状态汇总并可展开来源，零库存默认隐藏但历史可查。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“库存数量必须由不可变流水决定”。正式文档：`docs/architecture/database-design.md` §7/§13、`design.md` §6（库存行）、`docs/architecture/domain-and-quantity-model.md` §13。文件：新增 `backend/src/main/java/com/yumi/inventory/{InventoryController,InventoryService,InventoryViews}.java`、`inventory/batch/internal/{InventoryBatchRow,InventoryBatchRepository}.java`、`inventory/movement/internal/{InventoryMovementRow,InventoryMovementLineRow,InventoryMovementRepository}.java`、`inventory/internal/InventoryReference.java`；测试 `InventoryApiTest`。API：`GET /api/inventory/batches`（`productId`/`node`/`seamState`/`includeEmpty`）、`GET /api/inventory/summary`、`GET /api/inventory/movements`（`movementType`/`batchId`/业务日期区间）；错误码 `VALIDATION_INVALID`、`NOT_FOUND`、`AUTH_REQUIRED`。表：五张库存表。事务/锁定/幂等键：不适用（只读查询，不要求幂等键、不产生业务写入）。
+  - 口径：批次列表与汇总默认隐藏零库存（`quantity > 0` / `HAVING SUM > 0`），`includeEmpty=true` 时可查历史（含已清零批次）；汇总按 商品 + 工序 + 缝边状态 分组给出当前数量与批次数；流水按业务头 + 明细行返回，行内含变动前后数量、批次编号与订单明细追溯（订单号 + 明细序号）。
+  - 关键断言：按工序筛选返回对应批次；汇总为「制作未缝边 14（2 批）+ 缝边剪袋已缝边 6（1 批）」两行；把一条批次盘点到 0 后默认列表少一行、`includeEmpty=true` 恢复为 3 行；按批次查流水返回期初与盘点两条，行内 `batchNo` 以 `IB` 开头、变动前后数量逐项一致（期初 0→3、盘点 3→0）。
+  - 阶段门禁：`./mvnw test` 退出码 0，**206 测试 0 失败**。
+  - 人工证据：不适用（库存工作区在 4.11 实现并单独验收）。
+- [x] 4.3 实现期初库存 `POST /api/inventory/batches`，保存盘点日期、来源、操作人和备注，不伪造旧订单、生产或工资事实。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“库存数量必须由不可变流水决定”的 Scenario“期初库存”。正式文档：`docs/architecture/database-design.md` §7/§12、`design.md` §6。文件：`InventoryService.opening`、`OpeningRequest`、`InventoryNodes.isValidCombination`。API：`POST /api/inventory/batches`（201）；错误码 `VALIDATION_INVALID`（`productId`/`node`/`seamState`/`quantity`/`inventoryDate` 字段定位）、`AUTH_REQUIRED`。表：`inventory_batches`、`inventory_movements`、`inventory_movement_lines`、`number_sequences`。事务拥有者：`InventoryService.opening` 的 `@Transactional`（流水 + 批次 + 流水行同事务）；锁定对象：`number_sequences` 行锁（`FOR UPDATE`）；幂等键：必须 `Idempotency-Key`。
+  - 口径：期初只接受合法商品（存在且启用）、合法工序、合法工序-缝边状态组合（制作/捏毛装袋为 `NONE`、缝边剪袋为 `DONE`、可发货两种均可）与大于 0 的数量；先分配 `IM` 编号写业务头，再分配 `IB` 编号建批次（`source_type=OPENING`、`source_id=流水 id`，使「同一来源一条批次」的唯一键成立），最后写入库流水行（before 0 / after 数量）并落批次数量。
+  - 关键断言：返回 `IB\d{6}` 批次号、数量 10、工序与缝边状态正确、来源为 `OPENING`；对应流水为 `IM\d{6}`/`OPENING`/`IN`/数量 10/前后 0→10；**不伪造历史事实**——订单数、履约事实数与变更日志数在期初前后完全不变；数量 0、非法工序、非法工序-缝边组合、商品不存在、缺盘点日期五种非法入参均 400 + 字段定位，且库存批次数为 0。
+  - 阶段门禁：`./mvnw test` 退出码 0，**206 测试 0 失败**。
+  - 人工证据：不适用。
+- [x] 4.4 实现盘点调整 `POST /api/inventory/adjustments`，由实际数量计算差异并生成盘盈/盘亏流水；数量一致不写记录，错误只能用新调整/冲销事实更正。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“库存数量必须由不可变流水决定”的 Scenario“盘点调整”。正式文档：`docs/architecture/database-design.md` §7、`docs/architecture/domain-and-quantity-model.md` §14（已确认事实不物理删除）。文件：`InventoryService.adjust`、`AdjustmentRequest`。API：`POST /api/inventory/adjustments`；错误码 `VALIDATION_INVALID`（`batchId`/`actualQuantity`/`reason`）、`NOT_FOUND`、`CONFLICT_VERSION`、`AUTH_REQUIRED`。表：`inventory_movements`、`inventory_movement_lines`、`inventory_batches`。事务拥有者：`InventoryService.adjust` 的 `@Transactional`；锁定对象：`inventory_batches.version` 乐观锁（`updateQuantity` 带版本条件）；幂等键：必须 `Idempotency-Key`。
+  - 口径：由实际数量与当前数量计算差异，`差异 > 0` 生成 `IN` 盘盈流水行、`差异 < 0` 生成 `OUT` 盘亏流水行（都写变动前后数量），再按流水结果回写批次数量；**差异为 0 时不写任何记录**（直接返回当前批次）；盘点原因必填；错误只能通过新的盘点调整或后续冲销事实更正，原流水不可改删。
+  - 关键断言：10 → 实际 12 生成 `ADJUSTMENT`/`IN`/数量 2/前后 10→12 且原因落库；12 → 实际 8 生成 `OUT`/数量 4/前后 12→8；实际等于当前时流水总数不变；批次当前数量与有效流水行汇总一致（8）；缺原因 400 + `reason` 字段定位；批次不存在 404。
+  - 阶段门禁：`./mvnw test` 退出码 0，**206 测试 0 失败**。
+  - 人工证据：不适用。
+- [x] 4.5 实现库存推荐查询，按商品、接入工序、缝边兼容性和 FIFO 推荐；只推荐不自动提交，支持一次选择多个批次。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“订单库存领用必须原子扣减并接入”的 Scenario“多批次兼容领用”（推荐是领用前的候选面）。正式文档：`docs/architecture/domain-and-quantity-model.md` §8（接入矩阵）、`docs/architecture/database-design.md` §7/§13（FIFO 与锁定索引）。文件：新增 `backend/src/main/java/com/yumi/inventory/InventoryNodes.java`（工序/缝边常量 + 接入矩阵 + 组合合法性）、`InventoryService.recommendations`。API：`GET /api/inventory/recommendations?productId=&targetNode=`；错误码 `VALIDATION_INVALID`（非法接入工序）、`AUTH_REQUIRED`。表：`inventory_batches`。事务/锁定/幂等键：不适用（只读推荐，不加锁、不占用、不要求幂等键）。
+  - 接入矩阵（`InventoryNodes`）：制作合格 → 只能接入捏毛装袋；捏毛装袋合格（未缝边）→ 不缝边可发货 或 缝边剪袋；缝边剪袋合格（已缝边）→ 可发货；可发货是终态不可再接入。接入后的状态由 `seamStateAfter` 决定（接入缝边剪袋即视为已缝边、接入捏毛装袋为未缝边、接入可发货保持原缝边状态）。
+  - 关键断言：制作未缝边批次只出现在 `targetNode=PACKING_BAG` 的推荐里；捏毛装袋未缝边批次同时出现在 `SHIPPABLE` 与 `SEAM_CUTTING` 的推荐里，缝边剪袋已缝边批次只出现在 `SHIPPABLE`；`targetNode=MAKING` 无候选（终态不可再接入）；候选按批次 id 升序（FIFO）且带出该批次当前可接入的目标列表；**只推荐不占用**——推荐前后流水数与批次数量不变；非法接入工序 400。
+  - 阶段门禁：`./mvnw test` 退出码 0，**206 测试 0 失败**。
+  - 人工证据：不适用（推荐在 4.11 工作区展示，随 4.14 人工验收）。
+- [x] 4.6 实现 `POST /api/inventory-allocations`：稳定顺序悲观锁批次、重新校验余额/兼容性、生成出库流水、扣库存并在同一事务写订单履约接入。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“订单库存领用必须原子扣减并接入”的 Scenario“多批次兼容领用”“并发库存不足”。正式文档：`docs/architecture/database-design.md` §7、`docs/architecture/domain-and-quantity-model.md` §2.4/§8/§9、`design.md` §6（领用行）。文件：新增 `backend/src/main/java/com/yumi/inventory/InventoryAllocationController.java`、`inventory/allocation/internal/{InventoryAllocationRow,InventoryAllocationLineRow,InventoryAllocationRepository}.java`、`AllocationRequest.java`；`InventoryService.allocate`；`InventoryBatchRepository.lockByIds`；订单侧新增对外命名接口 `com.yumi.orders.ledger.FulfillmentLedger`（`@NamedInterface`，内部用 `FulfillmentRepository.insertEntryReturningId`/`applyInflow`）。API：`POST /api/inventory-allocations`（201）、`GET /api/inventory-allocations?orderId=`；错误码 `STATE_NOT_EDITABLE`（草稿订单不可领用）、`VALIDATION_INVALID`（明细归属/接入工序）、`NOT_FOUND`（批次不存在）、`STOCK_INSUFFICIENT`（每批缺口）、`AUTH_REQUIRED`。表：`inventory_allocations`、`inventory_allocation_lines`、`inventory_movements`、`inventory_movement_lines`、`inventory_batches`、`fulfillment_entries`、`order_item_fulfillment_balances`。事务拥有者：`InventoryService.allocate` 的单个 `@Transactional`（锁批次 → 出库流水 → 扣库存 → 履约接入 → 投影 → 领用单）；锁定对象：`inventory_batches` 行锁（`SELECT ... WHERE id IN (...) ORDER BY id FOR UPDATE`，跨明细按 id 升序避免死锁）+ `inventory_batches.version` 乐观锁；幂等键：必须 `Idempotency-Key`。
+  - 口径：领用只对已确认订单开放；明细必须属于该订单；批次由管理员显式选择（4.5 只给候选）；同一数量不得同时作为库存来源与生产合格来源（履约来源唯一键按 `source_type` 区分 `INVENTORY` 与 `PRODUCTION`）。
+  - 关键断言：两个制作批次（10 与 4）领用 8 + 4 到捏毛装袋 → 领用单两条明细、`quantityBefore/After` 为 10→2 与 4→0、批次剩余 2 与 0、`ALLOCATION` 流水为 `IM\d{6}`/`OUT`/数量 8、履约事实两条 `INVENTORY_ALLOCATION`/`PACKING_BAG`/`IN`、投影 `packing_inflow = 12`，明细行带出订单号追溯。
+  - 阶段门禁：`./mvnw test` 退出码 0，**212 测试 0 失败**。
+  - 人工证据：不适用（库存工作区在 4.11，随 4.14 人工验收）。
+- [x] 4.7 实现接入矩阵：制作合格库存→捏毛装袋；捏毛装袋合格库存→不缝边可发货或缝边剪袋；缝边剪袋合格库存→可发货；每笔来源只接入一次。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“订单库存领用必须原子扣减并接入”。正式文档：`docs/architecture/domain-and-quantity-model.md` §8（接入矩阵）。文件：`InventoryNodes.allowedTargets`/`canAllocate`/`seamStateAfter`/`isValidCombination`（4.5 已建，本任务在领用处强制）；`InventoryService.allocate` 的兼容性守卫；履约来源唯一键 `uk_fulfillment_entries_source`（V7）保证「每笔来源只接入一次」。API：领用；错误码 `VALIDATION_INVALID`（不兼容时给出批次工序/缝边状态与目标节点）。表：`inventory_batches`、`fulfillment_entries`。
+  - 关键断言：制作未缝边批次领用到 `SHIPPABLE` 被 400 拒绝并定位 `lines[0].targetNode`（消息含「批次工序 MAKING（缝边 NONE）不能接入 SHIPPABLE」）；合法路径（制作→捏毛装袋、捏毛装袋未缝边→缝边剪袋/可发货、缝边剪袋已缝边→可发货）在 4.5 的推荐用例与 4.6/4.9 的领用用例中逐条覆盖；接入后批次状态按 `seamStateAfter` 落库（接入缝边剪袋即 `DONE`）。
+  - 阶段门禁：`./mvnw test` 退出码 0，**212 测试 0 失败**。
+  - 人工证据：不适用。
+- [x] 4.8 实现草稿库存计划和确认时重验：草稿不占用；确认库存不足返回每批缺口，管理员明确重新选择或转生产，系统不得自动把缺口转生产。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“草稿库存计划不占用库存”的 Scenario“确认时库存发生变化”。正式文档：`docs/architecture/domain-and-quantity-model.md` §8、`docs/architecture/order-module-design.md` §3.9/§7/§8、`database-design.md` §6、`design.md` §6（确认行）。文件：`orders/order/OrderPlanLineRequest.java`、`OrderViews.OrderPlanLineView`、`OrderRepository.findPlanLines/deletePlanLines/insertPlanLine`、`OrderService.validatePlan/persistPlan/requirePlanAvailable`、`orders/order/internal/InventoryPlanReference.java`（只读批次快照 + 按批次聚合缺口）、前端 `pages/orders/planInput.ts`、`OrderCreatePage` 第 4 步。API：`POST /api/orders`、`PATCH /api/orders/{id}` 新增可选 `inventoryPlan:[{lineNo,batchId,quantity}]`（非空整体替换、空列表清空、不传保持原值）；`GET /api/orders/{id}` 返回 `inventoryPlan`（含 `batchNo/node/seamState/batchQuantity`）；`POST /api/orders/{id}/confirm` 入参只保留 `transferShortageToProduction`；错误码 `STOCK_INSUFFICIENT`（按批次聚合的缺口，`fieldErrors` 定位 `inventoryPlan`）、`VALIDATION_INVALID`（批次不存在/序号越界/数量非正/同明细同批次重复）、`CONFLICT_VERSION`。表：`order_inventory_plan_lines`（V9 新增）、`inventory_batches`（只读）、`orders`、`order_confirmation_snapshots` 等。事务拥有者：`OrderService.create/update/confirm` 的 `@Transactional`（计划写入与确认重验各自同一事务）；锁定对象：不适用（计划不占用库存，重验只读）；幂等键：必须 `Idempotency-Key`。
+  - 口径（2026-09-25 用户选择「持久化计划但不占库存」后定稿）：计划**持久化在草稿上**，重新打开草稿能带出上次选的批次与数量；计划只是参考、**不占用库存**——写入与确认都不改 `inventory_batches.quantity`、不产生库存流水。确认时在事务内**按批次聚合**重验余额（同一批次可被多条明细计划，逐行比较会漏判「单行都不超、合计超支」），有缺口且未明确 `transferShortageToProduction=true` 时返回每批缺口并整笔回滚；**系统不自动补缺**，缺口由生产需求覆盖（订单需求本身就是 Q，库存领用只是加速项）。确认本身**不创建领用事实**，实际领用仍由 4.6 的显式命令产生。计划行**不存接入节点**：`orders` 不得依赖 `inventory` 模块（模块循环已由 `orders → ledger` 单向边断开），接入矩阵只在领用时由库存模块判定。写入用**明细序号 `lineNo`** 而非明细 id：草稿明细整单替换，id 每次保存都会变，序号才稳定；因此整体替换明细前必须先清计划行（外键）。
+  - 关键断言（`OrderInventoryPlanTest` 6 用例 + `OrderMigrationTest`/`InventoryAllocationTest` 各 1 用例）：创建带 2 行计划 → 201 且 `inventoryPlan[0].batchQuantity/node/seamState` 正确、`GET` 回读一致、库内 2 行、批次数量不变；`PATCH` 非空列表整体替换、空列表清空；明细被替换且未传计划 → 计划行一并清空；批次不存在/序号越界/数量 0/同明细同批次重复 → 400 `VALIDATION_INVALID` 且不留计划行；两条明细各计划同一批次 5 件（批次只有 6）→ 409 `STOCK_INSUFFICIENT`（按批次聚合才判得出）且订单仍 `DRAFT`、批次仍 6；带 `transferShortageToProduction=true` 重发 → 200 `CONFIRMED`、批次仍 6、领用单数为 0；无计划草稿确认不触发重验。迁移断言：`order_inventory_plan_lines` 存在、`quantity` 为 `int unsigned`、唯一键与三个外键齐备、无任何库存余额列。
+  - 阶段门禁（清库重建后，2026-09-25）：后端 `YUMI_DB_PASSWORD=<钥匙串> ./mvnw test` 退出码 0，**222 测试 0 失败 0 错误**（阶段四批次边界 215 → 本项新增 7）；前端 `npm run typecheck`/`npm test`（7 文件 41 用例）/`npm run build` 退出码均 0；`openspec validate build-yumi-v2-order-fulfillment --strict` valid。
+  - 人工证据：见下方「4.8/4.11/4.14 合并人工验收」条目。
+- [x] 4.9 实现 `POST /api/inventory-allocations/{id}/cancel`，仅未被后续生产/核验/发货消费时生成反向库存和履约事实；已消费返回 `STATE_CANNOT_CANCEL`。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“领用取消必须使用反向事实”的两个 Scenario（未消费领用取消、已消费领用取消）。正式文档：`docs/architecture/database-design.md` §7、`docs/architecture/domain-and-quantity-model.md` §8/§14。文件：`InventoryService.cancelAllocation`、`ReverseRequest`、`InventoryAllocationController.cancel`；`InventoryMovementRepository.findLineById`；`FulfillmentRepository.hasDownstreamConsumption`。API：`POST /api/inventory-allocations/{id}/cancel`；错误码 `STATE_CANNOT_CANCEL`（已消费/已取消）、`VALIDATION_INVALID`（缺原因）、`NOT_FOUND`、`CONFLICT_VERSION`。表：`inventory_allocations`、`inventory_movements`、`inventory_movement_lines`、`inventory_batches`、`fulfillment_entries`、`order_item_fulfillment_balances`。事务拥有者：`cancelAllocation` 的单个 `@Transactional`；锁定对象：`inventory_allocations.version` 乐观锁；幂等键：必须 `Idempotency-Key`。
+  - 口径：消费判定＝该订单明细在领用履约事实之后存在下游事实（`PRODUCTION_QUALIFIED`/`REWORK_IN`/`REMAKE_IN`/`FINISHED_SURPLUS`/`SHIPMENT_CONSUME`）——阶段四这些事实恒为空，阶段五/六接入后即生效；取消写 `ALLOCATION_CANCEL` 反向流水（`reverses_movement_id` 指向原领用流水）+ 反向 `IN` 入库行恢复批次 + 反向 `OUT` 履约事实并回退投影，**原领用流水与明细保持不变**，只更新领用单状态与取消信息。
+  - 关键断言：取消未被消费的领用 → 领用单 `CANCELLED` 且带取消原因；批次由 4 恢复到 10；`ALLOCATION_CANCEL` 流水方向 `IN`/数量 6/`reverses_movement_id` 非空，流水总数 3（原领用仍在）；反向履约事实一条（`INVENTORY_ALLOCATION`/`OUT`）且 `shippable_quantity` 回退为 0；重复取消 409 `STATE_CANNOT_CANCEL`。已消费场景（插入一条 `PRODUCTION_QUALIFIED`）→ 取消 409 `STATE_CANNOT_CANCEL`，批次仍为 4（不回补）、领用单仍 `CONFIRMED`。
+  - 阶段门禁：`./mvnw test` 退出码 0，**212 测试 0 失败**。
+  - 人工证据：不适用（随 4.14 人工验收）。
+- [x] 4.10 实现库存流水冲销命令和查询，未消费流水可关联冲销，已被后续事实消费时拒绝；原流水、冲销、重录永久保留。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“库存流水只能通过冲销更正”的 Scenario“错误流水更正”。正式文档：`docs/architecture/database-design.md` §7、`docs/architecture/domain-and-quantity-model.md` §14（已确认事实不物理删除）。文件：`InventoryService.reverseMovement`、`InventoryController.reverseMovement`；`InventoryMovementRepository.findReversalOf`。API：`POST /api/inventory/movements/{id}/reverse`（原因必填）；查询沿用 `GET /api/inventory/movements`（冲销关系由 `reversesMovementId` 暴露）；错误码 `STATE_CANNOT_CANCEL`（已冲销/已被后续消费）、`VALIDATION_INVALID`（冲销流水再冲销/缺原因）、`NOT_FOUND`。表：`inventory_movements`、`inventory_movement_lines`、`inventory_batches`。事务拥有者：`reverseMovement` 的 `@Transactional`；锁定对象：`inventory_batches.version` 乐观锁；幂等键：必须 `Idempotency-Key`。
+  - 口径：可冲销条件＝①该流水未被冲销（不存在以它为 `reverses_movement_id` 的流水）；②冲销后批次数量不为负——冲销入库流水需要批次当前仍持有该数量（即未被后续业务消费），冲销出库流水则总是恢复数量；③冲销流水自身不可再冲销。冲销生成 `REVERSAL` 业务头（`reverses_movement_id` 指向原流水）与方向相反、数量相同的流水行，原流水与冲销流水都永久保留。
+  - 关键断言：冲销期初入库流水 → 返回 `REVERSAL` 且 `reversesMovementId` 等于原流水 id，批次数量归 0；对同一流水再次冲销 → 409 `STATE_CANNOT_CANCEL` 且流水总数仍为 2（原流水 + 冲销）；批次数量不足（已被后续消费）时冲销被拒。
+  - 阶段门禁：`./mvnw test` 退出码 0，**212 测试 0 失败**。
+  - 人工证据：不适用（随 4.14 人工验收）。
+- [x] 4.11 实现 `/inventory` 全页工作区：汇总、批次、流水、期初、盘点、订单领用和取消入口；展示出库前后数量、来源业务和订单明细追溯。
+  - 证据：Requirement/Scenario：`inventory-management` 全部 Requirement（工作区是这些命令与查询的正式入口）。正式文档：`design.md` §7（`/inventory` 行）、`docs/architecture/order-module-design.md` §8（页面要点同风格）。文件：新增 `frontend/src/api/inventory.ts`（库存/领用/冲销的类型与 11 个封装函数）、`frontend/src/pages/inventory/InventoryPage.tsx`；`frontend/src/routes/index.tsx` 把 `/inventory` 占位页替换为正式页。路由：正式 `/inventory`（`ROUTE_PATHS` 仍 13 条，**未新增路由**）。
+  - 结构：卡片标题「库存 + 当前数量由不可变流水决定，发货不会再扣原库存」，右上角为「期初入库」「订单领用」两个显式操作 + 「显示零库存」开关 + 「刷新」；页内一组 4 个只读页签：汇总（商品/已完成工序/缝边状态/当前数量/批次数）、批次（批次编号/商品/工序/缝边状态/当前数量/来源/盘点日期/行内「盘点」入口）、流水（流水编号/业务类型/业务日期/明细数/原因/操作人/冲销关系/行内「冲销」入口，展开显示明细行的**出库前/出库后数量、工序、商品与来源业务**＝订单号 + 明细序号）、订单领用（按订单 ID 查询，展开显示批次/订单明细/接入工序/数量/出库前后/履约事实 id，行内「取消」入口）。期初入库、盘点、领用、冲销、取消全部走弹窗（各自带口径提示），**页面无预置表单**。
+  - 浏览器自测（2026-09-24，正式路由 `http://127.0.0.1:5190`，后端 18090，登录本机合成账号 `admin`；结构化 DOM 探针）：①页签恰为「汇总/批次/流水/订单领用」四个；②右上角按钮为「期初入库」「订单领用」「刷新」与「显示零库存」开关；③汇总表头为「商品/已完成工序/缝边状态/当前数量/批次数」，批次表头为「批次编号/商品/已完成工序/缝边状态/当前数量/来源/盘点日期/操作」，流水表头为「流水编号/业务类型/业务日期/明细数/原因/操作人/冲销关系/操作」；④空态分别为「暂无库存；先录入期初库存」「暂无批次」「暂无流水」；⑤控制台无 error。
+  - 自测中发现的问题（非页面缺陷，已记录）：首次打开时三个库存查询返回 **404**——运行中的后端仍是批次 A 之前的进程，没有库存端点；重启后端后全部 200/401 正常。口径：**前端验收前必须用最新后端重启一次**。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（6 文件 37 用例）、`npm run build` 退出码 0；后端全量 **215 测试 0 失败**。
+  - 人工证据（与 4.14 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "库存页有「汇总 / 批次 / 流水 / 订单领用」四个页签，切换不跳转、无重复页签"
+        - "期初入库、订单领用从右上角明确按钮进入弹窗；盘点在批次行、冲销在流水行、取消在领用行，查看动作不误作提交动作"
+        - "流水展开能看到每条明细的「出库前 / 出库后」数量与来源业务（订单号 + 明细序号），订单领用展开能看到批次、接入工序与履约事实"
+        - "页面无预置表单；零库存默认不显示，开关打开后能看到已清零批次与历史流水"
+        - "视觉与订单页一致：白底常规后管骨架、轻量 Tag、紧凑筛选、表格自适应撑满"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: 已按清单逐项核对并签字（与 4.14、草稿库存计划步骤同批）。
+- [x] 4.12 编写 MySQL 并发测试：两个事务竞争同一批次只允许一个成功；失败事务无负库存、无部分流水、无履约接入；来源唯一约束拒绝重复领用。
+  - 证据：Requirement/Scenario：`inventory-management` Requirement“订单库存领用必须原子扣减并接入”的 Scenario“并发库存不足”。正式文档：`docs/architecture/database-design.md` §13/§15（锁定索引与并发测试门禁）、`docs/architecture/domain-and-quantity-model.md` §14。文件：`backend/src/test/java/com/yumi/InventoryConcurrencyTest.java`（3 用例）。API：`POST /api/inventory-allocations`；表：`inventory_batches`、`inventory_movements`、`inventory_movement_lines`、`inventory_allocations`、`inventory_allocation_lines`、`fulfillment_entries`、`order_item_fulfillment_balances`；Flyway：不新增。事务/锁定/幂等键：断言点即 `InventoryService.allocate` 的悲观锁（`ORDER BY id FOR UPDATE`）、乐观锁与幂等过滤器。
+  - 关键断言：①并发（两线程同时领用同一批次 6 件、批次共 10）→ 恰好 1 次 201 与 1 次 409，批次余 4，`inventory_movements` 只多 1 条，该批次 `OUT` 明细行恰 1 条，`INVENTORY_ALLOCATION` 履约事实恰 1 条，投影 `shippable_quantity = 6`，且**批次当前数量等于有效流水行汇总（4）**——失败事务没有留下负库存、部分流水或履约接入；②重复幂等键 → 两次 201 返回同一领用 id，批次只扣一次（余 6）、领用单 1 条、履约事实 1 条；③来源唯一：对同一 `(source_type, source_id, source_line_id, node, direction)` 直接二次插入被 `uk_fulfillment_entries_source` 拒绝。
+  - 阶段门禁：`./mvnw test` 退出码 0，**215 测试 0 失败 0 错误**（212 + 本任务新增 3）。
+  - 人工证据：不适用（并发属机器证据）。
+- [ ] 4.13 编写跨模块集成测试证明库存领用时已扣原库存，随后发货只消耗订单可发货，库存流水数量不因发货第二次减少。**（依赖阶段六：发货消耗可发货数量的行为在 6.x 实现，本任务待阶段六完成后回来补）**
   - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.2 实现库存批次/汇总/流水查询 `GET /api/inventory/batches|movements|summary`，默认按商品+工序+缝边状态汇总并可展开来源，零库存默认隐藏但历史可查。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.3 实现期初库存 `POST /api/inventory/batches`，保存盘点日期、来源、操作人和备注，不伪造旧订单、生产或工资事实。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.4 实现盘点调整 `POST /api/inventory/adjustments`，由实际数量计算差异并生成盘盈/盘亏流水；数量一致不写记录，错误只能用新调整/冲销事实更正。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.5 实现库存推荐查询，按商品、接入工序、缝边兼容性和 FIFO 推荐；只推荐不自动提交，支持一次选择多个批次。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.6 实现 `POST /api/inventory-allocations`：稳定顺序悲观锁批次、重新校验余额/兼容性、生成出库流水、扣库存并在同一事务写订单履约接入。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.7 实现接入矩阵：制作合格库存→捏毛装袋；捏毛装袋合格库存→不缝边可发货或缝边剪袋；缝边剪袋合格库存→可发货；每笔来源只接入一次。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.8 实现草稿库存计划和确认时重验：草稿不占用；确认库存不足返回每批缺口，管理员明确重新选择或转生产，系统不得自动把缺口转生产。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.9 实现 `POST /api/inventory-allocations/{id}/cancel`，仅未被后续生产/核验/发货消费时生成反向库存和履约事实；已消费返回 `STATE_CANNOT_CANCEL`。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.10 实现库存流水冲销命令和查询，未消费流水可关联冲销，已被后续事实消费时拒绝；原流水、冲销、重录永久保留。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.11 实现 `/inventory` 全页工作区：汇总、批次、流水、期初、盘点、订单领用和取消入口；展示出库前后数量、来源业务和订单明细追溯。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.12 编写 MySQL 并发测试：两个事务竞争同一批次只允许一个成功；失败事务无负库存、无部分流水、无履约接入；来源唯一约束拒绝重复领用。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.13 编写跨模块集成测试证明库存领用时已扣原库存，随后发货只消耗订单可发货，库存流水数量不因发货第二次减少。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 4.14 阶段人工验收：期初入库、盘点、多个批次领用到不同工序、取消未消费领用和拒绝已消费领用；视觉结论待用户签字。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [x] 4.14 阶段人工验收：期初入库、盘点、多个批次领用到不同工序、取消未消费领用和拒绝已消费领用。
+  - 证据（2026-09-25 阶段四验收，正式路由 `http://127.0.0.1:5190`，后端 18090，清库重建后空库起 V1→V8，登录本机合成账号 `admin`）：
+  - 环境：商品 P00001「验收-泰迪熊30cm」（单件成本 18.1200）、客户 C00001、订单 `YM00001`（Q=20 / E=8，应收 516.0000）已确认；四个期初批次：`IB000001`/`IB000002`（制作未缝边 10/6）、`IB000003`（捏毛装袋未缝边 8）、`IB000004`（缝边剪袋已缝边 5）。
+  - ①**期初入库**：四个批次分别返回 `IB00000X` 编号，来源 `OPENING`，各生成一条 `IM00000X`/`OPENING`/`IN` 流水（前后 0 → 数量）。
+  - ②**盘点调整**：`IB000001` 实际 12（盘盈 2，前后 10→12）、`IB000003` 实际 5（盘亏 3，前后 8→5）各生成一条 `ADJUSTMENT` 流水；随后对 `IB000003` 再提交「实际 5」（数量一致）——**流水总数 6 → 6，未生成任何记录**。
+  - ③**多批次领用到不同工序**（一次领用单含三条明细，覆盖接入矩阵三条合法路径）：制作 `IB000001` 4 件 → 捏毛装袋（出库 12→8）、捏毛装袋 `IB000003` 5 件 → 缝边剪袋（5→0）、缝边剪袋 `IB000004` 5 件 → 可发货（5→0）；领用单 `CONFIRMED`，三条明细分别带出批次编号、接入工序与出库前后数量，并各生成一条 `INVENTORY_ALLOCATION` 履约事实（节点分别为 PACKING_BAG/SEAM_CUTTING/SHIPPABLE）与投影（`packing_inflow=4`、`seam_inflow=5`、`shippable_quantity=5`）。
+  - ④**取消未消费领用**：从 `IB000002` 领用 3 件到捏毛装袋（批次 6→3）后取消 → 领用单 `CANCELLED` 且带取消原因，批次**恢复为 6**，生成 `IM000009`/`ALLOCATION_CANCEL` 且 `reverses_movement_id = 8`（指向原领用流水），并生成一条反向履约事实（`INVENTORY_ALLOCATION`/`OUT`/3），投影 `packing_inflow` 由 7 回退为 4。
+  - ⑤**拒绝已消费领用**：为订单明细写入一条 `PRODUCTION_QUALIFIED`（缝边剪袋 5 件，模拟阶段五消费）后再取消领用单 1 → 409 `STATE_CANCEL_NOT_ALLOWED`，消息「领用数量已进入后续生产、核验或发货，请使用更正或售后流程」，`fieldErrors` 定位 `allocationId`；批次与领用单状态**未被改动**。
+  - ⑥**终态一致性核对**：四个批次的当前数量与各自有效流水行汇总**逐批相等**（8=8、6=6、0=0、0=0）；流水为 4 条 `OPENING` + 2 条 `ADJUSTMENT` + 2 条 `ALLOCATION` + 1 条 `ALLOCATION_CANCEL`（冲销关联完整）；履约事实为需求 1 条 + 库存接入 4 条（含 1 条取消反向）+ 模拟生产 1 条；投影 `required_quantity=20`、`packing_inflow=4`、`seam_inflow=5`、`shippable_quantity=5`、`shipped_quantity=0`。
+  - **取证方式说明（如实记录）**：本轮验收用 **API + 库内核对**完成（与 3.15 同口径）；页面的期初/盘点/领用/取消入口与只读页签已在 4.11 用正式路由自测并留证（含展开行的出库前后与来源业务），视觉项见 4.11 的 `humanVisualConclusion`。
+  - 门禁：后端全量 **215 测试 0 失败**、前端 typecheck/37 用例/build 均 0、`openspec validate --strict` valid。
+  - 人工证据（与 4.11 同一批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "期初入库后能在汇总/批次里看到批次、工序、缝边状态与数量，来源为期初"
+        - "盘点盘盈/盘亏各生成一条流水且数量按差异更新；数量一致时不产生任何记录"
+        - "一次领用可含多个批次并分别接入不同工序，页面展开能看到每条的出库前后数量与来源订单明细"
+        - "取消未消费的领用会回补批次数量并生成反向事实，原领用流水保留；已进入后续生产/发货的领用取消被拒绝且不改动任何数据"
+        - "库存页视觉与订单页一致：白底常规后管骨架、轻量 Tag、紧凑筛选、表格自适应撑满（明细见 4.11 清单）"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: 已按清单逐项核对并签字（与 4.11、草稿库存计划步骤同批）。
+  - **4.8/4.11/4.14 合并人工验收（草稿库存计划步骤）**：本轮清库重建后新增 `order_inventory_plan_lines`（V9）与 `/orders/new` 第 4 步「库存计划（可选）」，与 4.11/4.14 清单同批签字。页面的库存工作区部分见 4.11 与上一条清单，本条目只覆盖订单工作区的计划步骤。
+    - 环境（2026-09-25）：后端 18090、前端 5190；清库重建后由 Flyway 从空库执行 **V1→V9**；`admin` 账号清库后重建（口令未写入仓库）。验收数据：客户「验收-计划客户」、商品 `P00062`「验收-计划商品」与 `P00063`「验收-计划商品二」、批次 `IB000028`（P00062 捏毛装袋未缝边 10）、`IB000029`（P00062 制作未缝边 6）、`IB000030`（P00063 制作未缝边 6）；草稿 `YM00031`（2 行计划：明细 1 → `IB000028` 计划 4、明细 2 → `IB000030` 计划 3，浏览器内改为 5 后确认成功）、缺口样例 `YM00034`（两条明细同为 `P00062`、各计划 `IB000028` 8 件，合计 16 > 10，留为草稿待签字复看）、另 `YM00033`（两条明细各计划 `IB000029` 4 件）用于 API 侧「缺口转生产」放行验证。
+    - 机器证据（API + 库内核对，已完成）：见 4.8「关键断言」；真机含 409 `STOCK_INSUFFICIENT` 缺口文案「批次 IB000029 可用 6，计划 8」（两条明细各 4 件，单行都不超、按批次聚合才判得出）、订单仍 `DRAFT`、批次仍 6；带 `transferShortageToProduction=true` → `CONFIRMED` 且批次仍 6、领用单 0、库存流水仍 2 条；序号越界/批次不存在/数量 0 三条字段错误且不留计划行。
+    - 浏览器自测（2026-09-25，正式路由 `http://127.0.0.1:5190`，后端 18090，登录本机合成账号 `admin`；结构化 DOM 探针 + MCP 真实点击，**非 API 代跑**）：①步骤恰为 5 步，第 4 步标题「库存计划（可选）」；②第 4 步表头为「订单明细 / 批次（该商品现有库存）/ 计划数量 / 操作」，提示文案「计划只是参考、**不占用库存**：保存草稿既不扣减也不预留批次数量；确认时服务端按批次重新核对余额…」；③打开草稿 `YM00031` 第 4 步带出 2 行计划——`#1 P00062 验收-计划商品 | IB000028 · 捏毛装袋/未缝边 · 余 10 | 4`、`#2 P00063 验收-计划商品二 | IB000030 · 制作/未缝边 · 余 6 | 3`；④第 2 行批次下拉候选恰为 `IB000030 · 制作/未缝边 · 余 6`（该商品唯一批次）；⑤把第 2 行数量由 3 改为 5 后「保存并继续」，第 5 步计划汇总表（表头「明细/批次/工序缝边/批次现有/计划」）显示 `#2 | IB000030 | 制作/未缝边 | 6 | 5`；**重新打开同一草稿第 4 步仍为 5**（持久化闭环）；⑥确认 `YM00031` → 跳转 `/orders/47`，状态 Tag 变「已确认」、派生「未开始/未发货」；⑦缺口样例 `YM00034`（两条明细同为 P00062、各计划 `IB000028` 8 件）点「确认订单」→ 红色告警「**库存计划余额不足，确认已整笔回滚**」+「批次 IB000028 可用 10，**计划 16**」（8+8 聚合）+ 两个出口「返回上一步重新选择批次」「缺口转生产并确认」，页面停留在复核步骤不跳转，订单仍 `DRAFT`、计划行完整、批次仍 10；⑧控制台除本次故意的 `409 /api/orders/50/confirm` 与既有的 vite/React DevTools/`HydrateFallback` 提示外无 error。
+    - 自测中发现并修复的两个真缺口（均属前端）：①重新打开带计划的草稿时，计划行的批次下拉**没有候选**（`loadBatches` 原本只在手选明细时触发）→ 加载草稿后按明细商品去重预取批次候选；②计划引用的批次若不在候选里（如明细商品被改过），下拉**只显示裸批次 id** → 把计划行自带的批次快照并入候选（去重合并），保证标签始终可读。修复后前端 typecheck/41 用例/build 全部重跑通过。
+    - humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "`/orders/new?orderId=<YM00031 的 id>` 第 4 步标题为「库存计划（可选）」，并带出草稿上已保存的 2 行计划（明细 #1/#2、批次 IB000028/IB000029、数量 4/3）"
+        - "批次下拉有候选且显示「批次号 · 工序/缝边 · 余 N」；步骤内提示计划只是参考、不占用库存"
+        - "在第 4 步改动计划后「保存并继续」，重新打开同一草稿能带出改动后的计划"
+        - "确认 `YM00031` 成功；确认缺口样例 `YM00034` 时出现缺口告警（列出「批次 IB000028 可用 10，计划 16」）并提供「返回上一步重新选择批次」与「缺口转生产并确认」两个出口，页面不自动补缺"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: 已按清单逐项核对并签字：第 4 步「库存计划（可选）」带出草稿计划、批次下拉标签可读、改动后保存并重新打开仍是改动后的值、确认成功；缺口样例出现按批次聚合的缺口告警与两个显式出口且不自动补缺。
 
 ## 5. 阶段五：生产计划、核验、返工、重做与超额提醒（依赖阶段三；库存接入依赖阶段四）
 

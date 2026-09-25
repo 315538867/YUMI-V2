@@ -57,9 +57,18 @@ public class OrderController {
         return service.update(id, request);
     }
 
+    /**
+     * 确认（任务 3.4/4.8）：草稿库存计划已在草稿上持久化，确认时读草稿按批次聚合重验余额；
+     * `transferShortageToProduction` 表示管理员明确将缺口转生产，缺口存在且未明确时返回 409 缺口明细。
+     */
     @PostMapping("/{id}/confirm")
-    public OrderViews.OrderDetail confirm(@PathVariable long id) {
-        return service.confirm(id);
+    public OrderViews.OrderDetail confirm(@PathVariable long id,
+                                          @RequestBody(required = false) ConfirmRequest request) {
+        return service.confirm(id, request != null && Boolean.TRUE.equals(request.transferShortageToProduction()));
+    }
+
+    /** 确认入参：`transferShortageToProduction` 表示管理员明确将库存计划缺口转生产。 */
+    public record ConfirmRequest(Boolean transferShortageToProduction) {
     }
 
     /** 履约视图（任务 3.6）：共同数量按工序分流 + 四层数量 + 派生状态。 */

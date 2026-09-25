@@ -4,7 +4,9 @@ import com.yumi.calculation.DecimalPolicy;
 import com.yumi.calculation.order.OrderPricing;
 import com.yumi.identity.AuditContext;
 import com.yumi.orders.order.internal.OrderItemRow;
+import com.yumi.orders.order.internal.InventoryPlanReference;
 import com.yumi.orders.order.internal.OrderItemResolver;
+import com.yumi.orders.order.internal.OrderPlanLineRow;
 import com.yumi.orders.order.internal.OrderReference;
 import com.yumi.orders.fulfillment.FulfillmentService;
 import com.yumi.orders.fulfillment.OrderStatuses;
@@ -41,6 +43,7 @@ public class OrderService {
     private final OrderReference reference;
     private final OrderItemResolver itemResolver;
     private final FulfillmentService fulfillmentService;
+    private final InventoryPlanReference inventoryPlanReference;
     private final OrderSnapshotRepository snapshotRepository;
     private final FulfillmentRepository fulfillmentRepository;
     private final SequenceAllocator sequenceAllocator;
@@ -48,6 +51,7 @@ public class OrderService {
 
     public OrderService(OrderRepository repository, OrderReference reference,
                         OrderItemResolver itemResolver, FulfillmentService fulfillmentService,
+                        InventoryPlanReference inventoryPlanReference,
                         OrderSnapshotRepository snapshotRepository,
                         FulfillmentRepository fulfillmentRepository,
                         SequenceAllocator sequenceAllocator, AuditContext auditContext) {
@@ -55,6 +59,7 @@ public class OrderService {
         this.reference = reference;
         this.itemResolver = itemResolver;
         this.fulfillmentService = fulfillmentService;
+        this.inventoryPlanReference = inventoryPlanReference;
         this.snapshotRepository = snapshotRepository;
         this.fulfillmentRepository = fulfillmentRepository;
         this.sequenceAllocator = sequenceAllocator;
@@ -72,7 +77,7 @@ public class OrderService {
 
     public OrderViews.OrderDetail get(long id) {
         var row = requireOrder(id);
-        return toDetail(row, repository.findItems(id), fulfillmentService.derivedFor(row));
+        return toDetail(row, repository.findItems(id), fulfillmentService.derivedFor(row), planLines(id));
     }
 
     /** 取消订单（任务 3.9）：草稿可直接取消；已确认仅在无执行类履约事实时可取消，不删除历史。 */
@@ -106,6 +111,7 @@ public class OrderService {
         var items = resolveItems(request.items(), errors);
         if (errors.isEmpty()) {
             requireDiscountInRange(request.discountAmount(), items, errors);
+            validatePlan(request.inventoryPlan(), items.size(), errors);
         }
         failIfInvalid(errors);
 
@@ -124,6 +130,7 @@ public class OrderService {
                 0L);
         long id = repository.insertOrder(row, audit.requestId(), audit.idempotencyKey());
         persistItems(id, items, audit.requestId());
+        persistPlan(id, request.inventoryPlan(), audit.requestId());
         return get(id);
     }
 
@@ -155,6 +162,9 @@ public class OrderService {
         var discount = request.discountAmount() != null ? request.discountAmount() : existing.discountAmount();
         if (errors.isEmpty()) {
             requireDiscountInRange(discount, items, errors);
+            if (request.inventoryPlan() != null) {
+                validatePlan(request.inventoryPlan(), items.size(), errors);
+            }
         }
         failIfInvalid(errors);
 
@@ -172,8 +182,14 @@ public class OrderService {
                 existing.version());
         repository.updateOrder(updated, audit.requestId());
         if (request.items() != null) {
+            // 计划行对明细有外键，且明细替换后原计划行引用的明细已不存在，必须先清计划再删明细
+            repository.deletePlanLines(id);
             repository.deleteItems(id);
             persistItems(id, items, audit.requestId());
+        }
+        if (request.inventoryPlan() != null) {
+            repository.deletePlanLines(id);
+            persistPlan(id, request.inventoryPlan(), audit.requestId());
         }
         return get(id);
     }
@@ -181,12 +197,43 @@ public class OrderService {
     // ---------- 确认 ----------
 
     /**
+     * 确认订单并重验草稿库存计划（任务 4.8）：计划不占用库存，确认时按批次聚合重验余额；
+     * 有缺口且未明确确认转生产时返回每批缺口（STOCK_INSUFFICIENT），**不自动补缺**。
+     * 确认本身不创建领用事实，实际领用仍由库存领用命令产生。
+     */
+    @Transactional
+    public OrderViews.OrderDetail confirm(long id, boolean transferShortageToProduction) {
+        requirePlanAvailable(id, transferShortageToProduction);
+        return doConfirm(id);
+    }
+
+    /** 计划缺口重验：管理员明确转生产时跳过；缺口消息按批次聚合，避免逐行比较漏判总量超支。 */
+    private void requirePlanAvailable(long id, boolean transferShortageToProduction) {
+        if (transferShortageToProduction) {
+            return;
+        }
+        var planned = repository.findPlanLines(id);
+        if (planned.isEmpty()) {
+            return;
+        }
+        var plannedByBatch = new LinkedHashMap<Long, Integer>();
+        for (var line : planned) {
+            plannedByBatch.merge(line.batchId(), line.quantity(), Integer::sum);
+        }
+        var gaps = inventoryPlanReference.gaps(plannedByBatch);
+        if (!gaps.isEmpty()) {
+            throw new ApiException(ErrorCode.STOCK_INSUFFICIENT,
+                    "草稿库存计划余额不足，请重新选择批次或明确将缺口转生产",
+                    gaps.stream().map(gap -> new ApiFieldError("inventoryPlan", gap)).toList());
+        }
+    }
+
+    /**
      * 确认订单（任务 3.4）：单事务内重验商品、Q/E、交期与金额自洽，写入订单级/明细级快照，
      * 建立履约需求事实与投影，并把订单置为已确认。不自动创建生产计划。
      * 重复幂等键由幂等过滤器返回首次结果，不重复生成快照与履约来源。
      */
-    @Transactional
-    public OrderViews.OrderDetail confirm(long id) {
+    private OrderViews.OrderDetail doConfirm(long id) {
         var order = requireOrder(id);
         if (!STATUS_DRAFT.equals(order.status())) {
             throw new ApiException(ErrorCode.STATE_NOT_CONFIRMABLE);
@@ -338,6 +385,36 @@ public class OrderService {
         }
     }
 
+    /**
+     * 草稿库存计划校验（任务 4.8）：序号须落在本次明细范围内、批次须存在、数量为正、
+     * 同明细同批次不重复。计划只是参考，因此不校验总量是否超过明细需求，也不占用库存。
+     */
+    private void validatePlan(List<OrderPlanLineRequest> plan, int itemCount, List<ApiFieldError> errors) {
+        if (plan == null || plan.isEmpty()) {
+            return;
+        }
+        var seenTargets = new java.util.HashSet<String>();
+        for (int i = 0; i < plan.size(); i++) {
+            var line = plan.get(i);
+            var prefix = "inventoryPlan[" + i + "]";
+            if (line.lineNo() == null || line.lineNo() < 1 || line.lineNo() > itemCount) {
+                errors.add(new ApiFieldError(prefix + ".lineNo", "明细序号必须在 1 与明细数量之间"));
+            }
+            if (line.batchId() == null) {
+                errors.add(new ApiFieldError(prefix + ".batchId", "批次必填"));
+            } else if (inventoryPlanReference.batch(line.batchId()) == null) {
+                errors.add(new ApiFieldError(prefix + ".batchId", "批次不存在"));
+            }
+            if (line.quantity() == null || line.quantity() < 1) {
+                errors.add(new ApiFieldError(prefix + ".quantity", "计划数量必须大于 0"));
+            }
+            if (line.lineNo() != null && line.batchId() != null
+                    && !seenTargets.add(line.lineNo() + ":" + line.batchId())) {
+                errors.add(new ApiFieldError(prefix + ".batchId", "同一明细的同一批次只能有一条计划行"));
+            }
+        }
+    }
+
     private static OrderPricing.OrderTotals totalsOf(List<OrderItemResolver.Resolved> items, BigDecimal discount) {
         return totalsOfAmounts(amountsOf(items), discount);
     }
@@ -367,6 +444,34 @@ public class OrderService {
         }
     }
 
+    /** 计划行按明细序号落库：明细 id 由序号反查，避免依赖插入后回填的自增 id。 */
+    private void persistPlan(long orderId, List<OrderPlanLineRequest> plan, String requestId) {
+        if (plan == null || plan.isEmpty()) {
+            return;
+        }
+        for (var line : plan) {
+            repository.insertPlanLine(orderId, repository.findItemId(orderId, line.lineNo()),
+                    line.batchId(), line.quantity(), requestId);
+        }
+    }
+
+    /** 计划行读模型：补上批次当前工序、缝边状态与数量，页面据此判断计划是否已过期。 */
+    private List<OrderViews.OrderPlanLineView> planLines(long orderId) {
+        var rows = repository.findPlanLines(orderId);
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        var batches = inventoryPlanReference.batches(
+                rows.stream().map(OrderPlanLineRow::batchId).distinct().toList());
+        return rows.stream().map(line -> {
+            var batch = batches.get(line.batchId());
+            return new OrderViews.OrderPlanLineView(line.id(), line.orderItemId(), line.lineNo(), line.batchId(),
+                    batch == null ? null : batch.batchNo(), batch == null ? null : batch.node(),
+                    batch == null ? null : batch.seamState(), batch == null ? 0 : batch.quantity(),
+                    line.quantity());
+        }).toList();
+    }
+
     private static void failIfInvalid(List<ApiFieldError> errors) {
         if (!errors.isEmpty()) {
             throw new ApiException(ErrorCode.VALIDATION_INVALID,
@@ -386,13 +491,14 @@ public class OrderService {
     }
 
     private static OrderViews.OrderDetail toDetail(OrderRow row, List<OrderItemRow> items,
-                                                  OrderStatuses.Derived derived) {
+                                                  OrderStatuses.Derived derived,
+                                                  List<OrderViews.OrderPlanLineView> inventoryPlan) {
         return new OrderViews.OrderDetail(row.id(), row.orderNo(), row.customerId(), row.customerName(),
                 row.status(), row.orderDate(), row.expectedDeliveryDate(),
                 row.recipientName(), row.recipientPhone(), row.region(), row.address(), row.note(),
                 row.goodsAmount(), row.seamAmount(), row.discountAmount(), row.receivableAmount(),
                 row.goodsCostAmount(), row.seamCostAmount(), row.costAmount(), row.profitAmount(),
-                row.version(), derived, items.stream().map(OrderService::toItemView).toList());
+                row.version(), derived, items.stream().map(OrderService::toItemView).toList(), inventoryPlan);
     }
 
     private static OrderViews.OrderItemView toItemView(OrderItemRow row) {

@@ -103,6 +103,17 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 
 只允许领域服务在写 `fulfillment_entries` 的同一事务内更新；阶段三只写 `required_quantity` 与订单需求/变更事实，其余列由阶段四/五/六写入。阶段九提供按事实重建并与本表比对的一致性检查。
 
+### 3.9 `order_inventory_plan_lines`（草稿库存计划，阶段四追加）
+
+`V9__order_inventory_plan.sql`。列：`order_id`、`order_item_id`、`batch_id`、`quantity`。
+
+**计划不占用库存**（`specs/inventory-management/spec.md`「草稿库存计划不占用库存」）：本表不产生库存流水、不改 `inventory_batches.quantity`，批次当前数量仍只由 `InventoryMovement` 改动。`order_item_id` 有外键，因此整体替换草稿明细前必须先清计划行（`OrderRepository.deletePlanLines`）。
+
+- 唯一键 `uk_order_inventory_plan_lines_target (order_item_id, batch_id)`：同一明细同一批次只保留一行，要更多数量就改这一行；同一批次仍可拆给不同明细。
+- 写入契约用**明细序号 `lineNo`** 而不是明细 id：草稿明细整单替换，明细 id 每次保存都会变，序号才稳定。
+- 表归属 `orders`（`database-design.md` §7）；因外键依赖 `inventory_batches`，迁移排在 `V8` 之后的 `V9`。
+- 计划行**不存接入节点**：`orders` 不得依赖 `inventory` 模块（模块循环已由 `orders → ledger` 单向边断开），接入矩阵只在领用时由库存模块判定，计划因此只是「打算用哪些批次、给哪条明细、多少件」。
+
 ## 4. 金额、成本与利润口径
 
 公式登记到 `calculation/order`，编号 `FP-ORDER-01..09`，同步写入 `docs/architecture/formula-catalog.md`。
@@ -168,10 +179,10 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 | 能力 | 方法与路径 | 幂等 | 成功结果 | 主要拒绝码 |
 | --- | --- | --- | --- | --- |
 | 订单列表 | `GET /api/orders` | 否 | 按状态/客户/日期筛选的摘要列表（含主状态与派生进度） | `AUTH_REQUIRED` |
-| 新建草稿 | `POST /api/orders` | 写入幂等 | 分配 `YM` 编号的草稿 + 明细 + 金额 | `VALIDATION_INVALID`, `STATE_DISABLED` |
-| 订单详情 | `GET /api/orders/{id}` | 否 | 订单、明细、金额、快照（已确认时）与派生状态 | `NOT_FOUND` |
-| 编辑草稿 | `PATCH /api/orders/{id}` | 写入幂等 | 整体重算金额后的草稿 | `STATE_NOT_EDITABLE`, `VALIDATION_INVALID`, `CONFLICT_VERSION` |
-| 确认 | `POST /api/orders/{id}/confirm` | 必须幂等 | 单事务快照 + 已确认订单 | `STATE_NOT_CONFIRMABLE`, `SNAPSHOT_FAILED`, `CONFLICT_VERSION` |
+| 新建草稿 | `POST /api/orders` | 写入幂等 | 分配 `YM` 编号的草稿 + 明细 + 金额 +（可选）草稿库存计划 | `VALIDATION_INVALID`, `STATE_DISABLED` |
+| 订单详情 | `GET /api/orders/{id}` | 否 | 订单、明细、金额、快照（已确认时）、草稿库存计划与派生状态 | `NOT_FOUND` |
+| 编辑草稿 | `PATCH /api/orders/{id}` | 写入幂等 | 整体重算金额后的草稿；`inventoryPlan` 非空整体替换、空列表清空、不传保持原值 | `STATE_NOT_EDITABLE`, `VALIDATION_INVALID`, `CONFLICT_VERSION` |
+| 确认 | `POST /api/orders/{id}/confirm` | 必须幂等 | 单事务快照 + 已确认订单；入参 `transferShortageToProduction` 表示管理员明确将计划缺口转生产 | `STATE_NOT_CONFIRMABLE`, `SNAPSHOT_FAILED`, `STOCK_INSUFFICIENT`, `CONFLICT_VERSION` |
 | 履约视图 | `GET /api/orders/{id}/fulfillment` | 否 | Q/E、共同数量、四层进度与派生状态 | `NOT_FOUND` |
 | 变更草稿 | `POST /api/orders/{id}/change-orders`、`GET/PATCH /api/order-changes/{id}` | 写入幂等 | 变更草稿（前后值 + 超出处理） | `STATE_NOT_CHANGEABLE`, `QUANTITY_REQUIRES_DISPOSITION` |
 | 变更确认 | `POST /api/order-changes/{id}/confirm` | 必须幂等 | 应用后订单 + 新投影 | `QUANTITY_BELOW_SHIPPED`, `CONFLICT_VERSION` |
@@ -184,7 +195,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 | 路由 | 页面 | 关键点 |
 | --- | --- | --- |
 | `/orders` | 订单列表 | 主状态/生产进度/发货进度分列；筛选紧凑排列；显式「新建订单」入口 |
-| `/orders/new` | 步骤化全页工作区 | 步骤：客户与收货 → 商品明细与 Q/E → 金额与优惠 → 确认复核；金额只读展示服务端值；缝边默认值取商品 |
+| `/orders/new` | 步骤化全页工作区 | 步骤：客户与收货 → 商品明细与 Q/E → 金额与优惠 → 库存计划（可选）→ 确认复核；金额只读展示服务端值；缝边默认值取商品；计划步骤按明细行选批次（显示工序/缝边/现有数量）并提示「不占用库存」，确认遇缺口时给出缺口明细与「缺口转生产并确认」 |
 | `/orders/:id` | 订单详情（只读多 Tab） | 总览 / 商品与履约 / 发货与售后 / 资金与利润 / 资料与变更；Tab 不新增路由；总览用可容纳 12+ 明细的简表；履约按阶段卡片；查看不预置表单，新建/编辑/处理走显式入口 |
 | `/orders/:id/changes/:changeId` | 变更确认操作页 | 明确列出变更前后、已发货下限、在途超出处理、待退款影响、确认后不可覆盖 |
 

@@ -49,6 +49,19 @@ export interface OrderItemView {
   note?: string | null;
 }
 
+/** 草稿库存计划行（任务 4.8）：按明细序号引用明细，不占用库存。 */
+export interface OrderPlanLineView {
+  id: number;
+  orderItemId: number;
+  lineNo: number;
+  batchId: number;
+  batchNo?: string | null;
+  node?: string | null;
+  seamState?: string | null;
+  batchQuantity: number;
+  quantity: number;
+}
+
 export interface OrderDetail {
   id: number;
   orderNo: string;
@@ -73,6 +86,7 @@ export interface OrderDetail {
   version: number;
   derived: DerivedStatus;
   items: OrderItemView[];
+  inventoryPlan: OrderPlanLineView[];
 }
 
 /** 明细入参：E=0 即不缝边剪袋，此时缝边字段被服务端忽略。 */
@@ -86,6 +100,13 @@ export interface OrderItemRequest {
   note?: string;
 }
 
+/** 计划行入参：lineNo 为明细序号（1 起），明细 id 每次保存都会变，序号才稳定。 */
+export interface OrderPlanLineRequest {
+  lineNo: number;
+  batchId: number;
+  quantity: number;
+}
+
 export interface OrderWriteRequest {
   customerId: number;
   orderDate: string;
@@ -97,6 +118,8 @@ export interface OrderWriteRequest {
   note?: string;
   discountAmount?: Money;
   items: OrderItemRequest[];
+  /** 非空列表整体替换草稿计划；空列表清空计划；不传则保持原值。 */
+  inventoryPlan?: OrderPlanLineRequest[];
 }
 
 export interface FulfillmentItem {
@@ -239,8 +262,16 @@ export function updateOrder(
   return apiFetch<OrderDetail>(`/api/orders/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 }
 
-export function confirmOrder(id: number | string): Promise<OrderDetail> {
-  return apiFetch<OrderDetail>(`/api/orders/${id}/confirm`, { method: 'POST', body: JSON.stringify({}) });
+export function confirmOrder(
+  id: number | string,
+  options: { transferShortageToProduction?: boolean } = {},
+): Promise<OrderDetail> {
+  return apiFetch<OrderDetail>(`/api/orders/${id}/confirm`, {
+    method: 'POST',
+    body: JSON.stringify(
+      options.transferShortageToProduction ? { transferShortageToProduction: true } : {},
+    ),
+  });
 }
 
 export function cancelOrder(id: number | string, reason: string): Promise<OrderDetail> {

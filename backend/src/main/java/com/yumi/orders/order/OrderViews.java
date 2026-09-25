@@ -52,7 +52,20 @@ public final class OrderViews {
             String note) {
     }
 
-    /** 订单详情：当前有效数据 + 明细 + 金额。 */
+    /** 草稿库存计划行（任务 4.8）：带批次当前工序与数量，便于页面判断计划是否已过期。 */
+    public record OrderPlanLineView(
+            long id,
+            long orderItemId,
+            int lineNo,
+            long batchId,
+            String batchNo,
+            String node,
+            String seamState,
+            int batchQuantity,
+            int quantity) {
+    }
+
+    /** 订单详情：当前有效数据 + 明细 + 金额 + 草稿库存计划。 */
     public record OrderDetail(
             long id,
             String orderNo,
@@ -76,6 +89,7 @@ public final class OrderViews {
             @JsonSerialize(using = ToStringSerializer.class) BigDecimal profitAmount,
             long version,
             com.yumi.orders.fulfillment.OrderStatuses.Derived derived,
-            List<OrderItemView> items) {
+            List<OrderItemView> items,
+            List<OrderPlanLineView> inventoryPlan) {
     }
 }
