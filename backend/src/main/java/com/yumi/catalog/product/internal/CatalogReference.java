@@ -9,8 +9,8 @@ import java.util.Optional;
 
 /**
  * 计价参考数据读取：全局设置、星级对照、包装档位、缝边种类、文件存在性。
- * 单价与预填费用读 catalog_settings；星级/档位只提供标准分钟（提成由商品持有）；
- * 缝边种类只提供名称与成本单价（商品只保存默认值指针）。
+ * 单价、时薪、制品有效工时率与预填费用读 catalog_settings；
+ * 星级/包装档位/缝边种类都只提供「标准分钟」（提成由商品持有），人工费一律由全局时薪派生。
  */
 @Component
 public class CatalogReference {
@@ -18,11 +18,11 @@ public class CatalogReference {
     public record StarLevel(long id, String name, int stdMinutes) {
     }
 
-    public record PackagingTier(Long id, String tierName, BigDecimal stdMinutes) {
+    public record PackagingTier(Long id, String tierName, int stdMinutes) {
     }
 
-    /** 缝边种类：商品只取名称与成本单价作订单缝边默认值与定价提示。 */
-    public record SeamType(long id, String name, BigDecimal costPrice) {
+    /** 缝边种类：与星级、档位同构，只提供标准分钟；单件人工成本 = 分钟 × 全局时薪 ÷ 60。 */
+    public record SeamType(long id, String name, int stdMinutes) {
     }
 
     private final JdbcTemplate jdbcTemplate;
@@ -42,9 +42,24 @@ public class CatalogReference {
         return value;
     }
 
-    /** 金额类设置统一转 scale4（胶水单价、各项默认费用）。 */
+    /** 金额类设置统一转 scale4（胶水单价、时薪、各项默认费用）。 */
     public BigDecimal moneySetting(String key) {
         return DecimalPolicy.money(setting(key));
+    }
+
+    /** 全局时薪（元/小时，scale4）。 */
+    public BigDecimal hourlyWage() {
+        return moneySetting("hourly_wage");
+    }
+
+    /** 工作日小时数（小时/天，scale4）：制品日薪与工作日标准数量的基数。 */
+    public BigDecimal workdayHours() {
+        return moneySetting("workday_hours");
+    }
+
+    /** 制品有效工时率（0–1 比例，scale6）。 */
+    public BigDecimal makingEffectiveHourRate() {
+        return DecimalPolicy.ratio(setting("making_effective_hour_rate"));
     }
 
     public Optional<StarLevel> starLevelById(long id) {
@@ -62,7 +77,7 @@ public class CatalogReference {
         var tier = jdbcTemplate.query(
                 "SELECT id, tier_name, std_minutes FROM packaging_tiers WHERE id = ?",
                 rs -> rs.next()
-                        ? new PackagingTier(rs.getLong(1), rs.getString(2), rs.getBigDecimal(3))
+                        ? new PackagingTier(rs.getLong(1), rs.getString(2), rs.getInt(3))
                         : null,
                 id);
         return Optional.ofNullable(tier);
@@ -73,8 +88,8 @@ public class CatalogReference {
             return Optional.empty();
         }
         var type = jdbcTemplate.query(
-                "SELECT id, name, cost_price FROM seam_types WHERE id = ?",
-                rs -> rs.next() ? new SeamType(rs.getLong(1), rs.getString(2), rs.getBigDecimal(3)) : null,
+                "SELECT id, name, std_minutes FROM seam_types WHERE id = ?",
+                rs -> rs.next() ? new SeamType(rs.getLong(1), rs.getString(2), rs.getInt(3)) : null,
                 id);
         return Optional.ofNullable(type);
     }

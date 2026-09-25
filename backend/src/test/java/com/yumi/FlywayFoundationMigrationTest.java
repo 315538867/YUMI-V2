@@ -53,9 +53,9 @@ class FlywayFoundationMigrationTest {
 
     @Test
     void rejectsModifiedAppliedMigration(@TempDir Path directory) throws IOException {
-        var original = getClass().getResourceAsStream("/db/migration/V1__foundation.sql");
+        var original = getClass().getResourceAsStream("/db/migration/V1__yumi_v2_schema.sql");
         assertThat(original).isNotNull();
-        var migration = Files.write(directory.resolve("V1__foundation.sql"), original.readAllBytes());
+        var migration = Files.write(directory.resolve("V1__yumi_v2_schema.sql"), original.readAllBytes());
         Files.writeString(migration, "\n-- altered after application\n", java.nio.file.StandardOpenOption.APPEND);
 
         var flyway = Flyway.configure()

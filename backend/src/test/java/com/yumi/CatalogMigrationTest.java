@@ -50,23 +50,20 @@ class CatalogMigrationTest {
     @Test
     void createsStaticDataCatalogTablesWithFixedCategories() {
         assertThat(uniqueKeys("seam_types")).contains("uk_seam_types_name");
-        assertThat(columnType("seam_types", "cost_price")).isEqualTo("decimal(19,4)");
+        assertThat(columnType("seam_types", "std_minutes")).isEqualTo("int unsigned");
         assertThat(uniqueKeys("work_types")).contains("uk_work_types_code", "uk_work_types_name");
-        assertThat(columnExists("work_types", "active")).isTrue();
+        assertThat(columnExists("work_types", "active")).isFalse();
         assertThat(columnType("employee_work_types", "work_type_id")).isEqualTo("bigint unsigned");
         assertThat(columnExists("employee_work_types", "work_type")).isFalse();
     }
 
     @Test
     void appliesFinalCatalogStructureAndStaticDataSeeds() {
-        var v4 = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '4' AND success = 1",
+        // 2026-09-25 压缩为单一基线迁移 V1__yumi_v2_schema.sql，结构与种子同属版本 1
+        var baseline = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = 1",
                 Integer.class);
-        var v5 = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '5' AND success = 1",
-                Integer.class);
-        assertThat(v4).isEqualTo(1);
-        assertThat(v5).isEqualTo(1);
+        assertThat(baseline).isEqualTo(1);
 
         // 最终结构：星级按 id 引用、商品无缝边列、档位无提成、商品提成自有
         assertThat(columnExists("star_levels", "star")).isFalse();
@@ -92,7 +89,8 @@ class CatalogMigrationTest {
         // 商品缝边默认值：默认缝边剪袋类型（可空＝默认不缝边剪袋）+ 名称与成本单价快照 + 缝边价格
         assertThat(columnType("products", "seam_type_id")).isEqualTo("bigint unsigned");
         assertThat(columnType("products", "seam_type_name")).isEqualTo("varchar(100)");
-        assertThat(columnType("products", "seam_type_cost_price")).isEqualTo("decimal(19,4)");
+        assertThat(columnType("products", "seam_std_minutes")).isEqualTo("int unsigned");
+        assertThat(columnType("products", "seam_unit_cost")).isEqualTo("decimal(19,4)");
         assertThat(columnType("products", "seam_fee")).isEqualTo("decimal(19,4)");
         assertThat(isNullable("products", "seam_type_id")).isTrue();
         assertThat(isNullable("products", "seam_fee")).isFalse();
@@ -104,9 +102,22 @@ class CatalogMigrationTest {
 
     @Test
     void seedsSixMinutePackagingTier() {
-        // V5 预置 6 分钟档位（真实核算表固定的 6×0.25 + 商品提成）
-        assertThat(jdbcTemplate.queryForList("SELECT std_minutes FROM packaging_tiers", String.class))
-                .contains("6.000");
+        // 种子预置 6 分钟档位（真实核算表固定的「6 分钟 × 时薪 ÷ 60 + 商品提成」）；分钟统一为整数
+        assertThat(jdbcTemplate.queryForList("SELECT std_minutes FROM packaging_tiers", Integer.class))
+                .contains(6);
+        assertThat(columnType("packaging_tiers", "std_minutes")).isEqualTo("int unsigned");
+    }
+
+    @Test
+    void seedsGlobalParametersUsedByLaborFormulas() throws Exception {
+        // 时薪与制品有效工时率写在迁移 SQL 的默认值里（取自清库前库内实际值），代码中不硬编码
+        var baseline = new String(getClass().getResourceAsStream("/db/migration/V1__yumi_v2_schema.sql")
+                .readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(baseline).contains("('hourly_wage', 15.000000");
+        assertThat(baseline).contains("('workday_hours', 8.000000");
+        assertThat(baseline).contains("('making_effective_hour_rate', 0.750000");
+        assertThat(jdbcTemplate.queryForList("SELECT setting_key FROM catalog_settings", String.class))
+                .contains("hourly_wage", "workday_hours", "making_effective_hour_rate");
     }
 
     private boolean tableExists(String tableName) {

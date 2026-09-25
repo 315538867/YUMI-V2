@@ -519,7 +519,7 @@ export function OrderCreatePage() {
                         onChange={value => patchItem(row.key, { seamTypeId: value ?? null })}
                         options={seamTypes.map(type => ({
                           value: type.id,
-                          label: `${type.name} · ${type.costPrice} 元/件`,
+                          label: `${type.name} · 标准 ${type.stdMinutes} 分钟`,
                         }))}
                       />
                     ),

@@ -60,7 +60,7 @@ CHECK：`discount_amount >= 0`、`discount_amount <= goods_amount + seam_amount`
 | `seam_quantity` | 当前缝边数量（不得超过订购数量，0 表示不缝边剪袋） |
 | `unit_price` / `goods_amount` | 商品成交单价 / 商品金额 = `unit_price × quantity` |
 | `seam_type_id` / `seam_type_name` | 缝边种类引用 + 名称快照，可空＝不缝边剪袋 |
-| `seam_unit_cost` / `seam_fee` | 种类成本单价快照（成本与提示）/ 缝边收费单价 |
+| `seam_unit_cost` / `seam_fee` | 单件缝边人工成本快照（= 种类标准分钟 × 下单当时全局时薪 ÷ 60）/ 缝边收费单价 |
 | `seam_amount` | 缝边收费 = `seam_fee × seam_quantity` |
 | `unit_cost` / `goods_cost_amount` | 商品单件成本快照（商品 `total_cost`，**不缝边剪袋**口径）/ 商品成本 = `unit_cost × quantity` |
 | `seam_cost_amount` | 缝边成本 = `seam_unit_cost × seam_quantity` |
@@ -123,7 +123,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 | FP-ORDER-01 | 明细商品金额 | `unit_price × quantity` | scale4 HALF_UP |
 | FP-ORDER-02 | 明细缝边收费 | `seam_fee × seam_quantity` | scale4 HALF_UP |
 | FP-ORDER-03 | 明细商品成本 | `unit_cost × quantity`（`unit_cost` 取商品 `total_cost`，不缝边剪袋口径） | scale4 HALF_UP |
-| FP-ORDER-04 | 明细缝边成本 | `seam_unit_cost × seam_quantity`（种类成本单价允许 0） | scale4 HALF_UP |
+| FP-ORDER-04 | 明细缝边成本 | `seam_unit_cost × seam_quantity`（单件成本由缝边标准分钟 × 全局时薪 ÷ 60 派生，允许 0） | scale4 HALF_UP |
 | FP-ORDER-05 | 订单商品金额 | Σ 明细商品金额 | scale4 HALF_UP |
 | FP-ORDER-06 | 订单缝边收费 | Σ 明细缝边收费 | scale4 HALF_UP |
 | FP-ORDER-07 | 订单应收 | `goods_amount + seam_amount − discount_amount` | scale4 HALF_UP |
@@ -216,7 +216,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 
 ## 10. 不做项
 
-- 不改写 V1–V6；本阶段新增 `V7__orders.sql`（新增表，不改既有表结构）。若评审要求改动 V7 内容，按未上线口径清库重建，不用 `flyway repair`。
+- 本阶段新增订单表（原 `V7__orders.sql`，2026-09-25 已并入单一基线 `V1__yumi_v2_schema.sql`）。未上线口径下改动迁移内容一律清库重建，不用 `flyway repair`。
 - 不提供通用状态覆盖端点（不手工改状态）。
 - 不实现订单级“打印/PDF”、报表导出与物流字段（阶段九）。
 - 不做明细行级删除历史：已确认后的移除只标记，不物理删行。

@@ -2,7 +2,7 @@ import { apiFetch } from './client';
 
 /**
  * 静态数据（任务 2.22/2.25）：类别由系统固定 code，不可增删改名；
- * 星级/包装档位/缝边种类条目用户自建，员工工种仅可改名与启停。
+ * 星级/包装档位/缝边种类条目用户自建（都只提供整数标准分钟），员工工种仅可改名。
  */
 export type StaticDataCode = 'STAR_LEVEL' | 'PACKAGING_TIER' | 'SEAM_TYPE' | 'WORK_TYPE';
 
@@ -17,23 +17,13 @@ export interface StaticDataItem {
   /** 仅员工工种有系统固定 code */
   code?: string;
   name: string;
-  /**
-   * 星级与包装档位的标准分钟。
-   * 注意类型不统一：`star_levels.std_minutes` 为 `int unsigned`（接口返回数字），
-   * `packaging_tiers.std_minutes` 为 `decimal(9,3)`（接口返回字符串），故为联合类型。
-   */
-  stdMinutes?: string | number;
-  /** 缝边种类的成本单价（元/件） */
-  costPrice?: string;
-  /** 仅员工工种有启停 */
-  active?: boolean;
+  /** 标准分钟（整数，1–360）：星级/包装档位/缝边种类三类同口径 */
+  stdMinutes?: string;
 }
 
 export interface StaticDataItemRequest {
   name?: string;
   stdMinutes?: string;
-  costPrice?: string;
-  active?: boolean;
   reason?: string;
 }
 

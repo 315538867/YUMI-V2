@@ -23,7 +23,7 @@ public class ProductRepository {
             sale_price, weight_g, loss_rate, glue_unit_price, glue_grams, glue_cost,
             colorpaste_unit_price, colorpaste_cost, qty_8h, qty_6h, product_labor_fee,
             packaging_tier_id, packaging_tier_name, packaging_std_minutes, packaging_commission,
-            packaging_labor_fee, seam_type_id, seam_type_name, seam_type_cost_price, seam_fee,
+            packaging_labor_fee, seam_type_id, seam_type_name, seam_std_minutes, seam_unit_cost, seam_fee,
             box_labor_fee, transport_packing_fee, daily_sundries_fee, rent_utilities_fee,
             mold_amort_fee, material_cost, labor_cost, other_cost, total_cost, reference_price, version
             """;
@@ -63,11 +63,11 @@ public class ProductRepository {
                     sale_price, weight_g, loss_rate, glue_unit_price, glue_grams, glue_cost,
                     colorpaste_unit_price, colorpaste_cost, qty_8h, qty_6h, product_labor_fee,
                     packaging_tier_id, packaging_tier_name, packaging_std_minutes, packaging_commission,
-                    packaging_labor_fee, seam_type_id, seam_type_name, seam_type_cost_price, seam_fee,
+                    packaging_labor_fee, seam_type_id, seam_type_name, seam_std_minutes, seam_unit_cost, seam_fee,
                     box_labor_fee, transport_packing_fee, daily_sundries_fee, rent_utilities_fee,
                     mold_amort_fee, material_cost, labor_cost, other_cost, total_cost, reference_price,
                     version, created_at, updated_at, request_id, idempotency_key
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                           0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?, ?)
                 """,
                 row.productNo(), row.name(), row.note(), row.status(), row.imageFileId(),
@@ -78,7 +78,7 @@ public class ProductRepository {
                 row.qty8h(), row.qty6h(), row.productLaborFee(),
                 row.packagingTierId(), row.packagingTierName(), row.packagingStdMinutes(),
                 row.packagingCommission(), row.packagingLaborFee(),
-                row.seamTypeId(), row.seamTypeName(), row.seamTypeCostPrice(), row.seamFee(),
+                row.seamTypeId(), row.seamTypeName(), row.seamStdMinutes(), row.seamUnitCost(), row.seamFee(),
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
@@ -99,7 +99,7 @@ public class ProductRepository {
                     qty_8h = ?, qty_6h = ?, product_labor_fee = ?,
                     packaging_tier_id = ?, packaging_tier_name = ?, packaging_std_minutes = ?,
                     packaging_commission = ?, packaging_labor_fee = ?,
-                    seam_type_id = ?, seam_type_name = ?, seam_type_cost_price = ?, seam_fee = ?,
+                    seam_type_id = ?, seam_type_name = ?, seam_std_minutes = ?, seam_unit_cost = ?, seam_fee = ?,
                     box_labor_fee = ?, transport_packing_fee = ?, daily_sundries_fee = ?,
                     rent_utilities_fee = ?, mold_amort_fee = ?,
                     material_cost = ?, labor_cost = ?, other_cost = ?, total_cost = ?, reference_price = ?,
@@ -113,7 +113,7 @@ public class ProductRepository {
                 row.qty8h(), row.qty6h(), row.productLaborFee(),
                 row.packagingTierId(), row.packagingTierName(), row.packagingStdMinutes(),
                 row.packagingCommission(), row.packagingLaborFee(),
-                row.seamTypeId(), row.seamTypeName(), row.seamTypeCostPrice(), row.seamFee(),
+                row.seamTypeId(), row.seamTypeName(), row.seamStdMinutes(), row.seamUnitCost(), row.seamFee(),
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
@@ -154,12 +154,13 @@ public class ProductRepository {
                 rs.getBigDecimal("product_labor_fee"),
                 tierNull ? null : tierId,
                 rs.getString("packaging_tier_name"),
-                rs.getBigDecimal("packaging_std_minutes"),
+                nullableInt(rs.getObject("packaging_std_minutes")),
                 rs.getBigDecimal("packaging_commission"),
                 rs.getBigDecimal("packaging_labor_fee"),
                 seamTypeNull ? null : seamTypeId,
                 rs.getString("seam_type_name"),
-                rs.getBigDecimal("seam_type_cost_price"),
+                nullableInt(rs.getObject("seam_std_minutes")),
+                rs.getBigDecimal("seam_unit_cost"),
                 rs.getBigDecimal("seam_fee"),
                 rs.getBigDecimal("box_labor_fee"),
                 rs.getBigDecimal("transport_packing_fee"),
@@ -172,5 +173,9 @@ public class ProductRepository {
                 rs.getBigDecimal("total_cost"),
                 rs.getBigDecimal("reference_price"),
                 rs.getLong("version"));
+    }
+    /** INT UNSIGNED 列经 MySQL 驱动 getObject 返回 Long，需按 Number 归一（可空）。 */
+    private static Integer nullableInt(Object value) {
+        return value == null ? null : ((Number) value).intValue();
     }
 }

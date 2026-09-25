@@ -403,6 +403,35 @@
   - 术语统一后的最终读数（2026-09-24 复验，正式路由）：商品编辑页表单标签「默认缝边剪袋类型」（提示「订单新建明细时的默认值，订单可改；留空＝默认不缝边剪袋」）、「缝边价格（元/件）」；面板行「单件总成本（不缝边剪袋）」「参考售价（不缝边剪袋，成本 ÷ 0.7）」「缝边剪袋变体（含缝边成本，单件）」「缝边剪袋变体总成本」「缝边剪袋变体参考售价」；员工页列表与下拉显示「缝边剪袋」；设置页静态数据「员工工种」弹窗 4 行（`SEAM_CUTTING | 缝边剪袋 | 启用`）。数值与术语无关，仍为不缝边剪袋 `18.1200`/`25.8857`、缝边剪袋变体 `19.3700`/`27.6714`。
   - 阶段二收口结论：2.21–2.27 全部实现与自动化门禁完成；`2.24`/`2.25`/`2.26`/`2.27` 已按全局完成定义第 1–4、6 条留证；第 5 条人工项待用户签字。**未完成的独立项**：2.20 只读公式说明的浏览器交互与签字（本批次未触碰，保持暂停），Electron 复用页实操（仅由 `electron/shell-guard.test.ts` 与共享 renderer/API 保证）。
 
+### 阶段二追加：缝边标准分钟、全局时薪与制品有效工时率、分钟整数化、工种去启用、迁移压缩（2026-09-25）
+
+依据：用户 4 项反馈（缝边种类应为标准分钟而非成本单价；包装档位与制品星级的分钟精度应统一；系统内置不可修改项需有标记；员工工种的启用状态无实际作用）+ 追加要求（新增全局「制品有效工时率」且只作用于制品；全局参数默认值写进 SQL 并取库内真实值；把所有 Flyway 版本压缩为一个文件、直接清库重建）。方案见 `docs/architecture/static-data-and-product-fields-design.md` §13。
+
+- [x] 2.28 压缩迁移为单一基线并落结构变更
+  - 证据：文件 `backend/src/main/resources/db/migration/V1__yumi_v2_schema.sql`（原 V1–V14 按版本顺序合并，章节横幅保留原版本号与文件名便于对照历史证据；旧文件已删除）。结构变更：`seam_types.cost_price` → `std_minutes INT UNSIGNED`；`packaging_tiers.std_minutes`、`products.packaging_std_minutes` 由 `DECIMAL(9,3)` 改 `INT UNSIGNED`；`products` 新增 `seam_std_minutes`、`seam_type_cost_price` 改名 `seam_unit_cost`；`work_types` 删除 `active`。
+  - 全局参数默认值写进 SQL（用户口径「读取现在表里的」）：`glue_unit_price 0.034000`、`colorpaste_unit_price 0.002400`、`loss_rate_default 20.000000`、`box_labor_default 0.500000`、`transport_packing_default 0.200000`、`sundries_default 0.500000`、`rent_utilities_default 0.800000`、`packaging_commission_default 0.500000`、`hourly_wage 15.000000`、`workday_hours 8.000000`、`making_effective_hour_rate 0.750000`。
+  - 测试：`CatalogMigrationTest` 7 用例 0 失败（`seedsGlobalParametersUsedByLaborFormulas` 直接校验基线 SQL 里的两个默认值 + 键存在，不依赖运行期是否被其它用例改写；`seedsSixMinutePackagingTier` 断言 `packaging_tiers.std_minutes` 为 `int unsigned` 且种子为 6）；`FlywayFoundationMigrationTest` 3 用例 0 失败（资源名改为新基线后仍能检出 checksum mismatch）。
+- [x] 2.29 计算模块接入全局时薪与制品有效工时率
+  - 文件：`calculation/product/ProductPricing`（**工作日标准数量** = `floor(工作日小时数 × 60 ÷ 星级标准分钟)`；**有效工时产量** = `floor(工作日小时数 × 60 × 制品有效工时率 ÷ 星级标准分钟)`；星级单件人工 = `(时薪 × 工作日小时数) ÷ 产量`，产量 0 → 0；包装人工 = `档位整数分钟 × (时薪 ÷ 60) + 商品包装提成`；新增 `minuteRate`/`seamUnitCost` 两个公开派生入口）、`calculation/FormulaCatalog`（FP-PROD-05 改名「工作日标准数量」，FP-PROD-06/07/08 的输入、表达式、结果含义与算例）。
+  - 关键断言（`ProductPricingBaselineTest` 13 用例 0 失败）：默认值（时薪 15、工作日 8、率 0.75）下与旧硬编码口径**逐位一致**（`floor(480÷7)=68`、`floor(360÷7)=51`、`120÷51=2.3529`、`9×0.25+0.3=2.5500`）；新增 `workdayHoursDrivesDayWageAndWorkdayOutput`（工作日 10、率 0.6、星级 7 → 工作日标准数量 85、有效工时产量 51、制品人工 `(15×10)÷51=2.9412`，与「工作日 8 + 率 0.75」的 2.3529 不同，证明工作日小时数真实参与成本）、`hourlyWageAndEffectiveHourRateDriveLaborFees`（时薪 16、率 0.5 → 产量 24、制品人工 `5.3333`、包装 `2.7000`）与 `seamUnitCostDerivesFromStandardMinutesAndHourlyWage`（5 分钟 × 时薪 15 → `1.2500`、× 24 → `2.0000`、无种类 → `0.0000`）；原 `fractionalMinutesDrivePackagingFee` 改为 `integerMinutesDrivePackagingFee`（分钟不再允许小数）。
+- [x] 2.30 后端接线：商品/订单缝边成本派生 + 静态数据与全局设置 API
+  - 商品：`CatalogReference`（`PackagingTier`/`SeamType` 改整数分钟；新增 `hourlyWage()`/`makingEffectiveHourRate()`）、`ProductInputResolver`（单件缝边人工成本 = 种类分钟 × 当前全局时薪 ÷ 60；**同引用且未显式刷新时沿用商品快照，不回溯**）、`ProductRow`/`ProductRepository`/`ProductDetail`/`ProductService`（`seamStdMinutes` + `seamUnitCost`；`packagingStdMinutes` 改 `Integer`；MySQL 对 `INT UNSIGNED` 的 `getObject` 返回 `Long`，统一经 `nullableInt` 归一——该缺陷由 `SettingsApiTest` 暴露为 500）。
+  - 订单：`OrderReference`（缝边种类只取 `std_minutes` + `hourlyWage()`）、`OrderItemResolver`（`seamUnitCost = ProductPricing.seamUnitCost(种类分钟, 全局时薪)`），`FP-ORDER-04` 表达式不变。
+  - 静态数据：`StaticDataService`（`ItemView` 只留 `stdMinutes`，删除 `costPrice`/`active`；缝边种类与包装档位统一整数 1–360；工种只改名，新增/删除仍被拒）。
+  - 全局设置：`SettingsService`/`SettingsViews`（`ValuesView` 增 `hourlyWage`、`workdayHours`、`makingEffectiveHourRate`；工时率校验 `0 < 值 ≤ 1`，越界返回字段级 400）；`WorkTypeReference` 删除 `active`。
+  - 测试：`StaticDataApiTest`（8）、`SettingsApiTest`（6，并把清零全局的 setup 改为恢复时薪/工时率，避免污染下游用例）、`ProductSeamDefaultApiTest`（6，缝边种类夹具改标准分钟、断言 `seamStdMinutes`/`seamUnitCost`）、`ProductSnapshotMatrixTest`（9）、`OrderApiTest`/`OrderConfirmationTest`/`OrderFulfillmentChangeTest` 全部 0 失败。
+- [x] 2.31 前端：设置页两个新键与内置标记、工种去启用、商品/订单缝边展示
+  - 设置页：单价与默认值 Tab 增「时薪（元/小时）」「工作日小时数（小时/天）」「制品有效工时率（0–1）」；静态数据 Tab 类别行名称旁标 Tag「系统内置」、员工工种条目行标 Tag「系统预置」；删除工种「状态」列与条目弹窗启停开关；缝边条目表单改「缝边标准时长（分钟/件）」，三类统一整数输入；删除已下线的旧星级/档位写接口（后端无对应端点、零调用点）。
+  - 商品页/订单页：缝边种类下拉与「与当前全局不一致」提示改为「标准 N 分钟」；`seamStdMinutes`/`seamUnitCost` 契约；`packagingStdMinutes` 由字符串改数字；商品试算表的「制品人工费（8h×N件 / 6h×N件）」改为按设置动态显示「工作日 Xh×N件 / 有效工时 Yh×N件」（X = 工作日小时数，Y = 工作日小时数 × 制品有效工时率，仅作标签展示，成本一律由服务端计算）。
+  - 证据：`npm run typecheck` 退出码 0；`npm test` 11 文件 55 用例 0 失败；`npm run build` 退出码 0。
+  - 浏览器自测（2026-09-25，清库重建后的正式路由 `http://127.0.0.1:5190`，后端 18090，结构化 DOM 探针；口令不填表单，用同源 `fetch('/api/session')` 建程序化会话）：①设置页「单价与默认值」表单标签含「时薪（元/小时）」「制品有效工时率（0–1）」，值分别回显 `15.0000`/`0.750000`；②静态数据 Tab 四个类别行名称旁均有 Tag「系统内置」，表头为「类别/系统标识/条目数/操作」；③员工工种弹窗每条行标 Tag「系统预置」，表头为「系统标识/名称/操作」，**无「状态」列、无启用开关**；④缝边种类弹窗列名为「标准时长（分钟）」，新建条目表单标签为「缝边标准时长（分钟/件）」、无开关；⑤商品页「默认缝边剪袋类型」下拉选项为「标准缝边 · 标准 10 分钟」（不再显示元/件）；⑥公式说明 Tab 显示 FP-PROD-06「有效工时产量 floor(480 × 制品有效工时率 ÷ stdMinutes)」、FP-PROD-07「(时薪 × 8) ÷ 有效工时产量」、FP-PROD-08「档位分钟 × (时薪 ÷ 60) + 商品包装提成」及算例。
+  - 人工证据：商品页与设置页视觉/交互已变，2.12/2.19 已签字清单失效 → 需重新验收，`pending-user-signoff`（本节自测只覆盖字段与文案，视觉判断留给用户）。
+- [x] 2.32 文档、规格与门禁
+  - 文档：`docs/architecture/static-data-and-product-fields-design.md` §13（新增 8 小节，并在文首标注 §1–§12 的取代项）、`database-design.md`（商品缝边列描述与 §15 迁移说明）、`formula-catalog.md`（FP-PROD-05..08/20、FP-ORDER-04、常量说明与失效的偏差例子）、`formula-management-design.md`（常量 → 全局设置）、`order-module-design.md`（`seam_unit_cost` 含义、FP-ORDER-04、迁移说明）。
+  - 规格：`openspec/.../design.md`、`specs/master-data-management/spec.md`（静态数据 Requirement、缝边变体 Scenario、快照 Scenario）、`specs/order-lifecycle/spec.md`（缝边定制 Requirement 与 Scenario）同步；`openspec validate build-yumi-v2-order-fulfillment --strict` 通过。
+  - 阶段门禁：清库重建后由单一基线迁移建库，后端全量 **314 测试 0 失败 0 错误**；前端 typecheck / 11 文件 55 用例 / build 全绿。
+  - 人工证据：商品页与设置页的字段与交互变化使 2.12/2.19 已签字视觉清单失效，需重新验收；本批次视觉复核状态 `pending-user-signoff`。
+
 ## 3. 阶段三：订单草稿、确认、变更与共同数量（依赖阶段二，含 2.13–2.27）
 
 - [x] 3.1 编写 Flyway 迁移创建 `orders/order_items/order_confirmation_snapshots/order_item_snapshots/order_change_orders/order_change_items/fulfillment_entries/order_item_fulfillment_balances`，落实 `@Version`、订购数量与缝边数量检查、来源唯一消费和索引；参考 `docs/architecture/database-design.md` 第 5-6、13-14 节。
@@ -1189,7 +1218,7 @@
   - 证据：门禁执行记录（2026-09-25，先清库重建 `yumi_v2_test` 再跑，避免验收数据污染全局计数用例）：
     | 门禁 | 命令 | 退出码 | 结果 |
     | --- | --- | --- | --- |
-    | 后端全量（含 Modulith、Flyway 空库 V1→V14、并发、契约） | `YUMI_DB_PASSWORD=… ./mvnw test` | **0** | **Tests run: 310, Failures: 0, Errors: 0, Skipped: 0**（演进：9.11 首次 298 → 补 4.13 为 299 → 9.5 指标/健康/慢查询 +6 → 售后补发来源拒绝 +1 → 作废占用校验 +1 → 308 → 售后一致性覆盖补强 +1 → 309 → 客户汇总接线 +1 → 310；每次均在**清库重建后**复跑，避免验收数据污染全局计数用例） |
+    | 后端全量（含 Modulith、Flyway 空库迁移、并发、契约） | `YUMI_DB_PASSWORD=… ./mvnw test` | **0** | **Tests run: 314, Failures: 0, Errors: 0, Skipped: 0**（演进：9.11 首次 298 → 补 4.13 为 299 → 9.5 指标/健康/慢查询 +6 → 售后补发来源拒绝 +1 → 作废占用校验 +1 → 308 → 售后一致性覆盖补强 +1 → 309 → 客户汇总接线 +1 → 310 → 2026-09-25 静态数据/缝边口径改造 +3（含 `CatalogMigrationTest.seedsGlobalParametersUsedByLaborFormulas`、`ProductPricingBaselineTest` 两个新用例）为 313 → 工作日小时数进全局设置 +1 为 314；每次均在**清库重建后**复跑，避免验收数据污染全局计数用例。空库迁移现为**单一基线** `V1__yumi_v2_schema.sql`） |
     | Modulith 模块结构与依赖方向 | 含在上行（`ModuleStructureTest`，`ApplicationModules.verify()`） | **0** | 通过（模块清单 `identity/catalog/orders/inventory/production/reports/files/shared/calculation`） |
     | 并发门禁 | 含在上行（`InventoryConcurrencyTest`、`ProductionConcurrencyTest`、`ShipmentConcurrencyTest`、`SettlementConcurrencyTest`、`AfterSalesConcurrencyTest`） | **0** | 全部通过（含本阶段新修的并发补发上限） |
     | 前端 typecheck | `npm run typecheck` | **0** | 无错误 |

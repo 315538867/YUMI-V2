@@ -12,7 +12,8 @@ public final class SettingsViews {
     public record ValuesView(String glueUnitPrice, String colorpasteUnitPrice, String lossRateDefault,
                              String boxLaborDefault, String transportPackingDefault,
                              String sundriesDefault, String rentUtilitiesDefault,
-                             String packagingCommissionDefault) {
+                             String packagingCommissionDefault, String hourlyWage,
+                             String workdayHours, String makingEffectiveHourRate) {
     }
 
     public record StarLevelView(long id, String name, int stdMinutes) {

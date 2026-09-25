@@ -42,11 +42,11 @@
 
 ### `products`
 
-当前商品资料、启停状态、销售单价、重量、损耗率、材料单价与成本、星级与制作成本快照、包装档位快照、缝边默认值（默认缝边剪袋类型 id + 名称与成本单价快照 + 缝边价格）、其他单件成本和总成本。
+当前商品资料、启停状态、销售单价、重量、损耗率、材料单价与成本、星级与制作成本快照、包装档位快照、缝边默认值（默认缝边剪袋类型 id + 名称与标准分钟快照 + 单件缝边人工成本快照 + 缝边价格）、其他单件成本和总成本。
 
 业务编号 `product_no` 唯一。
 
-商品**不保存缝边数量与缝边成本**：`total_cost`/`reference_price` 始终按**不缝边剪袋**口径落库；缝边剪袋变体预算（不缝边剪袋总成本 + 缝边种类成本单价）由 `calculation` 的 `FP-PROD-20/21` 读时派生，只出现在商品试算与详情响应里。`seam_type_id` 可空（空＝默认不缝边剪袋），非空时外键指向 `seam_types`。
+商品**不保存缝边数量与缝边成本**：`total_cost`/`reference_price` 始终按**不缝边剪袋**口径落库；缝边剪袋变体预算（不缝边剪袋总成本 + 单件缝边人工成本，后者 = 缝边标准分钟 × 全局时薪 ÷ 60）由 `calculation` 的 `FP-PROD-20/21` 读时派生，只出现在商品试算与详情响应里。`seam_type_id` 可空（空＝默认不缝边剪袋），非空时外键指向 `seam_types`。
 
 ### `customers`
 
@@ -290,7 +290,7 @@
 
 ## 15. Flyway 迁移与测试门禁
 
-迁移文件位于 `backend/src/main/resources/db/migration`，按 `V<版本>__<说明>.sql` 命名。已经在任何共享环境执行过的版本迁移不得修改；修正必须新增更高版本迁移。**上线前**（开发期、未部署到任何共享环境）允许在清库重建的前提下改写早期迁移为最终结构（2026-09-24 已按此重写 `V4`/`V5`：新增 `seam_types`/`work_types`，`packaging_tiers` 去提成并预置 6 分钟档，`products` 去缝边数量/成本列并新增缝边默认值四列，`packaging_commission` 语义改为商品提成，`employee_work_types` 改 `work_type_id`），上线后该禁止条款立即生效。`V6` 为 2.23 追加的全局默认包装提成（`packaging_commission_default`）。
+迁移文件位于 `backend/src/main/resources/db/migration`，按 `V<版本>__<说明>.sql` 命名。已经在任何共享环境执行过的版本迁移不得修改；修正必须新增更高版本迁移。**上线前**（开发期、未部署到任何共享环境）允许在清库重建的前提下改写早期迁移为最终结构（2026-09-24 已按此重写 `V4`/`V5`：新增 `seam_types`/`work_types`，`packaging_tiers` 去提成并预置 6 分钟档，`products` 去缝边数量/成本列并新增缝边默认值四列，`packaging_commission` 语义改为商品提成，`employee_work_types` 改 `work_type_id`），上线后该禁止条款立即生效。`V6` 为 2.23 追加的全局参数（`packaging_commission_default`、`hourly_wage`、`workday_hours`、`making_effective_hour_rate`）。**2026-09-25**：用户确认「把所有 Flyway 版本压缩到一个」，原 V1–V14 已合并为**单一基线** `V1__yumi_v2_schema.sql`（章节横幅保留原版本号便于对照历史证据），空库执行即得完整结构。
 
 每次数据库变更必须具备：
 

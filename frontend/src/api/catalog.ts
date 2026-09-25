@@ -45,13 +45,17 @@ export interface ProductDetail extends ProductSummary {
   productLaborFee: Money;
   packagingTierId?: number;
   packagingTierName?: string;
-  packagingStdMinutes?: string;
+  /** 包装档位标准分钟（整数） */
+  packagingStdMinutes?: number;
   packagingCommission?: Money;
   packagingLaborFee: Money;
   /** 默认缝边剪袋类型（可空＝默认不缝边剪袋）与缝边价格，作为订单缝边定制的默认值 */
   seamTypeId?: number;
   seamTypeName?: string;
-  seamTypeCostPrice?: Money;
+  /** 所选缝边种类的标准分钟快照（商品只提供默认值） */
+  seamStdMinutes?: number;
+  /** 单件缝边人工成本（服务端派生：标准分钟 × 全局时薪 ÷ 60） */
+  seamUnitCost: Money;
   seamFee: Money;
   /** 缝边剪袋变体预算；未选默认缝边剪袋类型时为 null */
   seamBudget?: SeamBudget | null;

@@ -22,7 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 任务 2.22 静态数据 API：类别由系统固定 code（不可增删改名），条目按类别管理。
- * 覆盖类别清单、条目读取、用户自建条目增改删、引用守卫、工种仅改名/启停、未知类别与认证。
+ * 覆盖类别清单、条目读取、用户自建条目增改删、引用守卫、工种仅改名、未知类别与认证。
+ * 2026-09-25 起三类都只提供整数标准分钟，工种不再有启用状态。
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -53,7 +54,7 @@ class StaticDataApiTest {
                 """, USERNAME, passwordEncoder.encode(PASSWORD));
         jdbcTemplate.update("DELETE FROM seam_types WHERE name LIKE '验收缝边%'");
         jdbcTemplate.update("DELETE FROM star_levels WHERE name LIKE '验收星级%'");
-        jdbcTemplate.update("UPDATE work_types SET name = '捏毛装袋', active = 1 WHERE code = 'PACKING_BAG'");
+        jdbcTemplate.update("UPDATE work_types SET name = '捏毛装袋' WHERE code = 'PACKING_BAG'");
         var login = mockMvc.perform(post("/api/session")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + USERNAME + "\",\"password\":\"" + PASSWORD + "\"}"))
@@ -88,14 +89,13 @@ class StaticDataApiTest {
         mockMvc.perform(get(BASE + "/STAR_LEVEL").cookie(sessionCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].name").value("一星"))
-                .andExpect(jsonPath("$.data[0].stdMinutes").value("5"))
-                .andExpect(jsonPath("$.data[0].costPrice").doesNotExist());
+                .andExpect(jsonPath("$.data[0].stdMinutes").value("5"));
 
         mockMvc.perform(get(BASE + "/WORK_TYPE").cookie(sessionCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].code").value("MAKING"))
                 .andExpect(jsonPath("$.data[0].name").value("制作"))
-                .andExpect(jsonPath("$.data[0].active").value(true));
+                .andExpect(jsonPath("$.data[0].stdMinutes").doesNotExist());
 
         mockMvc.perform(get(BASE + "/UNKNOWN").cookie(sessionCookie))
                 .andExpect(status().isNotFound())
@@ -108,10 +108,10 @@ class StaticDataApiTest {
                         .cookie(sessionCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
-                        .content("{\"name\":\"验收缝边-单边\",\"costPrice\":\"0.5000\"}"))
+                        .content("{\"name\":\"验收缝边-单边\",\"stdMinutes\":\"5\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.name").value("验收缝边-单边"))
-                .andExpect(jsonPath("$.data.costPrice").value("0.5000"))
+                .andExpect(jsonPath("$.data.stdMinutes").value("5"))
                 .andReturn();
         var id = objectMapper.readTree(created.getResponse().getContentAsString()).path("data").path("id").asLong();
 
@@ -120,7 +120,7 @@ class StaticDataApiTest {
                         .cookie(sessionCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
-                        .content("{\"name\":\"验收缝边-单边\",\"costPrice\":\"0.1000\"}"))
+                        .content("{\"name\":\"验收缝边-单边\",\"stdMinutes\":\"8\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CONFLICT_DUPLICATE"));
 
@@ -129,10 +129,10 @@ class StaticDataApiTest {
                         .cookie(sessionCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
-                        .content("{\"name\":\"验收缝边-双边\",\"costPrice\":\"0.8000\"}"))
+                        .content("{\"name\":\"验收缝边-双边\",\"stdMinutes\":\"8\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("验收缝边-双边"))
-                .andExpect(jsonPath("$.data.costPrice").value("0.8000"));
+                .andExpect(jsonPath("$.data.stdMinutes").value("8"));
 
         // 未引用可删
         mockMvc.perform(delete(BASE + "/SEAM_TYPE/items/" + id)
@@ -145,10 +145,10 @@ class StaticDataApiTest {
                         .cookie(sessionCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
-                        .content("{\"name\":\"验收缝边-非法\",\"costPrice\":\"-1\"}"))
+                        .content("{\"name\":\"验收缝边-非法\",\"stdMinutes\":\"0\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_INVALID"))
-                .andExpect(jsonPath("$.fieldErrors[?(@.field=='costPrice')]").isNotEmpty());
+                .andExpect(jsonPath("$.fieldErrors[?(@.field=='stdMinutes')]").isNotEmpty());
     }
 
     @Test
@@ -188,17 +188,17 @@ class StaticDataApiTest {
                         .cookie(sessionCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
-                        .content("{\"name\":\"验收缝边-被商品默认引用\",\"costPrice\":\"1.2500\"}"))
+                        .content("{\"name\":\"验收缝边-被商品默认引用\",\"stdMinutes\":\"5\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
         var id = objectMapper.readTree(created.getResponse().getContentAsString()).path("data").path("id").asLong();
 
         jdbcTemplate.update("""
                 INSERT INTO products (product_no, name, status, star_level_id, star_name, star_std_minutes,
-                    sale_price, weight_g, seam_type_id, seam_type_name, seam_type_cost_price, seam_fee,
-                    version, created_at, updated_at)
+                    sale_price, weight_g, seam_type_id, seam_type_name, seam_std_minutes, seam_unit_cost,
+                    seam_fee, version, created_at, updated_at)
                 VALUES (?, 'TST-缝边默认引用', 'ACTIVE', (SELECT MIN(id) FROM star_levels), '一星', 5,
-                    1.0000, 1, ?, '验收缝边-被商品默认引用', 1.2500, 2.0000, 0,
+                    1.0000, 1, ?, '验收缝边-被商品默认引用', 5, 1.2500, 2.0000, 0,
                     UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """, "Y" + String.format("%05d", id % 100000), id);
         try {
@@ -216,7 +216,7 @@ class StaticDataApiTest {
     }
 
     @Test
-    void workTypeOnlyAllowsRenameAndActivation() throws Exception {
+    void workTypeOnlyAllowsRename() throws Exception {
         var items = mockMvc.perform(get(BASE + "/WORK_TYPE").cookie(sessionCookie))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -236,16 +236,16 @@ class StaticDataApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_INVALID"));
 
-        // 改名与停用可用
+        // 只能改名：不再有启用状态字段
         mockMvc.perform(patch(BASE + "/WORK_TYPE/items/" + id)
                         .cookie(sessionCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
-                        .content("{\"name\":\"验收工种-装袋\",\"active\":false}"))
+                        .content("{\"name\":\"验收工种-装袋\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.code").value("PACKING_BAG"))
                 .andExpect(jsonPath("$.data.name").value("验收工种-装袋"))
-                .andExpect(jsonPath("$.data.active").value(false));
+                .andExpect(jsonPath("$.data.active").doesNotExist());
     }
 
     @Test

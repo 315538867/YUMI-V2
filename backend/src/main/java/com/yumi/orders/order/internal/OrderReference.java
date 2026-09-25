@@ -1,5 +1,6 @@
 package com.yumi.orders.order.internal;
 
+import com.yumi.calculation.DecimalPolicy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -7,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 /**
- * 订单参考数据读取：客户默认收货信息、商品识别与成本快照、缝边种类名称与成本单价。
+ * 订单参考数据读取：客户默认收货信息、商品识别与成本快照、缝边种类名称与标准分钟、全局时薪。
  * 只读，不缓存；订单侧不复制商品/静态数据的计算逻辑。
  */
 @Component
@@ -27,7 +28,8 @@ public class OrderReference {
                           BigDecimal otherCost, Long defaultSeamTypeId, BigDecimal defaultSeamFee) {
     }
 
-    public record SeamType(long id, String name, BigDecimal costPrice) {
+    /** 缝边种类：只提供标准分钟；单件人工成本由全局时薪派生（FP-ORDER-04）。 */
+    public record SeamType(long id, String name, int stdMinutes) {
     }
 
     private final JdbcTemplate jdbcTemplate;
@@ -81,9 +83,20 @@ public class OrderReference {
 
     public Optional<SeamType> seamType(long id) {
         var type = jdbcTemplate.query(
-                "SELECT id, name, cost_price FROM seam_types WHERE id = ?",
-                rs -> rs.next() ? new SeamType(rs.getLong(1), rs.getString(2), rs.getBigDecimal(3)) : null,
+                "SELECT id, name, std_minutes FROM seam_types WHERE id = ?",
+                rs -> rs.next() ? new SeamType(rs.getLong(1), rs.getString(2), rs.getInt(3)) : null,
                 id);
         return Optional.ofNullable(type);
+    }
+
+    /** 全局时薪（元/小时，scale4）：缝边单件人工成本的派生基数。 */
+    public BigDecimal hourlyWage() {
+        var value = jdbcTemplate.query(
+                "SELECT setting_value FROM catalog_settings WHERE setting_key = 'hourly_wage'",
+                rs -> rs.next() ? rs.getBigDecimal(1) : null);
+        if (value == null) {
+            throw new IllegalStateException("缺少目录设置项: hourly_wage");
+        }
+        return DecimalPolicy.money(value);
     }
 }

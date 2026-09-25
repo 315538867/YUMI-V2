@@ -37,9 +37,13 @@ public class SettingsService {
             "transportPackingDefault", "transport_packing_default",
             "sundriesDefault", "sundries_default",
             "rentUtilitiesDefault", "rent_utilities_default",
-            "packagingCommissionDefault", "packaging_commission_default");
+            "packagingCommissionDefault", "packaging_commission_default",
+            "hourlyWage", "hourly_wage",
+            "workdayHours", "workday_hours");
     public static final String LOSS_KEY = "lossRateDefault";
     private static final String LOSS_SETTING = "loss_rate_default";
+    public static final String HOUR_RATE_KEY = "makingEffectiveHourRate";
+    private static final String HOUR_RATE_SETTING = "making_effective_hour_rate";
 
     private final JdbcTemplate jdbcTemplate;
     private final AuditContext auditContext;
@@ -81,7 +85,10 @@ public class SettingsService {
                 money(byKey, "transport_packing_default"),
                 money(byKey, "sundries_default"),
                 money(byKey, "rent_utilities_default"),
-                money(byKey, "packaging_commission_default"));
+                money(byKey, "packaging_commission_default"),
+                money(byKey, "hourly_wage"),
+                money(byKey, "workday_hours"),
+                ratio6(byKey, HOUR_RATE_SETTING));
         return new SettingsViews.SettingsView(values, starLevels(), tiers());
     }
 
@@ -96,7 +103,8 @@ public class SettingsService {
             }
             var column = MONEY_KEYS.get(key);
             var isLoss = LOSS_KEY.equals(key);
-            if (column == null && !isLoss) {
+            var isHourRate = HOUR_RATE_KEY.equals(key);
+            if (column == null && !isLoss && !isHourRate) {
                 throw new ApiException(ErrorCode.VALIDATION_INVALID, "未知设置项：" + key,
                         List.of(new ApiFieldError(key, "未知设置项")));
             }
@@ -111,8 +119,13 @@ public class SettingsService {
                 throw new ApiException(ErrorCode.VALIDATION_INVALID, "设置值不得为负：" + key,
                         List.of(new ApiFieldError(key, "不得为负")));
             }
-            var normalized = (isLoss ? DecimalPolicy.ratio(parsed) : DecimalPolicy.money(parsed)).toPlainString();
-            updates.put(isLoss ? LOSS_SETTING : column, normalized);
+            if (isHourRate && (parsed.signum() == 0 || parsed.compareTo(BigDecimal.ONE) > 0)) {
+                throw new ApiException(ErrorCode.VALIDATION_INVALID, "制品有效工时率必须在 0 与 1 之间",
+                        List.of(new ApiFieldError(key, "必须大于 0 且不超过 1")));
+            }
+            var isRatio = isLoss || isHourRate;
+            var normalized = (isRatio ? DecimalPolicy.ratio(parsed) : DecimalPolicy.money(parsed)).toPlainString();
+            updates.put(isLoss ? LOSS_SETTING : isHourRate ? HOUR_RATE_SETTING : column, normalized);
             data.put(key, normalized);
         }
         if (updates.isEmpty()) {
@@ -157,7 +170,7 @@ public class SettingsService {
                 (rs, rowNum) -> new TierView(
                         rs.getLong("id"),
                         rs.getString("tier_name"),
-                        rs.getBigDecimal("std_minutes").toPlainString()));
+                        String.valueOf(rs.getInt("std_minutes"))));
     }
 
     public List<StarLevelView> starLevels() {
@@ -184,6 +197,11 @@ public class SettingsService {
     }
 
     private String percent6(Map<String, BigDecimal> byKey, String key) {
+        var value = byKey.get(key);
+        return value == null ? "0.000000" : DecimalPolicy.ratio(value).toPlainString();
+    }
+
+    private String ratio6(Map<String, BigDecimal> byKey, String key) {
         var value = byKey.get(key);
         return value == null ? "0.000000" : DecimalPolicy.ratio(value).toPlainString();
     }

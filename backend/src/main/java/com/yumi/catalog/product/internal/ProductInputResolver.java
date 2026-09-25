@@ -39,7 +39,8 @@ public class ProductInputResolver {
             BigDecimal packagingCommission,
             Long seamTypeId,
             String seamTypeName,
-            BigDecimal seamTypeCostPrice,
+            Integer seamStdMinutes,
+            BigDecimal seamUnitCost,
             BigDecimal seamFee) {
     }
 
@@ -98,13 +99,14 @@ public class ProductInputResolver {
 
         var inputs = new ProductPricing.Inputs(request.weightG(), globalLossRate(), starLevel.stdMinutes(),
                 tier == null ? null : tier.stdMinutes(), commission,
+                reference.hourlyWage(), reference.workdayHours(), reference.makingEffectiveHourRate(),
                 gluePrice, colorpastePrice, box, transport,
                 reference.moneySetting("sundries_default"), reference.moneySetting("rent_utilities_default"),
                 mold, DecimalPolicy.money(request.salePrice()));
         return new Resolved(inputs, starLevel.id(), starLevel.name(),
                 tier == null ? null : tier.id(), tier == null ? null : tier.tierName(), commission,
                 seamType == null ? null : seamType.id(), seamType == null ? null : seamType.name(),
-                seamCostPrice(seamType), seamFee);
+                seamType == null ? null : seamType.stdMinutes(), seamUnitCost(seamType), seamFee);
     }
 
     /**
@@ -180,39 +182,60 @@ public class ProductInputResolver {
         BigDecimal commission = request.packagingCommission() != null
                 ? DecimalPolicy.money(request.packagingCommission()) : existing.packagingCommission();
 
-        // 缝边默认值：清空 → 默认不缝边剪袋；换成不同引用或显式刷新时取当前条目；同引用/未传保留商品快照
-        final CatalogReference.SeamType seamType;
+        // 缝边默认值：清空 → 默认不缝边剪袋；换成不同引用或显式刷新时按当前时薪重新派生；
+        // 同引用且未刷新时保留商品快照（名称与单件缝边人工成本都不回溯）
+        final Long seamTypeId;
+        final String seamTypeName;
+        final Integer seamStdMinutes;
+        final BigDecimal seamUnitCost;
         if (clearSeam) {
-            seamType = null;
+            seamTypeId = null;
+            seamTypeName = null;
+            seamStdMinutes = null;
+            seamUnitCost = DecimalPolicy.money(BigDecimal.ZERO);
         } else if (request.seamTypeId() != null
                 && !Objects.equals(request.seamTypeId(), existing.seamTypeId())) {
-            seamType = reference.seamType(request.seamTypeId()).orElse(null);
+            var current = reference.seamType(request.seamTypeId()).orElse(null);
+            seamTypeId = current == null ? null : current.id();
+            seamTypeName = current == null ? null : current.name();
+            seamStdMinutes = current == null ? null : current.stdMinutes();
+            seamUnitCost = seamUnitCost(current);
         } else if (existing.seamTypeId() == null) {
-            seamType = null;
+            seamTypeId = null;
+            seamTypeName = null;
+            seamStdMinutes = null;
+            seamUnitCost = DecimalPolicy.money(BigDecimal.ZERO);
+        } else if (refreshGlobals) {
+            var current = reference.seamType(existing.seamTypeId()).orElse(null);
+            seamTypeId = current == null ? existing.seamTypeId() : current.id();
+            seamTypeName = current == null ? existing.seamTypeName() : current.name();
+            seamStdMinutes = current == null ? existing.seamStdMinutes() : current.stdMinutes();
+            seamUnitCost = current == null ? existing.seamUnitCost() : seamUnitCost(current);
         } else {
-            var current = refreshGlobals ? reference.seamType(existing.seamTypeId()).orElse(null) : null;
-            seamType = current != null ? current
-                    : new CatalogReference.SeamType(existing.seamTypeId(), existing.seamTypeName(),
-                            existing.seamTypeCostPrice());
+            seamTypeId = existing.seamTypeId();
+            seamTypeName = existing.seamTypeName();
+            seamStdMinutes = existing.seamStdMinutes();
+            seamUnitCost = existing.seamUnitCost();
         }
         BigDecimal seamFee = request.seamFee() != null
                 ? DecimalPolicy.money(request.seamFee()) : existing.seamFee();
 
         var inputs = new ProductPricing.Inputs(weightG, globalLossRate(), starLevel.stdMinutes(),
                 tier == null ? null : tier.stdMinutes(), commission,
+                reference.hourlyWage(), reference.workdayHours(), reference.makingEffectiveHourRate(),
                 gluePrice, colorpastePrice, box, transport,
                 reference.moneySetting("sundries_default"), reference.moneySetting("rent_utilities_default"),
                 mold, sale);
         return new Resolved(inputs, starLevelId, starLevel.name(),
                 tier == null ? null : tier.id(), tier == null ? null : tier.tierName(), commission,
-                seamType == null ? null : seamType.id(), seamType == null ? null : seamType.name(),
-                seamCostPrice(seamType), seamFee);
+                seamTypeId, seamTypeName, seamStdMinutes, seamUnitCost, seamFee);
     }
 
-    /** 缝边种类成本单价快照：默认不缝边剪袋（无种类）时按 0，列非空。 */
-    private static BigDecimal seamCostPrice(CatalogReference.SeamType seamType) {
+    /** 单件缝边人工成本 = 种类标准分钟 × 当前全局时薪 ÷ 60；默认不缝边剪袋（无种类）时按 0，列非空。 */
+    private BigDecimal seamUnitCost(CatalogReference.SeamType seamType) {
         return seamType == null
-                ? DecimalPolicy.money(BigDecimal.ZERO) : DecimalPolicy.money(seamType.costPrice());
+                ? DecimalPolicy.money(BigDecimal.ZERO)
+                : ProductPricing.seamUnitCost(seamType.stdMinutes(), reference.hourlyWage());
     }
 
     /** 全局口径字段：胶水损耗率一律取当前全局设置（百分比 → 内部比例）。 */

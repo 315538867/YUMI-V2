@@ -125,7 +125,7 @@ class ProductSnapshotMatrixTest {
 
         var data = patchProduct(created.path("id").asLong(), 0, "{\"version\":%d,\"packagingTierId\":" + tierId + "}");
 
-        assertThat(data.path("packagingStdMinutes").asText()).isEqualTo("10.000");
+        assertThat(data.path("packagingStdMinutes").asInt()).isEqualTo(10);
         assertThat(data.path("packagingLaborFee").asText()).isEqualTo("2.5000");
         assertThat(data.path("totalCost").asText()).isEqualTo("18.7200");
     }
@@ -195,7 +195,7 @@ class ProductSnapshotMatrixTest {
         var kept = patchProduct(id, 0, "{\"version\":%d,\"note\":\"不刷新\"}");
         assertThat(kept.path("starStdMinutes").asInt()).isEqualTo(15);
         assertThat(kept.path("glueUnitPrice").asText()).isEqualTo("0.0100");
-        assertThat(kept.path("packagingStdMinutes").asText()).isEqualTo("10.000");
+        assertThat(kept.path("packagingStdMinutes").asInt()).isEqualTo(10);
         assertThat(kept.path("packagingLaborFee").asText()).isEqualTo("2.5000");
         assertThat(kept.path("totalCost").asText()).isEqualTo("18.7200");
 
@@ -206,7 +206,7 @@ class ProductSnapshotMatrixTest {
         assertThat(refreshed.path("qty6h").asInt()).isEqualTo(6);
         assertThat(refreshed.path("productLaborFee").asText()).isEqualTo("20.0000");
         assertThat(refreshed.path("glueUnitPrice").asText()).isEqualTo("0.0200");
-        assertThat(refreshed.path("packagingStdMinutes").asText()).isEqualTo("20.000");
+        assertThat(refreshed.path("packagingStdMinutes").asInt()).isEqualTo(20);
         assertThat(refreshed.path("packagingLaborFee").asText()).isEqualTo("5.0000");
         // material=12.9600、labor=25.5000、other=1.0000
         assertThat(refreshed.path("totalCost").asText()).isEqualTo("39.4600");
@@ -276,7 +276,7 @@ class ProductSnapshotMatrixTest {
         jdbcTemplate.update("""
                 INSERT INTO packaging_tiers (tier_name, std_minutes, version, created_at, updated_at)
                 VALUES (?, ?, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
-                """, name, new java.math.BigDecimal(stdMinutes));
+                """, name, new java.math.BigDecimal(stdMinutes).intValueExact());
         return jdbcTemplate.queryForObject("SELECT id FROM packaging_tiers WHERE tier_name = ?", Long.class, name);
     }
 

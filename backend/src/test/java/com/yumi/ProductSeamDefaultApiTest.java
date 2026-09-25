@@ -69,6 +69,9 @@ class ProductSeamDefaultApiTest {
         setSetting("sundries_default", "0.200000");
         setSetting("rent_utilities_default", "0.400000");
         setSetting("packaging_commission_default", "0.000000");
+        // 缝边人工成本 = 缝边标准分钟 × 时薪 ÷ 60；本类按 15 元/时钉死算例（5 分钟 → 1.2500）
+        setSetting("hourly_wage", "15.000000");
+        setSetting("making_effective_hour_rate", "0.750000");
         int[] mins = {5, 10, 15, 20, 30};
         for (int i = 0; i < mins.length; i++) {
             jdbcTemplate.update("UPDATE star_levels SET std_minutes = ? WHERE id = ?", mins[i], i + 1);
@@ -81,7 +84,7 @@ class ProductSeamDefaultApiTest {
                 .andExpect(status().isOk())
                 .andReturn();
         sessionCookie = login.getResponse().getCookie("YUMI_SESSION");
-        seamTypeId = createSeamType("验收缝边-默认", "1.2500");
+        seamTypeId = createSeamType("验收缝边-默认", "5");
     }
 
     @AfterEach
@@ -112,7 +115,8 @@ class ProductSeamDefaultApiTest {
                 // 缝边默认值：引用 + 名称与成本单价快照 + 缝边价格
                 .andExpect(jsonPath("$.data.seamTypeId").value(seamTypeId))
                 .andExpect(jsonPath("$.data.seamTypeName").value("验收缝边-默认"))
-                .andExpect(jsonPath("$.data.seamTypeCostPrice").value("1.2500"))
+                .andExpect(jsonPath("$.data.seamStdMinutes").value(5))
+                .andExpect(jsonPath("$.data.seamUnitCost").value("1.2500"))
                 .andExpect(jsonPath("$.data.seamFee").value("2.0000"))
                 // 缝边剪袋变体：16.1200 + 1.2500 = 17.3700；17.37/0.7 = 24.8142.85… → 24.8143
                 .andExpect(jsonPath("$.data.seamBudget.seamUnitCost").value("1.2500"))
@@ -125,13 +129,14 @@ class ProductSeamDefaultApiTest {
                 .path("data").path("id").asLong();
         // 落库口径：商品成本列为不缝边剪袋口径，缝边只存默认值与成本单价快照
         var row = jdbcTemplate.queryForMap(
-                "SELECT total_cost, reference_price, seam_type_id, seam_type_name, seam_type_cost_price, seam_fee "
-                        + "FROM products WHERE id = ?", id);
+                "SELECT total_cost, reference_price, seam_type_id, seam_type_name, seam_std_minutes, "
+                        + "seam_unit_cost, seam_fee FROM products WHERE id = ?", id);
         assertThat(String.valueOf(row.get("total_cost"))).isEqualTo("16.1200");
         assertThat(String.valueOf(row.get("reference_price"))).isEqualTo("23.0286");
         assertThat(((Number) row.get("seam_type_id")).longValue()).isEqualTo(seamTypeId);
         assertThat(row.get("seam_type_name")).isEqualTo("验收缝边-默认");
-        assertThat(String.valueOf(row.get("seam_type_cost_price"))).isEqualTo("1.2500");
+        assertThat(((Number) row.get("seam_std_minutes")).intValue()).isEqualTo(5);
+        assertThat(String.valueOf(row.get("seam_unit_cost"))).isEqualTo("1.2500");
         assertThat(String.valueOf(row.get("seam_fee"))).isEqualTo("2.0000");
     }
 
@@ -158,26 +163,26 @@ class ProductSeamDefaultApiTest {
         assertThat(created.path("seamBudget").path("totalCost").asText()).isEqualTo("17.3700");
 
         // 条目改值不回溯：同引用再保存仍用商品快照 1.2500
-        patchSeamType(seamTypeId, "9.0000");
+        patchSeamType(seamTypeId, "36");
         var sameReference = patchProduct(id,
                 "{\"version\":" + version + ",\"seamTypeId\":" + seamTypeId + "}");
-        assertThat(sameReference.path("seamTypeCostPrice").asText()).isEqualTo("1.2500");
+        assertThat(sameReference.path("seamUnitCost").asText()).isEqualTo("1.2500");
         assertThat(sameReference.path("seamBudget").path("totalCost").asText()).isEqualTo("17.3700");
         version = sameReference.path("version").asLong();
 
         // 显式刷新才采纳当前条目值：16.1200 + 9.0000 = 25.1200；25.12/0.7 → 35.8857
         var refreshed = patchProduct(id, "{\"version\":" + version + ",\"refreshGlobalReferences\":true}");
-        assertThat(refreshed.path("seamTypeCostPrice").asText()).isEqualTo("9.0000");
+        assertThat(refreshed.path("seamUnitCost").asText()).isEqualTo("9.0000");
         assertThat(refreshed.path("seamBudget").path("totalCost").asText()).isEqualTo("25.1200");
         assertThat(refreshed.path("seamBudget").path("referencePrice").asText()).isEqualTo("35.8857");
         assertThat(refreshed.path("totalCost").asText()).isEqualTo("16.1200");
         version = refreshed.path("version").asLong();
 
         // 换成不同引用取当前条目：16.1200 + 3.0000 = 19.1200
-        var otherId = createSeamType("验收缝边-默认乙", "3.0000");
+        var otherId = createSeamType("验收缝边-默认乙", "12");
         var switched = patchProduct(id, "{\"version\":" + version + ",\"seamTypeId\":" + otherId + "}");
         assertThat(switched.path("seamTypeName").asText()).isEqualTo("验收缝边-默认乙");
-        assertThat(switched.path("seamTypeCostPrice").asText()).isEqualTo("3.0000");
+        assertThat(switched.path("seamUnitCost").asText()).isEqualTo("3.0000");
         assertThat(switched.path("seamBudget").path("totalCost").asText()).isEqualTo("19.1200");
         version = switched.path("version").asLong();
 
@@ -287,24 +292,24 @@ class ProductSeamDefaultApiTest {
 
     // ---------- 工具 ----------
 
-    private long createSeamType(String name, String costPrice) throws Exception {
+    private long createSeamType(String name, String stdMinutes) throws Exception {
         var created = mockMvc.perform(post(STATIC_DATA + "/SEAM_TYPE/items")
                         .cookie(sessionCookie)
                         .header("Idempotency-Key", key())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"" + name + "\",\"costPrice\":\"" + costPrice + "\"}"))
+                        .content("{\"name\":\"" + name + "\",\"stdMinutes\":\"" + stdMinutes + "\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(created.getResponse().getContentAsString())
                 .path("data").path("id").asLong();
     }
 
-    private void patchSeamType(long id, String costPrice) throws Exception {
+    private void patchSeamType(long id, String stdMinutes) throws Exception {
         mockMvc.perform(patch(STATIC_DATA + "/SEAM_TYPE/items/" + id)
                         .cookie(sessionCookie)
                         .header("Idempotency-Key", key())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"costPrice\":\"" + costPrice + "\"}"))
+                        .content("{\"stdMinutes\":\"" + stdMinutes + "\"}"))
                 .andExpect(status().isOk());
     }
 

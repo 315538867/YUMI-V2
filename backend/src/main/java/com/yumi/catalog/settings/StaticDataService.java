@@ -10,14 +10,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 静态数据 API（任务 2.22）：类别由系统固定 code、不可增删改名；类别下条目按类别管理。
- * 星级/包装档位/缝边种类条目由用户增删改（被引用禁删），员工工种为系统预置四道工序、仅可改名与启停。
+ * 星级/包装档位/缝边种类条目由用户增删改（被引用禁删），员工工种为系统预置四道工序、仅可改名。
+ * 星级/包装档位/缝边种类都只提供「标准分钟」（整数 1–360），人工费由全局时薪派生。
  * 条目名称在类别内唯一；增删改记变更日志；查询不产生业务写入。
  */
 @Service
@@ -43,11 +43,11 @@ public class StaticDataService {
     public record CategoryView(String code, String name, int itemCount) {
     }
 
-    /** 条目：仅对应类别有值的字段非空（星级/档位给 stdMinutes，缝边给 costPrice，工种给 code 与 active）。 */
-    public record ItemView(long id, String code, String name, String stdMinutes, String costPrice, Boolean active) {
+    /** 条目：星级/包装档位/缝边种类给 stdMinutes（整数分钟），员工工种给系统 code。 */
+    public record ItemView(long id, String code, String name, String stdMinutes) {
     }
 
-    public record ItemRequest(String name, String stdMinutes, String costPrice, Boolean active, String reason) {
+    public record ItemRequest(String name, String stdMinutes, String reason) {
     }
 
     private final JdbcTemplate jdbcTemplate;
@@ -73,19 +73,18 @@ public class StaticDataService {
             case STAR_LEVEL -> jdbcTemplate.query(
                     "SELECT id, name, std_minutes FROM star_levels ORDER BY id",
                     (rs, rowNum) -> new ItemView(rs.getLong(1), null, rs.getString(2),
-                            String.valueOf(rs.getInt(3)), null, null));
+                            String.valueOf(rs.getInt(3))));
             case PACKAGING_TIER -> jdbcTemplate.query(
                     "SELECT id, tier_name, std_minutes FROM packaging_tiers ORDER BY id",
                     (rs, rowNum) -> new ItemView(rs.getLong(1), null, rs.getString(2),
-                            rs.getBigDecimal(3).toPlainString(), null, null));
+                            String.valueOf(rs.getInt(3))));
             case SEAM_TYPE -> jdbcTemplate.query(
-                    "SELECT id, name, cost_price FROM seam_types ORDER BY id",
-                    (rs, rowNum) -> new ItemView(rs.getLong(1), null, rs.getString(2), null,
-                            rs.getBigDecimal(3).toPlainString(), null));
+                    "SELECT id, name, std_minutes FROM seam_types ORDER BY id",
+                    (rs, rowNum) -> new ItemView(rs.getLong(1), null, rs.getString(2),
+                            String.valueOf(rs.getInt(3))));
             default -> jdbcTemplate.query(
-                    "SELECT id, code, name, active FROM work_types ORDER BY id",
-                    (rs, rowNum) -> new ItemView(rs.getLong(1), rs.getString(2), rs.getString(3), null, null,
-                            rs.getBoolean(4)));
+                    "SELECT id, code, name FROM work_types ORDER BY id",
+                    (rs, rowNum) -> new ItemView(rs.getLong(1), rs.getString(2), rs.getString(3), null));
         };
     }
 
@@ -104,11 +103,11 @@ public class StaticDataService {
                 case PACKAGING_TIER -> jdbcTemplate.update(
                         "INSERT INTO packaging_tiers (tier_name, std_minutes, version, created_at, updated_at) "
                                 + "VALUES (?, ?, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                        name, decimal(request.stdMinutes(), "stdMinutes", 0, 999, 3));
+                        name, stdMinutes(request, 1, 360));
                 default -> jdbcTemplate.update(
-                        "INSERT INTO seam_types (name, cost_price, version, created_at, updated_at) "
+                        "INSERT INTO seam_types (name, std_minutes, version, created_at, updated_at) "
                                 + "VALUES (?, ?, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                        name, decimal(request.costPrice(), "costPrice", 0, 999, 4));
+                        name, stdMinutes(request, 1, 360));
             }
         } catch (DuplicateKeyException duplicate) {
             throw duplicateName();
@@ -132,17 +131,17 @@ public class StaticDataService {
                 case PACKAGING_TIER -> jdbcTemplate.update(
                         "UPDATE packaging_tiers SET tier_name = ?, std_minutes = ?, version = version + 1, "
                                 + "updated_at = UTC_TIMESTAMP(6) WHERE id = ?",
-                        name, request.stdMinutes() == null ? new BigDecimal(before.stdMinutes())
-                                : decimal(request.stdMinutes(), "stdMinutes", 0, 999, 3), id);
+                        name, request.stdMinutes() == null ? Integer.valueOf(before.stdMinutes())
+                                : stdMinutes(request, 1, 360), id);
                 case SEAM_TYPE -> jdbcTemplate.update(
-                        "UPDATE seam_types SET name = ?, cost_price = ?, version = version + 1, "
+                        "UPDATE seam_types SET name = ?, std_minutes = ?, version = version + 1, "
                                 + "updated_at = UTC_TIMESTAMP(6) WHERE id = ?",
-                        name, request.costPrice() == null ? new BigDecimal(before.costPrice())
-                                : decimal(request.costPrice(), "costPrice", 0, 999, 4), id);
+                        name, request.stdMinutes() == null ? Integer.valueOf(before.stdMinutes())
+                                : stdMinutes(request, 1, 360), id);
                 default -> jdbcTemplate.update(
-                        "UPDATE work_types SET name = ?, active = ?, version = version + 1, "
+                        "UPDATE work_types SET name = ?, version = version + 1, "
                                 + "updated_at = UTC_TIMESTAMP(6) WHERE id = ?",
-                        name, request.active() == null ? before.active() : request.active(), id);
+                        name, id);
             }
         } catch (DuplicateKeyException duplicate) {
             throw duplicateName();
@@ -240,12 +239,6 @@ public class StaticDataService {
         if (item.stdMinutes() != null) {
             map.put("stdMinutes", item.stdMinutes());
         }
-        if (item.costPrice() != null) {
-            map.put("costPrice", item.costPrice());
-        }
-        if (item.active() != null) {
-            map.put("active", item.active());
-        }
         return map;
     }
 
@@ -270,22 +263,6 @@ public class StaticDataService {
         } catch (NumberFormatException bad) {
             throw invalid("stdMinutes", "必须是整数分钟");
         }
-    }
-
-    private static BigDecimal decimal(String raw, String field, int min, int max, int scale) {
-        if (raw == null) {
-            throw invalid(field, "必填");
-        }
-        BigDecimal value;
-        try {
-            value = new BigDecimal(raw.trim());
-        } catch (NumberFormatException bad) {
-            throw invalid(field, "不是合法数字");
-        }
-        if (value.signum() < 0 || value.compareTo(new BigDecimal(max)) > 0) {
-            throw invalid(field, "必须在 " + min + "-" + max + " 之间");
-        }
-        return value.setScale(scale, java.math.RoundingMode.HALF_UP);
     }
 
     private static ApiException invalid(String field, String message) {

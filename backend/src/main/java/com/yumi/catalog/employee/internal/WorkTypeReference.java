@@ -9,13 +9,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 工种目录只读访问（任务 2.26）：解析静态数据 `work_types` 的 code / name / active。
+ * 工种目录只读访问（任务 2.26）：解析静态数据 `work_types` 的 code / name。
  * 业务侧一律按系统固定 code 引用与存储，展示使用 name；改名不影响既有引用。
+ * 2026-09-25 起取消工种「启用状态」：该字段原本只存不判，不参与排产与核验。
  */
 @Component
 public class WorkTypeReference {
 
-    public record WorkType(long id, String code, String name, boolean active) {
+    public record WorkType(long id, String code, String name) {
     }
 
     private final JdbcTemplate jdbcTemplate;
@@ -29,7 +30,7 @@ public class WorkTypeReference {
             return Optional.empty();
         }
         return jdbcTemplate.query(
-                "SELECT id, code, name, active FROM work_types WHERE code = ?",
+                "SELECT id, code, name FROM work_types WHERE code = ?",
                 rs -> rs.next() ? Optional.of(map(rs)) : Optional.empty(),
                 code);
     }
@@ -42,7 +43,7 @@ public class WorkTypeReference {
         }
         var placeholders = String.join(",", ids.stream().map(id -> "?").toList());
         jdbcTemplate.query(
-                "SELECT id, code, name, active FROM work_types WHERE id IN (" + placeholders + ")",
+                "SELECT id, code, name FROM work_types WHERE id IN (" + placeholders + ")",
                 rs -> {
                     result.put(rs.getLong("id"), map(rs));
                 },
@@ -51,7 +52,6 @@ public class WorkTypeReference {
     }
 
     private static WorkType map(java.sql.ResultSet rs) throws java.sql.SQLException {
-        return new WorkType(rs.getLong("id"), rs.getString("code"), rs.getString("name"),
-                rs.getBoolean("active"));
+        return new WorkType(rs.getLong("id"), rs.getString("code"), rs.getString("name"));
     }
 }

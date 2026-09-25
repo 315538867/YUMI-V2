@@ -57,6 +57,11 @@ class SettingsApiTest {
         sessionCookie = login.getResponse().getCookie("YUMI_SESSION");
         // 恢复全局设置与测试脏数据（星级种子 id1-5：5/10/15/20/30）
         jdbcTemplate.update("UPDATE catalog_settings SET setting_value = 0 WHERE setting_key <> 'loss_rate_default'");
+        // 时薪、工作日小时数与制品有效工时率是三类人工费的派生基数，清零会让后续用例的人工费/产量全为 0 → 恢复 SQL 默认值
+        jdbcTemplate.update("UPDATE catalog_settings SET setting_value = 15.000000 WHERE setting_key = 'hourly_wage'");
+        jdbcTemplate.update("UPDATE catalog_settings SET setting_value = 8.000000 WHERE setting_key = 'workday_hours'");
+        jdbcTemplate.update(
+                "UPDATE catalog_settings SET setting_value = 0.750000 WHERE setting_key = 'making_effective_hour_rate'");
         jdbcTemplate.update("DELETE FROM packaging_tiers WHERE tier_name LIKE '验收档位%'");
         jdbcTemplate.update("DELETE FROM star_levels WHERE name LIKE '测试星级%' OR name LIKE '被引用星级%'");
         int[] mins = {5, 10, 15, 20, 30};
@@ -180,7 +185,7 @@ class SettingsApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
                         .content("""
-                                {"name":"%s","stdMinutes":"8.5"}
+                                {"name":"%s","stdMinutes":"8"}
                                 """.formatted(tierName)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.name").value(tierName))
@@ -212,8 +217,8 @@ class SettingsApiTest {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/products/" + productId).cookie(sessionCookie))
                 .andExpect(jsonPath("$.data.packagingTierName").value(tierName))
-                .andExpect(jsonPath("$.data.packagingStdMinutes").value("8.500"))
-                .andExpect(jsonPath("$.data.packagingLaborFee").value("2.4250"));
+                .andExpect(jsonPath("$.data.packagingStdMinutes").value(8))
+                .andExpect(jsonPath("$.data.packagingLaborFee").value("2.3000"));
 
         // 被引用 → 禁止删除
         mockMvc.perform(delete("/api/settings/static-data/PACKAGING_TIER/items/" + tierId)
@@ -316,7 +321,7 @@ class SettingsApiTest {
                                  "packagingTierId":%d,"packagingCommission":"0.3000"}
                                 """.formatted(prefix, System.nanoTime(), tierId)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.packagingLaborFee").value("2.4250"))
+                .andExpect(jsonPath("$.data.packagingLaborFee").value("2.3000"))
                 .andReturn();
         return new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();

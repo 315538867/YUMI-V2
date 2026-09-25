@@ -8,22 +8,24 @@ import java.math.RoundingMode;
 /**
  * 商品计价纯函数（任务 2.3 公式钉死，2.14 迁入集中计算模块；目录 FP-PROD-02..08、11..17、20..21）：
  * glueGrams=round(weight*(1+loss))；胶水/色浆=克重*单价(4)；
- * qty8=floor(480/std)、qty6=floor(360/std)、星级人工=120/qty6(4)（qty6=0 → 0）；
- * 包装=档位标准分钟*0.25+商品包装提成(4)；total=material+labor+other(4)；参考售价=total/0.7(4)；
+ * 工作日标准数量=floor(工作日小时数*60/std)；有效工时产量=floor(工作日小时数*60*制品有效工时率/std)；
+ * 星级人工=(时薪*工作日小时数)/有效工时产量(4)（产量=0 → 0）；
+ * 包装=档位整数分钟*(时薪/60)+商品包装提成(4)；total=material+labor+other(4)；参考售价=total/0.7(4)；
  * 派生利润=sale−total(4)、毛利率=(sale−total)/sale(6)（sale=0 → 0）。
+ * 三类工序人工费统一由全局时薪派生：制品按「时薪×工作日小时数 ÷ 有效工时产量」（工作日小时数与
+ * 制品有效工时率都来自全局设置；制品工序不可能排满整个工作日，故按有效工时率折算的产量计标准产量）；
+ * 包装与缝边按「标准分钟 × 时薪 ÷ 60」。
  * 缝边决策权在订单，商品只提供默认值：商品自身总成本按不缝边剪袋口径，缝边剪袋变体用
- * {@link #seamBudget} 单列展示（不缝边剪袋总成本 + 种类成本单价），不进入商品快照。
+ * {@link #seamBudget} 单列展示（不缝边剪袋总成本 + 单件缝边人工成本），不进入商品快照。
  * 不访问数据库、实体、HTTP、当前时间或登录上下文。
  */
 public final class ProductPricing {
 
-    private static final BigDecimal MINUTE_RATE = new BigDecimal("0.25");
     private static final BigDecimal MARGIN_DIVISOR = new BigDecimal("0.7");
-    private static final BigDecimal LABOR_BASE = new BigDecimal("120");
-    private static final int HOURS_8H = 480;
-    private static final int MINUTES_6H = 360;
+    private static final BigDecimal MINUTES_PER_HOUR = new BigDecimal("60");
     private static final int MONEY_SCALE = 4;
     private static final int RATIO_SCALE = 6;
+    private static final int RATE_SCALE = 8;
 
     private ProductPricing() {
     }
@@ -32,8 +34,11 @@ public final class ProductPricing {
             int weightG,
             BigDecimal lossRate,
             int stdMinutes,
-            BigDecimal tierStdMinutes,
+            Integer tierStdMinutes,
             BigDecimal packagingCommission,
+            BigDecimal hourlyWage,
+            BigDecimal workdayHours,
+            BigDecimal makingEffectiveHourRate,
             BigDecimal glueUnitPrice,
             BigDecimal colorpasteUnitPrice,
             BigDecimal boxLaborFee,
@@ -77,16 +82,23 @@ public final class ProductPricing {
         BigDecimal colorpasteCost = DecimalPolicy.money(grams.multiply(in.colorpasteUnitPrice()));
 
         int std = in.stdMinutes();
-        int qty8 = std <= 0 ? 0 : HOURS_8H / std;
-        int qty6 = std <= 0 ? 0 : MINUTES_6H / std;
+        BigDecimal workday = workdayHours(in.workdayHours());
+        int workdayMinutes = workday.multiply(MINUTES_PER_HOUR).setScale(0, RoundingMode.FLOOR).intValue();
+        int qty8 = std <= 0 ? 0 : workdayMinutes / std;
+        int effectiveMinutes = in.makingEffectiveHourRate() == null
+                ? 0
+                : BigDecimal.valueOf(workdayMinutes).multiply(in.makingEffectiveHourRate())
+                        .setScale(0, RoundingMode.FLOOR).intValue();
+        int qty6 = std <= 0 ? 0 : effectiveMinutes / std;
         BigDecimal productLaborFee = qty6 == 0
                 ? DecimalPolicy.money(BigDecimal.ZERO)
-                : LABOR_BASE.setScale(MONEY_SCALE, RoundingMode.HALF_UP)
+                : DecimalPolicy.money(hourlyWage(in.hourlyWage()).multiply(workday))
                         .divide(BigDecimal.valueOf(qty6), MONEY_SCALE, RoundingMode.HALF_UP);
 
         BigDecimal packagingLaborFee = in.tierStdMinutes() == null
                 ? DecimalPolicy.money(BigDecimal.ZERO)
-                : DecimalPolicy.money(in.tierStdMinutes().multiply(MINUTE_RATE)
+                : DecimalPolicy.money(BigDecimal.valueOf(in.tierStdMinutes())
+                        .multiply(minuteRate(in.hourlyWage()))
                         .add(in.packagingCommission() == null ? BigDecimal.ZERO : in.packagingCommission()));
 
         BigDecimal material = DecimalPolicy.money(glueCost.add(colorpasteCost));
@@ -103,8 +115,29 @@ public final class ProductPricing {
                 packagingLaborFee, material, labor, other, total, referencePrice, profit, margin);
     }
 
+    /** 每分钟时薪 = 时薪 ÷ 60（scale8 HALF_UP）；包装与缝边的单件人工费基数。 */
+    public static BigDecimal minuteRate(BigDecimal hourlyWage) {
+        return hourlyWage(hourlyWage).divide(MINUTES_PER_HOUR, RATE_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /** 单件缝边人工成本 = 缝边标准分钟 × 每分钟时薪（scale4 HALF_UP）。 */
+    public static BigDecimal seamUnitCost(Integer seamStdMinutes, BigDecimal hourlyWage) {
+        if (seamStdMinutes == null) {
+            return DecimalPolicy.money(BigDecimal.ZERO);
+        }
+        return DecimalPolicy.money(BigDecimal.valueOf(seamStdMinutes).multiply(minuteRate(hourlyWage)));
+    }
+
+    private static BigDecimal hourlyWage(BigDecimal hourlyWage) {
+        return hourlyWage == null ? BigDecimal.ZERO : hourlyWage;
+    }
+
+    private static BigDecimal workdayHours(BigDecimal workdayHours) {
+        return workdayHours == null ? BigDecimal.ZERO : workdayHours;
+    }
+
     /**
-     * 缝边剪袋变体预算（FP-PROD-20/21，单件口径）：总成本 = 不缝边剪袋总成本 + 缝边种类成本单价；
+     * 缝边剪袋变体预算（FP-PROD-20/21，单件口径）：总成本 = 不缝边剪袋总成本 + 单件缝边人工成本；
      * 参考售价 = 变体总成本 ÷ 0.7。缝边价格按商品填写的收费单价原样回传，不参与成本。
      */
     public static SeamBudget seamBudget(BigDecimal productTotalCost, BigDecimal seamUnitCost, BigDecimal seamFee) {

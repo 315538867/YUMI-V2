@@ -2,6 +2,7 @@ package com.yumi.orders.order.internal;
 
 import com.yumi.calculation.DecimalPolicy;
 import com.yumi.calculation.order.OrderPricing;
+import com.yumi.calculation.product.ProductPricing;
 import com.yumi.orders.order.OrderItemRequest;
 import com.yumi.shared.error.ApiFieldError;
 import org.springframework.stereotype.Component;
@@ -115,7 +116,7 @@ public class OrderItemResolver {
                 } else {
                     seamTypeId = type.id();
                     seamTypeName = type.name();
-                    seamUnitCost = DecimalPolicy.money(type.costPrice());
+                    seamUnitCost = ProductPricing.seamUnitCost(type.stdMinutes(), reference.hourlyWage());
                 }
             }
             BigDecimal fee;

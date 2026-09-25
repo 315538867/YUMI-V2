@@ -10,8 +10,8 @@ import {
   Popconfirm,
   Row,
   Space,
-  Switch,
   Table,
+  Tag,
   Tabs,
   Typography,
   type TableColumnsType,
@@ -37,7 +37,8 @@ import { describeApiError } from '../../api/errors';
 
 /**
  * 全局设置（任务 2.20/2.25）：Tab「单价与默认值」/「静态数据」/「公式说明」。
- * 静态数据 Tab 先列系统固定类别（不可增删改名），点「编辑」用弹窗管理该类别的条目。
+ * 静态数据 Tab 先列系统固定类别（不可增删改名，标「系统内置」），点「编辑」用弹窗管理该类别的条目；
+ * 员工工种为系统预置四道工序（标「系统预置」，只能改名）；星级/包装档位/缝边都只填整数标准分钟。
  */
 export function SettingsPage() {
   const { message } = App.useApp();
@@ -137,8 +138,6 @@ export function SettingsPage() {
       const payload = {
         name: body.name,
         stdMinutes: body.stdMinutes === undefined || body.stdMinutes === null ? undefined : String(body.stdMinutes),
-        costPrice: body.costPrice === undefined || body.costPrice === null ? undefined : String(body.costPrice),
-        active: body.active,
       };
       if (itemModal.id) {
         await updateStaticDataItem(active.code, itemModal.id, payload);
@@ -172,27 +171,27 @@ export function SettingsPage() {
   }
 
   const isWorkType = active?.code === 'WORK_TYPE';
-  const valueTitle = active?.code === 'SEAM_TYPE' ? '成本单价（元/件）' : '标准时长（分钟）';
 
   const itemColumns: TableColumnsType<StaticDataItem> = [
     ...(isWorkType ? [{ title: '系统标识', dataIndex: 'code', width: 150 }] : []),
-    { title: '名称', dataIndex: 'name' },
+    {
+      title: '名称',
+      dataIndex: 'name',
+      render: (value: string) => (
+        <Space size={6}>
+          <span>{value}</span>
+          {isWorkType && <Tag color="blue">系统预置</Tag>}
+        </Space>
+      ),
+    },
     ...(isWorkType
-      ? [
-          {
-            title: '状态',
-            dataIndex: 'active',
-            width: 90,
-            render: (value: boolean) => (value ? '启用' : '停用'),
-          },
-        ]
+      ? []
       : [
           {
-            title: valueTitle,
+            title: '标准时长（分钟）',
             key: 'value',
             width: 180,
-            render: (_: unknown, row: StaticDataItem) =>
-              active?.code === 'SEAM_TYPE' ? row.costPrice : row.stdMinutes,
+            render: (_: unknown, row: StaticDataItem) => row.stdMinutes,
           },
         ]),
     {
@@ -208,8 +207,6 @@ export function SettingsPage() {
               setItemDraft({
                 name: row.name,
                 stdMinutes: row.stdMinutes,
-                costPrice: row.costPrice,
-                active: row.active ?? true,
               });
               setItemModal({ open: true, id: row.id });
             }}
@@ -289,6 +286,25 @@ export function SettingsPage() {
                         <Input placeholder="如 0.4000（商品只读使用）" />
                       </Form.Item>
                     </Col>
+                    <Col span={8}>
+                      <Form.Item name="hourlyWage" label="时薪（元/小时）" rules={[{ required: true }]}>
+                        <Input placeholder="如 15.0000（制品/包装/缝边人工费基数）" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item name="workdayHours" label="工作日小时数（小时/天）" rules={[{ required: true }]}>
+                        <Input placeholder="如 8.0000（制品日薪 = 时薪 × 该值）" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item
+                        name="makingEffectiveHourRate"
+                        label="制品有效工时率（0–1）"
+                        rules={[{ required: true }]}
+                      >
+                        <Input placeholder="如 0.750000（工作日小时数 × 该率 = 制品有效工时）" />
+                      </Form.Item>
+                    </Col>
                   </Row>
                   <Button type="primary" loading={saving} onClick={() => void saveValues()}>
                     保存单价与默认值
@@ -311,7 +327,16 @@ export function SettingsPage() {
                   pagination={false}
                   dataSource={categories}
                   columns={[
-                    { title: '类别', dataIndex: 'name' },
+                    {
+                      title: '类别',
+                      dataIndex: 'name',
+                      render: (value: string) => (
+                        <Space size={6}>
+                          <span>{value}</span>
+                          <Tag color="blue">系统内置</Tag>
+                        </Space>
+                      ),
+                    },
                     { title: '系统标识', dataIndex: 'code', width: 180 },
                     { title: '条目数', dataIndex: 'itemCount', width: 100 },
                     {
@@ -350,7 +375,7 @@ export function SettingsPage() {
       >
         {isWorkType ? (
           <Typography.Paragraph type="secondary">
-            员工工种为系统预置的四道工序，标识固定；只能改名称与启停，不能新增或删除。
+            员工工种为系统预置的四道工序，标识固定；只能改名称，不能新增、删除或停用。
           </Typography.Paragraph>
         ) : (
           <Button
@@ -378,24 +403,13 @@ export function SettingsPage() {
           <Form.Item name="name" label="名称" rules={[{ required: true, whitespace: true, message: '请输入名称' }]}>
             <Input placeholder="类别内不可重名" />
           </Form.Item>
-          {active?.code === 'STAR_LEVEL' && (
-            <Form.Item name="stdMinutes" label="标准时长（分钟/件）" rules={[{ required: true, message: '请输入时长' }]}>
-              <Input placeholder="整数，1-360" />
-            </Form.Item>
-          )}
-          {active?.code === 'PACKAGING_TIER' && (
-            <Form.Item name="stdMinutes" label="包装标准时长（分钟）" rules={[{ required: true, message: '请输入时长' }]}>
-              <Input placeholder="允许小数，如 6.000" />
-            </Form.Item>
-          )}
-          {active?.code === 'SEAM_TYPE' && (
-            <Form.Item name="costPrice" label="成本单价（元/件）" rules={[{ required: true, message: '请输入成本单价' }]}>
-              <Input placeholder="允许为 0，如 0.5000" />
-            </Form.Item>
-          )}
-          {isWorkType && (
-            <Form.Item name="active" label="启用" valuePropName="checked">
-              <Switch />
+          {!isWorkType && (
+            <Form.Item
+              name="stdMinutes"
+              label={active?.code === 'SEAM_TYPE' ? '缝边标准时长（分钟/件）' : '标准时长（分钟）'}
+              rules={[{ required: true, message: '请输入时长' }]}
+            >
+              <Input placeholder="整数分钟，1-360" />
             </Form.Item>
           )}
           <Space>

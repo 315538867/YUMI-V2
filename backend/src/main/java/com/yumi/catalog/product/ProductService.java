@@ -94,17 +94,17 @@ public class ProductService {
                 pricing.qty8h(), pricing.qty6h(), in.salePrice(),
                 pricing.estimatedProfit(), pricing.estimatedMarginRate(),
                 percentText(pricing.estimatedMarginRate()),
-                seamBudget(resolved.seamTypeId(), resolved.seamTypeCostPrice(), resolved.seamFee(),
+                seamBudget(resolved.seamTypeId(), resolved.seamUnitCost(), resolved.seamFee(),
                         pricing.totalCost()));
     }
 
     /** 缝边剪袋变体预算：未选默认缝边剪袋类型（默认不缝边剪袋）时为 null，不伪造零值。 */
-    private static SeamBudgetView seamBudget(Long seamTypeId, BigDecimal seamTypeCostPrice, BigDecimal seamFee,
+    private static SeamBudgetView seamBudget(Long seamTypeId, BigDecimal seamUnitCost, BigDecimal seamFee,
                                             BigDecimal productTotalCost) {
         if (seamTypeId == null) {
             return null;
         }
-        return SeamBudgetView.of(ProductPricing.seamBudget(productTotalCost, seamTypeCostPrice, seamFee));
+        return SeamBudgetView.of(ProductPricing.seamBudget(productTotalCost, seamUnitCost, seamFee));
     }
 
     /** 利润率展示文本：比例 → 百分比并去掉无意义尾零，如 0.351200 → 35.12%。 */
@@ -141,7 +141,8 @@ public class ProductService {
                 resolved.packagingTierId(), resolved.packagingTierName(),
                 in.tierStdMinutes(), resolved.packagingCommission(),
                 pricing.packagingLaborFee(),
-                resolved.seamTypeId(), resolved.seamTypeName(), resolved.seamTypeCostPrice(), resolved.seamFee(),
+                resolved.seamTypeId(), resolved.seamTypeName(), resolved.seamStdMinutes(),
+                resolved.seamUnitCost(), resolved.seamFee(),
                 in.boxLaborFee(), in.transportPackingFee(), in.dailySundriesFee(),
                 in.rentUtilitiesFee(), in.moldAmortFee(),
                 pricing.materialCost(), pricing.laborCost(), pricing.otherCost(),
@@ -190,7 +191,8 @@ public class ProductService {
                 resolved.packagingTierId(), resolved.packagingTierName(),
                 in.tierStdMinutes(), resolved.packagingCommission(),
                 pricing.packagingLaborFee(),
-                resolved.seamTypeId(), resolved.seamTypeName(), resolved.seamTypeCostPrice(), resolved.seamFee(),
+                resolved.seamTypeId(), resolved.seamTypeName(), resolved.seamStdMinutes(),
+                resolved.seamUnitCost(), resolved.seamFee(),
                 in.boxLaborFee(), in.transportPackingFee(), in.dailySundriesFee(),
                 in.rentUtilitiesFee(), in.moldAmortFee(),
                 pricing.materialCost(), pricing.laborCost(), pricing.otherCost(),
@@ -217,7 +219,8 @@ public class ProductService {
                 existing.qty8h(), existing.qty6h(), existing.productLaborFee(),
                 existing.packagingTierId(), existing.packagingTierName(),
                 existing.packagingStdMinutes(), existing.packagingCommission(), existing.packagingLaborFee(),
-                existing.seamTypeId(), existing.seamTypeName(), existing.seamTypeCostPrice(), existing.seamFee(),
+                existing.seamTypeId(), existing.seamTypeName(), existing.seamStdMinutes(),
+                existing.seamUnitCost(), existing.seamFee(),
                 existing.boxLaborFee(), existing.transportPackingFee(), existing.dailySundriesFee(),
                 existing.rentUtilitiesFee(), existing.moldAmortFee(),
                 existing.materialCost(), existing.laborCost(), existing.otherCost(),
@@ -259,7 +262,7 @@ public class ProductService {
                 row.qty8h(), row.qty6h(), row.productLaborFee(),
                 row.packagingTierId(), row.packagingTierName(), row.packagingStdMinutes(),
                 row.packagingCommission(), row.packagingLaborFee(),
-                row.seamTypeId(), row.seamTypeName(), row.seamTypeCostPrice(), row.seamFee(),
+                row.seamTypeId(), row.seamTypeName(), row.seamStdMinutes(), row.seamUnitCost(), row.seamFee(),
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
@@ -275,7 +278,7 @@ public class ProductService {
                 row.qty8h(), row.qty6h(), row.productLaborFee(),
                 row.packagingTierId(), row.packagingTierName(), row.packagingStdMinutes(),
                 row.packagingCommission(), row.packagingLaborFee(),
-                row.seamTypeId(), row.seamTypeName(), row.seamTypeCostPrice(), row.seamFee(),
+                row.seamTypeId(), row.seamTypeName(), row.seamStdMinutes(), row.seamUnitCost(), row.seamFee(),
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
@@ -298,14 +301,14 @@ public class ProductService {
                 row.qty8h(), row.qty6h(), row.productLaborFee(),
                 row.packagingTierId(), row.packagingTierName(), row.packagingStdMinutes(),
                 row.packagingCommission(), row.packagingLaborFee(),
-                row.seamTypeId(), row.seamTypeName(), row.seamTypeCostPrice(), row.seamFee(),
+                row.seamTypeId(), row.seamTypeName(), row.seamStdMinutes(), row.seamUnitCost(), row.seamFee(),
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(),
                 row.totalCost(), row.referencePrice(),
                 ProductPricing.estimatedProfit(row.salePrice(), row.totalCost()),
                 ProductPricing.estimatedMarginRate(row.salePrice(), row.totalCost()),
-                seamBudget(row.seamTypeId(), row.seamTypeCostPrice(), row.seamFee(), row.totalCost()),
+                seamBudget(row.seamTypeId(), row.seamUnitCost(), row.seamFee(), row.totalCost()),
                 row.version());
     }
 }

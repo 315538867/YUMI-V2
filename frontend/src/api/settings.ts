@@ -11,6 +11,12 @@ export interface SettingsValues {
   rentUtilitiesDefault: Money;
   /** 包装提成默认值（元/件）：商品表单取此值作默认、可修改 */
   packagingCommissionDefault: Money;
+  /** 时薪（元/小时）：制品/包装/缝边三类人工费的统一派生基数 */
+  hourlyWage: Money;
+  /** 工作日小时数（小时/天）：制品日薪 = 时薪 × 该值；工作日标准数量按该值折算 */
+  workdayHours: Money;
+  /** 制品有效工时率（0–1 比例，如 0.750000）：制品人工费按有效工时产量计 */
+  makingEffectiveHourRate: string;
 }
 
 export interface StarLevel {
@@ -22,7 +28,8 @@ export interface StarLevel {
 export interface PackagingTier {
   id: number;
   tierName: string;
-  stdMinutes: string;
+  /** 标准分钟（整数） */
+  stdMinutes: number;
 }
 
 export interface SettingsView {
@@ -37,55 +44,6 @@ export function getSettings(): Promise<SettingsView> {
 
 export function patchSettings(patch: Partial<SettingsValues> & { reason?: string }): Promise<SettingsValues> {
   return apiFetch<SettingsValues>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) });
-}
-
-export function createStarLevel(body: { name: string; stdMinutes: number }): Promise<StarLevel> {
-  return apiFetch<StarLevel>('/api/settings/star-levels', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-
-export function patchStarLevel(
-  id: number,
-  body: { name?: string; stdMinutes?: number },
-): Promise<StarLevel> {
-  return apiFetch<StarLevel>(`/api/settings/star-levels/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
-}
-
-export function deleteStarLevel(id: number): Promise<void> {
-  return apiFetch<void>(`/api/settings/star-levels/${id}`, { method: 'DELETE' });
-}
-
-export function listPackagingTiers(): Promise<PackagingTier[]> {
-  return apiFetch<PackagingTier[]>('/api/settings/packaging-tiers');
-}
-
-export function createPackagingTier(body: {
-  tierName: string;
-  stdMinutes: string;
-}): Promise<PackagingTier> {
-  return apiFetch<PackagingTier>('/api/settings/packaging-tiers', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-
-export function updatePackagingTier(
-  id: number,
-  body: { tierName: string; stdMinutes: string },
-): Promise<PackagingTier> {
-  return apiFetch<PackagingTier>(`/api/settings/packaging-tiers/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
-}
-
-export function deletePackagingTier(id: number): Promise<void> {
-  return apiFetch<void>(`/api/settings/packaging-tiers/${id}`, { method: 'DELETE' });
 }
 
 /* ---------------- 只读公式说明（任务 2.20） ---------------- */

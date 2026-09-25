@@ -269,8 +269,8 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
     : undefined;
   const seamDrifted = Boolean(
     !refreshReferences && currentSeam && detail
-    && detail.seamTypeCostPrice !== undefined && currentSeam.costPrice !== undefined
-    && Number(currentSeam.costPrice) !== Number(detail.seamTypeCostPrice),
+    && detail.seamStdMinutes !== undefined && currentSeam.stdMinutes !== undefined
+    && Number(currentSeam.stdMinutes) !== Number(detail.seamStdMinutes),
   );
 
   // 商品自身引用的星级/档位按冻结快照展示；仅在与当前全局不一致时标注（商品快照）
@@ -295,14 +295,12 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
       : { value: tier.id, label: `${tier.tierName} · ${tier.stdMinutes}分钟` },
   );
   const seamOptions = seamTypes.map(type =>
-    editing && detail && detail.seamTypeId === type.id
+    editing && detail && detail.seamTypeId === type.id && seamDrifted
       ? {
           value: type.id,
-          label: seamDrifted
-            ? `${detail.seamTypeName} · ${detail.seamTypeCostPrice} 元/件（商品快照）`
-            : `${type.name} · ${type.costPrice} 元/件`,
+          label: `${detail.seamTypeName} · 商品快照 ${detail.seamStdMinutes} 分钟`,
         }
-      : { value: type.id, label: `${type.name} · ${type.costPrice} 元/件` },
+      : { value: type.id, label: `${type.name} · 标准 ${type.stdMinutes} 分钟` },
   );
 
   const globalDrifts: string[] = [];
@@ -328,7 +326,7 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
   }
   if (seamDrifted && currentSeam && detail) {
     globalDrifts.push(
-      `缝边种类「${currentSeam.name}」成本单价 ${detail.seamTypeCostPrice} → ${currentSeam.costPrice}`,
+      `缝边种类「${currentSeam.name}」标准时长 ${detail.seamStdMinutes} → ${currentSeam.stdMinutes} 分钟`,
     );
   }
 
@@ -554,7 +552,11 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
               <tr><td>色浆成本</td><td>{cell(preview, 'colorpasteCost')}</td></tr>
               <tr><td>材料成本</td><td><b>{cell(preview, 'materialCost')}</b></td></tr>
               <tr>
-                <td>制品人工费（8h×{preview.result?.qty8h ?? '—'}件 / 6h×{preview.result?.qty6h ?? '—'}件）</td>
+                <td>
+                  制品人工费（工作日 {displayHours(settings?.workdayHours)}h×
+                  {preview.result?.qty8h ?? '—'}件 / 有效工时{' '}
+                  {displayHours(effectiveHours(settings))}h×{preview.result?.qty6h ?? '—'}件）
+                </td>
                 <td>{cell(preview, 'productLaborFee')}</td>
               </tr>
               <tr><td>包装人工费</td><td>{cell(preview, 'packagingLaborFee')}</td></tr>
@@ -615,4 +617,17 @@ function seamCell(
     return '—';
   }
   return `${snapshot.result.seamBudget[field]}${suffix}`;
+}
+
+/** 展示用小时数：取设置值并去掉多余小数（如 8 → 8、7.5 → 7.5）。 */
+function displayHours(hours: string | undefined): string {
+  return hours === undefined ? '—' : String(Number(Number(hours).toFixed(2)));
+}
+
+/** 制品有效工时 = 工作日小时数 × 制品有效工时率（仅用于展示标签，成本一律由服务端计算）。 */
+function effectiveHours(settings: SettingsValues | null): string {
+  if (!settings) {
+    return '—';
+  }
+  return String(Number((Number(settings.workdayHours) * Number(settings.makingEffectiveHourRate)).toFixed(2)));
 }

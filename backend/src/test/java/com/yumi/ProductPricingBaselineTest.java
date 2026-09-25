@@ -46,6 +46,37 @@ class ProductPricingBaselineTest {
     }
 
     @Test
+    void workdayHoursDrivesDayWageAndWorkdayOutput() {
+        // 工作日 10 小时、制品有效工时率 0.6：工作日标准数量 floor(600÷7)=85、有效工时产量 floor(600×0.6÷7)=51；
+        // 星级人工 = (15 × 10) ÷ 51 = 2.9412（≠「工作日 8 小时 + 率 0.75」的 2.3529：日薪按 10 小时算）
+        var result = input().star(7).workdayHours("10").effectiveHourRate("0.6").compute();
+
+        assertThat(result.qty8h()).isEqualTo(85);
+        assertThat(result.qty6h()).isEqualTo(51);
+        plain(result.productLaborFee(), "2.9412");
+    }
+
+    @Test
+    void hourlyWageAndEffectiveHourRateDriveLaborFees() {
+        // 时薪 16、制品有效工时率 0.5：有效工时产量 = floor(480×0.5÷10) = 24；星级人工 = (16×8)÷24 = 5.3333
+        // 包装 9 分钟：9 × (16÷60) = 2.4000 + 提成 0.3 = 2.7000
+        var result = input().star(10).hourlyWage("16").effectiveHourRate("0.5").tier("9", "0.3").compute();
+
+        assertThat(result.qty6h()).isEqualTo(24);
+        plain(result.productLaborFee(), "5.3333");
+        plain(result.packagingLaborFee(), "2.7000");
+        plain(result.laborCost(), "8.0333");
+    }
+
+    @Test
+    void seamUnitCostDerivesFromStandardMinutesAndHourlyWage() {
+        // 缝边标准 5 分钟：时薪 15 → 5 × 0.25 = 1.2500；时薪 24 → 5 × 0.4 = 2.0000；无种类 → 0
+        plain(ProductPricing.seamUnitCost(5, new BigDecimal("15")), "1.2500");
+        plain(ProductPricing.seamUnitCost(5, new BigDecimal("24")), "2.0000");
+        plain(ProductPricing.seamUnitCost(null, new BigDecimal("15")), "0.0000");
+    }
+
+    @Test
     void highPrecisionUnitPricesRoundHalfUpAtMoneyNode() {
         // 100g 无损耗：100×0.0012345=0.12345 → scale4 HALF_UP 0.1235（HALF_EVEN 会得 0.1234）
         var result = input().weight(100)
@@ -63,18 +94,18 @@ class ProductPricingBaselineTest {
     }
 
     @Test
-    void fractionalMinutesDrivePackagingFee() {
-        // 包装档位 8.5 分钟 + 商品包装提成 0.3：8.5×0.25=2.125+0.3=2.425→2.4250
-        var result = input().tier("8.5", "0.3").box("0.5").salePrice("5").compute();
+    void integerMinutesDrivePackagingFee() {
+        // 包装档位 9 分钟（整数）+ 商品包装提成 0.3：9×(15÷60)=2.25+0.3=2.55→2.5500
+        var result = input().tier("9", "0.3").box("0.5").salePrice("5").compute();
 
         plain(result.productLaborFee(), "0.0000");
-        plain(result.packagingLaborFee(), "2.4250");
+        plain(result.packagingLaborFee(), "2.5500");
         plain(result.materialCost(), "0.0000");
-        plain(result.laborCost(), "2.9250");
-        plain(result.totalCost(), "2.9250");
-        plain(result.referencePrice(), "4.1786");
-        plain(result.estimatedProfit(), "2.0750");
-        plain(result.estimatedMarginRate(), "0.415000");
+        plain(result.laborCost(), "3.0500");
+        plain(result.totalCost(), "3.0500");
+        plain(result.referencePrice(), "4.3571");
+        plain(result.estimatedProfit(), "1.9500");
+        plain(result.estimatedMarginRate(), "0.390000");
     }
 
     @Test
@@ -154,8 +185,11 @@ class ProductPricingBaselineTest {
         private int weightG;
         private BigDecimal lossRate = BigDecimal.ZERO;
         private int stdMinutes;
-        private BigDecimal tierStdMinutes;
+        private Integer tierStdMinutes;
         private BigDecimal packagingCommission;
+        private BigDecimal hourlyWage = new BigDecimal("15");
+        private BigDecimal workdayHours = new BigDecimal("8");
+        private BigDecimal makingEffectiveHourRate = new BigDecimal("0.75");
         private BigDecimal glueUnitPrice = BigDecimal.ZERO;
         private BigDecimal colorpasteUnitPrice = BigDecimal.ZERO;
         private BigDecimal boxLaborFee = BigDecimal.ZERO;
@@ -181,8 +215,23 @@ class ProductPricingBaselineTest {
         }
 
         Builder tier(String stdMinutes, String commission) {
-            this.tierStdMinutes = new BigDecimal(stdMinutes);
+            this.tierStdMinutes = Integer.valueOf(stdMinutes.trim());
             this.packagingCommission = new BigDecimal(commission);
+            return this;
+        }
+
+        Builder hourlyWage(String value) {
+            this.hourlyWage = new BigDecimal(value);
+            return this;
+        }
+
+        Builder workdayHours(String value) {
+            this.workdayHours = new BigDecimal(value);
+            return this;
+        }
+
+        Builder effectiveHourRate(String value) {
+            this.makingEffectiveHourRate = new BigDecimal(value);
             return this;
         }
 
@@ -228,7 +277,8 @@ class ProductPricingBaselineTest {
 
         ProductPricing.Result compute() {
             return ProductPricing.compute(new ProductPricing.Inputs(weightG, lossRate, stdMinutes,
-                    tierStdMinutes, packagingCommission, glueUnitPrice, colorpasteUnitPrice, boxLaborFee,
+                    tierStdMinutes, packagingCommission, hourlyWage, workdayHours, makingEffectiveHourRate,
+                    glueUnitPrice, colorpasteUnitPrice, boxLaborFee,
                     transportPackingFee, dailySundriesFee, rentUtilitiesFee, moldAmortFee, salePrice));
         }
     }
