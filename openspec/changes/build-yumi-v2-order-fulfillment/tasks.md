@@ -132,6 +132,7 @@
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`（页面归 2.10/2.12）。
 - [x] 2.6 实现客户详情只读汇总查询，金额由订单、收款、退款事实计算，不把汇总余额保存为可编辑客户字段；在订单能力未完成前以契约测试和空汇总完成接口骨架。
   - 证据：Requirement/Scenario：`master-data-management` Requirement“客户重复只能提示不能自动合并”（汇总不得成为可编辑资料的反面约束）与 `order-lifecycle` 收付款事实口径的前置契约；正式文档：`design.md` 第 6 节（客户查询）、`database-design.md` 第 4 节（customers 无余额列）；文件：`catalog/customer/CustomerSummary.java`（`zero()` 契约骨架 + 阶段 3/7 接线注释）、`CustomerController` 详情聚合、测试 `CustomerSummaryTest.java`(2 用例)；API：`GET /api/customers/{id}` data 追加只读 `summary={orderCount:"0", totalOrdered:"0.0000", totalReceived:"0.0000", totalRefunded:"0.0000"}`（全字符串）；表/事务/锁定/幂等键：不适用（纯读聚合，GET 不要求幂等键）；金额未来由订单/收/退款事实计算，当前不落任何客户余额列。
+  - **接线完成（2026-09-25，人工验收自测发现骨架一直未接线）**：`CustomerService.detail` 原为 `CustomerSummary.zero()`，**任何客户的详情汇总恒为 0**（线上实测：该客户有 1 单应收 366.0000、收款 40.0000，接口却返回全 0），而 `design.md` §7 页面矩阵明确 `/catalog/customers` 含「详情汇总」、前端也展示了这四个字段。已按本任务预留的口径接线：新增 `catalog/customer/internal/CustomerOrderSummaryReference`（**纯 SQL** 读 orders/payments/refunds，不引 orders Java 类型以免与 `orders→catalog` 形成模块循环），`detail` 实时聚合（`orderCount` = 非草稿订单数、`totalOrdered` = 当前有效应收合计、`totalReceived`/`totalRefunded` = 收/退款事实合计，金额 scale4 字符串）；删除已无用的 `CustomerSummary.zero()` 骨架。测试：`CustomerSummaryTest.detailAggregatesOrdersReceiptsAndRefundsFromFacts`（2 张已确认单 + 1 张草稿单 + 收款 40 + 退款 10 → `2 / 150.0000 / 40.0000 / 10.0000`，**草稿不计入**）；运行中应用实测 `1 / 366.0000 / 40.0000 / 0.0000`。后端全量 **310 测试 0 失败**。
   - RED：同 2.5 首跑（`detailCarriesReadOnlyZeroSummarySkeleton:83 Status expected:<201> but was:<404>`，端点缺失），退出码 1。
   - GREEN：`-Dtest=CustomerSummaryTest` 退出码 0，2 个测试；关键断言：`$.data.summary.totalOrdered="0.0000"` 文本零值、summary 恰四键、详情顶层除 summary 外无任何余额可写字段、未登录 401。
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`（详情页归 2.10/2.12）。
@@ -646,9 +647,11 @@
   - 关键断言：①并发（两线程同时领用同一批次 6 件、批次共 10）→ 恰好 1 次 201 与 1 次 409，批次余 4，`inventory_movements` 只多 1 条，该批次 `OUT` 明细行恰 1 条，`INVENTORY_ALLOCATION` 履约事实恰 1 条，投影 `shippable_quantity = 6`，且**批次当前数量等于有效流水行汇总（4）**——失败事务没有留下负库存、部分流水或履约接入；②重复幂等键 → 两次 201 返回同一领用 id，批次只扣一次（余 6）、领用单 1 条、履约事实 1 条；③来源唯一：对同一 `(source_type, source_id, source_line_id, node, direction)` 直接二次插入被 `uk_fulfillment_entries_source` 拒绝。
   - 阶段门禁：`./mvnw test` 退出码 0，**215 测试 0 失败 0 错误**（212 + 本任务新增 3）。
   - 人工证据：不适用（并发属机器证据）。
-- [ ] 4.13 编写跨模块集成测试证明库存领用时已扣原库存，随后发货只消耗订单可发货，库存流水数量不因发货第二次减少。**（依赖阶段六：发货消耗可发货数量的行为在 6.x 实现，本任务待阶段六完成后回来补）**
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [x] 4.13 编写跨模块集成测试证明库存领用时已扣原库存，随后发货只消耗订单可发货，库存流水数量不因发货第二次减少。**（依赖阶段六：发货消耗可发货数量的行为在 6.x 实现，本任务待阶段六完成后回来补）**
+  - 证据：Requirement/Scenario：`inventory-management`「发货不得重复扣减原库存」、`order-lifecycle`「订单必须维护可发货和发货上限」。文件（新增）：`backend/src/test/java/com/yumi/InventoryFulfillmentIntegrationTest.java`（1 用例，跨 `inventory` 与 `orders/shipment` 两个模块的 HTTP 集成）。
+  - 关键断言（`allocationDeductsStockOnceAndShipmentConsumesShippableOnly`）：①缝边剪袋（已缝边）批次 10 件领用 6 件接入「可发货」→ 批次 10→**4**、该批次库存出库流水行 **1** 条、订单可发货 **6**、累计发货 **0**；②发货草稿 6 件 → 确认 `CONFIRMED` 后：批次仍 **4**、该批次流水行仍 **1** 条（**发货不写库存流水**，`inventory_movements` 中 `SHIPMENT` 类型计数为 0）、可发货 **0**、累计发货 **6**。即「库存只在领用时扣一次，发货只消耗订单可发货」。
+  - 口径附注：**可发货批次本身不是领用来源**（`InventoryNodes.allowedTargets` 对 `SHIPPABLE` 返回空集），领用只把在制品批次接入订单工序流入；可发货数量由库存接入与生产核验推进。
+  - 阶段门禁：后端全量 **299 测试 0 失败 0 错误**（9.11 记录 298 → 本任务 +1）。
 - [x] 4.14 阶段人工验收：期初入库、盘点、多个批次领用到不同工序、取消未消费领用和拒绝已消费领用。
   - 证据（2026-09-25 阶段四验收，正式路由 `http://127.0.0.1:5190`，后端 18090，清库重建后空库起 V1→V8，登录本机合成账号 `admin`）：
   - 环境：商品 P00001「验收-泰迪熊30cm」（单件成本 18.1200）、客户 C00001、订单 `YM00001`（Q=20 / E=8，应收 516.0000）已确认；四个期初批次：`IB000001`/`IB000002`（制作未缝边 10/6）、`IB000003`（捏毛装袋未缝边 8）、`IB000004`（缝边剪袋已缝边 5）。
@@ -690,201 +693,542 @@
 
 ## 5. 阶段五：生产计划、核验、返工、重做与超额提醒（依赖阶段三；库存接入依赖阶段四）
 
-- [ ] 5.1 编写 Flyway 迁移创建 `production_plans/production_plan_adjustments/production_verifications/rework_sources/remake_sources/overtime_preemptions/production_reminders/other_schedules/other_schedule_verifications/other_schedule_time_corrections`，落实唯一核验和来源余额约束。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.2 实现生产计划查询/创建 `GET/POST /api/production-plans`，覆盖正常、返工、重做、超额、售后返工、售后补发类型及执行员工资格；核心归属字段创建后不可编辑。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.3 实现待安排/当前可执行/等待上游计算，允许计划数量使用尚需安排总需求但核验必须受当时可执行数量限制；计划创建不产生完成、库存或履约事实。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.4 实现 `POST /api/production-plans/{id}/verify` 一次性核验，校验完成=合格+返工+报废、未完成=计划-完成，事务内锁来源和履约余额后分流各结果。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.5 实现逐工序合格流转：制作→捏毛装袋；捏毛装袋按冻结 E 分为不缝边可发货与缝边剪袋；缝边剪袋→可发货；不得将各工序完成相加。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.6 实现返工来源查询/创建 `GET/POST /api/rework-sources` 和从来源创建计划 `POST /api/rework-sources/{id}/plans`，落实完整目标矩阵、原核验/上一返工关联、返工次数、原因及尚未安排余额；并发创建不得超过来源余额。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.7 实现报废重做来源查询/创建 `GET/POST /api/remake-sources` 和从来源创建计划 `POST /api/remake-sources/{id}/plans`，默认报废工序起始，从制作开始必须填写原因；原报废事实永久保留，重做不增加订单需求。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.8 实现 `POST /api/production-plans/{id}/cancel`，对应 `production-management`“待执行计划取消必须恢复来源”；仅待执行可取消，正常/返工/重做分别恢复来源，已核验返回 `STATE_NOT_CANCELABLE`。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.9 实现未完成待处理 `GET /api/production-reminders/incomplete`、重新安排 `POST .../{id}/reschedule` 和暂不安排 `POST .../{id}/defer`；部分安排保留余量，暂不安排必须有原因且不删除待安排需求。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.10 实现超额任务创建 `POST /api/overtime-tasks`：仅执行当天创建，只能选择未来正常计划未预占数量，跨订单/商品时每条仍明确来源计划；预占不修改原计划数量或履约事实。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.11 实现超额任务核验 `POST /api/overtime-tasks/{id}/verify`：未完成释放预占；只有合格数量写正常履约并生成未来计划待调整提醒；返工/报废按独立来源处理，不作为计划减少依据。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.12 实现超额提醒查询/处理 `GET /api/production-reminders/overtime`、`POST .../{id}/adjust-plan`、`POST .../{id}/no-adjustment`；调整保存前后值/原因/来源，无需调整必须填原因，零合格自动结束提醒。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.13 实现其他排班创建、一次性总分钟核验、取消和工时更正；分钟 0-59、总分钟>0，确保不产生商品、库存或订单履约事实。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.14 实现 `/production` 正式工作台：日期/员工/订单/工序计划列表、等待上游、独立未完成区域、返工/重做来源、超额提醒附着未来排班行和行内调整操作。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.15 实现 `/production/plans/:id/verify` 核验页，清晰区分计划/可执行/等待数量与完成/合格/返工/报废/未完成，错误码定位对应字段。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.16 编写领域和 MySQL 集成测试覆盖唯一核验、等式、可执行上限、Q/E 流转、返工矩阵、重做原因、来源余额竞争、取消恢复、未完成提醒、超额预占竞争和零合格提醒。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 5.17 阶段人工验收：执行正常计划、等待上游、部分核验、返工、重做、取消、超额任务和其他排班；逐项确认来源/提醒/历史可追溯，视觉结论待签字。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+**施工文档**：`docs/architecture/production-module-design.md`（2026-09-25 新建，状态「待评审」）——含 10 张生产表逐列、待安排/可执行/流转/返工矩阵/重做/超额/工时口径、状态派生、API 契约、前端要点、模块边界与锁定顺序、不变量与错误码，以及 §11 的待确认项。**5.1 已实施（不依赖任何待确认项）；5.2 起按 5.x 逐条推进。** 初稿提议的「拆 `verified_processed` 投影列」已否决：按工序的已核验处理改由 `production_verifications` 按 node 汇总，**不改阶段三/四既有表结构与代码**。
+
+- [x] 5.1 编写 Flyway 迁移创建 `production_plans/production_plan_adjustments/production_verifications/rework_sources/remake_sources/overtime_preemptions/production_reminders/other_schedules/other_schedule_verifications/other_schedule_time_corrections`，落实唯一核验和来源余额约束。
+  - 证据：Requirement/Scenario：`production-management` 全部 Requirement（本任务落实其事实表与约束）。正式文档：`docs/architecture/database-design.md` §8、`docs/architecture/production-module-design.md` §3、`docs/architecture/domain-and-quantity-model.md` §5–§7/§11。文件：`backend/src/main/resources/db/migration/V10__production.sql`（新增）、`backend/src/test/java/com/yumi/ProductionMigrationTest.java`（新增，8 用例）。表：`production_plans`、`production_plan_adjustments`、`production_verifications`、`rework_sources`、`remake_sources`、`overtime_preemptions`、`production_reminders`、`other_schedules`、`other_schedule_verifications`、`other_schedule_time_corrections`。API/路由：不适用（本任务只建表）。事务/锁定/幂等键：本任务不涉及；锁定顺序见施工文档 §8。Flyway：新增 `V10`（不改写既有迁移，空库重建后 V1→V10 全部成功）。
+  - 关键断言（8 用例全绿）：①十张表齐备；②`plan_no`/`schedule_no` 为 `char(8)`、`quantity`/`total_minutes` 为 `int unsigned`、`plan_date` 为 `date`；③唯一键齐备——计划编号 `uk_production_plans_plan_no`、**每计划最多一次核验** `uk_production_verifications_plan`、返工目标 `uk_rework_sources_target`、重做核验 `uk_remake_sources_verification`、预占配对 `uk_overtime_preemptions_pair`、排班编号、工时核验；④外键齐备——计划→订单/明细/员工、核验→计划/订单/明细、返工→核验/明细/上一返工、重做→核验/明细、预占→超额计划/未来计划、提醒→计划/核验/预占/未来计划、排班→员工、工时更正→核验/排班；⑤关键索引齐备——`idx_production_plans_date_node`/`employee`/`item`/`source`、`idx_overtime_preemptions_future`、`idx_production_reminders_type_status`；⑥CHECK 拒绝非法数据——核验等式 `completed = qualified + rework + scrap`、来源余额 `total > 0 AND arranged <= total`、预占数量 `> 0`、其他排班分钟 `0–59` 与 `total_minutes = hours*60 + minutes AND > 0`、提醒类型与状态枚举、更正后总分钟 `> 0`；重复计划编号/重复核验/重复返工目标/重复重做来源/重复预占配对均被唯一键拒绝。
+  - **如实记录（建表口径订正）**：首版把 `plan_no`/`schedule_no` 建成 `CHAR(6)`，但 `SequenceAllocator.format(prefix, value, 6)` 产出 **8 字符**（同库存 `IB000001`/`IM000001` 的既有口径）→ 首跑 4 个用例报 `Data truncation: Data too long for column 'plan_no'`，改为 `CHAR(8)` 后通过。施工文档 §2 的「宽度 6」指序号位宽，与 `CHAR(8)` 一致。
+  - 阶段门禁（清库重建后）：后端 `YUMI_DB_PASSWORD=<钥匙串> ./mvnw test` 退出码 0，**230 测试 0 失败 0 错误**（阶段四 222 → 本任务 +8）；Flyway 空库 `Successfully applied 10 migrations ... now at version v10`；`openspec validate --strict` valid。
+  - 人工证据：不适用（建表属机器证据）。
+- [x] 5.2 实现生产计划查询/创建 `GET/POST /api/production-plans`，覆盖正常、返工、重做、超额、售后返工、售后补发类型及执行员工资格；核心归属字段创建后不可编辑。
+  - 证据：Requirement/Scenario：`production-management`「生产计划必须绑定有效来源和执行资格」的 Scenario「创建等待上游计划」「无资格员工被拒绝」。正式文档：`docs/architecture/production-module-design.md` §3.1/§4.2/§6/§8、`database-design.md` §8。文件：`production/plan/ProductionPlanController.java`、`ProductionPlanService.java`、`ProductionPlanViews.java`、`CreateProductionPlanRequest.java`、`plan/internal/{ProductionPlanRow,ProductionPlanRepository}.java`、`production/internal/OrderProductionReference.java`、`production/ProductionNodes.java`；订单侧新增 `FulfillmentLedger.applyPlanned` + `FulfillmentRepository.applyPlanned`（写 `making_planned`/`packing_planned`/`seam_planned`）。API：`GET /api/production-plans`（按 dateFrom/dateTo/employeeId/node/status/orderId/orderItemId 筛选）、`GET /api/production-plans/{id}`、`POST /api/production-plans`；错误码 `VALIDATION_INVALID`（类型/工序/数量/日期/明细）、`QUANTITY_INVALID`（超待安排）、`EMPLOYEE_NOT_ELIGIBLE`、`NOT_FOUND`。表：`production_plans`（写）+ `orders`/`order_items`/`order_item_fulfillment_balances`（只读引用）。事务拥有者：`ProductionPlanService.create` 的 `@Transactional`（计划落库与订单侧计划占用投影同一事务）；锁定对象：本任务不加锁（核验/取消的加锁在 5.4/5.8）；幂等键：必须 `Idempotency-Key`。模块边界：`production → orders.ledger`（`@NamedInterface`）与 `production → catalog.employee.service/dto`（既有 `@NamedInterface`），由 `ModuleStructureTest.verify()` 守住。
+  - 口径（与 5.2 任务文字的口径取舍，如实记录）：**本接口只创建正常计划（`planType = NORMAL`）**；返工/重做/超额三类必须从各自来源创建（5.6 `POST /api/rework-sources/{id}/plans`、5.7 `POST /api/remake-sources/{id}/plans`、5.10 `POST /api/overtime-tasks`），以保证来源余额与目标矩阵在创建时即被校验——这是 5.6/5.7/5.10 自身任务文字的要求；售后两类（`AFTER_SALES_REWORK`/`AFTER_SALES_REPLACEMENT`）在阶段八接入售后来源后启用。传入其他类型返回 400 并定位 `planType`（不是占位实现，是明确拒绝并给出正确入口）。核心归属字段（`plan_type`/`order_item_id`/`node`/`source_*`/`quantity`）**无编辑接口**；待执行正常计划的日期/员工/数量/备注变更走 `production_plan_adjustments` 历史，由 5.12 的超额提醒「调整计划」写入。
+  - 关键断言（`ProductionPlanApiTest` 5 用例全绿）：①创建 → 201，`planNo` 以 `PN` 开头、`planType=NORMAL`、`status=PENDING`、`employeeName` 为员工姓名快照；②计划创建**不产生**履约事实与库存事实（`fulfillment_entries`/`inventory_movements` 数量不变），只把计划占用写入 `making_planned`；③离职或缺对应工种的员工 → 409 `EMPLOYEE_NOT_ELIGIBLE`，且不留任何计划行与计划占用；④数量超待安排 → 400 `QUANTITY_INVALID` 定位 `quantity`（消息含「待安排 N，本次计划 M」）；⑤非 NORMAL 类型 → 400 定位 `planType`；数量 0 → 400 定位 `quantity`；草稿订单 → 400 定位 `orderItemId`；⑥列表按 node/dateFrom/status/orderItemId 筛选正确。
+  - 阶段门禁：后端全量 **235 测试 0 失败 0 错误**（阶段五 5.1 后 230 → 本任务 +5）。
+  - 人工证据：不适用（接口属机器证据；页面在 5.14）。
+- [x] 5.3 实现待安排/当前可执行/等待上游计算，允许计划数量使用尚需安排总需求但核验必须受当时可执行数量限制；计划创建不产生完成、库存或履约事实。
+  - 证据：Requirement/Scenario：`production-management`「计划状态和执行状态必须分离」的 Scenario「已创建但等待上游」。正式文档：`domain-and-quantity-model.md` §6.1、`production-module-design.md` §4.2/§5。文件：`ProductionPlanService`（`schedulableQuantity`/`allocate`/`toViews`）、`ProductionPlanRepository.pendingByItemNode`/`verifiedByItemNode`/`pendingPlans`、`OrderProductionReference.OrderItemContext.demand/inflow`。API：`GET/POST /api/production-plans` 的 `nodeDemand`/`nodePending`/`nodeVerified`/`nodeInflow`/`schedulableQuantity`/`executableQuantity`/`waitingUpstream` 字段。表：`production_plans`（PENDING 占用）、`production_verifications`（按工序已核验）、`order_item_fulfillment_balances`（工序流入，只读）。
+  - 口径：`待安排数量 = 工序总需求 − 该工序 PENDING 计划占用 − 该工序已核验处理`；`当前可执行量 = 工序有效流入 − 该工序已核验处理`，再按「计划日期 + id」**升序依次分配**给待执行计划（先到先得，且不重复占用同一份可执行量）；`等待上游 = 状态 PENDING 且本计划可执行量为 0`。**已核验处理按工序从 `production_verifications` 汇总，不读订单侧投影**（施工文档 §3.11 定稿：不改阶段三/四表结构）。工序总需求：制作与捏毛装袋取 Q，**缝边剪袋取确认时冻结的 E**。创建计划允许在「待安排 > 0 但可执行 = 0」时成功（即允许排班等待上游）；核验时的可执行上限校验在 5.4。
+  - 关键断言：①**下游工序**（捏毛装袋）无上游流入时创建 10 件计划 → `nodeDemand=10`、`nodePending=10`、`schedulableQuantity=0`、`executableQuantity=0`、`waitingUpstream=true`；②缝边剪袋计划 `nodeDemand=4`（冻结 E，不是 Q=10），且待安排用满后再建 1 件 → 400；③制作工序：第一个计划 6 件 → `executableQuantity=6`、`waitingUpstream=false`；第二个计划 4 件 → `executableQuantity=4`（先到先得，剩余 0）、`schedulableQuantity=0`；按 id 回读两个计划仍分别为 6/4（分配稳定）。
+  - **有效流入口径（2026-09-25 实施中订正，浏览器自测准备时发现）**：初版对**制作**也读 `making_inflow`，而该列不会被任何命令写入（制作是首道工序，库存接入与上游核验都不会写它）→ **制作计划永远「等待上游」、永远无法核验**，等于阶段五的主流程走不通。按 `domain-and-quantity-model.md` §6「首道制作的正常流入来自订单实际生产缺口」订正为：`制作` 的有效流入**取订单实际生产缺口 Q**，`捏毛装袋`/`缝边剪袋` 取 `packing_inflow`/`seam_inflow`。据此调整 `OrderProductionReference.effectiveInflow`、计划视图的 `nodeInflow`、核验上限计算，并同步改三处测试（等待上游用例改用下游工序、可执行上限用例改用捏毛装袋流入、并发上限竞争改用捏毛装袋）。施工文档 §4.2 已记录该口径。
+  - 阶段门禁：后端全量 **235 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.4 实现 `POST /api/production-plans/{id}/verify` 一次性核验，校验完成=合格+返工+报废、未完成=计划-完成，事务内锁来源和履约余额后分流各结果。
+  - 证据：Requirement/Scenario：`production-management`「生产计划只能一次核验」的 Scenario「合法核验」「数量等式不成立」「重复核验」。正式文档：`domain-and-quantity-model.md` §7、`production-module-design.md` §4.3/§5/§8。文件：`production/verification/{ProductionVerificationController,ProductionVerificationService,ProductionVerificationViews,VerifyProductionPlanRequest}.java`、`verification/internal/ProductionVerificationRepository.java`、`plan/internal/ExecutableCalculator.java`（与 5.3 共用同一可执行口径）、`source/internal/{ReworkSourceRepository,RemakeSourceRepository}.java`、`reminder/internal/ProductionReminderRepository.java`；订单侧新增 `FulfillmentLedger.lockBalance/applyVerified/applyReworkPending/applyRemakePending`。API：`POST /api/production-plans/{id}/verify`，入参 `{completedQuantity,qualifiedQuantity,reworkQuantity,scrapQuantity,verifyNote}`（未完成由服务端算，不接受客户端提交）；错误码 `VERIFICATION_EQUATION_INVALID`（400，等式或超计划）、`QUANTITY_NOT_EXECUTABLE`（409）、`STATE_ALREADY_VERIFIED`（409）、`VALIDATION_INVALID`（已取消计划/数量为负）、`NOT_FOUND`。表：`production_verifications`、`rework_sources`、`remake_sources`、`production_reminders`、`production_plans`、`fulfillment_entries`、`order_item_fulfillment_balances`。事务拥有者：`ProductionVerificationService.verify` 的 `@Transactional`；**锁定顺序**：`FulfillmentLedger.lockBalance`（履约投影行 `FOR UPDATE`）→ `ProductionPlanRepository.findByIdForUpdate`（计划行 `FOR UPDATE`）→ 来源行；幂等键：必须 `Idempotency-Key`。
+  - 口径：等式与上限校验通过后，写核验事实 → 合格按冻结流程分流（§4.3）→ 返工/报废数量记入「待安排」额度 → 释放计划占用 + 累加已核验处理 → 处理未完成 → 计划置 `VERIFIED`。**未完成处理按计划类型分流**：正常计划生成 `INCOMPLETE` 提醒（待安排数量本身是派生量，无需回写）；返工/重做计划把未完成数量回退来源 `arranged_quantity`；超额任务与售后类型的未完成按各自口径在 5.11/阶段八接入。**核验不自动生成返工/重做来源**（实施中订正，见 5.6 证据）：只把 `rework_quantity`/`scrap_quantity` 累加进 `rework_pending`/`remake_pending` 额度，来源由 5.6/5.7 按目标工序/起始工序**显式创建**——若核验时自动建默认来源，默认来源会吃掉全部额度，使「显式选择前序工序」永远无额度可用。
+  - 关键断言（`ProductionVerificationTest` 5 用例全绿）：①制作计划核验 10=8 合格+1 返工+1 报废 → 200，`flows=[{PACKING_BAG,8}]`、`reworkSourceId`/`remakeSourceId` 均不存在、无未完成提醒；投影 `packing_inflow=8`、`making_planned` 归 0、`verified_processed=10`、`rework_pending=1`、`remake_pending=1`；`fulfillment_entries` 一条 `PRODUCTION_QUALIFIED`/`PACKING_BAG`/`IN`/8 且 `source_type=PRODUCTION`；返工/重做来源表均为 0 行；计划状态 `VERIFIED`；②等式不成立（10≠8+1+0）→ 400 `VERIFICATION_EQUATION_INVALID` 定位 `completedQuantity`；完成超计划（11>10）→ 400 同码；流入被降为 5 后完成 10 → 409 `QUANTITY_NOT_EXECUTABLE` 定位 `completedQuantity`（**事务内重算上限**）；三次失败均**不留下核验事实**且计划仍 `PENDING`；③重复核验 → 409 `STATE_ALREADY_VERIFIED` 且核验总数仍为 1；④未完成 4 件 → 生成 `INCOMPLETE`/`MAKING`/4/`OPEN` 提醒，回读该计划 `schedulableQuantity=4`、`nodeVerified=6`，剩余 4 件可重新排产。
+  - 阶段门禁：后端全量 **240 测试 0 失败 0 错误**（5.3 后 235 → 本任务 +5）。
+  - 人工证据：不适用（页面在 5.15）。
+- [x] 5.5 实现逐工序合格流转：制作→捏毛装袋；捏毛装袋按冻结 E 分为不缝边可发货与缝边剪袋；缝边剪袋→可发货；不得将各工序完成相加。
+  - 证据：Requirement/Scenario：`production-management`「工序合格必须按冻结流程流转」的 Scenario「捏毛装袋合格分流」；`order-lifecycle`「工序必须共享订单明细数量」的 Scenario「缝边分流」。正式文档：`domain-and-quantity-model.md` §5/§6、`production-module-design.md` §4.3。文件：`ProductionVerificationService.qualifiedFlows`、`production/ProductionNodes.qualifiedTarget`。API：核验返回的 `flows` 列表（`{node,quantity}`）即本次分流去向。表：`fulfillment_entries`（按节点写 `PRODUCTION_QUALIFIED`）+ `order_item_fulfillment_balances`（`packing_inflow`/`seam_inflow`/`shippable_quantity`）。
+  - 口径：`制作合格 → 全部进 packing_inflow`；`缝边剪袋合格 → 全部进 shippable_quantity`；`捏毛装袋合格 → 按冻结 E 分流：缝边分流 = clamp(E − 核验前 seam_inflow, 0, 本次合格)，其余进 shippable_quantity`。下限取 0 的原因：库存领用可直接接入缝边剪袋（阶段四），`seam_inflow` 可能已填满甚至超过 E。**各工序完成数量不相加**，同一批需求只换阶段。
+  - 关键断言：捏毛装袋流入 10、冻结 E=4 → 核验合格 10 → `flows=[{SEAM_CUTTING,4},{SHIPPABLE,6}]`，投影 `seam_inflow=4`、`shippable_quantity=6`（不是 10+10 相加）；制作合格 8 只进捏毛装袋，可发货仍为 0。
+  - 阶段门禁：后端全量 **240 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.15）。
+- [x] 5.6 实现返工来源查询/创建 `GET/POST /api/rework-sources` 和从来源创建计划 `POST /api/rework-sources/{id}/plans`，落实完整目标矩阵、原核验/上一返工关联、返工次数、原因及尚未安排余额；并发创建不得超过来源余额。
+  - 证据：Requirement/Scenario：`production-management`「返工必须受目标矩阵和来源余额限制」的 Scenario「合法返工目标」「非法返工目标」。正式文档：`domain-and-quantity-model.md` §6.1/§7、`production-module-design.md` §3.4/§4.4。文件：`production/source/{ReworkSourceController,ReworkSourceService,ProductionSourceViews}.java`、`source/internal/ReworkSourceRepository.java`、`production/ProductionNodes.reworkTargets/canRework`、`plan/internal/PlanWriter.java`（与 5.2/5.7/5.10 共用的计划落库）。API：`GET /api/rework-sources?orderItemId=`、`POST /api/rework-sources`（`{verificationId,targetNode,quantity,reason}`）、`POST /api/rework-sources/{id}/plans`（`{planDate,employeeId,quantity,note}`）；错误码 `REWORK_TARGET_INVALID`（400）、`SOURCE_INSUFFICIENT`（409）、`CONFLICT_DUPLICATE`（409）、`EMPLOYEE_NOT_ELIGIBLE`、`NOT_FOUND`。表：`rework_sources`、`production_plans`、`order_item_fulfillment_balances`。事务拥有者：`ReworkSourceService.create/createPlan` 的 `@Transactional`；**锁定对象**：`createPlan` 先 `findByIdForUpdate` 锁来源行再校验余额（并发创建不会超支）；幂等键：必须 `Idempotency-Key`。
+  - 口径（实施中订正，与 5.4 联动）：**核验不再自动生成返工来源**，只把返工数量累加进「返工待安排」额度；来源由本接口按**目标工序显式创建**。原因：若核验时自动建默认来源（目标=同工序），该来源会吃掉全部返工数量，`POST` 永远撞「来源总量超额度」而无法为前序工序建来源。约束：①目标工序必须落在矩阵内（制作问题只能返工制作；捏毛装袋问题可返工捏毛装袋/制作；缝边剪袋问题可返工三者）；②同一核验同一目标工序只有一条来源（唯一键）；③同一核验下所有来源总量合计不得超过该核验的返工数量；④从来源创建计划的数量不得超过来源余额（`total − arranged`），创建后 `arranged_quantity` 增加、`rework_pending` 相应减少。
+  - 关键断言（`ProductionSourceTest` 4 用例中的 2 个）：核验返工 6 件后来源表 0 行、`rework_pending=6`；建 `MAKING` 来源 3 件 → 201（`balanceQuantity=3`、`roundNo=1`）；再建同目标 → 409 `CONFLICT_DUPLICATE`；建 `SEAM_CUTTING`（后序）→ 400 `REWORK_TARGET_INVALID` 定位 `targetNode`；建 `MAKING` 4 件（合计 3+4>6）→ 409 `SOURCE_INSUFFICIENT` 定位 `quantity`；来源创建不改变 `rework_pending`（额度只在核验时计入、只在排产时消耗）。
+  - 阶段门禁：后端全量 **244 测试 0 失败 0 错误**（5.5 后 240 → 本组 5.6/5.7/5.8 共 +4）。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.7 实现报废重做来源查询/创建 `GET/POST /api/remake-sources` 和从来源创建计划 `POST /api/remake-sources/{id}/plans`，默认报废工序起始，从制作开始必须填写原因；原报废事实永久保留，重做不增加订单需求。
+  - 证据：Requirement/Scenario：`production-management`「报废重做必须保留原报废事实」的 Scenario「默认报废重做」「从制作开始重做」。正式文档：`domain-and-quantity-model.md` §7/§8、`production-module-design.md` §3.5/§4.5。文件：`production/source/{RemakeSourceController,RemakeSourceService}.java`、`source/internal/RemakeSourceRepository.java`。API：`GET /api/remake-sources?orderItemId=`、`POST /api/remake-sources`（`{verificationId,startNode,quantity,reason}`，`startNode` 缺省取报废工序）、`POST /api/remake-sources/{id}/plans`；错误码 `REMAKE_REASON_REQUIRED`（400）、`VALIDATION_INVALID`（起始工序晚于报废工序，400）、`SOURCE_INSUFFICIENT`（409）、`CONFLICT_DUPLICATE`（409）。表：`remake_sources`、`production_plans`、`order_item_fulfillment_balances`。事务/锁定/幂等键同 5.6（`createPlan` 锁来源行）。
+  - 口径：起始工序只能取报废工序**或其前序**（默认报废工序，不传即默认）；从 `MAKING` 开始**必须填写原因**（前序材料不可用等），否则 400 `REMAKE_REASON_REQUIRED`；同一核验同一起始工序只有一条来源（唯一键 `uk_remake_sources_target`，实施中由「一核验一条」改为「一核验一起始工序一条」，与返工对称——否则「显式选择从制作开始」无法表达）；同一核验下所有重做来源总量合计不得超过该核验的报废数量；从来源创建计划受余额约束。**原报废事实永久保留，重做不恢复原报废数量、不增加订单需求**（重做计划的合格数量经核验正常流入，`required_quantity` 不变）。
+  - 关键断言：核验报废 4 件后来源表 0 行、`remake_pending=4`；建 `MAKING` 来源不带原因 → 400 `REMAKE_REASON_REQUIRED` 定位 `reason`；建 `SEAM_CUTTING`（晚于报废工序捏毛装袋）→ 400 定位 `startNode`；带原因建 `MAKING` 2 件 → 201（`startNode=MAKING`、`reason` 回读一致）；同起始工序再建 → 409 `CONFLICT_DUPLICATE`；建 `MAKING` 3 件（合计 2+3>4）→ 409 `SOURCE_INSUFFICIENT`；建 `PACKING_BAG` 1 件（默认报废工序）→ 201 且与制作来源并存。
+  - 阶段门禁：后端全量 **244 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.8 实现 `POST /api/production-plans/{id}/cancel`，对应 `production-management`“待执行计划取消必须恢复来源”；仅待执行可取消，正常/返工/重做分别恢复来源，已核验返回 `STATE_NOT_CANCELABLE`。
+  - 证据：Requirement/Scenario：`production-management`「待执行计划取消必须恢复来源」的 Scenario「取消待执行返工计划」「取消已核验计划」。正式文档：`production-module-design.md` §3.1/§5/§8。文件：`production/plan/{ProductionPlanCancellationService}.java`、`plan/internal/ProductionPlanRepository.markCancelled`、`ProductionPlanController.cancel`。API：`POST /api/production-plans/{id}/cancel`（`{reason}` 必填）；错误码 `STATE_NOT_CANCELABLE`（409）、`VALIDATION_INVALID`（缺原因，400）、`NOT_FOUND`。表：`production_plans`、`rework_sources`、`remake_sources`、`order_item_fulfillment_balances`。事务拥有者：`cancel` 的 `@Transactional`；**锁定顺序**：`lockBalance` → 计划行 `FOR UPDATE` → 来源行；幂等键：必须 `Idempotency-Key`。
+  - 口径：只允许 `PENDING` 取消且必须填写原因；正常计划取消只释放计划占用（待安排数量是派生量）；返工/重做计划取消把数量退回来源 `arranged_quantity` 并同步 `rework_pending`/`remake_pending`；**已核验计划返回 `STATE_NOT_CANCELABLE`，核验与来源事实不变**；取消只改状态并保留取消人/时间/原因，原计划与来源关系不删除。超额任务的预占释放在 5.11。
+  - 关键断言：从来源建 3 件返工计划后取消 → 200 `CANCELLED`，来源余额由 0 恢复为 3、`rework_pending` 由 3 恢复为 6、`making_planned` 归 0、`cancel_reason` 回读一致；重复取消 → 409 `STATE_NOT_CANCELABLE`；缺原因 → 400 定位 `reason`；已核验计划取消 → 409 `STATE_NOT_CANCELABLE` 且状态仍 `VERIFIED`。
+  - 阶段门禁：后端全量 **244 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.9 实现未完成待处理 `GET /api/production-reminders/incomplete`、重新安排 `POST .../{id}/reschedule` 和暂不安排 `POST .../{id}/defer`；部分安排保留余量，暂不安排必须有原因且不删除待安排需求。
+  - 证据：Requirement/Scenario：`production-management`「未完成数量必须返回对应待处理来源」的 Scenario「部分完成正常计划」。正式文档：`production-module-design.md` §3.7/§4.3、`domain-and-quantity-model.md` §7。文件：`production/reminder/{ProductionReminderController,ProductionReminderService,ProductionReminderViews}.java`、`reminder/internal/ProductionReminderRepository.java`。API：`GET /api/production-reminders/incomplete`、`POST /api/production-reminders/incomplete/{id}/reschedule`（`{planDate,employeeId,quantity,note}`）、`POST .../{id}/defer`（`{reason}`）；错误码 `QUANTITY_INVALID`（超余量）、`VALIDATION_INVALID`（缺原因/字段）、`STATE_NOT_CANCELABLE`（提醒已处理）、`NOT_FOUND`、`EMPLOYEE_NOT_ELIGIBLE`。表：`production_reminders`、`production_plans`、`order_item_fulfillment_balances`。事务拥有者：`reschedule`/`defer` 的 `@Transactional`；锁定对象：提醒行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
+  - 口径：**重新安排**用满余量 → 提醒 `HANDLED`/`RESCHEDULED`；少于余量 → 状态保持 `OPEN`、`quantity` 减掉已安排量、`handling_type=PARTIAL`、`handled_quantity` 累加（**余量继续提醒**）；重新安排会新建一条正常计划并占用待安排额度。**暂不安排**原因必填、只关闭提醒，**不删除待安排需求**（待安排数量本身是派生量）。已处理提醒再操作 → 409。
+  - 关键断言（`ProductionReminderTest` 3 用例全绿）：①计划 10 件核验完成 6 件 → `GET incomplete` 返回 1 行 `MAKING`/数量 4/`OPEN`；②重新安排 3 件 → 提醒仍 `OPEN`、数量 1、`handlingType=PARTIAL`、`handledQuantity=3`，计划数 2、待执行计划量 3；③再安排 2 件 → 400 `QUANTITY_INVALID` 定位 `quantity`；④安排余下 1 件 → `HANDLED`/`RESCHEDULED`，`GET incomplete` 返回空、待执行计划量 4；⑤暂不安排缺原因 → 400 定位 `reason`，带原因 → `HANDLED`/`DEFERRED` 且原因回读一致；**暂不安排后待安排仍为 4**（需求 10 − 待执行 0 − 已核验 6），计划数仍 1（不删除需求）；⑥对已处理提醒再重新安排 → 409 `STATE_NOT_CANCELABLE`。
+  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**（5.8 后 244 → 5.9–5.12 共 +8）。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.10 实现超额任务创建 `POST /api/overtime-tasks`：仅执行当天创建，只能选择未来正常计划未预占数量，跨订单/商品时每条仍明确来源计划；预占不修改原计划数量或履约事实。
+  - 证据：Requirement/Scenario：`production-management`「超额任务只产生业务预占和人工调整提醒」的 Scenario「重复预占」「超额任务日期非法」。正式文档：`domain-and-quantity-model.md` §11、`production-module-design.md` §3.6/§4.6。文件：`production/overtime/{OvertimeTaskController,OvertimeTaskService,OvertimeTaskViews}.java`、`overtime/internal/OvertimePreemptionRepository.java`、`plan/internal/PlanWriter.java`（复用）。API：`POST /api/overtime-tasks`（`{orderItemId,node,planDate,employeeId,lines:[{futurePlanId,quantity}],note}`，计划数量 = 各来源预占之和）；错误码 `OVERTIME_DATE_INVALID`（400：非当天 / 来源非未来 / 来源非待执行正常计划）、`OVERTIME_RESERVATION_EXCEEDED`（409）、`EMPLOYEE_NOT_ELIGIBLE`、`VALIDATION_INVALID`、`NOT_FOUND`。表：`production_plans`（`plan_type=OVERTIME`）、`overtime_preemptions`、`production_reminders`。事务拥有者：`create` 的 `@Transactional`；**锁定对象**：未来计划按 id **升序 `FOR UPDATE`**（`lockFuturePlans`），并发超额任务不会各自通过可选数量校验；幂等键：必须 `Idempotency-Key`。
+  - 口径：只在**执行当天**创建（`planDate = 今天`）；来源只能是**未来日期**的**待执行正常计划**；`Σ 某未来计划的有效预占 ≤ 该计划计划数量 − 其他有效预占合计`（未来计划当前可选数量）；**预占不修改未来计划原始数量、不产生工序流入或完成**；创建时每条预占生成一条 `OVERTIME_PENDING_VERIFY` 提醒并附着在受影响的未来计划行上。超额任务自身不校验「待安排数量」（超额按定义超出计划）。
+  - 关键断言（`OvertimeTaskTest` 5 用例）：①创建 4 件超额任务（来源=明天 4 件的正常计划）→ 201、`PN` 编号、`quantity=4`、预占 1 条 `ACTIVE`/4；**未来计划数量仍 4**、`fulfillment_entries` 数量不变；生成 `OVERTIME_PENDING_VERIFY` 提醒（`future_plan_id` 正确、数量 4、`OPEN`）；②未预占余额 4−4=0，再要 8 件 → 409 `OVERTIME_RESERVATION_EXCEEDED` 定位 `lines`，未来计划数量不变；③`planDate=昨天` → 400 `OVERTIME_DATE_INVALID` 定位 `planDate`；来源为当天正常计划 → 400 同码；④零合格核验后：预占 `RELEASED`、待核验提醒 `HANDLED`/`NO_ADJUSTMENT`（原因含「零合格」）、不生成计划减少建议、提醒总数仍 1、返工/报废只进待安排额度（2/1）。
+  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.11 实现超额任务核验 `POST /api/overtime-tasks/{id}/verify`：未完成释放预占；只有合格数量写正常履约并生成未来计划待调整提醒；返工/报废按独立来源处理，不作为计划减少依据。
+  - 证据：Requirement/Scenario：`production-management`「超额任务只产生业务预占和人工调整提醒」的 Scenario「超额任务核验后提醒」「零合格超额任务」。正式文档：`production-module-design.md` §4.6。文件：`ProductionVerificationService.settleOvertime`（复用核验服务的等式/可执行/分流口径）、`OvertimeTaskController.verify`。API：`POST /api/overtime-tasks/{id}/verify`（入参与生产核验一致）；表：`production_verifications`、`overtime_preemptions`、`production_reminders`、`fulfillment_entries`。
+  - 口径：核验复用同一服务（等式、事务内重算可执行上限、按冻结流程分流）；核验后 ①**释放该任务全部有效预占**（`RELEASED`，预占只用于借用未来产能）；②待核验提醒结束——合格 > 0 置 `HANDLED`/`SUPERSEDED`（已由计划待调整接管），零合格置 `HANDLED`/`NO_ADJUSTMENT`；③合格 > 0 时按**预占顺序**把合格数量分摊到受影响未来计划，生成 `PLAN_ADJUSTMENT` 提醒（建议减少数量 = 分摊量，绝不超过该计划预占量）；④返工/报废走独立来源、只进待安排额度，**不作为**计划减少依据；⑤未完成不生成普通「未完成待处理」提醒。
+  - 关键断言：4 件超额任务核验 4 件全合格 → 200、`flows=[{PACKING_BAG,4}]`；预占 `RELEASED`；待核验提醒 `HANDLED`/`SUPERSEDED`；`GET /api/production-reminders/overtime` 返回 1 条 `PLAN_ADJUSTMENT`（`futurePlanId` 正确、数量 4 = 合格数量分摊）；`POST .../adjust-plan` 后未来计划数量由 4 改为 1、`production_plan_adjustments` 记录 `QUANTITY`/4→1/原因、`making_planned` 减 3。
+  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.12 实现超额提醒查询/处理 `GET /api/production-reminders/overtime`、`POST .../{id}/adjust-plan`、`POST .../{id}/no-adjustment`；调整保存前后值/原因/来源，无需调整必须填原因，零合格自动结束提醒。
+  - 证据：Requirement/Scenario：`production-management`「超额提醒必须支持人工处理」的 Scenario「调整未来计划」「无需调整」。正式文档：`production-module-design.md` §3.2/§3.7/§6。文件：`production/reminder/ProductionReminderService.adjustPlan/noAdjustment`、`plan/internal/ProductionPlanAdjustmentRepository.java`、`ProductionPlanRepository.updateQuantity`。API：`GET /api/production-reminders/overtime`、`POST .../{id}/adjust-plan`（`{newQuantity,reason}`）、`POST .../{id}/no-adjustment`（`{reason}`）；错误码 `VALIDATION_INVALID`（原因必填 / 提醒类型不符）、`QUANTITY_INVALID`（新数量 < 1）、`STATE_NOT_EDITABLE`（未来计划非待执行）、`STATE_NOT_CANCELABLE`（提醒已处理）。表：`production_reminders`、`production_plan_adjustments`、`production_plans`、`order_item_fulfillment_balances`。事务拥有者：`adjustPlan`/`noAdjustment` 的 `@Transactional`；锁定对象：提醒行 `FOR UPDATE` → 未来计划行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
+  - 口径：**调整计划**只允许 `PLAN_ADJUSTMENT` 提醒，写入 `production_plan_adjustments`（`before_quantity`/`after_quantity`/`reason`/操作人）并同步计划数量与计划占用投影（按差值），提醒置 `HANDLED`/`ADJUSTED`；**新数量必须 ≥ 1**——`production_plans` 有 `CHECK (quantity > 0)`，保留数量 0 的待执行计划没有业务含义，确实无需生产应改用取消计划（**实施中发现并订正**：首版允许 0，实测触发 `ck_production_plans_quantity` 500）；**无需调整**原因必填、不改计划，提醒置 `HANDLED`/`NO_ADJUSTMENT`；零合格在核验时自动结束（5.11）。
+  - 关键断言：无需调整缺原因 → 400 定位 `reason`；带原因 → `HANDLED`/`NO_ADJUSTMENT` 且**未来计划数量不变**；调整计划 → 前后值/原因留痕、计划数量与 `making_planned` 同步、提醒 `HANDLED`/`ADJUSTED`。
+  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.13 实现其他排班创建、一次性总分钟核验、取消和工时更正；分钟 0-59、总分钟>0，确保不产生商品、库存或订单履约事实。
+  - 证据：Requirement/Scenario：`production-management`「生产计划必须绑定有效来源和执行资格」的 Scenario「记录其他排班」、「其他排班只能一次工时核验」的 Scenario「合法工时核验」「工时更正」。正式文档：`production-module-design.md` §3.8–§3.10/§4.7、`database-design.md` §8。文件：`production/otherschedule/{OtherScheduleController,OtherScheduleService,OtherScheduleViews}.java`、`otherschedule/internal/OtherScheduleRepository.java`；员工侧新增 `catalog/employee/service/EmployeeEligibilityService.requireActive`（只校验在职，其他排班不绑定工序）。API：`GET/POST /api/other-schedules`、`POST /api/other-schedules/{id}/verify`、`POST .../{id}/cancel`、`POST .../{id}/corrections`；错误码 `VALIDATION_INVALID`（分钟越界/总分钟为 0/缺原因）、`STATE_NOT_CANCELABLE`（重复核验 / 已核验不可取消）、`EMPLOYEE_NOT_ELIGIBLE`（离职）、`NOT_FOUND`。表：`other_schedules`、`other_schedule_verifications`、`other_schedule_time_corrections`（**不写任何商品/库存/履约表**）。事务拥有者：`create/verify/cancel/correct` 的 `@Transactional`；锁定对象：排班行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
+  - 口径：`OS` 编号；以**小时 + 0–59 分钟**录入，`总分钟 = 小时 × 60 + 分钟` 且必须大于 0；一次性核验（`uk_other_schedule_verifications_schedule`）；已核验后录错用**工时更正**追加事实（**原核验不动**，有效工时取最新更正的 after）；取消只改状态并留原因。**有效工时在未核验时为空**——不拿计划值冒充工时事实（实施中订正：初版测试期望未核验时返回计划总分钟，语义错误）。其他排班只校验员工**在职**（施工文档 §11 推荐项）。
+  - 关键断言（`OtherScheduleTest` 3 用例全绿）：①创建 1h30 → 201、`OS` 编号、`totalMinutes=90`、`PENDING`、员工姓名快照；`production_plans`/`fulfillment_entries`/`inventory_movements` 均为 0（**不产生商品、库存或履约事实**）；②分钟 60 → 400 定位 `minutes`；0h0m → 400 定位 `hours`；离职员工 → 409 `EMPLOYEE_NOT_ELIGIBLE`；③未核验时 `effectiveMinutes`/`verifiedMinutes` 为空、`corrected=false`；核验 2h → `verifiedMinutes=120`、`effectiveMinutes=120`；重复核验 → 409 且核验数仍 1；④更正为 1h45 → `verifiedMinutes` 仍 120（原核验不动）、`effectiveMinutes=105`、`corrected=true`，更正表 `before=120/after=105/reason` 正确；更正缺原因 → 400；⑤取消缺原因 → 400，带原因 → `CANCELLED` + `cancelReason`；已核验排班取消 → 409；列表按员工/状态筛选正确。
+  - 阶段门禁：后端全量 **259 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 5.14）。
+- [x] 5.14 实现 `/production` 正式工作台：日期/员工/订单/工序计划列表、等待上游、独立未完成区域、返工/重做来源、超额提醒附着未来排班行和行内调整操作。
+  - 证据：Requirement/Scenario：`production-management` 全部 Requirement（工作台是这些命令与查询的正式入口）；`design.md` §7（`/production` 行）。正式文档：`docs/architecture/production-module-design.md` §7。文件：新增 `frontend/src/api/production.ts`（生产/核验/来源/提醒/超额/其他排班的类型与 23 个封装函数）、`frontend/src/pages/production/ProductionPage.tsx`；`frontend/src/routes/index.tsx` 把 `/production` 占位页替换为正式页。路由：正式 `/production`（`ROUTE_PATHS` 仍 13 条，**未新增路由**）。
+  - 结构：卡片标题「生产工作台」+「数量由服务端事实派生」标签；右上角 4 个显式按钮（新建计划 / 新建超额任务 / 新建其他排班 / 刷新）；紧凑筛选（日期区间 / 员工 / 工序 / 计划状态）；一组 5 个页签：**计划**（计划编号/类型/订单明细/工序/日期/员工/计划/待安排/当前可执行/状态与等待上游 Tag/超额提醒/操作）、**等待上游**（同一列集合按 `waitingUpstream` 过滤，去掉提醒列）、**未完成待处理**（原计划/订单明细/工序/未完成数量/已安排 + 行内「重新安排」「暂不安排」）、**返工重做来源**（按订单明细查看；返工表与重做表并列展示余额 + 行内「从来源创建计划」，余额为 0 时禁用）、**其他排班**（计划工时/有效工时/状态 + 行内「核验」「取消」「更正工时」，并提示不产生商品库存履约数量）。**所有写操作收敛到一个弹窗**（14 种 kind 决定标题、字段与提交端点），**页面无预置表单**。
+  - 口径：待安排 / 当前可执行 / 等待上游一律取服务端派生值，页面不做数量算术；**超额「计划待调整」提醒附着在受影响的未来计划行上**并带行内「调整计划」「无需调整」；新建超额任务只列**未来日期**的待执行正常计划作为来源；新建计划通过「订单 → 明细」两级选择解析出 `orderItemId`；返工/重做来源的「新建来源」需填写核验 ID（来源表已展示该 ID）。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（8 文件 **45 用例**）、`npm run build` 退出码 0。
+  - 人工证据（与 5.15 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "`/production` 有「计划 / 等待上游 / 未完成待处理 / 返工重做来源 / 其他排班」五个页签，切换不跳转、无重复页签"
+        - "计划表能同时看到计划/待安排/当前可执行三列与「等待上游」「可执行」Tag；等待上游页签只显示等待上游的计划"
+        - "新建计划、新建超额任务、新建其他排班从右上角明确按钮进入弹窗；核验/取消在计划行、重新安排/暂不安排在未完成行、从来源创建计划在来源行、核验/取消/更正在排班行，查看动作不误作提交动作"
+        - "超额「计划待调整」提醒附着在受影响的未来计划行上，并能就地「调整计划」「无需调整」"
+        - "页面无预置表单；视觉与订单/库存页一致：白底常规后管骨架、轻量 Tag、紧凑筛选、表格自适应撑满"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 5.14 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
+- [x] 5.15 实现 `/production/plans/:id/verify` 核验页，清晰区分计划/可执行/等待数量与完成/合格/返工/报废/未完成，错误码定位对应字段。
+  - 证据：Requirement/Scenario：`production-management`「生产计划只能一次核验」的 Scenario「合法核验」「数量等式不成立」「重复核验」。正式文档：`production-module-design.md` §4.3/§7。文件：新增 `frontend/src/pages/production/ProductionVerifyPage.tsx`、`frontend/src/pages/production/verifyMath.ts`（纯逻辑，可单测）与 `verifyMath.test.ts`；`routes/index.tsx` 把 `/production/plans/:id/verify` 占位页替换为正式页。路由：正式 `/production/plans/:id/verify`（`ROUTE_PATHS` 仍 13 条）。
+  - 结构：左栏「计划信息」（订单明细/工序/类型/日期/员工/状态与等待上游 Tag）+ 三列大字号「计划数量 / 当前可执行 / 该工序待安排」+ 说明「已核验处理 · 有效流入」；核验表单四项（本次完成/合格/返工/报废）+ 核验备注；右侧「核验结果」面板展示服务端返回的完成/合格/返工/报废/未完成与**合格分流去向** Tag。
+  - 口径：页面**不做权威数量计算**——未完成与等式只是即时提示，服务端在同一事务内重算当前可执行数量并校验等式与上限；提交前用 `canSubmit` 拦截（等式不成立或本次完成超过计划数量时禁用提交）；服务端 400/409 的 `fieldErrors` 逐字段展示（`field：message` 列表）便于定位；**已核验/已取消计划不提供核验表单**，改为提示「每计划最多一次有效核验、已核验事实不可修改」。
+  - 关键断言（`verifyMath.test.ts` 4 用例）：①等式成立判定（含全 0 合法）；②未完成 = 计划 − 完成，超计划为负；③`canSubmit` 拦截等式不成立与超计划；④缺省/非法值按 0 处理，不产生 NaN 提示。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（8 文件 **45 用例**）、`npm run build` 退出码 0。
+  - 人工证据（与 5.14 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "核验页把「计划数量 / 当前可执行 / 该工序待安排」与「本次完成 / 合格 / 返工 / 报废 / 未完成」分区展示，一眼能分清计划值与可执行值"
+        - "等式不成立或本次完成超过计划数量时提交按钮不可点，并给出红/绿 Tag 提示"
+        - "提交后右侧显示服务端返回的核验事实与合格分流去向；已核验计划再进入该页不出现核验表单"
+        - "服务端拒绝时逐字段显示 field：message，能直接定位到出错的输入项"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 5.15 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
+- [x] 5.16 编写领域和 MySQL 集成测试覆盖唯一核验、等式、可执行上限、Q/E 流转、返工矩阵、重做原因、来源余额竞争、取消恢复、未完成提醒、超额预占竞争和零合格提醒。
+  - 证据：Requirement/Scenario：`production-management` 全部 Requirement（本任务为其测试覆盖）。正式文档：`design.md` §4（事务内稳定顺序锁定）、`production-module-design.md` §8/§9、`database-design.md` §15（并发与悲观锁测试门禁）。文件：`ProductionMigrationTest`（8：表/编号/唯一核验/来源余额/预占/分钟口径/提醒枚举）、`ProductionPlanApiTest`（5：创建/资格/待安排/可执行/筛选）、`ProductionVerificationTest`（5：等式/上限/唯一核验/分流/未完成）、`ProductionSourceTest`（4：返工矩阵/来源余额/重做原因/取消恢复）、`ProductionReminderTest`（3：部分安排/暂不安排/已处理拒绝）、`OvertimeTaskTest`（5：预占/日期/结算/零合格/无需调整）、`ProductionConcurrencyTest`（4：**来源余额竞争、超额预占竞争、可执行上限竞争、同一计划唯一核验竞争**）。API：生产计划、核验、返工/重做来源、提醒、超额任务、其他排班全部命令端点。表：阶段五全部 10 张表。
+  - **并发覆盖与实测发现的真缺陷（重要）**：`ProductionConcurrencyTest` 首跑时「超额预占竞争」出现 **两个事务都返回 201**（预占合计 8 > 可选 6，违反不变量）。根因：MySQL **REPEATABLE READ** 下普通 `SELECT` 走事务首次读建立的快照，第二个事务在锁定读之后用普通 SELECT 读预占合计，看不到对方刚提交的预占行。修复：①预占合计改为**锁定读**（`SELECT ... FOR UPDATE`，同时对该未来计划加区间锁）；②核验与取消的锁定顺序统一为**计划行 → 履约余额**，且首次读取改为锁定读（原实现先做普通 SELECT 再 `lockBalance`，快照已提前建立）；③计划创建在算「待安排数量」前先锁履约余额。修复后 4 个并发用例全部通过，`production-module-design.md` §8 的锁定顺序与「必须用锁定读」口径同步更新。
+  - 关键断言（4 用例）：①同一返工来源（总量 3）两个并发计划各 2 件 → 恰好 1 个 201、1 个 409，来源余额为 1（只扣一次）；②同一未来计划（6 件）两个并发超额任务各预占 4 → 恰好 1 个 201、1 个 409，未来计划原始数量仍 6、有效预占合计 4；③同一明细同工序有效流入 6、两条各 6 件的计划并发核验 → 恰好 1 个 200、1 个 409，核验处理合计 6、`verified_processed=6`（**不超可执行上限**）；④同一计划并发核验两次 → 恰好 1 个 200、1 个 409，核验表仍 1 行、计划为 `VERIFIED`。
+  - 阶段门禁：后端全量 **259 测试 0 失败 0 错误**（5.12 后 252 → 本组 5.13/5.16 共 +7）。
+  - 人工证据：不适用（并发属机器证据）。
+- [x] 5.17 阶段人工验收：执行正常计划、等待上游、部分核验、返工、重做、取消、超额任务和其他排班；逐项确认来源/提醒/历史可追溯，视觉结论待签字。
+  - 证据：Requirement/Scenario：`production-management` 各 Requirement。逐项实测见 `docs/delivery/manual-acceptance-report.md` §8.3（5.17 表）与 §8.7。要点：新建计划（修复缺「计划数量」字段后）创建成功 `PN000050`；「等待上游」页签存在且制作计划不等待上游；核验实时等式与未完成回退；「返工/重做来源」页签显示来源余额（总量 − 已安排）；`PN000049` 取消 → `已取消`、操作列清空；**超额任务**：来源未来计划 `PN000050`、预占 `ACTIVE`、**未来计划原数量未变**、生成 `OVERTIME_PENDING_VERIFY` 提醒、列表出现 `PN000051 超额`；其他排班 `OS000005` 计划 90 分 / 有效 120 分 / 已核验。
+  - 人工证据（用户 2026-09-25 确认）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "正常计划可从工作台创建并核验，列表显示待安排/当前可执行/等待上游"
+        - "部分核验的未完成数量回到待安排并生成「未完成待处理」提醒"
+        - "返工/重做来源页签显示来源余额与「总量 − 已安排」口径"
+        - "取消待执行计划后状态为已取消、操作列清空"
+        - "超额任务预占未来正常计划（原数量不变）并生成「超额待核验」提醒"
+        - "其他排班只保存工时事实，不产生商品/库存/履约数量"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 5.17 生产阶段人工验收通过（自测证据见报告 §8.3/§8.7）。"
 
 ## 6. 阶段六：订单发货、物流与发货更正（依赖阶段四和五）
 
-- [ ] 6.1 编写 Flyway 迁移创建 `shipments/shipment_items/shipment_source_links/shipment_logistics_changes/shipment_corrections`，落实批次编号、状态、快照、来源关联和等量更正唯一约束；表归 `orders`。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.2 实现订单发货查询/草稿 API `GET/POST /api/orders/{id}/shipments` 和草稿编辑，草稿不影响可发货/累计发货且可预览非正式清单。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.3 实现 `POST /api/orders/{id}/shipments/{shipmentId}/confirm`：锁定履约余额，校验订单状态、每明细可发货、当前有效需求和缝边状态，整批原子写确认快照、来源链接和累计发货。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.4 实现并验证确认上限：本次发货<=当前可发货，累计有效发货+本次<=当前有效订购；任一明细失败整批不生效。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.5 实现物流修改 `PATCH .../logistics`，只允许公司、单号、运费和备注，必须填写原因并保留前后值；不得修改订单、商品、数量、日期和来源。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.6 实现未关闭订单发货作废 `POST .../void`，先校验原批次明细无有效售后占用，再写反向履约恢复可发货和累计发货，不恢复原库存；有售后占用返回 `SHIPMENT_AFTER_SALES_LINKED`；原确认快照保留，作废批次不可再次确认。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.7 实现已关闭订单发货更正 `POST .../corrections`，同一事务使原批次失效并创建等量替代；有有效售后引用而未处理来源关联时返回 `SHIPMENT_AFTER_SALES_LINKED`；不能立即替代时返回 `CORRECTION_REPLACEMENT_REQUIRED` 并引导售后。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.8 实现 `/orders/:id` 内“发货与售后”只读 Tab 的发货批次区域：草稿、确认、来源追溯、物流修改、作废/更正、打印/PDF；显式进入订单上下文操作界面，不建立 `/shipments` 顶级工作区，不允许普通操作编辑已确认业务数量。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.9 编写 HTTP/MySQL 并发测试覆盖超量、两个并发发货、整批回滚、领用后不二扣库存、无售后作废恢复、已被售后占用时拒绝作废/失效更正、关闭后等量更正和物流修改不影响数量。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 6.10 阶段人工验收：分别从生产和库存形成可发货、分批确认、修改物流、作废未关闭批次和执行等量更正；确认库存只在领用时扣一次，视觉结论待签字。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [x] 6.1 编写 Flyway 迁移创建 `shipments/shipment_items/shipment_source_links/shipment_logistics_changes/shipment_corrections`，落实批次编号、状态、快照、来源关联和等量更正唯一约束；表归 `orders`。
+  - 证据：Requirement/Scenario：`order-lifecycle`「发货事实和物流修改必须分离」「订单必须维护可发货和发货上限」。正式文档：`docs/architecture/shipment-module-design.md` §3、`database-design.md` §9、`domain-and-quantity-model.md` §9。文件：`backend/src/main/resources/db/migration/V11__shipments.sql`（新增）、`backend/src/test/java/com/yumi/ShipmentMigrationTest.java`（新增，3 用例）。表：`shipments`、`shipment_items`、`shipment_source_links`、`shipment_logistics_changes`、`shipment_corrections`（表归 `orders`）。API/路由：不适用（本任务只建表）。Flyway：新增 `V11`（不改写既有迁移，空库重建后 V1→V11 全部成功）。
+  - 关键断言（3 用例全绿）：①五张表齐备；②`shipment_no` 为 `char(8)`、`freight`/`current_freight` 为 `decimal(19,4)`、`shipment_items.quantity` 为 `int unsigned`；③唯一键齐备——批次编号 `uk_shipments_shipment_no`、同批次同明细 `uk_shipment_items_shipment_item`、来源追溯 `uk_shipment_source_links_source`、**等量更正唯一** `uk_shipment_corrections_original`；④外键齐备——批次→订单/被替代批次、明细→批次/订单明细、来源→发货明细、物流历史→批次、更正→原批次/替代批次；⑤CHECK 拒绝非法数据——批次状态枚举、运费非负、明细数量大于 0；重复编号/重复明细/重复更正均被唯一键拒绝。
+  - 阶段门禁：后端全量 **268 测试 0 失败 0 错误**（阶段五 259 → 本阶段 6.1–6.7 共 +9）。
+  - 人工证据：不适用（建表属机器证据）。
+- [x] 6.2 实现订单发货查询/草稿 API `GET/POST /api/orders/{id}/shipments` 和草稿编辑，草稿不影响可发货/累计发货且可预览非正式清单。
+  - 证据：Requirement/Scenario：`order-lifecycle`「发货事实和物流修改必须分离」的 Scenario「编辑发货草稿」。正式文档：`shipment-module-design.md` §3.1/§3.2/§4/§6。文件：`orders/shipment/{ShipmentController,ShipmentService,ShipmentViews}.java`、`shipment/internal/ShipmentRepository.java`。API：`GET /api/orders/{id}/shipments`、`POST /api/orders/{id}/shipments`、`PATCH /api/orders/{id}/shipments/{shipmentId}`（整批替换明细）；错误码 `STATE_NOT_EDITABLE`（非已确认订单/非草稿批次）、`VALIDATION_INVALID`（明细为空/数量非正/明细不属于该订单/同明细重复）、`ORDER_NOT_FOUND`。表：`shipments`、`shipment_items`。事务拥有者：`createDraft`/`updateDraft` 的 `@Transactional`；锁定对象：`updateDraft` 锁批次行；幂等键：写入幂等。
+  - 口径：草稿**不占用**可发货、不增加累计发货、不写任何履约事实（测试直接断言事实数与投影不变）；明细携带商品与收货展示快照；同一批次同一明细只能一条；`PATCH` 为整批替换（先删来源追溯与明细再重插）。
+  - 关键断言（`ShipmentApiTest` 6 用例中的 2 个）：①创建草稿 → 201、`SH` 编号、`DRAFT`、明细数量与收货人快照正确、`cumulativeShippedQuantity` 为空（草稿无快照）；**草稿不影响可发货（仍 10）与累计发货（仍 0），履约事实数不变**；②草稿订单创建发货草稿 → 409 `STATE_NOT_EDITABLE`；明细不属于该订单 → 400 定位 `items[0].orderItemId`。
+  - 阶段门禁：后端全量 **268 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 6.8）。
+- [x] 6.3 实现 `POST /api/orders/{id}/shipments/{shipmentId}/confirm`：锁定履约余额，校验订单状态、每明细可发货、当前有效需求和缝边状态，整批原子写确认快照、来源链接和累计发货。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单必须维护可发货和发货上限」的 Scenario「库存领用后发货」、「发货事实和物流修改必须分离」的 Scenario「物流修改」。正式文档：`shipment-module-design.md` §4.2/§8。文件：`ShipmentService.confirm/confirmInternal/linkSources`、`ShipmentRepository.markItemConfirmed/markConfirmed/findShippableInflows`；订单侧新增 `FulfillmentLedger.applyShipped` + `FulfillmentRepository.applyShipped`。API：`POST /api/orders/{id}/shipments/{shipmentId}/confirm`；错误码 `SHIPMENT_EXCEEDS_AVAILABLE`、`SHIPMENT_EXCEEDS_DEMAND`、`STATE_NOT_CONFIRMABLE`、`NOT_FOUND`。表：`shipments`、`shipment_items`、`shipment_source_links`、`fulfillment_entries`、`order_item_fulfillment_balances`。事务拥有者：`confirm` 的 `@Transactional`；**锁定顺序**：履约投影行（按 `order_item_id` 升序 `FOR UPDATE`）→ 批次行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
+  - 口径：确认写 `SHIPMENT_CONSUME`/`OUT`（节点 `SHIPPABLE`，来源 `SHIPMENT` + 批次 id + 明细 id）→ 消耗可发货（`shippable_quantity` 减少）→ 累加累计发货（`shipped_quantity` 增加）→ 冻结明细快照（本次之后的累计发货与未交付需求）→ **按事实 id 升序把本次数量分摊到该明细的可发货入库来源**写 `shipment_source_links`（只追溯，不改库存）。**不生成任何库存流水**（库存已在领用时扣减）。
+  - 关键断言：确认 4 件 → 200 `CONFIRMED`，明细快照 `cumulativeShippedQuantity=4`/`undeliveredQuantity=6`，来源追溯 1 条 `PRODUCTION_QUALIFIED`/4；投影 `shippable=6`/`shipped=4`；`fulfillment_entries` 一条 `SHIPMENT_CONSUME`/`SHIPPABLE`/`OUT`/4；**`inventory_movements` 为 0**（发货不二扣库存）。
+  - 阶段门禁：后端全量 **268 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 6.8）。
+- [x] 6.4 实现并验证确认上限：本次发货<=当前可发货，累计有效发货+本次<=当前有效订购；任一明细失败整批不生效。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单必须维护可发货和发货上限」的 Scenario「超过可发货被拒绝」。正式文档：`shipment-module-design.md` §4.1/§4.2、`domain-and-quantity-model.md` §9。文件：`ShipmentService.confirmInternal` 的上限校验段（逐明细收集字段错误后统一抛 `ApiException`，事务回滚）。API：同 6.3。
+  - 口径：**本次发货 ≤ 当前可发货**（`shippable_quantity`）→ 否则 `SHIPMENT_EXCEEDS_AVAILABLE`；**累计有效发货 + 本次 ≤ 当前有效订购**（`required_quantity`）→ 否则 `SHIPMENT_EXCEEDS_DEMAND`；字段错误定位 `items[i].quantity`；**任一明细失败整批不生效**（同一事务内校验通过后才写任何事实）。
+  - 关键断言：①草稿 11 件（可发货 10）→ 409 `SHIPMENT_EXCEEDS_AVAILABLE` 定位 `items[0].quantity`，可发货仍 10、累计发货仍 0；②累计发货 8（有效订购 10）后再发 4 → 409 `SHIPMENT_EXCEEDS_DEMAND`，累计发货仍 8（整批回滚）。
+  - 阶段门禁：后端全量 **268 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 6.8）。
+- [x] 6.5 实现物流修改 `PATCH .../logistics`，只允许公司、单号、运费和备注，必须填写原因并保留前后值；不得修改订单、商品、数量、日期和来源。
+  - 证据：Requirement/Scenario：`order-lifecycle`「发货事实和物流修改必须分离」的 Scenario「物流修改」。正式文档：`shipment-module-design.md` §3.4/§4.3。文件：`ShipmentService.changeLogistics`、`ShipmentRepository.insertLogisticsChange/updateCurrentLogistics`。API：`PATCH /api/orders/{id}/shipments/{shipmentId}/logistics`（`{carrier,trackingNo,freight,logisticsNote,reason}`，未传字段沿用当前值）；错误码 `STATE_NOT_EDITABLE`（非已确认批次）、`VALIDATION_INVALID`（缺原因/运费为负）。表：`shipment_logistics_changes`、`shipments`。事务拥有者：`@Transactional`；锁定对象：批次行 `FOR UPDATE`。
+  - 口径：只改**当前有效物流四字段**并保留修改前后值与原因；**原始物流快照不变**（视图同时暴露 `carrier` 原始快照与 `currentCarrier` 当前有效值）；累计发货、可发货、明细数量与来源关系**完全不变**。
+  - 关键断言：缺原因 → 400 定位 `reason`；带原因修改 → 200，`currentCarrier=顺丰`、`currentTrackingNo=SF123456`、**原始快照仍为「中通」**、物流修改历史 1 条（前后值 + 原因）；`shipped`/`shippable` 不变（3/7）。
+  - 阶段门禁：后端全量 **268 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 6.8）。
+- [x] 6.6 实现未关闭订单发货作废 `POST .../void`，先校验原批次明细无有效售后占用，再写反向履约恢复可发货和累计发货，不恢复原库存；有售后占用返回 `SHIPMENT_AFTER_SALES_LINKED`；原确认快照保留，作废批次不可再次确认。
+  - 证据：Requirement/Scenario：`order-lifecycle`「发货事实和物流修改必须分离」的 Scenario「未关闭订单作废」「已受理售后的批次不可直接作废」。正式文档：`shipment-module-design.md` §4.4。文件：`ShipmentService.voidShipment/voidInternal`、`ShipmentRepository.markVoided`。API：`POST /api/orders/{id}/shipments/{shipmentId}/void`（`{reason}` 必填）；错误码 `STATE_CLOSED_REQUIRES_CORRECTION`（已关闭订单）、`STATE_NOT_CANCELABLE`（非已确认批次/累计发货不足）、`VALIDATION_INVALID`（缺原因）。表：`shipments`、`fulfillment_entries`、`order_item_fulfillment_balances`。事务拥有者：`@Transactional`；锁定顺序：批次行 → 履约投影行 `FOR UPDATE`。
+  - 口径：写反向履约事实 `SHIPMENT_VOID`/`IN`（节点 `SHIPPABLE`）→ 恢复可发货、回退累计发货 → 批次置 `VOIDED` 并保留原因与操作人；**原确认快照保留**；**不恢复原库存**（需要恢复库存须另行取消领用并生成反向库存流水）；作废批次**不可再次确认**。**「无有效售后占用」校验在阶段八接入售后表后生效**——当前无售后事实，条件恒真（已在施工文档 §1/§4.4 与本条如实记录）。
+  - 关键断言：缺原因 → 400 定位 `reason`；带原因作废 → 200 `VOIDED` + `voidReason`，**明细的累计发货快照仍为 4（原快照保留）**，可发货回到 10、累计发货回到 0，`SHIPMENT_VOID`/`IN` 事实 1 条；再次确认 → 409 `STATE_NOT_CONFIRMABLE`；已关闭订单作废 → 409 `STATE_CLOSED_REQUIRES_CORRECTION`。
+  - 阶段门禁：后端全量 **268 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 6.8）。
+- [x] 6.7 实现已关闭订单发货更正 `POST .../corrections`，同一事务使原批次失效并创建等量替代；有有效售后引用而未处理来源关联时返回 `SHIPMENT_AFTER_SALES_LINKED`；不能立即替代时返回 `CORRECTION_REPLACEMENT_REQUIRED` 并引导售后。
+  - 证据：Requirement/Scenario：`order-lifecycle`「更正必须保留原始事实」的 Scenario「已关闭订单发货更正」。正式文档：`shipment-module-design.md` §3.5/§4.5。文件：`ShipmentService.correct`、`ShipmentRepository.existsCorrectionFor/insertCorrection/markReplaces`。API：`POST /api/orders/{id}/shipments/{shipmentId}/corrections`（`{reason}` 必填）；错误码 `STATE_NOT_EDITABLE`（未关闭订单/非已确认批次）、`CONFLICT_DUPLICATE`（已更正过）、`CORRECTION_REPLACEMENT_REQUIRED`（可发货不足以立即替代）、`VALIDATION_INVALID`（缺原因）。表：`shipment_corrections`、`shipments`、`shipment_items`。事务拥有者：`correct` 的 `@Transactional`（作废 + 建替代 + 确认同一事务）；锁定顺序：批次行 → 履约投影行。
+  - 口径：已关闭订单**不得作废只能更正**；同一事务内先作废原批次（恢复可发货与累计发货），再创建**等量替代批次**（数量与明细一一对应）并确认，写 `shipment_corrections` 关系与替代批次的 `replaces_shipment_id`；**交付数量不下降**；可发货不足以立即替代 → `CORRECTION_REPLACEMENT_REQUIRED`（整笔回滚）。一个原批次最多一次等量更正（`uk_shipment_corrections_original`）。「有效售后引用」的校验同 6.6，在阶段八接入。
+  - 关键断言：未关闭订单更正 → 409 `STATE_NOT_EDITABLE`；置为 `CLOSED` 后更正 4 件 → 200，替代批次 `CONFIRMED`、数量 4、`replacesShipmentId` 指向原批次，原批次 `VOIDED`，`shipment_corrections` 1 条，**可发货/累计发货回到确认后水平（交付数量不下降）**；对原批次再更正 → 409 `CONFLICT_DUPLICATE`。
+  - 阶段门禁：后端全量 **268 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 6.8）。
+- [x] 6.8 实现 `/orders/:id` 内“发货与售后”只读 Tab 的发货批次区域：草稿、确认、来源追溯、物流修改、作废/更正、打印/PDF；显式进入订单上下文操作界面，不建立 `/shipments` 顶级工作区，不允许普通操作编辑已确认业务数量。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单详情必须区分只读事实与显式操作」的 Scenario「查看已发批次并发起售后」、「发货事实和物流修改必须分离」。正式文档：`shipment-module-design.md` §7、`design.md` §7（`/orders/:id` 行）。文件：新增 `frontend/src/api/shipments.ts`（发货类型与 7 个封装函数）、`frontend/src/pages/orders/ShipmentPanel.tsx`；`frontend/src/pages/orders/OrderDetailPage.tsx` 的「发货与售后」Tab 由占位提示替换为 `ShipmentPanel` + 售后占位说明。路由：**不新增路由**（复用 `/orders/:id`，`ROUTE_PATHS` 仍 13 条）。
+  - 结构：Tab 内为「发货批次」区域——批次表（批次编号/状态 Tag/发货日期/当前物流/明细数/操作）+ 展开行（明细表：本次数量、**累计发货与未交付快照**、来源追溯 Tag、收货快照；物流修改历史表：公司/单号/运费/备注的前后值 + 原因）+ 提示「来源追溯只说明本次消耗了哪些可发货来源，库存已在领用时扣减」。操作：`新建发货草稿`/`打印 / PDF`/`刷新` 为显式按钮；草稿行内 `编辑草稿`/`确认`，已确认行内 `物流修改`/`作废`/`等量更正`，已作废行显示作废原因。**一个弹窗按 kind 决定字段与提交动作**（草稿/物流修改/作废/更正），页面无预置表单。
+  - 口径：只读区域**不提供编辑已确认业务数量的入口**（确认后只剩物流四字段可改，且必须填原因）；`确认` 走二次确认框并提示「冻结快照、消耗可发货、不再次扣减原库存」；非已确认订单不提供新建草稿入口并给出说明；`打印 / PDF` 用浏览器打印（服务端 PDF 导出属阶段九，已在施工文档 §10 记录）。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（8 文件 **45 用例**）、`npm run build` 退出码 0。
+  - 人工证据（与 6.10 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "`/orders/:id` 的「发货与售后」Tab 能看到发货批次表，展开后能看到明细、累计发货/未交付快照、来源追溯与物流修改历史"
+        - "草稿批次只有「编辑草稿/确认」，已确认批次只有「物流修改/作废/等量更正」，已作废批次只显示作废原因——查看不会出现录入表单"
+        - "确认前有二次确认并说明「冻结快照、消耗可发货、不再次扣减原库存」"
+        - "物流修改必须填原因，改完能在历史里看到前后值与原因；数量与来源关系不变"
+        - "页面未新增顶级发货工作区，视觉与订单详情其余 Tab 一致（白底常规后管、轻量 Tag、表格自适应撑满）"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 6.8 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
+- [x] 6.9 编写 HTTP/MySQL 并发测试覆盖超量、两个并发发货、整批回滚、领用后不二扣库存、无售后作废恢复、已被售后占用时拒绝作废/失效更正、关闭后等量更正和物流修改不影响数量。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单必须维护可发货和发货上限」「发货事实和物流修改必须分离」「更正必须保留原始事实」。正式文档：`shipment-module-design.md` §4/§8/§9、`design.md` §4（事务内稳定顺序锁定）。文件：`backend/src/test/java/com/yumi/ShipmentConcurrencyTest.java`（新增，2 用例：**两个并发发货**、**同一批次并发确认**）与 `ShipmentApiTest`（6 用例：超量/整批回滚/领用后不二扣库存/无售后作废恢复/关闭后等量更正/物流修改不影响数量）。API：`POST/PATCH /api/orders/{id}/shipments`、`.../confirm`、`.../logistics`、`.../void`、`.../corrections`。表：`shipments`、`shipment_items`、`shipment_source_links`、`shipment_logistics_changes`、`shipment_corrections`、`fulfillment_entries`、`order_item_fulfillment_balances`。
+  - 关键断言（并发 2 例）：①可发货 6、两个各 4 件的草稿并发确认 → 恰好 1 个 200、1 个 409 `SHIPMENT_EXCEEDS_AVAILABLE`，可发货只被消耗一次（余 2）、累计发货只增加一次（4）、`SHIPMENT_CONSUME` 事实恰 1 条；②同一草稿并发确认两次 → 恰好 1 个 200、1 个 409 `STATE_NOT_CONFIRMABLE`，累计发货仍 4、`SHIPMENT_CONSUME` 仍 1 条。
+  - 其余场景的机器证据（`ShipmentApiTest`）：超量（可发货 10 发 11 → 409 且数量不变）、整批回滚（累计 8 + 本次 4 > 有效订购 10 → 409 且累计仍 8）、**领用后不二扣库存**（确认后 `inventory_movements` 为 0）、无售后作废恢复（作废后可发货回到 10、累计回到 0、原快照保留、不可再确认）、关闭后等量更正（替代批次等量、交付数量不下降、原批次 VOIDED、更正关系唯一）、物流修改不影响数量（`shipped`/`shippable` 不变）。
+  - **待阶段八补测（如实记录）**：「已被售后占用时拒绝作废/失效更正」（`SHIPMENT_AFTER_SALES_LINKED`）依赖阶段八的售后台账表，当前无售后事实、条件恒真，随 8.x 接入售后表后回来补测——已在施工文档 §1/§4.4 与本条记录。
+  - 阶段门禁：后端全量 **270 测试 0 失败 0 错误**（6.7 后 268 → 本组 6.8/6.9 共 +2）。
+  - 人工证据：不适用（并发属机器证据）。
+- [x] 6.10 阶段人工验收：分别从生产和库存形成可发货、分批确认、修改物流、作废未关闭批次和执行等量更正；确认库存只在领用时扣一次，视觉结论待签字。
+  - 证据：Requirement/Scenario：`order-lifecycle`「发货事实和物流修改必须分离」「订单必须维护可发货和发货上限」。逐项实测见 `manual-acceptance-report.md` §8.2（发货批次区）、§8.3（6.10 表）、§8.6（物流留痕）、§8.12（冲销）。要点：生产核验与库存接入形成可发货；发货草稿不影响可发货、确认后冻结快照；**物流修改**保留修改前后四组值 + 原因（顺丰→中通、SF-…→ZT-…、运费 8→12）；**作废被售后占用的批次 → 409 `SHIPMENT_AFTER_SALES_LINKED`**（批次保持 CONFIRMED）；**库存只在领用时扣一次**（`InventoryFulfillmentIntegrationTest` + §8.12 冲销：批次 0→4、`packing_inflow` 4→0、一致性 `true`）。
+  - 人工证据（用户 2026-09-25 确认）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "发货批次列表区分草稿/已确认，草稿不影响可发货与累计发货"
+        - "分批确认后冻结累计/未交付快照"
+        - "物流修改保留修改前后值并可追溯（含原因）"
+        - "作废未关闭批次受售后占用守卫（被占用时拒绝并给出原因）"
+        - "库存只在领用时扣一次，发货不再扣减原库存"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 6.10 发货阶段人工验收通过（自测证据见报告 §8.2/§8.3/§8.6/§8.12）。"
 
 ## 7. 阶段七：收款、退款与订单关闭（依赖阶段六）
 
-- [ ] 7.1 编写 Flyway 迁移创建 `payments/refunds` 及订单款项投影/索引，金额 `DECIMAL(19,4)`、来源关联、幂等唯一和退款累计约束；表归 `orders`。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.2 实现 `POST /api/orders/{id}/payments`，仅已确认/允许补录的业务状态可登记，保存金额、日期、方式、备注和管理员；草稿返回 `PAYMENT_DRAFT_FORBIDDEN`，事实不可编辑删除。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.3 实现 `POST /api/orders/{id}/refunds`，校验订单变更退款与售后退款合计<=累计收款，保存方式、原因、备注及来源类型；订单变更退款关联变更单并参与结清，售后退款关联售后单且订单仍已确认时也可登记；已取消/已关闭订单仅允许有依据的实际退款补录，原收款不变。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.4 实现服务端订单结清公式：结清净额=累计订单收款-累计订单变更退款；订单待退款=max(累计订单收款-当前有效应收-累计订单变更退款,0)；售后退款另列累计实际净收，不冲减订单结清净额、不产生新的原订单待收/待退；收款状态按有效应收与结清净额派生。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.5 实现 `POST /api/orders/{id}/close`，同一事务锁订单及履约/款项投影并重验全部有效需求已发货或明确取消、应收结清、无待退款和无未处理差额。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.6 实现已取消/已关闭互斥终态和已关闭不重开；关闭后禁止新增原订单生产、发货和收款，允许独立物流修改、实际退款、更正和售后。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.7 实现 `/orders/:id` 内“资金与利润”只读 Tab：逐笔收退款、订单结清净额、售后退款单列、累计实际净收、订单待退款、成本快照及预计利润拆解；订单关闭条件逐项可查看，不提供普通编辑/删除。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.8 编写领域/HTTP/MySQL 测试覆盖多次收款、退款上限、来源必填、变更待退款、草稿拒绝、生产完成但未交付拒绝关闭、并发关闭重验及终态互斥。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 7.9 阶段人工验收：执行未收/部分/全额收款、减单待退款、退款处理和关闭；确认报废、余量或生产完成不能单独关闭，视觉结论待签字。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [x] 7.1 编写 Flyway 迁移创建 `payments/refunds` 及订单款项投影/索引，金额 `DECIMAL(19,4)`、来源关联、幂等唯一和退款累计约束；表归 `orders`。
+  - 证据：Requirement/Scenario：`order-lifecycle`「收款和退款必须是不可变事实」。正式文档：`docs/architecture/settlement-module-design.md` §3、`database-design.md` §10、`design.md` §7.1。文件：`backend/src/main/resources/db/migration/V12__settlement.sql`（新增）、`backend/src/test/java/com/yumi/SettlementMigrationTest.java`（新增，3 用例）。表：`payments`、`refunds`、`order_settlement_balances`（表归 `orders`）。Flyway：新增 `V12`（空库重建后 V1→V12 全部成功）。
+  - 关键断言（3 用例全绿）：①三张表齐备；②`payment_no`/`refund_no` 为 `char(8)`、金额列 `decimal(19,4)`、`refunds.source_id` 为 `bigint unsigned`；③唯一键齐备——收款编号、退款编号、**每单一条款项投影**；索引 `idx_refunds_source`；外键齐备；④CHECK 拒绝非法数据——收款/退款金额必须大于 0、退款来源类型枚举（`ORDER_CHANGE`/`AFTER_SALES`）、款项投影各金额非负；重复编号与重复投影行被唯一键拒绝。
+  - 阶段门禁：后端全量 **280 测试 0 失败 0 错误**（阶段六 270 → 本阶段 7.1–7.8 共 +10）。
+  - 人工证据：不适用（建表属机器证据）。
+- [x] 7.2 实现 `POST /api/orders/{id}/payments`，仅已确认/允许补录的业务状态可登记，保存金额、日期、方式、备注和管理员；草稿返回 `PAYMENT_DRAFT_FORBIDDEN`，事实不可编辑删除。
+  - 证据：Requirement/Scenario：`order-lifecycle`「收款和退款必须是不可变事实」的 Scenario「草稿收款被拒绝」。正式文档：`settlement-module-design.md` §3.1/§5.1。文件：`orders/settlement/{SettlementController,SettlementService,SettlementViews}.java`、`settlement/internal/SettlementRepository.java`。API：`POST /api/orders/{id}/payments`（`{amount,businessDate,method,note}`）；错误码 `PAYMENT_DRAFT_FORBIDDEN`（草稿）、`STATE_NOT_EDITABLE`（已取消/已关闭）、`VALIDATION_INVALID`（金额非正/缺日期/缺方式）。表：`payments`、`order_settlement_balances`。事务拥有者：`registerPayment` 的 `@Transactional`；锁定对象：订单行 `FOR UPDATE`；幂等键：写入幂等。**只追加，不提供编辑/删除端点**。
+  - 关键断言：草稿收款 → 409 `PAYMENT_DRAFT_FORBIDDEN`；恢复已确认后收款 40 → 200 `paidAmount=40.0000`、收款状态「部分收款」、逐笔表 1 行；再收 60 → 累计 100.0000、状态「已结清」、逐笔 2 行；金额 0 → 400 定位 `amount`；投影 `paid_amount=100.0000`。
+  - 阶段门禁：后端全量 **280 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 7.7）。
+- [x] 7.3 实现 `POST /api/orders/{id}/refunds`，校验订单变更退款与售后退款合计<=累计收款，保存方式、原因、备注及来源类型；订单变更退款关联变更单并参与结清，售后退款关联售后单且订单仍已确认时也可登记；已取消/已关闭订单仅允许有依据的实际退款补录，原收款不变。
+  - 证据：Requirement/Scenario：`order-lifecycle`「收款和退款必须是不可变事实」的 Scenario「部分发货售后退款不形成原订单欠款」。正式文档：`settlement-module-design.md` §3.2/§5.2、`design.md` §7.1。文件：`SettlementService.registerRefund`、`SettlementRepository.insertRefund/sumRefunds`。API：`POST /api/orders/{id}/refunds`（`{amount,businessDate,method,reason,note,sourceType,sourceId}`）；错误码 `REFUND_EXCEEDS_RECEIPTS`、`REFUND_REFERENCE_REQUIRED`（来源缺失或变更单不属于该订单）、`VALIDATION_INVALID`、`PAYMENT_DRAFT_FORBIDDEN`（草稿）。表：`refunds`、`order_settlement_balances`。锁定对象：订单行 `FOR UPDATE`；幂等键：写入幂等。
+  - 口径：`reason` 必填、`sourceType ∈ {ORDER_CHANGE, AFTER_SALES}`、`sourceId` 必填；**累计退款（含售后退款）≤ 累计收款**；`ORDER_CHANGE` 退款须关联本单的变更单（校验归属）；`AFTER_SALES` 退款在订单仍 `CONFIRMED` 时也可登记，且**不冲减订单结清净额、不产生新的原订单待收/待退**。「售后单是否存在」的校验随阶段八售后表接入（当前条件恒真，已在施工文档 §10 与 7.6 记录）。
+  - 关键断言：来源缺失 → 400 同时定位 `sourceType`/`sourceId`；`ORDER_CHANGE` 但变更单不属于该订单 → 409 `REFUND_REFERENCE_REQUIRED`；退款 120 > 累计收款 100 → 409 `REFUND_EXCEEDS_RECEIPTS`；售后退款 30 → 200：`netSettledAmount` 仍 100.0000、`afterSalesRefundAmount=30.0000`、`actualNetReceived=70.0000`、`refundPendingAmount=0.0000`、收款状态仍「已结清」。
+  - 阶段门禁：后端全量 **280 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 7.7）。
+- [x] 7.4 实现服务端订单结清公式：结清净额=累计订单收款-累计订单变更退款；订单待退款=max(累计订单收款-当前有效应收-累计订单变更退款,0)；售后退款另列累计实际净收，不冲减订单结清净额、不产生新的原订单待收/待退；收款状态按有效应收与结清净额派生。
+  - 证据：Requirement/Scenario：`order-lifecycle`「收款和退款必须是不可变事实」与 `design.md` §7.1 的结清口径。正式文档：`settlement-module-design.md` §4。文件：`SettlementService.totalsOf/receivableStatus`、`SettlementRepository.updateSettlement`（投影 upsert）、`GET /api/orders/{id}/settlement`。表：`order_settlement_balances`（`paid_amount`/`change_refund_amount`/`after_sales_refund_amount`/`net_settled_amount`/`effective_receivable_amount`/`refund_pending_amount`）。
+  - 口径：全部由**不可变事实 + 订单当前有效应收**派生（投影只是缓存，读视图直接由事实计算，不依赖投影）；收款状态：结清净额 0 → 未收款；0 < 结清净额 < 当前有效应收 → 部分收款；结清净额 ≥ 应收且待退款 0 → 已结清；待退款 > 0 → 待退款；已取消/已关闭按主状态单列。**售后退款单列于累计实际净收**（`actualNetReceived = 结清净额 − 累计售后退款`），不冲减结清净额、不产生新的待收/待退。
+  - 关键断言：收款 40 → 「部分收款」；收款累计 100（应收 100）→ 「已结清」；减单后应收 50、收款 100、未退变更款 → `refundPendingAmount=50.0000` 且状态「待退款」；登记变更退款 50 → 待退款 0、结清净额 50；售后退款 30 → 结清净额不变、累计实际净收 70（见 7.3）。
+  - 阶段门禁：后端全量 **280 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 7.7）。
+- [x] 7.5 实现 `POST /api/orders/{id}/close`，同一事务锁订单及履约/款项投影并重验全部有效需求已发货或明确取消、应收结清、无待退款和无未处理差额。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单关闭必须同时满足履约和款项条件」的 Scenario「条件同时满足」「生产完成不能替代履约」。正式文档：`settlement-module-design.md` §5.3、`domain-and-quantity-model.md` §14（关闭重验）。文件：`SettlementService.close/fulfillmentPending`、`SettlementRepository.findDeliveryGaps/lockOrCreate`、`OrderRepository.findByIdForUpdate`、`OrderSnapshotRepository.markClosed`。API：`POST /api/orders/{id}/close`；错误码 `CLOSE_FULFILLMENT_PENDING`、`CLOSE_SETTLEMENT_PENDING`、`CLOSE_REFUND_PENDING`、`STATE_NOT_CANCELABLE`。表：`orders`（`closed_at`/`closed_by`）、`order_item_fulfillment_balances`、`order_settlement_balances`。事务拥有者：`close` 的 `@Transactional`；**锁定顺序**：订单行 → 履约投影行（按 `order_item_id` 升序）→ 款项投影行，全部用锁定读；幂等键：必须 `Idempotency-Key`。
+  - 口径：事务内**重新读取并逐项校验**——①每条明细 `累计有效发货 ≥ 当前有效需求`（需求已由订单变更维护；**生产完成与成品余量不参与判定**，它们不能替代交付）→ 否则 `CLOSE_FULFILLMENT_PENDING`；②`结清净额 ≥ 当前有效应收` → 否则 `CLOSE_SETTLEMENT_PENDING`；③`待退款 = 0` → 否则 `CLOSE_REFUND_PENDING`。`markClosed` 带 `status='CONFIRMED'` 条件，并发关闭只有一个生效。
+  - 关键断言：①生产已全部处理（`verified_processed=10`）且有成品余量、可发货 10，但一件未发 + 已全额收款 → 409 `CLOSE_FULFILLMENT_PENDING` 且 `closeConditions[0].satisfied=false`、其余两项 true；②已全部发货但未收款 → 409 `CLOSE_SETTLEMENT_PENDING`；③发货满 + 全额收款 → 200 `CLOSED` 且记录关闭人；④减单产生待退款 → 409 `CLOSE_REFUND_PENDING`，登记关联变更单的退款后三项满足 → 200 `CLOSED`。
+  - 阶段门禁：后端全量 **280 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 7.7）。
+- [x] 7.6 实现已取消/已关闭互斥终态和已关闭不重开；关闭后禁止新增原订单生产、发货和收款，允许独立物流修改、实际退款、更正和售后。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单关闭必须同时满足履约和款项条件」（已关闭不得重开）与 `design.md` §7.1（关闭后约束）。正式文档：`settlement-module-design.md` §5.4。文件：`SettlementService.close` 的终态分支、`SettlementService.registerPayment` 的状态守卫；生产计划创建（要求 `CONFIRMED`）与发货确认（要求 `CONFIRMED`）沿用既有守卫。API：`POST /api/orders/{id}/close`、`POST /api/orders/{id}/payments`。
+  - 口径：`CANCELLED` 与 `CLOSED` 都是终态，不可互转、不可重开（已关闭再关闭 → 409 `STATE_NOT_CANCELABLE`「订单已关闭，不得重开」；已取消不能关闭）；关闭后**禁止**新增原订单生产计划（计划创建要求 `CONFIRMED`）、确认发货（要求 `CONFIRMED`）、新增收款（409 `STATE_NOT_EDITABLE`）；**允许**独立物流修改（只要求批次 `CONFIRMED`）、有依据的实际退款补录、发货等量更正、售后（阶段八）。
+  - 关键断言：关闭后再关闭 → 409 `STATE_NOT_CANCELABLE` 且订单仍 `CLOSED`；关闭后收款 → 409 `STATE_NOT_EDITABLE`；`closed_by` 为当次操作人。
+  - 阶段门禁：后端全量 **280 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 7.7）。
+- [x] 7.7 实现 `/orders/:id` 内“资金与利润”只读 Tab：逐笔收退款、订单结清净额、售后退款单列、累计实际净收、订单待退款、成本快照及预计利润拆解；订单关闭条件逐项可查看，不提供普通编辑/删除。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单详情必须区分只读事实与显式操作」「收款和退款必须是不可变事实」「订单关闭必须同时满足履约和款项条件」。正式文档：`settlement-module-design.md` §4/§7、`design.md` §7（`/orders/:id` 行）。文件：新增 `frontend/src/api/settlement.ts`（类型与 4 个封装函数）、`frontend/src/pages/orders/SettlementPanel.tsx`；`OrderDetailPage.tsx` 的「资金与利润」Tab 由金额列表 + 占位说明替换为 `SettlementPanel`。路由：**不新增路由**（复用 `/orders/:id`，`ROUTE_PATHS` 仍 13 条）。
+  - 结构：①金额快照与利润拆解（商品金额/缝边收费/整单优惠/当前有效应收/商品成本/缝边成本/总成本/预计利润）；②收款状态 Tag + 结清口径六行（累计收款、累计变更退款、**结清净额**、**订单待退款**、**售后退款（单列）**、累计实际净收）+ 口径说明；③**逐笔收款表**与**逐笔退款表**（编号/金额/日期/方式/来源/原因/操作人，只读）；④**关闭条件逐项表**（条件名 + 满足/未满足 Tag + 当前情况，来自服务端 `closeConditions`）；⑤显式按钮「登记收款」「登记退款」「关闭订单」「刷新」。**没有编辑/删除入口**。
+  - 口径：金额与收款状态全部取服务端；「登记收款」仅已确认订单可用（草稿禁用并给出说明）、「登记退款」草稿外可用（已取消/已关闭仅允许有依据的补录，服务端校验来源）、「关闭订单」走二次确认框并说明「事务内重验三项条件、关闭后不可重开」；服务端 400/409 的 `fieldErrors` 逐字段展示（收款/退款弹窗与关闭操作共用一处 Alert），**不提供普通编辑/删除**。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（8 文件 **45 用例**）、`npm run build` 退出码 0。
+  - 人工证据（与 7.9 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "「资金与利润」Tab 能看到金额快照、收款状态 Tag、结清净额/订单待退款/售后退款单列/累计实际净收，以及逐笔收款与退款表（只读，无编辑/删除入口）"
+        - "「关闭条件」逐项列出履约/应收/待退款三项并标出满足或未满足，未满足时能看到当前情况说明"
+        - "「登记收款」「登记退款」「关闭订单」都是显式按钮：草稿订单的收款按钮禁用；关闭走二次确认并说明不可重开"
+        - "服务端拒绝时逐字段显示 field：message（如 CLOSE_FULFILLMENT_PENDING 对应的未发货明细说明）"
+        - "视觉与订单详情其余 Tab 一致：白底常规后管、轻量 Tag、表格自适应撑满"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 7.7 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
+- [x] 7.8 编写领域/HTTP/MySQL 测试覆盖多次收款、退款上限、来源必填、变更待退款、草稿拒绝、生产完成但未交付拒绝关闭、并发关闭重验及终态互斥。
+  - 证据：Requirement/Scenario：`order-lifecycle`「收款和退款必须是不可变事实」「订单关闭必须同时满足履约和款项条件」。正式文档：`settlement-module-design.md` §4/§5/§8/§9、`design.md` §4。文件：`SettlementMigrationTest`（3：表/编号/金额与来源检查/投影唯一）、`SettlementApiTest`（5：草稿拒绝与多次收款、退款上限与来源必填与售后退款单列、变更待退款、生产完成不能替代交付、应收未结清与终态互斥）、`SettlementConcurrencyTest`（2：**并发关闭只生效一次**、**并发收款不丢更新**）。API：`POST /api/orders/{id}/payments|refunds|close`、`GET /api/orders/{id}/settlement`。表：`payments`、`refunds`、`order_settlement_balances`、`orders`、`order_item_fulfillment_balances`。
+  - 关键断言（并发 2 例）：①已全额收款且已全部发货的订单并发关闭 → 恰好 1 个 200、1 个 409，订单 `CLOSED` 且 `closed_at` 非空（`markClosed` 的 `status='CONFIRMED'` 条件保证只生效一次）；②两个并发收款各 40 → 都 200，收款事实 2 条、投影 `paid_amount=80.0000`（订单行锁保证不丢更新）。
+  - 阶段门禁：后端全量 **280 测试 0 失败 0 错误**（阶段六 270 → 本阶段 +10）。
+  - 人工证据：不适用（并发属机器证据）。
+- [x] 7.9 阶段人工验收：执行未收/部分/全额收款、减单待退款、退款处理和关闭；确认报废、余量或生产完成不能单独关闭，视觉结论待签字。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单关闭必须同时满足履约和款项条件」「收款和退款必须是不可变事实」。逐项实测见 `manual-acceptance-report.md` §8.3（7.9 表）与 §8.2（售后退款）。要点：部分收款 `PA000010 40`、全额收款 `PA000011 326` → 累计收款 `366.0000`；**减单待退款**：变更 `CO00007` 数量 10→6（须先处理超出 8）→ 应收 366→**266**、待退款 **100**；退款 `RF000004 100`（来源「订单变更退款 #8」）→ 结清净额 266、待退款 0；**关闭条件逐项**：三项明细 + 服务端拒绝回显（`fulfillment：明细 #1 需求 10，已发 4`），减单后「无待退款」也变未满足 → **待退款确实阻止关闭**；售后退款单列 20.0000 且**结清净额不被冲减**。
+  - 人工证据（用户 2026-09-25 确认）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "未收/部分/全额收款正确累计，待收随应收变化"
+        - "减单产生待退款并阻止关闭"
+        - "退款处理后待退款归零、结清净额正确"
+        - "关闭条件逐项展示并在不满足时给出明细"
+        - "报废、余量或生产完成不能单独关闭；售后退款单列不冲减结清净额"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 7.9 收退款与关闭阶段人工验收通过（自测证据见报告 §8.3）。"
 
 ## 8. 阶段八：发货后售后独立台账（依赖库存、生产、发货和退款）
 
-- [ ] 8.1 编写 Flyway 迁移创建 `after_sales_cases/after_sales_items/after_sales_return_verifications/after_sales_fulfillment_entries/after_sales_shipment_links` 及更正记录，落实退回等式、原发货批次明细的必填引用、有效受理数量投影和来源唯一约束；表归 `orders`。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.2 实现 `POST /api/orders/{id}/after-sales`，必须关联已确认且有效的原发货批次明细、原订单明细，锁定明细剩余可受理量并保存类型、问题、方案与补发需求；订单部分发货但未关闭也允许创建；草稿、作废、未发或超量来源返回 `AFTER_SALES_SOURCE_INVALID`/`AFTER_SALES_QUANTITY_EXCEEDED`。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.3 实现 `POST .../{caseId}/verify-return`，校验客户退回=售后返工+售后报废，保存问题、原因、核验人/时间；退回不自动入库、不恢复原发货库存。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.4 实现售后返工来源并复用生产计划一次核验与返工矩阵；最终合格按售后用途进入可补发，不自动进入通用库存，转库存必须显式新建库存批次。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.5 实现售后报废事实和补发需求，报废不入库、不恢复库存、不计已补发；库存不足部分只能创建关联售后单和原订单明细的售后补发生产计划。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.6 实现售后库存领用，兼容批次扣库存后只增加售后可补发；生产合格同样只增加可补发，二者均不得直接增加已补发。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.7 实现 `POST .../{caseId}/replacement-shipments` 和确认命令，锁售后余额并校验本次<=可补发/待补发；确认后增加售后已补发，原订单订购、累计发货、未交付和应收不变。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.8 实现关联售后单的退款，单列售后退款并更新累计实际净收；不冲减订单结清净额、不产生原订单新的待收/待退，订单无论仍在履约或已经关闭均保持主状态；首期不支持售后补差价、补应收或补收款。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.9 实现售后更正记录，退回核验等不可覆盖事实出现错误时通过新更正事实处理，保留原值和来源链。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.10 实现 `/orders/:id` 内“发货与售后”只读 Tab 的售后区域：从已确认发货批次明细查看售后占用、退回核验、返工/报废、库存/生产补发来源、可补发/已补发、补发发货、退款和历史；显式进入处理操作，不提供顶级售后业务模块。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.11 编写领域/HTTP/MySQL 测试覆盖部分发货即可创建、无效/重复/超量来源拒绝、批次售后占用上限、退回等式、退回不入库、来源独立、补发确认时点、原订单统计不变、售后退款不改变结清口径和主状态、并发补发上限。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 8.12 阶段人工验收：在部分发货且订单仍已确认时，从订单“发货与售后”Tab 对已确认批次创建售后并执行退回返工、报废、库存补发、生产补发、补发发货和退款；再验证剩余订单继续履约、售后与原订单台账分离、已关闭订单仍可按同一规则处理；视觉结论待签字。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [x] 8.1 编写 Flyway 迁移创建 `after_sales_cases/after_sales_items/after_sales_return_verifications/after_sales_fulfillment_entries/after_sales_shipment_links` 及更正记录，落实退回等式、原发货批次明细的必填引用、有效受理数量投影和来源唯一约束；表归 `orders`。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」。正式文档：`docs/architecture/after-sales-module-design.md` §3、`database-design.md` §11、`domain-and-quantity-model.md` §12。文件：`backend/src/main/resources/db/migration/V13__after_sales.sql`（新增）、`backend/src/test/java/com/yumi/AfterSalesMigrationTest.java`（新增，3 用例）。表：`after_sales_cases`、`after_sales_items`、`after_sales_return_verifications`、`after_sales_fulfillment_entries`、`after_sales_shipment_links`、`after_sales_corrections`（表归 `orders`）。Flyway：新增 `V13`（空库重建后 V1→V13 全部成功）。
+  - 关键断言（3 用例全绿）：①六张表齐备；②`case_no` 为 `char(8)`、受理数量为 `int unsigned`；③唯一键齐备——售后编号、**同一发货批次明细只允许一个有效售后占用**、每售后明细一条退回核验、售后台账来源唯一、补发发货关联唯一；④外键齐备（售后明细→售后单/订单/订单明细/**发货批次明细**，台账→售后明细，补发关联→发货批次明细）；⑤CHECK 拒绝非法数据——**退回 = 返工 + 报废**（数据库级等式）、受理数量大于 0、台账方向与数量、售后类型与状态枚举；重复售后编号/重复占用/重复来源/重复核验均被唯一键拒绝。
+  - 阶段门禁：后端全量 **288 测试 0 失败 0 错误**（阶段七 280 → 本阶段 8.1–8.9 共 +8）。
+  - 人工证据：不适用（建表属机器证据）。
+- [x] 8.2 实现 `POST /api/orders/{id}/after-sales`，必须关联已确认且有效的原发货批次明细、原订单明细，锁定明细剩余可受理量并保存类型、问题、方案与补发需求；订单部分发货但未关闭也允许创建；草稿、作废、未发或超量来源返回 `AFTER_SALES_SOURCE_INVALID`/`AFTER_SALES_QUANTITY_EXCEEDED`。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」的 Scenario「部分发货即可创建售后」「无有效已发来源被拒绝」。正式文档：`after-sales-module-design.md` §3.1/§3.2/§4.1。文件：`orders/aftersales/{AfterSalesController,AfterSalesService,AfterSalesViews}.java`、`aftersales/internal/AfterSalesRepository.java`。API：`GET/POST /api/orders/{id}/after-sales`、`GET /api/after-sales/{caseId}`；错误码 `AFTER_SALES_SOURCE_INVALID`（草稿/已作废批次、明细不属于该订单）、`AFTER_SALES_QUANTITY_EXCEEDED`（超有效已发数量、同一发货明细已被占用）、`VALIDATION_INVALID`、`STATE_NOT_EDITABLE`（草稿订单）。表：`after_sales_cases`、`after_sales_items`（+ 只读 `shipment_items`/`shipments`/`order_items`）。事务拥有者：`create` 的 `@Transactional`；**锁定对象**：订单行 → 原发货批次明细 `FOR UPDATE`（`lockSource`）；幂等键：写入幂等。
+  - 口径：来源必须是**已确认且有效**的发货批次明细（锁定读校验批次状态与明细归属）；受理量 ≤ 该发货明细本次已发数量；同一发货明细只允许一个有效售后占用（唯一键 + 预检）；**订单部分发货但未关闭即可创建**，剩余订单需求可继续生产与发货；读模型用只读版本查询来源（`findSource`），避免在视图里加锁。
+  - 关键断言：草稿批次明细 → 409 `AFTER_SALES_SOURCE_INVALID`；受理 5 > 已发 4 → 409 `AFTER_SALES_QUANTITY_EXCEEDED`；受理 4 → 201 `AS` 编号、`OPEN`、明细 `availableQuantity=0`/`shippedQuantity=0`/`pendingQuantity=4`；同一发货明细再次受理 → 409 `AFTER_SALES_QUANTITY_EXCEEDED`；订单仍 `CONFIRMED` 时列表可见该售后单。
+  - 阶段门禁：后端全量 **288 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 8.10）。
+- [x] 8.3 实现 `POST .../{caseId}/verify-return`，校验客户退回=售后返工+售后报废，保存问题、原因、核验人/时间；退回不自动入库、不恢复原发货库存。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」的 Scenario「退回等式错误」。正式文档：`after-sales-module-design.md` §3.3/§4.2。文件：`AfterSalesService.verifyReturn`、`AfterSalesRepository.insertReturnVerification/markReturnVerified`。API：`POST /api/after-sales/{caseId}/verify-return`（`{afterSalesItemId,returnedQuantity,reworkQuantity,scrapQuantity,reason}`）；错误码 `AFTER_SALES_EQUATION_INVALID`、`AFTER_SALES_QUANTITY_EXCEEDED`（退回超受理）、`STATE_ALREADY_VERIFIED`、`NOT_FOUND`。表：`after_sales_return_verifications`（唯一）+ `after_sales_items`。事务拥有者：`@Transactional`；锁定对象：售后明细行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
+  - 口径：**退回 = 售后返工 + 售后报废**（应用校验 + 数据库 CHECK 双保险）；退回 ≤ 受理数量；每售后明细只能核验一次；**退回不自动入库、不恢复原发货库存**（测试断言 `inventory_movements` 数与订单累计发货均不变）。
+  - 关键断言：退回 3 ≠ 返工 2 + 报废 0 → 409 `AFTER_SALES_EQUATION_INVALID`；退回 5 > 受理 4 → 409 `AFTER_SALES_QUANTITY_EXCEEDED`；退回 3 = 返工 2 + 报废 1 → 200 且 `returnVerified=true`、返工/报废回读一致；再次核验 → 409 `STATE_ALREADY_VERIFIED`；`inventory_movements` 与订单累计发货（4）均不变。
+  - 阶段门禁：后端全量 **288 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 8.10）。
+- [x] 8.4 实现售后返工来源并复用生产计划一次核验与返工矩阵；最终合格按售后用途进入可补发，不自动进入通用库存，转库存必须显式新建库存批次。
+  - 证据：Requirement/Scenario：`production-management`「生产计划必须记录来源」的 Scenario「售后返工与售后补发生产保存售后来源」（`specs/production-management/spec.md` 第 9 行）、`order-lifecycle`「售后必须独立于原订单履约」的 Scenario「售后补发确认」。正式文档：`after-sales-module-design.md` §3.7/§4.3/§6/§8、`production-module-design.md` §3.11/§4.3/§6/§8、`database-design.md` §11。文件（新增）：`db/migration/V14__after_sales_production.sql`（`after_sales_production_sources`）、`production/aftersales/{AfterSalesProductionViews,AfterSalesProductionService,AfterSalesProductionController}.java`、`production/aftersales/internal/AfterSalesProductionSourceRepository.java`、`production/internal/AfterSalesProductionReference.java`（跨模块只读纯 SQL）；修改：`plan/internal/PlanWriter.java`（`insertForAfterSales`：只写计划行、不登记订单侧计划占用）、`plan/ProductionPlanService.java`（`isAfterSalesType` 与售后计划的读模型分支）、`plan/ProductionPlanCancellationService.java`（取消退回售后来源余额）、`plan/internal/ProductionPlanRepository.java`（`pendingByItemNode`/`verifiedByItemNode` 只统计订单侧计划类型）、`verification/ProductionVerificationService.java`（售后计划核验分支）。API：`GET /api/after-sales/{caseId}/production-sources`、`POST /api/after-sales/{caseId}/production-sources/plans`（`{afterSalesItemId,purpose,node,planDate,employeeId,quantity,note}`）；计划类型 `AFTER_SALES_REWORK`。表：`after_sales_production_sources`（+ 只读 `after_sales_items`/`after_sales_return_verifications`/`after_sales_fulfillment_entries`）。事务拥有者：`createPlan` 的 `@Transactional`；**锁定顺序**：`after_sales_items`（`itemForUpdate`）→ 来源行（`findForUpdate`）；幂等键：写入幂等。
+  - 口径：售后返工额度 = 退回核验的返工数量；**未核验退回（返工为 0）不允许排产**；售后计划复用同一次核验（同一 `production_verifications` 表与等式校验），**合格只写售后台账 `PRODUCTION_INFLOW`/`IN`（`source_type=PRODUCTION`）**，不写订单履约事实、不推进订单工序流入、不自动新建库存批次；未完成数量退回来源余额可重排。
+  - 关键断言（`AfterSalesProductionTest.reworkPlanFeedsAvailableQuantityWithoutTouchingOrderFulfillment`、`...incompleteReworkQuantityReturnsToSourceForRescheduling`、`...rejectsPlanForItemOfAnotherCaseAndBadRequests`）：未核验退回 → 409 `SOURCE_INSUFFICIENT`；返工 2 时排 3 → 409 `SOURCE_INSUFFICIENT`（定位 `quantity`）；排 2 → 201 `AFTER_SALES_REWORK`/`AFTER_SALES_SOURCE`，**订单履约投影快照（需求/可发货/已发/三工序计划占用/已核验处理）前后一致**；核验合格 2 → `flows[0].node=AFTER_SALES_AVAILABLE`、售后可补发 2、已补发 0、`fulfillment_entries` 数不变、`inventory_batches` 为 0、台账事实类型为 `PRODUCTION_INFLOW`；完成 1/未完成 1 → 来源余额回到 1 且可再排 1（再排 1 → 409）；非本售后单的明细与非法 `purpose` → 400 且不落来源行与计划。
+  - 阶段门禁：后端全量 **298 测试 0 失败 0 错误**（8.11 后 293 → 8.4/8.5 +5）；前端 `npm run typecheck` 退出码 0。
+  - 人工证据：页面入口见 8.10（「生产补发」行内按钮 + 来源额度展示），人工验收在 8.12。
+- [x] 8.5 实现售后报废事实和补发需求，报废不入库、不恢复库存、不计已补发；库存不足部分只能创建关联售后单和原订单明细的售后补发生产计划。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」的 Scenario「退回等式错误」「售后补发确认」、`production-management`「生产计划必须记录来源」（同 8.4）。正式文档：`after-sales-module-design.md` §3.7/§4.3/§6、`production-module-design.md` §3.11/§6。文件：同 8.4（`purpose=REPLACEMENT` 分支与 `plan_type=AFTER_SALES_REPLACEMENT`）。API：同 8.4。表：`after_sales_production_sources`（`purpose=REPLACEMENT`）、`after_sales_return_verifications`（报废数量只作为退回等式的一部分）。
+  - 口径：报废数量**只参与退回等式**（退回 = 返工 + 报废，应用 + 数据库 CHECK 双保险），**不入库、不恢复库存、不计已补发、不产生任何库存流水**；补发需求缺口 = 补发需求 − 已补发 − 可补发，**只为缺口排产**（已被可补发覆盖时拒绝），且计划必须关联售后单与原订单明细（`after_sales_production_sources` 的 `after_sales_item_id`/`order_id`/`order_item_id` 外键）。
+  - 关键断言（`AfterSalesProductionTest.scrapStaysOutOfInventoryAndReplacementPlanCoversShortage`）：退回 3 = 返工 2 + 报废 1 后，`inventory_batches`/`inventory_movements` 均为 0、可补发与已补发均为 0（报废不入库、不计已补发）；缺口 4 时排 5 → 409 `SOURCE_INSUFFICIENT`；排 4 → 201 `AFTER_SALES_REPLACEMENT`，来源读模型 `totalQuantity=4`/`arrangedQuantity=4`/`balance=0`；核验合格 4 → 可补发 4 且 `inventory_batches` 仍为 0（**不自动进入通用库存**）；可补发已覆盖需求后再排 1 → 409 `SOURCE_INSUFFICIENT`。
+  - 阶段门禁：后端全量 **298 测试 0 失败 0 错误**；迁移断言 `AfterSalesMigrationTest.enforcesAfterSalesProductionSourceConstraints`（来源唯一键、`purpose` 枚举 CHECK、`arranged_quantity <= total_quantity` CHECK、三个外键）全绿。
+  - 人工证据：页面入口见 8.10，人工验收在 8.12。
+- [x] 8.6 实现售后库存领用，兼容批次扣库存后只增加售后可补发；生产合格同样只增加可补发，二者均不得直接增加已补发。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」的 Scenario「售后补发确认」（补发来源部分）。正式文档：`after-sales-module-design.md` §3.4/§4.3、`domain-and-quantity-model.md` §12。文件：新增 `orders/ledger/AfterSalesLedger.java`（`@NamedInterface` 包的跨模块结果接口，与 `FulfillmentLedger` 同风格）、`inventory/AfterSalesAllocationRequest.java`、`InventoryService.allocateToAfterSales`（含 `reverseMovement` 的售后冲销联动）、`InventoryController` 的 `POST /api/inventory/after-sales-allocations`、`InventoryReference.afterSalesItem`（只读取售后明细商品）。API：`POST /api/inventory/after-sales-allocations`（`{afterSalesItemId,batchId,quantity,reason}`）；错误码 `VALIDATION_INVALID`（非成品批次/商品不一致）、`STOCK_INSUFFICIENT`、`NOT_FOUND`。表：`inventory_movements`（`AFTER_SALES_ALLOCATION`/`AFTER_SALES` 来源）、`inventory_movement_lines`、`inventory_batches`、`after_sales_fulfillment_entries`（`INVENTORY_INFLOW`/`IN`）。事务拥有者：`allocateToAfterSales` 的 `@Transactional`（扣库存与登记台账事实同一事务）；锁定对象：批次行（`lockByIds` 悲观锁）；幂等键：写入幂等。**不改既有表结构**（未走订单领用表，避免为售后放宽 `inventory_allocation_lines` 的必填列）。
+  - 口径：售后补发**只能领用成品批次（`SHIPPABLE`）**且批次商品必须与售后明细的原订单商品一致；扣库存只发生一次（与订单领用同一套不可变流水）；**只增加售后可补发，不直接增加已补发**（已补发只由补发发货确认增加）；`after_sales_fulfillment_entries` 的来源唯一键保证每笔来源只接入一次；**冲销原流水时同步写一条 `REVERSAL`/`OUT` 售后台账事实**，两个台账保持一致。「生产合格只增加可补发」的生产侧入口属 8.4/8.5（见下条未完成说明）。
+  - 关键断言（`AfterSalesApiTest` 6 用例中的 1 个）：制作批次 → 400 `VALIDATION_INVALID`；领用 9 > 批次 6 → 409 `STOCK_INSUFFICIENT`；领用 4 → 201（`AFTER_SALES_ALLOCATION`/`AFTER_SALES`），批次 6→2、售后可补发 4、**原订单累计发货仍 4**；冲销原流水 → 批次回到 6、售后可补发回到 0（台账同步回退）；重新领用 4 后创建并确认补发发货 → 已补发 4、可补发 0、待补发 0，且**补发发货不再扣原库存**（批次仍 2）。
+  - 阶段门禁：后端全量 **289 测试 0 失败 0 错误**（8.1–8.9 后 288 → 本任务 +1）。
+  - 人工证据：不适用（页面在 8.10）。
+- [x] 8.7 实现 `POST .../{caseId}/replacement-shipments` 和确认命令，锁售后余额并校验本次<=可补发/待补发；确认后增加售后已补发，原订单订购、累计发货、未交付和应收不变。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」的 Scenario「售后补发确认」。正式文档：`after-sales-module-design.md` §3.5/§4.4。文件：`AfterSalesService.createReplacementShipment/confirmReplacementShipment`、`AfterSalesRepository.insertShipmentLink/findLinkedAfterSalesItemId/insertEntry/availableQuantity/shippedQuantity`。API：`POST /api/after-sales/{caseId}/replacement-shipments`、`POST .../replacement-shipments/{shipmentId}/confirm`；错误码 `AFTER_SALES_REPLACEMENT_INSUFFICIENT`、`STATE_NOT_CONFIRMABLE`、`NOT_FOUND`。表：`after_sales_shipment_links`、`after_sales_fulfillment_entries`（`REPLACEMENT_CONSUME`/`OUT`）、`shipments`、`shipment_items`。事务拥有者：两个命令各自 `@Transactional`；锁定对象：售后明细行 → 补发批次行 `FOR UPDATE`；幂等键：确认必须 `Idempotency-Key`。
+  - 口径：**草稿补发批次不占用可补发**（与发货草稿同理），余额校验在**确认时**进行；确认时校验 `本次 ≤ 可补发` 且 `已补发 + 本次 ≤ 补发需求`；确认后写 `REPLACEMENT_CONSUME`/`OUT` 事实、写补发发货关联、增加售后已补发并冻结补发批次的累计/未交付快照；**原订单订购数量、累计发货、未交付需求、应收与主状态全部不变**。补发批次的明细通过关联表反查售后明细（`after_sales_items.shipment_item_id` 指向的是**原**发货明细）。
+  - 关键断言：尚无补发来源时创建草稿 → 201（不占用），确认 → 409 `AFTER_SALES_REPLACEMENT_INSUFFICIENT`；写入库存接入事实 4 件后确认 → 200：`shippedQuantity=4`、`availableQuantity=0`、`pendingQuantity=0`；原订单 `status=CONFIRMED`、`required_quantity=10`、`shipped_quantity=4` 全部不变。
+  - 阶段门禁：后端全量 **288 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 8.10）。
+- [x] 8.8 实现关联售后单的退款，单列售后退款并更新累计实际净收；不冲减订单结清净额、不产生原订单新的待收/待退，订单无论仍在履约或已经关闭均保持主状态；首期不支持售后补差价、补应收或补收款。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」的 Scenario「售后退款」、「收款和退款必须是不可变事实」的 Scenario「部分发货售后退款不形成原订单欠款」。正式文档：`after-sales-module-design.md` §4.5、`settlement-module-design.md` §4、`design.md` §7.1。文件：`SettlementService.registerRefund` 新增「售后单存在且属于该订单」守卫（`AfterSalesRepository.findCase`）。API：`POST /api/orders/{id}/refunds`（`sourceType=AFTER_SALES` + 售后单 id）；错误码 `REFUND_REFERENCE_REQUIRED`（售后单不存在或不属于该订单）、`REFUND_EXCEEDS_RECEIPTS`。
+  - 口径：售后退款进入**累计实际净收**，**不冲减订单结清净额**、不产生原订单新的待收/待退；订单无论仍在履约还是已关闭都保持主状态；首期不支持售后补差价、补应收或补收款（施工文档 §10）。
+  - 关键断言：`sourceId` 为不存在的售后单 → 409 `REFUND_REFERENCE_REQUIRED`；关联真实售后单退款 30 → 200：`afterSalesRefundAmount=30.0000`、`netSettledAmount` 仍 100.0000、`actualNetReceived=70.0000`、`refundPendingAmount=0.0000`；订单主状态仍 `CONFIRMED`。
+  - 阶段门禁：后端全量 **288 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 8.10）。
+- [x] 8.9 实现售后更正记录，退回核验等不可覆盖事实出现错误时通过新更正事实处理，保留原值和来源链。
+  - 证据：Requirement/Scenario：`order-lifecycle`「更正必须保留原始事实」。正式文档：`after-sales-module-design.md` §3.6/§4.6。文件：`AfterSalesService.correct`、`AfterSalesRepository.insertCorrection/findCorrections`。API：`POST /api/after-sales/{caseId}/corrections`（`{targetType,targetId,beforeValue,afterValue,reason}`）；错误码 `VALIDATION_INVALID`（缺原因 / 首期只支持更正退回核验）、`NOT_FOUND`（退回核验不存在或不属于该售后单）。表：`after_sales_corrections`。
+  - 口径：**不覆盖原事实**——更正只追加一条记录（保留原值、新值、原因与操作人）；首期只支持更正 `RETURN_VERIFICATION`（其他目标的更正随后续阶段，已在施工文档 §10 记录）；原退回核验保持不变。
+  - 关键断言：缺原因 → 400 定位 `reason`；带原因更正 → 200 且 `corrections` 1 条；**原退回核验的 `returned_quantity` 仍为 3**（未被覆盖）。
+  - **读模型修正（2026-09-25，人工验收审计发现）**：`findCorrections` 的 SQL 选了 5 列却只映射 2 列（`long[]{id,target_id}`），`before_value/after_value/reason` 被丢弃，`CorrectionView` 里恒为 `null` —— 与本任务「保留原值、新值、原因」的口径不符。已改为 `CorrectionRow(id,targetId,beforeValue,afterValue,reason)` 并接线；测试补断言 `beforeValue/afterValue/reason` 回读正确（`3` / `2` / `退回数量录错`）。
+  - 阶段门禁：后端全量 **288 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 8.10）。
+- [x] 8.10 实现 `/orders/:id` 内“发货与售后”只读 Tab 的售后区域：从已确认发货批次明细查看售后占用、退回核验、返工/报废、库存/生产补发来源、可补发/已补发、补发发货、退款和历史；显式进入处理操作，不提供顶级售后业务模块。
+  - 证据：Requirement/Scenario：`order-lifecycle`「订单详情必须区分只读事实与显式操作」的 Scenario「查看已发批次并发起售后」、「售后必须独立于原订单履约」。正式文档：`after-sales-module-design.md` §7、`design.md` §7（`/orders/:id` 行）。文件：新增 `frontend/src/api/afterSales.ts`（类型与 8 个封装函数）、`frontend/src/pages/orders/AfterSalesPanel.tsx`；`OrderDetailPage.tsx` 的「发货与售后」Tab 由售后占位说明替换为 `AfterSalesPanel`（与 `ShipmentPanel` 同页上下排列）；售后单视图补 `replacementShipmentIds`（页面创建补发草稿后据此确认）。路由：**不新增路由**（复用 `/orders/:id`，`ROUTE_PATHS` 仍 13 条）。
+  - 结构：Tab 内为「售后台账」区域——售后单表（售后单号/类型/状态 Tag/问题/明细数）+ 展开行（明细表：来源批次明细、受理、退回、补发需求、**退回核验（返工/报废 Tag）**、**可补发/已补发/待补发**、行内「退回核验」「库存补发」「补发发货」「更正」；更正记录数与售后退款笔数提示；并提示「售后独立于原订单履约」）；显式按钮「创建售后」「刷新」；页脚提示草稿批次不提供售后入口、售后一律在订单上下文处理。**一个弹窗按 kind 决定字段与提交动作**（创建/退回核验/库存补发/补发发货/更正），页面无预置表单。
+  - 口径：来源下拉**只列已确认批次**的明细并显示已发数量（草稿批次不可选）；「补发发货」提交后创建补发草稿批次并立即确认（确认成功才增加已补发）；「库存补发」只列 `SHIPPABLE` 成品批次；服务端 400/409 的 `fieldErrors` 逐字段展示；**不提供顶级售后工作区**，只读区域无录入表单。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（**10 文件 51 用例**）、`npm run build` 退出码 0；后端全量 **306 测试 0 失败 0 错误**。
+  - 补充机器证据（2026-09-25）：把来源候选与售后生产计划入参抽成纯模块 `frontend/src/pages/orders/afterSalesInput.ts`，新增 `afterSalesInput.test.ts`（4 用例）固定两条 8.10 口径——**只列已确认批次的明细**（草稿/作废批次不产生候选、无已确认批次时为空）与**计划日期格式化为 `YYYY-MM-DD` 且用途/工序/数量原样透传**；`AfterSalesPanel` 改为调用该模块，避免口径散落在组件里。
+  - 人工证据（与 8.12 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "「发货与售后」Tab 能看到售后台账表，展开后能看到来源批次明细、受理/退回/补发需求、退回核验（返工/报废）、可补发/已补发/待补发"
+        - "来源下拉只列已确认批次的明细并显示已发数量；存在草稿批次时页脚有提示且草稿不可作为售后来源"
+        - "创建售后、退回核验、库存补发、生产补发、补发发货、更正都从行内/顶部显式按钮进入弹窗；查看不会出现录入表单"
+        - "库存补发只列成品（可发货）批次；生产补发可选售后返工/售后补发生产、工序、计划日期与执行员工，并提示「合格只增加可补发，不进入订单履约、也不自动进入通用库存」"
+        - "售后来源候选**排除售后补发批次**（补发品不是原发货批次明细，服务端同样拒绝）；发货批次列表给售后补发批次打「售后补发」Tag"
+        - "补发发货提交后提示「创建草稿并立即确认，确认成功才增加已补发」"
+        - "展开行在存在售后生产来源时显示额度/已安排/余额（售后返工、售后补发生产）"
+        - "页面未新增顶级售后工作区，视觉与订单详情其余 Tab 一致（白底常规后管、轻量 Tag、表格自适应撑满）"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 8.10 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
+- [x] 8.11 编写领域/HTTP/MySQL 测试覆盖部分发货即可创建、无效/重复/超量来源拒绝、批次售后占用上限、退回等式、退回不入库、来源独立、补发确认时点、原订单统计不变、售后退款不改变结清口径和主状态、并发补发上限。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」（Scenario「部分发货即可创建售后」「无有效已发来源被拒绝」「退回等式错误」「售后补发确认」「售后退款」）、「更正必须保留原始事实」、「收款和退款必须是不可变事实」（Scenario「部分发货售后退款不形成原订单欠款」）。正式文档：`after-sales-module-design.md` §3、§4、§8、§9。文件：`AfterSalesMigrationTest.java`（MySQL/DDL 层，3 用例）、`AfterSalesApiTest.java`（HTTP 层，6 用例）、`AfterSalesConcurrencyTest.java`（并发层，1 用例，**本任务新增**）。API/表：见 8.1–8.9 各项；本任务不新增端点与表。
+  - 十项覆盖点与对应断言：
+    ①**部分发货即可创建**：订单 `CONFIRMED` 且仅发 4/10 时 `POST /api/orders/{id}/after-sales` → 201 `AS` 编号、`OPEN`（`AfterSalesApiTest.createsCaseOnlyFromConfirmedShipmentWithinAcceptedQuantity`）。
+    ②**无效来源拒绝**：草稿批次明细作为来源 → 409 `AFTER_SALES_SOURCE_INVALID`；明细不属于该订单 → 409 `AFTER_SALES_SOURCE_INVALID`（同用例）。
+    ③**重复来源拒绝**：同一发货批次明细再次受理 → 409 `AFTER_SALES_QUANTITY_EXCEEDED`；数据库层 `uk_after_sales_items_shipment_item` 重复占用被唯一键拒绝（同用例 + `AfterSalesMigrationTest.enforcesNumbersSourceUniquenessAndReturnEquation`）。
+    ④**超量来源拒绝**：受理 5 > 已发 4 → 409 `AFTER_SALES_QUANTITY_EXCEEDED`（同用例）。
+    ⑤**退回等式**：退回 3 ≠ 返工 2 + 报废 0 → 409 `AFTER_SALES_EQUATION_INVALID`；退回 3 = 返工 2 + 报废 1 → 200；数据库 CHECK `ck_after_sales_return_equation` 同样拒绝非法等式（`AfterSalesApiTest.verifiesReturnEquationOnceAndDoesNotTouchInventory` + `AfterSalesMigrationTest.enforcesReturnEquationAndEntryUniqueness`）。
+    ⑥**退回不入库**：核验前后 `inventory_movements` 计数与订单累计发货（4）均不变；退回核验不写 `inventory_*`（同用例）。
+    ⑦**来源独立**：台账来源唯一键 `uk_after_sales_fulfillment_entries_source` 拒绝同一来源重复接入（`AfterSalesMigrationTest`）。
+    ⑧**补发确认时点**：无补发来源时创建草稿 → 201（**草稿不占用**），确认 → 409 `AFTER_SALES_REPLACEMENT_INSUFFICIENT`；写入 4 件库存接入事实后确认 → 200，`shippedQuantity=4`、`availableQuantity=0`、`pendingQuantity=0`（`AfterSalesApiTest.replacementShipmentRequiresAvailableQuantityAndKeepsOrderUntouched`）。
+    ⑨**原订单统计不变**：补发确认前后原订单 `status=CONFIRMED`、`required_quantity=10`、`shipped_quantity=4` 均不变（同用例）。
+    ⑩**售后退款不改变结清口径和主状态**：售后单不存在 → 409 `REFUND_REFERENCE_REQUIRED`；关联真实售后单退款 30 → `afterSalesRefundAmount=30.0000`、`netSettledAmount` 仍 `100.0000`、`actualNetReceived=70.0000`、`refundPendingAmount=0.0000`，订单主状态仍 `CONFIRMED`（`AfterSalesApiTest.afterSalesRefundRequiresCaseAndKeepsSettlementAndStatus`）。
+    ⑪**并发补发上限**：两个并发「创建补发草稿 + 确认」（同一售后明细、各 4 件、可补发仅 4）→ 恰好 `[200, 409]`；`REPLACEMENT_CONSUME` 事实只 1 条、已补发 4、可补发 0（`AfterSalesConcurrencyTest.concurrentReplacementShipmentsAllowOnlyOne`）。
+  - 并发真缺陷与修复（本任务发现）：`confirmReplacementShipment` 已对售后明细行加锁（`findItemForUpdate`），但余额校验用**普通读** `availableQuantity`/`shippedQuantity`；MySQL REPEATABLE READ 下快照由事务内更早的 `requireCase` 普通读建立，等待锁的事务因此读到**并发前的旧余额** → 两个请求都通过校验（实测 `[200, 200]`）。修复：新增锁定读 `lockAvailableQuantity`/`lockShippedQuantity`（`... FOR UPDATE`，强制读最新已提交版本），确认路径的余额校验与已补发回写统一改用锁定读，`requireReplacementWithinBalance` 改为接收已读到的 `available`/`shipped`。锁定顺序仍为**售后明细行 → 补发批次行**，与 `after-sales-module-design.md` §8 一致。
+  - 阶段门禁：后端全量 **293 测试 0 失败 0 错误**（阶段九 9.1/9.2/9.4 后 292 → 本任务 +1，命令 `./mvnw test`，退出码 0；本任务前先清库重建 `yumi_v2_test` 以免验收数据污染全局计数用例）。
+  - 人工证据：不适用（页面证据在 8.10，人工验收在 8.12）。
+- [x] 8.12 阶段人工验收：在部分发货且订单仍已确认时，从订单“发货与售后”Tab 对已确认批次创建售后并执行退回返工、报废、库存补发、生产补发、补发发货和退款；再验证剩余订单继续履约、售后与原订单台账分离、已关闭订单仍可按同一规则处理；视觉结论待签字。
+  - 证据：Requirement/Scenario：`order-lifecycle`「售后必须独立于原订单履约」。全链路逐项实测见 `manual-acceptance-report.md` §8.2（十步）。要点：前提「部分发货且订单仍已确认」；创建 `AS000012`（来源下拉实测**只有已确认批次**）→ 退回核验 `3 = 返工 2 + 报废 1`（退回不入库）→ 生产补发（`额度 2 / 已安排 2 / 余额 0`，`PN000050 售后返工`，**待安排 0** 不占订单需求）→ 核验（合格分流 **`AFTER_SALES_AVAILABLE 2`**）→ 补发发货（可补发 0 / 已补发 2 / 待补发 2）→ 库存补发（弹窗**只列成品批次**，可补发回到 2）→ 售后退款（结清净额仍 40.0000、累计实际净收 20.0000、订单待退 0）；原订单 `status=CONFIRMED`、`部分发货` 未变，一致性 `true`。本会话修复：**补发批次不得作为售后来源**（服务端 409 + 列表「售后补发」Tag）。
+  - 人工证据（用户 2026-09-25 确认）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "从「发货与售后」Tab 对已确认批次创建售后，草稿批次不提供入口"
+        - "退回核验等式成立；退回不入库、不恢复库存；报废不入库、不计已补发"
+        - "库存补发只列成品批次且扣库存一次；生产补发（售后返工/售后补发生产）合格只增加可补发"
+        - "补发发货确认后才增加已补发；售后退款单列且不冲减结清净额"
+        - "售后与原订单台账分离：原订单订购/累计发货/未交付/应收/主状态不变"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 8.12 售后阶段人工验收通过（自测证据见报告 §8.2，含 2 张截图）。"
 
 ## 9. 阶段九：查询导出、打印、发布与最终追踪（依赖阶段一至八）
 
-- [ ] 9.1 实现 `GET /api/reports/{type}` 查询订单履约、库存、生产、发货、收退款和售后台账，筛选和分页均由服务端执行；结果只读且来自事实/投影。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.2 实现 `GET /api/reports/{type}/export`，固定业务字段清单并验证不含物流公司、单号、运费、发货备注；金额保持字符串，历史资料使用快照。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.3 实现订单/发货/台账打印与 PDF 数据准备，历史客户/商品/收货使用确认快照，发货物流使用当前有效物流；Electron 调用薄壳打印而不复制业务计算。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.4 实现事实重建和投影一致性检查，至少覆盖履约余额、库存批次、售后可补发；不一致时产生失败证据而非静默覆盖。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
+- [x] 9.1 实现 `GET /api/reports/{type}` 查询订单履约、库存、生产、发货、收退款和售后台账，筛选和分页均由服务端执行；结果只读且来自事实/投影。
+  - 证据：Requirement/Scenario：`reporting-and-operations` 报表相关 Requirement。正式文档：`design.md` §6（查询导出行）、§7（`/reports` 行）。文件：新增只读模块 `com.yumi.reports`（`ReportController`/`ReportService`/`ReportTypes`/`ReportViews`，**纯只读 SQL、不依赖任何业务模块的 Java 类型**，Modulith 视图下无出边）；`ModuleStructureTest` 的模块清单加入 `reports`。API：`GET /api/reports/{type}`（`type ∈ ORDER_FULFILLMENT / INVENTORY / PRODUCTION / SHIPMENT / SETTLEMENT / AFTER_SALES`，可选 `dateFrom`/`dateTo`/`orderId`/`page`/`size`）；错误码 `REPORT_TYPE_INVALID`。表：只读 `orders`/`order_items`/`order_item_fulfillment_balances`/`inventory_batches`/`production_plans`/`production_verifications`/`shipments`/`shipment_items`/`order_settlement_balances`/`after_sales_*`（**历史资料取快照列**，如发货明细的累计/未交付快照、售后明细的商品快照）。事务：`@Transactional(readOnly = true)`（一致性检查）；幂等键：只读不要求。
+  - 口径：每类报表有**固定业务字段清单**（`ReportTypes`），查询与导出共用同一清单；筛选（日期区间按类型的时间列、订单按类型的订单列）与分页（`LIMIT/OFFSET` + 子查询计数）全部在服务端执行；金额统一以**字符串**输出（scale4），日期转 ISO 字符串；结果只读、来自事实与投影。
+  - 关键断言（`ReportApiTest` 3 用例之一）：六类报表均 200 且列清单非空；`page=1&size=1` → `rows.length()=1`、`total=1`、`size=1`（服务端分页）；按 `orderId` 筛选 → `total=1` 且 `orderNo=TRP0001`、`receivableAmount="100.0000"`（金额字符串）；按 `dateFrom=2026-09-26` 筛选发货台账 → `total=0`（日期区间生效）；未知类型 → 400 `REPORT_TYPE_INVALID`。
+  - 阶段门禁：后端全量 **292 测试 0 失败 0 错误**（阶段八 289 → 本阶段 9.1/9.2/9.4 共 +3）。
+  - 人工证据：不适用（页面在 9.9 的路由清单与人工验收）。
+- [x] 9.2 实现 `GET /api/reports/{type}/export`，固定业务字段清单并验证不含物流公司、单号、运费、发货备注；金额保持字符串，历史资料使用快照。
+  - 证据：Requirement/Scenario：`reporting-and-operations` 导出相关 Requirement。正式文档：`design.md` §6/§7（导出无物流字段）。文件：`ReportService.exportCsv`、`ReportController.export`。API：`GET /api/reports/{type}/export`（可选筛选参数同 9.1）；返回 `text/csv` 附件。
+  - 口径：导出的表头与行**严格按该类型的固定业务字段清单**，发货台账清单里**没有物流公司、单号、运费与发货备注**，因此导出天然不含物流字段；金额以字符串输出；历史资料取确认/发货快照列。**统一信封例外（如实记录）**：`/export` 返回文件而非业务负载，与 `204` 同类，故不套 `{code,message,fieldErrors,requestId,data}` 信封；为此在 `EnvelopeAdvice` 增加**精确豁免**（仅 `text/*` 与 `application/octet-stream`，actuator 的 `vnd...+json` 仍照旧包装），并由 `SuccessEnvelopeContractTest` 守住既有信封契约。
+  - 关键断言（`ReportApiTest` 3 用例之一）：导出发货台账 → 200 且 `Content-Type: text/csv`；CSV 含「批次编号/订单编号/本次数量/累计发货快照」；**不含「物流公司/单号/运费/物流备注」四个字段名，也不含物流值「中通」「ZT123456」**；含订单号与数量快照（字符串）。
+  - 阶段门禁：后端全量 **292 测试 0 失败 0 错误**。
+  - 人工证据：不适用（页面在 9.9 的路由清单与人工验收）。
+- [x] 9.3 实现订单/发货/台账打印与 PDF 数据准备，历史客户/商品/收货使用确认快照，发货物流使用当前有效物流；Electron 调用薄壳打印而不复制业务计算。
+  - 证据：Requirement/Scenario：`reporting-and-operations`「打印和 PDF 必须展示有效快照」、`platform-foundation`「浏览器和 Electron 必须使用同一业务 API」、`order-lifecycle`「发货事实和物流修改必须分离」。文件：新增 `frontend/src/lib/print.ts`（统一打印入口：`window.yumiShell.print` 存在时走 Electron 主进程打印，否则回退 `window.print()`；**不复制任何业务计算**）、`frontend/src/lib/print.test.ts`（2 用例）；`OrderDetailPage.tsx`（新增「打印 / PDF」）、`ShipmentPanel.tsx`、`ReportsPage.tsx`（改为统一入口）；既有 `frontend/electron/{main.cjs,preload.cjs}`（`print` IPC + `contextBridge` 暴露）与 `electron/shell-guard.test.ts`（5 用例守卫：不直连数据库、不复制业务规则、`contextIsolation` 开且 `nodeIntegration` 关、preload 暴露面仅打印/文件选择/系统信息）。
+  - 口径：**数据准备不新增接口**——打印内容取自既有只读读模型，历史客户/商品/收货用确认快照（`order_*_snapshots` 与订单/发货快照列），发货物流用当前有效物流（`shipment_logistics_changes` 的最新有效值）；PDF 走系统打印对话框「另存为 PDF」，**不引入服务端 PDF 生成**；Electron 只做打印触发，业务数据一律走同一 `/api/**`。
+  - 关键断言（`print.test.ts` 2 用例）：有薄壳时调用主进程打印且**不调用**浏览器打印；无薄壳时回退 `window.print()` 一次。`electron/shell-guard.test.ts` 5 用例断言薄壳边界。
+  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（**9 文件 47 用例**）、`npm run build` 退出码 0；后端不受影响（298 测试）。
+  - **已知偏差（记录不掩盖）**：**未做打包/分发**（无 electron-builder 配置），首期以源码方式运行薄壳。
+  - 人工证据（与 9.12 同批签字）：
+    humanVisualConclusion:
+      status: confirmed
+      checklist:
+        - "订单详情、发货面板与 `/reports` 都有「打印 / PDF」入口，点击后进入系统打印预览"
+        - "打印内容为页面上已渲染的只读快照（客户/商品/收货为确认快照，发货显示当前有效物流）"
+        - "打印不出现录入表单、不出现导出隐藏字段（业务导出仍不含物流公司/单号/运费/备注）"
+      confirmedBy: chen
+      confirmedOn: 2026-09-25
+      conclusion: "用户于 2026-09-25 确认 9.3 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
+- [x] 9.4 实现事实重建和投影一致性检查，至少覆盖履约余额、库存批次、售后可补发；不一致时产生失败证据而非静默覆盖。
+  - 证据：Requirement/Scenario：`reporting-and-operations` 一致性检查相关 Requirement；`domain-and-quantity-model.md` §14（所有汇总均可从来源事实重建）。正式文档：`docs/architecture/database-design.md` §15（重建校验）、`design.md` §5（投影可重建）。文件：`ReportService.consistency/fulfillmentBalanceCheck/inventoryBatchCheck/afterSalesCheck`、`ReportController.consistency`。API：`GET /api/reports/consistency`（只读）。表：`order_item_fulfillment_balances` vs `fulfillment_entries`、`inventory_batches` vs `inventory_movement_lines`、`after_sales_fulfillment_entries` vs `after_sales_shipment_links`。事务：`@Transactional(readOnly = true)`。
+  - 口径：三项检查全部**从事实重建后再与投影比对**，只产出失败证据（返回不一致的记录 id/编号列表），**不做任何静默覆盖**：①履约余额（各工序流入与累计发货 vs 履约事实汇总，含 `SHIPMENT_CONSUME` 减 `SHIPMENT_VOID`）；②库存批次当前数量 vs 该批次有效流水行汇总（`IN` 加 `OUT` 减）；③售后已补发（台账 `REPLACEMENT_CONSUME`/`OUT` 合计）vs 补发发货关联数量合计。
+  - 覆盖补强（2026-09-25，审计发现）：第三项「售后已补发 vs 补发发货关联」原先在测试里是**空集真空通过**（`ReportApiTest` 无任何 `after_sales` 数据，无法证明它真在比对）。新增 `ReportApiTest.afterSalesCheckComparesConsumedAgainstLinks`：造售后明细 + `REPLACEMENT_CONSUME` 消耗 2 + 补发关联 2 → 一致；把关联改成 1 → 必须报不一致且 `detail` 能定位到该售后明细。后端全量 **309 测试 0 失败**。
+  - 关键断言（`ReportApiTest` 用例之一）：干净数据 → `allConsistent=true` 且三项检查齐备；人为把某批次数量改成 99（与流水不符）→ `allConsistent=false`、该项检查 `consistent=false` 且给出不一致批次编号；**检查后库内数量仍为 99（未静默覆盖）**。
+  - 阶段门禁：后端全量 **292 测试 0 失败 0 错误**。
+  - **修正（2026-09-25，由 9.7 恢复演练发现）**：初版重建子查询把三列各**错位一个节点**（PACKING_BAG 合格量当成 `making_inflow`、SEAM_CUTTING 当成 `packing_inflow`、SHIPPABLE 当成 `seam_inflow`）且**漏查 `shippable_quantity`**；投影本身正确，是检查写错（`ORDER_DEMAND` 是需求登记，不得计入可发货）。已按节点列正确对应重写并补 `shippable_quantity` 校验；新增回归用例 `ReportApiTest.consistencyCheckMapsNodeColumnsAndShippable`（多工序流入一致 → true、列错位 → false、只改可发货 → false），并修正原夹具（原先 `shippable_quantity=6` 无对应流入事实，夹具自身不自洽）。真实铺数数据上 `GET /api/reports/consistency` → `allConsistent=true`；后端全量 **304 测试 0 失败**。详见 `docs/delivery/release-and-backup-runbook.md` §3。 **再修正（2026-09-25，人工验收自测发现）**：该修复版把 `SHIPPABLE` 上所有 `OUT` 都计入物理出库，导致已变更订单（`ORDER_CHANGE` 需求基线事实）被误报不一致；按既有口径（`countExecutionFacts`「需求与变更事实是需求基线，不算已产生履约」）在重建中排除 `ORDER_DEMAND`/`ORDER_CHANGE`，并补回归用例；实测插入 `ORDER_CHANGE` 事实后仍 `allConsistent=true`。
+  - 人工证据：不适用（属机器证据）。
 - [ ] 9.5 完成生产结构化日志、指标、慢查询、HTTP 5xx、磁盘、连接池、文件不可写和备份失败告警配置；执行秘密扫描并证明日志脱敏。
+  - **代码侧已完成（2026-09-25）**：①结构化 JSON 日志、请求 id 与**日志脱敏**（`logback-spring.xml`，`StructuredLogMaskingTest` 断言 `password`/`cookie`/`authorization` 被掩码）；②**指标**：新增 `io.micrometer:micrometer-registry-prometheus`，暴露 `/api/actuator/metrics` 与 `/api/actuator/prometheus`（均受管理员认证保护，未认证 401）；③**HTTP 5xx 计数**：新增 `shared/observability/HttpServerErrorMetricsFilter`，5xx 累加 `yumi_http_server_errors_total{method,status,uri}`，`uri` 只取**路由模板**（`/api/orders/{id}/confirm`）避免高基数；④**文件不可写**：新增 `shared/observability/FileStorageHealthIndicator`（`${YUMI_FILES_DIR}` 下建删探针文件，失败报 `DOWN`），作为独立健康组件暴露且**不并入 readiness 组**（避免只读盘把服务判为不可接流量）；⑤健康详情 `show-components/show-details: always`；⑥连接池与磁盘指标由 Boot 自带（`hikaricp_*`、`disk.free`）随 `metrics`/`prometheus` 输出；⑦**慢查询**：`spring.jpa.properties.hibernate.session.events.log.LOG_QUERIES_SLOWER_THAN_MS=500`，超阈值语句按 `org.hibernate.SQL_SLOW` 打出 SQL 与耗时（实测 `Slow query took 376 milliseconds [SELECT SLEEP(0.3)]`），新增 `SlowQueryLoggingTest`（阈值 100ms + 300ms 语句 → 日志必须含该 SQL）。
+  - 文件：`shared/observability/{HttpServerErrorMetricsFilter,FileStorageHealthIndicator}.java`（新增）、`application.yml`（暴露 `health,info,metrics,prometheus` + 健康详情）、`pom.xml`（新增 prometheus registry）。测试：`ObservabilityApiTest`（4 用例：metrics/prometheus 未认证 401、认证后 metrics 可达且含 `disk.free`、健康含 `fileStorage` 组件与目录详情、5xx 计数只计 5xx 且带路由模板标签）。
+  - 运行中应用实测（curl）：`GET /api/actuator/prometheus` 返回 `# HELP jvm_memory_used_bytes`（`text/plain` 直出，不经错误信封）；`GET /api/actuator/metrics` 返回 `names` 列表含 `application.started.time`/`disk.free`。
+  - **秘密扫描（2026-09-25，全仓检索）**：私钥（`BEGIN … PRIVATE KEY`）**0 命中**；云/三方密钥形态（`AKIA…`/`sk-…`/`ghp_…`/`xox…`）**0 命中**；仓库内 `.env`/凭据/证书文件**0 个**（`git ls-files` 亦无）；主代码与配置中的明文口令**0 命中**。**发现并记录**：验收管理员口令出现在 `docs/delivery/manual-acceptance-report.md`、`docs/delivery/acceptance-seed.sh` 与 tasks.md 证据中——这是**本机未上线**的验收账号，可接受；**上线前必须更换生产管理员口令并确保验收口令不入库**。
+  - **告警规则已交付（2026-09-25）**：`docs/delivery/alert-rules.yml`（Prometheus 规则）覆盖 5xx 速率/占比、就绪探针不可抓取、连接池等待/使用率/获取超时、磁盘 15%/5%、JVM 堆 90%、**文件不可写**、**备份过期/失败**、MySQL 慢查询与连接数；新增 `shared/observability/FileStorageMetrics`（`yumi_file_storage_writable`，抓取时实时判定）使「文件不可写」告警有真实指标；`backup.sh` 写 Prometheus 文本文件（`yumi_backup_last_success_timestamp_seconds`/`yumi_backup_failures_total`）供备份告警采集。**核对工具**：`docs/delivery/check-alert-rules.sh` 实测退出码 **0**——①`check-alert-rules.py` 无依赖结构校验：5 个分组、14 条规则，成组且 `alert` 名唯一、含 `expr`/`for`/`severity`/`summary`（去掉一条的 `for` 实测报 `FAIL(结构): YumiDiskCritical: 缺少 for`，断言非空转）；②规则引用的 14 个指标全部可追溯（应用实时端点 10、源码声明 2、外部白名单 2）；③会话失效时打印可执行的重新登录命令而非静默退出。
+  - **未完成（运维侧，需在部署环境落地后才可勾选）**：把 `alert-rules.yml` 加载进实际 Prometheus/Alertmanager 并配置通知渠道（值班/邮件/IM）；`mysqld_exporter` 与 node_exporter textfile collector 部署；MySQL 服务端慢查询日志开启（`slow_query_log=ON`/`long_query_time`，应用侧不接管）。
+  - 阶段门禁：后端全量 **306 测试 0 失败 0 错误**（9.5 指标/健康 +5、慢查询 +1）。
+  - 死字段清理（2026-09-25，人工验收审计发现）：`VerificationView` 的 `reworkSourceId`/`remakeSourceId` **后端从不填、前端从不读**，而本任务证据早已写明「两者均不存在」（测试也断言 `doesNotExist()`）——已按既有约定删除这两个字段（后端 record + 构造调用 + 前端类型），测试保持通过。
+  - 日志侧告警（运维侧）：`org.hibernate.SQL_SLOW` 的 `Slow query took N milliseconds [SQL]` 可经日志管道（Loki/ELK）配置告警，与 `alert-rules.yml` 的 `YumiMySqlSlowQueries`（需 mysqld_exporter）互为补充。
+  - 阶段门禁：后端全量 **303 测试 0 失败 0 错误**（4.13 后 299 → 本任务 +4）。
+  - 人工证据：不适用（运维配置）。
   - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
 - [ ] 9.6 建立发布流程：配置/磁盘/连接检查→MySQL+文件一致备份→临时 MySQL `flyway validate/migrate`→正式迁移→启动→Hibernate validate→健康检查→只读冒烟→恢复流量。
+  - **已交付（2026-09-25）**：`docs/delivery/release-preflight.sh`（配置/磁盘/连接/**迁移对齐**/只读冒烟，任一项失败退出非 0）+ `docs/delivery/release-and-backup-runbook.md` §1（含临时库演练迁移、健康检查、只读冒烟、回滚依赖备份恢复的说明）。**实测**：`release-preflight.sh` 退出码 **0**（配置 ok、空闲磁盘 97631MB、连接 ok、代码 V14 / 库内 14 条迁移对齐、只读冒烟返回关键表计数）。
+  - **编排脚本已交付（2026-09-25）**：`docs/delivery/release.sh` 把五步串成一条命令并给出 go/no-go——①前置检查 ②一致备份（`--skip-backup` 可跳过）③启动/迁移（`--skip-start`/`--start-cmd`）④健康检查（就绪含 db + `fileStorage` 必须 UP，管理员登录后核验）⑤只读冒烟（六类台账 200 + `allConsistent=true`）；任一步失败即 **NO-GO** 退出非 0 并打印回滚口径。**实测（端到端，2026-09-25）**：`BACKUP_ROOT=… YUMI_ADMIN_USERNAME=… YUMI_ADMIN_PASSWORD=… bash docs/delivery/release.sh` 退出码 **0**、输出 `GO`——五步全跑通（备份 `db.sql` 833400 bytes 且保留 3 份；应用起在 `18090`；`readiness=UP` + `fileStorage` UP；六类台账 200 + `allConsistent=true`）。**实跑发现并修掉两个会让发布失败的缺陷**：①默认启动命令未把数据库口令传给子进程（应用空口令启动 → 表现为「管理员登录失败」的 NO-GO）；②默认启动命令未带端口，应用起在默认 `8080` 而非 `--api` 端口。二者只有在真跑编排时才暴露（`--skip-start` 检查不出来），已改为解析并 `export` 必需环境变量 + 从 `--api` 注入 `--server.port`。
+  - **未完成（运维侧，需在部署环境落地后才可勾选）**：把 `release.sh` 接入 CI/CD 与审批；反向代理流量切换与回滚演练；发布窗口。告警规则文件 `docs/delivery/alert-rules.yml` 已交付（见 9.5），发布后需确认其已加载。
+  - 人工证据：不适用（运维流程）。
+  - **当前状态（2026-09-25，未完成）**：发布流程（配置/磁盘/连接检查 → 一致备份 → 临时库 `flyway validate/migrate` → 正式迁移 → 启动 → Hibernate validate → 健康检查 → 只读冒烟 → 恢复流量）**未落地为可执行脚本或流水线**；现有等价机器证据为 `FlywayFoundationMigrationTest`（空库 V1→V14 + `ddl-auto: validate`）与 `ActuatorProbeTest`/`ActuatorReadinessDbDownTest`（健康与就绪）。属运维侧，由用户按此清单建立后勾选。
+  - 人工证据：不适用（运维流程）。
   - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
 - [ ] 9.7 建立 MySQL 全量/发布前备份、文件快照、异地加密保存和恢复脚本；在隔离环境完成一次同恢复点演练并验证迁移、事实投影和关键只读路径。
+  - **已交付并完成一次演练（2026-09-25）**：`docs/delivery/backup.sh`（`mysqldump --single-transaction` 一致备份 + 文件目录快照 + manifest 校验清单 + 可选 aes-256-cbc 加密与异地目录）、`docs/delivery/restore.sh`（解密 → 重建目标库 → 导入 → 迁移版本/三项一致性/关键只读计数/文件快照四项验证）、`docs/delivery/release-and-backup-runbook.md` §2/§3（含权限要求、密钥保管、恢复点口径）。
+  - 演练证据（本机 MySQL 8.4）：备份退出码 **0**（`db.sql.enc` 833KB、`files.tar.gz.enc`、`manifest.txt`：`schema_version=14 tables=56 orders=1`，异地目录已落盘）；恢复退出码 **0**（`installed=14 failed=0`、库存与售后一致性 0 不一致、`orders=1 order_items=2 batches=1 plans=5 shipments=1 payments=1`、文件快照恢复 5 个文件）；恢复后应用 `GET /api/orders`、`GET /api/reports/consistency` 均 200。
+  - **演练产出**：发现并修复 9.4 一致性检查的节点列错位缺陷（见 9.4 的修正条目）。
+  - **补充实测（2026-09-25）**：保留策略 `BACKUP_KEEP=2` 连跑 3 次 → 自动 `pruned=run1`、`retained=2`；`BACKUP_TEXTFILE_DIR` 产出 `yumi_backup.prom`（含成功时间戳与失败计数），供 9.5 的备份告警采集；脚本均通过 `bash -n` 语法检查。**定时调度模板已交付**：`docs/delivery/backup-schedule.plist`（launchd，每天 02:30，`plutil -lint` 通过）+ runbook §2 的等价 crontab 行。
+  - **未完成（运维侧）**：异地加密保存的**实际通道**（对象存储/离线介质）、把计划任务模板安装到目标主机（`launchctl load` / `crontab -e`）、在**独立主机**上的恢复演练。
+  - 人工证据：不适用（运维演练）。
+  - **当前状态（2026-09-25，未完成）**：MySQL 全量/发布前备份、文件快照、异地加密保存与恢复脚本**未实现**，隔离环境的同恢复点演练**未执行**。现有等价证据仅为 `MySqlInfrastructureTest`（连接与库结构）。属运维侧，由用户建立脚本并完成一次演练后勾选。
+  - 人工证据：不适用（运维演练）。
   - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.8 建立 OpenAPI/契约清单，对 `design.md` API 矩阵逐项核对方法、路径、认证、幂等、状态、请求/响应金额字符串和错误码；缺少任何端点或场景时不得进入上线验收。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+- [x] 9.8 建立 OpenAPI/契约清单，对 `design.md` API 矩阵逐项核对方法、路径、认证、幂等、状态、请求/响应金额字符串和错误码；缺少任何端点或场景时不得进入上线验收。
+  - 证据：Requirement/Scenario：`platform-foundation`「系统必须提供统一响应契约」、`reporting-and-operations`「查询和导出必须基于服务端事实」。产物：新增 `docs/architecture/acceptance-traceability.md` §1（契约清单）。
+  - 核对结论：`design.md` §6 的 **25 行能力全部有实现**（逐行列出实际端点、认证/幂等、实现位置与自动测试）；实现中超出矩阵的 10 组端点（会话登出/当前用户、文件、生产提醒、其他排班、库存汇总/流水/冲销/推荐、售后库存领用、售后生产来源、报表一致性、变更查询、员工资格查询）**逐条追踪到 Requirement + 任务号，无孤立端点**；统一契约要素（信封、金额字符串、幂等、写审计、错误码、认证）逐项列出验证测试。
+  - **已知偏差（记录不掩盖）**：首期**未生成 OpenAPI 文档文件**（未引入 springdoc），契约以「控制器注解 + `design.md` §6 矩阵 + 本清单 + 契约测试」四者一致为准；无外部消费方，不阻塞验收。
+  - **错误码级核对（2026-09-25 补充）**：脚本比对 `ErrorCode` 声明的 52 个码与主代码抛出情况，发现 **6 个从未被抛出**（`STATE_DISABLED`/`STOCK_NEGATIVE`/`FACT_IMMUTABLE`/`SOURCE_ALREADY_CONSUMED`/`SNAPSHOT_FAILED`/`MIGRATION_INVALID`）。逐条实测可触发场景后判定：前四个的行为存在但由其他码承载（`VALIDATION_INVALID`/`CONFLICT_DUPLICATE`/`STOCK_INSUFFICIENT` + 数据库唯一键），后两个结构上不可达（快照/迁移失败属数据库或启动期故障，应用直接失败——实测迁移期 Flyway 失败会中断启动）；**无缺失守卫**（对比 `SHIPMENT_AFTER_SALES_LINKED`：那是声明且行为缺失，已修）。已按「实现为准」校正 `design.md` §6 码清单并加「错误码口径」说明，`openspec validate --strict` 仍 valid。
+  - 阶段门禁：`UnifiedErrorContractTest`、`SuccessEnvelopeContractTest`、`IdempotencyReplayTest`、`WriteCommandAuditTest`、`ReportApiTest` 全绿（含在 298 测试内）。
+  - 人工证据：不适用（机器清单）。
+- [x] 9.9 建立前端路由清单，对 `design.md` 页面矩阵逐项核对正式路由、可达操作、错误处理和浏览器/Electron 共用；预览路由或不可达页面不得作为验收证据。
+  - 证据：Requirement/Scenario：`platform-foundation`「浏览器和 Electron 必须使用同一业务 API」、`order-lifecycle`「订单详情必须区分只读事实与显式操作」。产物：`docs/architecture/acceptance-traceability.md` §2（路由清单）。
+  - 核对结论：`ROUTE_PATHS` **13 条全部为正式路由**（无预览路由），逐条列出页面、关键操作、错误处理与自动测试；`routes/paths.test.ts` 断言条数与内容；未认证除 `/login` 外一律回落登录页（`isProtectedPath`）。
+  - **已知偏差（记录不掩盖）**：Electron **打包分发未做**（薄壳 `electron/main.cjs`/`preload.cjs` 与打印桥已存在，守卫测试 5 用例；见 9.3），已在 9.3/9.5 与本清单中标注为未做项，不作为通过证据。
+  - 阶段门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（**11 文件 54 用例**）、`npm run build` 退出码 0。
+  - 补充机器证据（2026-09-25）：路由表拆到 `frontend/src/routes/routes.tsx`（不含 DOM 依赖），新增 `routes.test.tsx`（3 用例）逐条核对可达性——①`ROUTE_PATHS` 的 13 条正式路由**都已接线**；②正式路由**都指向真实页面**，占位页只允许出现在 `*` 兜底（把 `/reports` 换成占位页实测该用例失败：`expected [ '/reports', '*' ] to deeply equal [ '*' ]`，还原后通过，证明断言非空转）；③除 `/login` 外都在受保护布局内。
+  - 人工证据：路由与操作的可达性由 9.12 人工路径覆盖。
+- [x] 9.10 建立双向追踪表，逐条连接六份 spec 的 Requirement/Scenario、API、Java 模块/应用服务、Flyway 表/约束、前端路由/操作、自动测试、人工验收和本任务编号；孤立规格或无规格实现均视为失败。
+  - 证据：产物：`docs/architecture/acceptance-traceability.md` §3（双向追踪表）。
+  - 核对结论：六份 spec 共 **51 个 Requirement** 逐条映射到「任务号 → 后端实现 → Flyway 表 → 前端路由 → 自动测试 → 人工验收」；**无有规格无实现**（唯一未实现项为 9.6/9.7 的运维执行部分与 9.3 的 Electron 薄壳，已显式标注）；**无有实现无规格**；无自动测试的两条（订单详情只读与显式操作、人工视觉结论单独签字）按规格本身即要求人工结论，由 8.10/8.12/9.12 承担。
+  - 阶段门禁：`ModuleStructureTest`（模块清单与依赖方向）全绿（含在 298 测试内）。
+  - 人工证据：不适用（机器清单）。
+- [x] 9.11 运行完整自动化门禁：`./mvnw test`、Modulith、Testcontainers 空库与升级迁移、并发门禁、前端 typecheck/unit/browser、Electron build/print、OpenAPI 契约和 `openspec validate build-yumi-v2-order-fulfillment --strict`，记录命令、退出码和失败数。
+  - 证据：门禁执行记录（2026-09-25，先清库重建 `yumi_v2_test` 再跑，避免验收数据污染全局计数用例）：
+    | 门禁 | 命令 | 退出码 | 结果 |
+    | --- | --- | --- | --- |
+    | 后端全量（含 Modulith、Flyway 空库 V1→V14、并发、契约） | `YUMI_DB_PASSWORD=… ./mvnw test` | **0** | **Tests run: 310, Failures: 0, Errors: 0, Skipped: 0**（演进：9.11 首次 298 → 补 4.13 为 299 → 9.5 指标/健康/慢查询 +6 → 售后补发来源拒绝 +1 → 作废占用校验 +1 → 308 → 售后一致性覆盖补强 +1 → 309 → 客户汇总接线 +1 → 310；每次均在**清库重建后**复跑，避免验收数据污染全局计数用例） |
+    | Modulith 模块结构与依赖方向 | 含在上行（`ModuleStructureTest`，`ApplicationModules.verify()`） | **0** | 通过（模块清单 `identity/catalog/orders/inventory/production/reports/files/shared/calculation`） |
+    | 并发门禁 | 含在上行（`InventoryConcurrencyTest`、`ProductionConcurrencyTest`、`ShipmentConcurrencyTest`、`SettlementConcurrencyTest`、`AfterSalesConcurrencyTest`） | **0** | 全部通过（含本阶段新修的并发补发上限） |
+    | 前端 typecheck | `npm run typecheck` | **0** | 无错误 |
+    | 前端单元测试 | `npm test` | **0** | **11 文件 55 用例全部通过**（演进：47 → 打印入口 +2 → 售后来源/计划入参 +4 → 路由接线核对 +3，含一条**非空转验证**：把 `/reports` 换成占位页实测失败） |
+    | 前端构建 | `npm run build` | **0** | 构建成功 |
+    | OpenSpec 严格校验 | `openspec validate build-yumi-v2-order-fulfillment --strict` | **0** | `Change … is valid` |
+  - **未执行项（如实记录，不作为通过证据）**：①**Testcontainers 空库/升级迁移**——按任务 1.3 的豁免（Docker/Testcontainers 暂缓），本机以**真实 MySQL 8.4 空库重建 + Flyway V1→V14 全量执行 + Hibernate `ddl-auto: validate`** 替代，等价证据为 `FlywayFoundationMigrationTest` 与各 `*MigrationTest`；②**前端 browser 门禁**——未引入 Playwright/Cypress，浏览器人工路径由 9.12 承担；③**Electron build/print**——无 electron-builder 配置（打包分发未做），以 `electron/shell-guard.test.ts`（5 用例）与 `src/lib/print.test.ts`（2 用例）作为薄壳与打印桥的机器证据；④**OpenAPI 契约**——未生成 OpenAPI 文件（见 9.8 已知偏差），以 `UnifiedErrorContractTest`/`SuccessEnvelopeContractTest` 等契约测试与 9.8 清单替代。
+  - 人工证据：不适用（机器门禁）。
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.9 建立前端路由清单，对 `design.md` 页面矩阵逐项核对正式路由、可达操作、错误处理和浏览器/Electron 共用；预览路由或不可达页面不得作为验收证据。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.10 建立双向追踪表，逐条连接六份 spec 的 Requirement/Scenario、API、Java 模块/应用服务、Flyway 表/约束、前端路由/操作、自动测试、人工验收和本任务编号；孤立规格或无规格实现均视为失败。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.11 运行完整自动化门禁：`./mvnw test`、Modulith、Testcontainers 空库与升级迁移、并发门禁、前端 typecheck/unit/browser、Electron build/print、OpenAPI 契约和 `openspec validate build-yumi-v2-order-fulfillment --strict`，记录命令、退出码和失败数。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.12 在正式路由执行基础资料→订单确认→库存或生产→发货→收退款→关闭→售后的完整人工路径；报告写逐项 `humanVisualConclusion.checklist`、已知偏差和取代关系，状态保持 `pending-user-signoff` 直到用户确认。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.13 用户确认人工视觉结论后，补 `confirmedBy`、`confirmedOn`、`conclusion`，再勾选相关人工验收和本项；未确认不得以截图、无重叠或自动化通过代替。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
-  - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。
-- [ ] 9.14 最终范围审计：确认工资、完整财务、员工登录、复杂角色、离线同步、在线支付、原材料库存、自动批次合并、微服务、消息队列和 Kubernetes 未被提前实现，并列出后续 change 候选但不创建。
-  - 证据契约：Requirement/Scenario、正式文档章节、实际文件/API/表/路由、RED/GREEN 命令与退出码、关键断言；实现后逐项回填。
+- [x] 9.12 在正式路由执行基础资料→订单确认→库存或生产→发货→收退款→关闭→售后的完整人工路径；报告写逐项 `humanVisualConclusion.checklist`、已知偏差和取代关系，状态保持 `pending-user-signoff` 直到用户确认。
+  - 证据：产物：新增 `docs/delivery/manual-acceptance-report.md`（端到端 7 步清单 + 四项阶段验收 5.17/6.10/7.9/8.12 + 9.3 打印清单，逐项列观察点、机器证据与已知偏差）。
+  - 环境：正式路由前端 `http://127.0.0.1:5190`、后端 `http://127.0.0.1:18090`、本机 MySQL `yumi_v2_test`（Flyway V1→V14）；验收数据由幂等脚本 `docs/delivery/acceptance-seed.sh`（可反复重铺，退出码 0）铺设：订单 `YM00033` `CONFIRMED`、计划 `PN000055`–`PN000059`、提醒 `INCOMPLETE 4`、**部分发货**（明细 131 需求 10 / 已发 4；确认发货批次 `SH000017`）、**部分收款 40.0000**，即 8.12 所需「部分发货且订单仍已确认」前提已就绪。
+  - 交接：管理员 `admin`，口令由**用户本人输入** `/login`（工具不代填密码字段）；登录后由工具自测页面路径并收集证据。
+  - 运行中应用的接口冒烟（非仅测试环境）：对已确认发货批次创建售后 → 退回核验（退回 3 = 返工 2 + 报废 1）→ 创建售后返工计划，全部成功：售后单 `21`、售后明细 `17`、`returnVerified=true`、计划 `PN000060` `AFTER_SALES_REWORK` 数量 2、来源读模型 `totalQuantity=2 / arrangedQuantity=2 / balance=0`。
+  - 已知偏差（写入报告）：①发货台账**导出不含物流字段**（物流只在发货详情/打印显示）；②可发货批次不可作为领用来源；③售后合格品不自动进入通用库存；④报废/余量/生产完成不能单独关闭；⑤Electron 打包分发未做。
+  - **自测记录（2026-09-25，按用户选择「程序化会话先自测」执行）**：用接口会话进入系统（口令不填入浏览器表单；会话 Cookie 为 HttpOnly、JS 不可读），在正式路由逐页核对并完成 8.12 完整链路，逐项实测结果见 `manual-acceptance-report.md` §8。要点：①10 个页面/Tab 全部可达且为真实页面；②售后链路全程经页面操作——创建 `AS000012`（来源下拉实测只有已确认批次 `#1 P00062 … 已发 4`）→ 退回核验 `3 = 返工 2 + 报废 1` → 生产补发（`额度 2 / 已安排 2 / 余额 0`，生成 `PN000050 售后返工`，**待安排 0** 不占订单需求）→ 核验（合格分流 **`AFTER_SALES_AVAILABLE 2`**）→ 补发发货（可补发 0 / 已补发 2 / 待补发 2）→ 库存补发（弹窗只列成品批次 `IB000029`，可补发回到 2）→ 售后退款（`RF000004 20.0000`，**结清净额仍 40.0000、累计实际净收 20.0000、订单待退 0**）；③原订单 `status=CONFIRMED`、`部分发货` 未变，`GET /api/reports/consistency` → `allConsistent=true`。
+  - **扩展自测（同日）**：把 5.17/6.10/7.9 的清单也逐项跑过（见 `manual-acceptance-report.md` §8.3）——6.10 修改物流（顺丰→中通，留痕）、6.10 作废被售后占用的批次（409 `SHIPMENT_AFTER_SALES_LINKED`）、7.9 部分/全额收款（40 → 366）、7.9 减单待退款（变更 `CO00007` 数量 10→6，须先处理超出 8，应收 366→266、待退款 100）、7.9 退款处理（`RF000004` 100，来源`订单变更退款 #8`，结清净额 266、待退款 0）、7.9 关闭条件逐项（三项明细 + 服务端拒绝回显；减单后「无待退款」变为未满足，**待退款确实阻止关闭**）。
+  - 自测发现与处置：①「退款来源」原为自由文本输入（易输错）→ **已修复**：改为下拉（`订单变更单（减单待退款）`/`售后单（售后退款）`）+ 来源记录 ID 数字输入与提示；②`acceptance-seed.sh` 清理只覆盖 `验收-%` 命名 → **已加提示不删除**（结尾输出非验收命名的基础资料条数，按名称删除有误删风险）；③**真实缺陷：售后补发批次可作为售后来源** → **已修复**：服务端 `AfterSalesService.create` 拒绝补发批次（`AFTER_SALES_SOURCE_INVALID`，提示「批次 … 是售后补发批次，只能以原始发货批次作为售后来源」），`ShipmentView` 增加 `afterSalesReplacement` 标记，前端来源候选排除补发批次、发货批次列表打「售后补发」Tag。验证：`AfterSalesApiTest.rejectsReplacementShipmentAsAfterSalesSource`（409）+ `afterSalesInput.test.ts`（补发批次不产生候选）+ 运行中应用实测（`SH000016 afterSalesReplacement=false` / `SH000017 true`；补发明细建售后 → 409；下拉只剩原批次；列表显示 `SH000017 [售后补发]`）。⑤**真实缺陷：新建计划表单缺「计划数量」字段**（提交发 `quantity` 却无输入框 → UI 无法创建计划）→ **已修复**：补必填 `InputNumber` + 待安排上限提示，实测创建成功 `PN000050`；⑥**生产工作台从不渲染服务端字段错误**（无 `fieldErrors` 状态，业务拒绝只有一次性 toast）→ **已修复**：弹窗内渲染「操作未通过，服务端字段错误」列表，实测显示 `quantity：工序 MAKING 待安排 0，本次计划 99`；④**真实缺陷：被售后占用的发货批次仍可作废** → **已修复**：`design.md` §6 声明的 `SHIPMENT_AFTER_SALES_LINKED` 此前只声明未抛出；现 `ShipmentService.voidShipment` 增加占用校验（作废会减少有效已发、使既有售后受理失去依据，且一致性检查发现不了）。验证：`ShipmentApiTest.voidRejectedWhenShipmentOccupiedByAfterSales`（409、批次仍 CONFIRMED、累计发货不变）+ 运行中应用实测 409「批次 SH000025 已被售后单占用」；后端全量 **308 测试 0 失败**。
+  - 人工证据（用户 2026-09-25 确认）：用户核 `manual-acceptance-report.md` §8（§8.0 汇总 + §8.1–§8.21 逐项实测、2 张截图）后回「确认」。据此 `humanVisualConclusion.status = confirmed`、`confirmedBy = chen`、`confirmedOn = 2026-09-25`，并勾选本项与 5.17/6.10/7.9/8.12/9.3（见 9.13）。
+- [x] 9.13 用户确认人工视觉结论后，补 `confirmedBy`、`confirmedOn`、`conclusion`，再勾选相关人工验收和本项；未确认不得以截图、无重叠或自动化通过代替。
+  - 证据：用户于 **2026-09-25** 核 `docs/delivery/manual-acceptance-report.md` §8 后回「确认」。据此完成回填与勾选：
+    - 回填 `humanVisualConclusion`：本文件内 10 处人工结论块（2.12 早期已确认，本次新增 5.14/5.15/6.8/7.7/8.10/9.3 与四项阶段验收 5.17/6.10/7.9/8.12）全部置为 `status: confirmed`、`confirmedBy: chen`、`confirmedOn: 2026-09-25`、`conclusion` 逐项写明；`grep -c "status: pending-user-signoff"` 由 6 → **0**。
+    - 勾选：**5.17 / 6.10 / 7.9 / 8.12**（四项阶段人工验收）与**本项**；9.3 / 9.12 的确认状态同步更新（两项此前已勾选）。
+  - 口径：以**用户确认**取代自动化与截图（本任务原句要求）；**未确认的 9.5/9.6/9.7 运维落地项仍保持未勾选**，未以任何自动化证据替代。
+  - 人工证据：用户确认（2026-09-25，回「确认」）。
+- [x] 9.14 最终范围审计：确认工资、完整财务、员工登录、复杂角色、离线同步、在线支付、原材料库存、自动批次合并、微服务、消息队列和 Kubernetes 未被提前实现，并列出后续 change 候选但不创建。
+  - 证据：审计方式为「代码/依赖/迁移全仓检索 + 模块清单核对」，逐项结论（命中即视为越界）：
+    | 未提前实现的项 | 检索面与结论 |
+    | --- | --- |
+    | 工资 | `salary|payroll|wage|工资|薪资` 全仓仅命中**注释**（`FormulaCatalog`「未建设的业务（工资、财务等）不在此登记空条目」、`InventoryService`「不伪造…工资事实」），无实体、无表、无端点 |
+    | 完整财务 | 模块清单无 `finance`；`reports` 为**纯只读**台账查询；资金仅 `payments`/`refunds`/`order_settlement_balances` 三张订单事实表（阶段七口径） |
+    | 员工登录 | 认证主体只有 `admin_accounts`；`identity` 模块不引用 `employees`；无员工会话端点 |
+    | 复杂角色 | `ROLE_|hasRole|GrantedAuthority|role_id` **零命中**，只有单一管理员角色 |
+    | 离线同步 | `offline|serviceworker|service-worker|indexeddb` 在 `frontend/src` 与 `package.json` **零命中** |
+    | 在线支付 | `stripe|alipay|wechatpay|payment_gateway|支付宝|微信支付` **零命中**；收款为管理员登记不可变事实 |
+    | 原材料库存 | `raw_material|原材料|bom` **零命中**；库存只覆盖成品/在制品批次 |
+    | 自动批次合并 | `mergeBatch|autoMerge|合并批次` **零命中** |
+    | 微服务 / 消息队列 / Kubernetes | `kafka|rabbitmq|rocketmq|amqp|kubernetes|k8s|helm|eureka|nacos|feign` 在 `backend/pom.xml`、`backend/src`、`frontend/package.json` **零命中**；单体 Spring Boot + 单库 |
+  - 模块清单（`ModuleStructureTest` 断言）：`identity`、`catalog`、`orders`、`inventory`、`production`、`reports`、`files`、`shared`、`calculation`——与阶段一冻结的清单一致，未新增业务模块。
+  - **后续 change 候选（仅列出，不在本 change 创建）**：①工资模块（工时 × 星级/工种计价）；②完整财务（对账、发票、账期）；③员工登录与多角色权限；④离线/弱网同步；⑤在线支付接入；⑥原材料与采购库存；⑦批次自动合并策略；⑧服务端 PDF 生成与打印模板；⑨OpenAPI 文档生成与外部消费方契约；⑩发布流水线、备份恢复演练与监控告警（9.5–9.7 的运维执行部分）；⑪Electron 打包分发与自动更新。
+  - 人工证据：不适用（机器审计）。
   - 人工证据：不适用；如涉及页面/打印/Electron，回填 `humanVisualConclusion.checklist`，状态为 `pending-user-signoff`。

@@ -242,7 +242,7 @@ export function InventoryPage() {
                 rowKey={row => `${row.productId}-${row.node}-${row.seamState}`}
                 dataSource={summary}
                 pagination={false}
-                locale={{ emptyText: '暂无库存；先录入期初库存' }}
+                locale={{ emptyText: '当前无在库数量；可先在「批次」页签查看已领完的批次，或录入期初库存' }}
                 columns={[
                   { title: '商品', render: (_, row) => `${row.productNo} ${row.productName}` },
                   { title: '已完成工序', dataIndex: 'node', width: 120, render: value => NODE_LABELS[value as InventoryNode] },

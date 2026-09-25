@@ -67,6 +67,14 @@ public class InventoryController {
     }
 
     /** 流水冲销（任务 4.10）：新增反向流水并保留关联历史。 */
+    /** 售后库存领用（任务 8.6）：从成品批次扣库存，只增加售后可补发。 */
+    @PostMapping("/after-sales-allocations")
+    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    public InventoryViews.MovementView allocateToAfterSales(
+            @RequestBody AfterSalesAllocationRequest request) {
+        return service.allocateToAfterSales(request);
+    }
+
     @PostMapping("/movements/{id}/reverse")
     public InventoryViews.MovementView reverseMovement(@PathVariable long id,
                                                        @RequestBody ReverseRequest request) {

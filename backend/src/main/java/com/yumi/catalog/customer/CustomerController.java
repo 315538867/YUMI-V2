@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 客户 API（任务 2.5/2.6）：无 DELETE；重复只提示；详情附只读 summary 骨架。
+ * 客户 API（任务 2.5/2.6）：无 DELETE；重复只提示；详情附只读 summary（由订单与收退款事实实时聚合）。
  * 成功响应由 EnvelopeAdvice 统一包 {code,message,fieldErrors,requestId,data}。
  */
 @RestController

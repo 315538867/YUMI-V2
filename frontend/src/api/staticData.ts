@@ -17,8 +17,12 @@ export interface StaticDataItem {
   /** 仅员工工种有系统固定 code */
   code?: string;
   name: string;
-  /** 星级与包装档位的标准分钟 */
-  stdMinutes?: string;
+  /**
+   * 星级与包装档位的标准分钟。
+   * 注意类型不统一：`star_levels.std_minutes` 为 `int unsigned`（接口返回数字），
+   * `packaging_tiers.std_minutes` 为 `decimal(9,3)`（接口返回字符串），故为联合类型。
+   */
+  stdMinutes?: string | number;
   /** 缝边种类的成本单价（元/件） */
   costPrice?: string;
   /** 仅员工工种有启停 */

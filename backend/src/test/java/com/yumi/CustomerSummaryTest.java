@@ -48,6 +48,10 @@ class CustomerSummaryTest {
 
     @BeforeEach
     void login() throws Exception {
+        var testOrders = "SELECT id FROM orders WHERE order_no LIKE 'TS9%'";
+        jdbcTemplate.update("DELETE FROM refunds WHERE order_id IN (" + testOrders + ")");
+        jdbcTemplate.update("DELETE FROM payments WHERE order_id IN (" + testOrders + ")");
+        jdbcTemplate.update("DELETE FROM orders WHERE order_no LIKE 'TS9%'");
         jdbcTemplate.update("DELETE FROM customers WHERE name LIKE '客户测试-%'");
         jdbcTemplate.update("DELETE FROM idempotency_records WHERE idempotency_key LIKE 'cust-sum-key-%'");
         jdbcTemplate.update("DELETE FROM admin_accounts WHERE username = ?", USERNAME);
@@ -112,6 +116,49 @@ class CustomerSummaryTest {
                         || field.toLowerCase().contains("received")
                         || field.toLowerCase().contains("refunded")
                         || field.toLowerCase().contains("ordered"));
+    }
+
+    /**
+     * 任务 2.6 的「阶段 3/7 接线」：汇总必须由**订单与收退款事实**实时聚合，而不是骨架常量 0；
+     * 草稿订单属于内部工作态，不计入客户台账。
+     */
+    @Test
+    void detailAggregatesOrdersReceiptsAndRefundsFromFacts() throws Exception {
+        long customerId = createCustomer();
+        insertOrder(customerId, "TS90001", "CONFIRMED", "100.0000");
+        insertOrder(customerId, "TS90002", "CONFIRMED", "50.0000");
+        insertOrder(customerId, "TS90003", "DRAFT", "999.0000");
+        jdbcTemplate.update("""
+                INSERT INTO payments (payment_no, order_id, amount, business_date, method, operator_username,
+                    version, created_at, updated_at)
+                VALUES ('PA900001', (SELECT id FROM orders WHERE order_no = 'TS90001'), 40.0000, '2026-09-25',
+                    'TRANSFER', 'tester', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO refunds (refund_no, order_id, amount, business_date, method, reason, source_type,
+                    source_id, operator_username, version, created_at, updated_at)
+                VALUES ('RF900001', (SELECT id FROM orders WHERE order_no = 'TS90002'), 10.0000, '2026-09-25',
+                    'TRANSFER', '验收-汇总', 'ORDER_CHANGE', 1, 'tester', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                """);
+
+        mockMvc.perform(get(CUSTOMERS + "/" + customerId).cookie(sessionCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.summary.orderCount").value("2"))
+                .andExpect(jsonPath("$.data.summary.totalOrdered").value("150.0000"))
+                .andExpect(jsonPath("$.data.summary.totalReceived").value("40.0000"))
+                .andExpect(jsonPath("$.data.summary.totalRefunded").value("10.0000"));
+    }
+
+    private void insertOrder(long customerId, String orderNo, String status, String receivable) {
+        jdbcTemplate.update("""
+                INSERT INTO orders (order_no, customer_id, customer_name, status, order_date, recipient_name,
+                    recipient_phone, region, address, goods_amount, seam_amount, discount_amount,
+                    receivable_amount, goods_cost_amount, seam_cost_amount, cost_amount, profit_amount,
+                    version, created_at, updated_at)
+                VALUES (?, ?, '客户测试-汇总甲', ?, '2026-09-25', '收件人甲', '13700000001',
+                    '浙江省杭州市余杭区', '文一西路1号', 100.0000, 0.0000, 0.0000, ?, 60.0000, 0.0000, 60.0000,
+                    40.0000, 1, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                """, orderNo, customerId, status, receivable);
     }
 
     @Test

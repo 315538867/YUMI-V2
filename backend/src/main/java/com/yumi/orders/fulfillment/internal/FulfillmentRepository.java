@@ -65,6 +65,56 @@ public class FulfillmentRepository {
     }
 
     /**
+     * 按工序调整「有效计划占用」投影（阶段五计划创建/取消/调整）：making_planned / packing_planned / seam_planned。
+     * 计划占用不是履约事实，只影响订单侧排产状态派生；数量不会为负（由调用方保证）。
+     */
+    public void applyPlanned(long orderItemId, String node, int quantity, boolean increase, String requestId) {
+        var column = switch (node) {
+            case "MAKING" -> "making_planned";
+            case "PACKING_BAG" -> "packing_planned";
+            default -> "seam_planned";
+        };
+        var sign = increase ? "+" : "-";
+        jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET " + column + " = " + column + " "
+                + sign + " ?, version = version + 1, updated_at = UTC_TIMESTAMP(6), request_id = ? "
+                + "WHERE order_item_id = ?", quantity, requestId, orderItemId);
+    }
+
+    /** 累加「已核验处理」（阶段五核验）：全部工序合计，订单侧生产进度用。 */
+    public void applyVerified(long orderItemId, int quantity, String requestId) {
+        jdbcTemplate.update("""
+                UPDATE order_item_fulfillment_balances SET verified_processed = verified_processed + ?,
+                    version = version + 1, updated_at = UTC_TIMESTAMP(6), request_id = ?
+                WHERE order_item_id = ?
+                """, quantity, requestId, orderItemId);
+    }
+
+    /** 累加「累计有效发货」（阶段六发货确认；作废用 increase=false 回退）。 */
+    public void applyShipped(long orderItemId, int quantity, boolean increase, String requestId) {
+        var sign = increase ? "+" : "-";
+        jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET shipped_quantity = shipped_quantity "
+                + sign + " ?, version = version + 1, updated_at = UTC_TIMESTAMP(6), request_id = ? "
+                + "WHERE order_item_id = ?", quantity, requestId, orderItemId);
+    }
+
+    /** 增减「返工待安排」投影（阶段五来源创建/安排/取消）。 */
+    public void applyReworkPending(long orderItemId, int quantity, boolean increase, String requestId) {
+        applyPending("rework_pending", orderItemId, quantity, increase, requestId);
+    }
+
+    /** 增减「重做待安排」投影（阶段五来源创建/安排/取消）。 */
+    public void applyRemakePending(long orderItemId, int quantity, boolean increase, String requestId) {
+        applyPending("remake_pending", orderItemId, quantity, increase, requestId);
+    }
+
+    private void applyPending(String column, long orderItemId, int quantity, boolean increase, String requestId) {
+        var sign = increase ? "+" : "-";
+        jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET " + column + " = " + column + " "
+                + sign + " ?, version = version + 1, updated_at = UTC_TIMESTAMP(6), request_id = ? "
+                + "WHERE order_item_id = ?", quantity, requestId, orderItemId);
+    }
+
+    /**
      * 该订单明细在指定履约事实之后是否存在下游消费事实（生产核验、返工、重做、成品余量、发货）。
      * 领用取消与流水冲销据此判断“是否已被后续事实消费”。
      */
@@ -100,6 +150,16 @@ public class FulfillmentRepository {
         return jdbcTemplate.query(
                 "SELECT required_quantity FROM order_item_fulfillment_balances WHERE order_item_id = ?",
                 rs -> rs.next() ? rs.getInt(1) : null, orderItemId);
+    }
+
+    /**
+     * 悲观锁定明细投影行：核验等命令重算可执行数量前调用，防止并发超验。
+     * 用 queryForList 以容忍投影行不存在（草稿订单尚无投影行）时返回空列表而不是抛异常。
+     */
+    public void lockBalance(long orderItemId) {
+        jdbcTemplate.queryForList(
+                "SELECT order_item_id FROM order_item_fulfillment_balances WHERE order_item_id = ? FOR UPDATE",
+                Long.class, orderItemId);
     }
 
     /** 明细数量投影（阶段三只有需求列有值，其余列由阶段四–六写入）。 */

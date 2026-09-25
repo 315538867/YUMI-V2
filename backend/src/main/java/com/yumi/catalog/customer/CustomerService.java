@@ -8,7 +8,9 @@ import com.yumi.catalog.customer.CustomerDtos.CustomerPatchRequest;
 import com.yumi.catalog.customer.CustomerDtos.CustomerView;
 import com.yumi.catalog.customer.CustomerDtos.DuplicateCandidate;
 import com.yumi.catalog.customer.internal.CustomerEntity;
+import com.yumi.catalog.customer.internal.CustomerOrderSummaryReference;
 import com.yumi.catalog.customer.internal.CustomerRepository;
+import com.yumi.calculation.DecimalPolicy;
 import com.yumi.identity.AuditContext;
 import com.yumi.shared.error.ApiException;
 import com.yumi.shared.error.ApiFieldError;
@@ -38,11 +40,14 @@ public class CustomerService {
     private final SequenceAllocator sequenceAllocator;
     private final AuditContext auditContext;
     private final MasterDataChangeLogService changeLogService;
+    private final CustomerOrderSummaryReference summaryReference;
 
     public CustomerService(CustomerRepository customerRepository, SequenceAllocator sequenceAllocator,
-                           AuditContext auditContext, MasterDataChangeLogService changeLogService) {
+                           AuditContext auditContext, MasterDataChangeLogService changeLogService,
+                           CustomerOrderSummaryReference summaryReference) {
         this.customerRepository = customerRepository;
         this.sequenceAllocator = sequenceAllocator;
+        this.summaryReference = summaryReference;
         this.auditContext = auditContext;
         this.changeLogService = changeLogService;
     }
@@ -89,10 +94,16 @@ public class CustomerService {
         return rows.stream().map(this::view).toList();
     }
 
+    /** 客户详情 + 只读汇总：汇总实时由订单与收退款事实聚合（任务 2.6 的接线），不落客户余额列。 */
     @Transactional(readOnly = true)
     public CustomerDetail detail(long id) {
         var entity = requireCustomer(id);
-        return CustomerDetail.of(view(entity), CustomerSummary.zero());
+        var summary = summaryReference.summary(id);
+        return CustomerDetail.of(view(entity), new CustomerSummary(
+                String.valueOf(summary.orderCount()),
+                DecimalPolicy.money(summary.totalOrdered()).toPlainString(),
+                DecimalPolicy.money(summary.totalReceived()).toPlainString(),
+                DecimalPolicy.money(summary.totalRefunded()).toPlainString()));
     }
 
     public CustomerView patch(long id, CustomerPatchRequest request) {

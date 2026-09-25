@@ -49,6 +49,13 @@ public class OrderRepository {
         return rows.stream().findFirst();
     }
 
+    /** 锁定读订单行（关闭等命令使用；竞争资源的读取一律用锁定读，避免 REPEATABLE READ 快照读到旧状态）。 */
+    public Optional<OrderRow> findByIdForUpdate(long id) {
+        var rows = jdbcTemplate.query("SELECT " + ORDER_COLUMNS + " FROM orders WHERE id = ? FOR UPDATE",
+                ORDER_MAPPER, id);
+        return rows.stream().findFirst();
+    }
+
     /** 列表筛选：状态、客户、下单日期区间均可选。 */
     public List<OrderRow> find(String status, Long customerId, LocalDate from, LocalDate to) {
         var sql = new StringBuilder("SELECT " + ORDER_COLUMNS + " FROM orders WHERE 1=1");

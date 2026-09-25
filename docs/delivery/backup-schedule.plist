@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  定时备份（任务 9.7）：macOS launchd 计划任务模板。
+  安装：
+    cp docs/delivery/backup-schedule.plist ~/Library/LaunchAgents/com.yumi.backup.plist
+    # 按部署环境修改 ProgramArguments 里的仓库路径与 BACKUP_ROOT / 异地路径 / 密钥文件
+    launchctl load ~/Library/LaunchAgents/com.yumi.backup.plist
+    launchctl list | grep com.yumi.backup
+  校验：plutil -lint docs/delivery/backup-schedule.plist
+  说明：每天 02:30 执行全量备份；失败会以非 0 退出（launchd 记录在 StandardErrorPath），
+        并由 backup.sh 写的 yumi_backup.prom 触发 YumiBackupStale / YumiBackupFailed 告警。
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yumi.backup</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/srv/yumi/docs/delivery/backup.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/srv/yumi</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>BACKUP_ROOT</key>
+        <string>/var/backups/yumi</string>
+        <key>BACKUP_OFFSITE_DIR</key>
+        <string>/mnt/offsite/yumi</string>
+        <key>BACKUP_ENC_KEY_FILE</key>
+        <string>/etc/yumi/backup.key</string>
+        <key>BACKUP_KEEP</key>
+        <string>14</string>
+        <key>BACKUP_TEXTFILE_DIR</key>
+        <string>/var/lib/node_exporter/textfile</string>
+        <key>YUMI_DB_HOST</key>
+        <string>127.0.0.1</string>
+        <key>YUMI_DB_NAME</key>
+        <string>yumi_v2</string>
+        <key>YUMI_DB_USER</key>
+        <string>yumi_backup</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/var/log/yumi/backup.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/yumi/backup.err.log</string>
+</dict>
+</plist>

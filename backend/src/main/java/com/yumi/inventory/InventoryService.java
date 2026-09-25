@@ -43,6 +43,8 @@ public class InventoryService {
     private static final String TYPE_ALLOCATION_CANCEL = "ALLOCATION_CANCEL";
     private static final String TYPE_REVERSAL = "REVERSAL";
     private static final String SOURCE_INVENTORY = "INVENTORY";
+    private static final String SOURCE_AFTER_SALES = "AFTER_SALES";
+    private static final String TYPE_AFTER_SALES_ALLOCATION = "AFTER_SALES_ALLOCATION";
     private static final String SOURCE_INVENTORY_CANCEL = "INVENTORY_CANCEL";
     private static final String ORDER_CONFIRMED = "CONFIRMED";
     private static final String ALLOCATION_CONFIRMED = "CONFIRMED";
@@ -54,6 +56,7 @@ public class InventoryService {
     private final InventoryReference reference;
     private final InventoryAllocationRepository allocationRepository;
     private final FulfillmentLedger fulfillmentLedger;
+    private final com.yumi.orders.ledger.AfterSalesLedger afterSalesLedger;
     private final SequenceAllocator sequenceAllocator;
     private final AuditContext auditContext;
 
@@ -62,6 +65,7 @@ public class InventoryService {
                             InventoryAllocationRepository allocationRepository,
                             InventoryReference reference,
                             FulfillmentLedger fulfillmentLedger,
+                            com.yumi.orders.ledger.AfterSalesLedger afterSalesLedger,
                             SequenceAllocator sequenceAllocator,
                             AuditContext auditContext) {
         this.batchRepository = batchRepository;
@@ -69,6 +73,7 @@ public class InventoryService {
         this.allocationRepository = allocationRepository;
         this.reference = reference;
         this.fulfillmentLedger = fulfillmentLedger;
+        this.afterSalesLedger = afterSalesLedger;
         this.sequenceAllocator = sequenceAllocator;
         this.auditContext = auditContext;
     }
@@ -250,6 +255,65 @@ public class InventoryService {
 
     // ---------- 流水冲销（任务 4.10） ----------
 
+    /**
+     * 售后库存领用（任务 8.6）：从**成品批次（可发货）**扣库存，只增加售后可补发。
+     * 售后补发不改变原订单履约，因此没有订单明细与接入工序；
+     * 库存只扣一次（与订单领用同一套流水），冲销原流水时同步冲销售后台账事实。
+     */
+    @Transactional
+    public InventoryViews.MovementView allocateToAfterSales(AfterSalesAllocationRequest request) {
+        var errors = new ArrayList<ApiFieldError>();
+        if (request.afterSalesItemId() == null) {
+            errors.add(new ApiFieldError("afterSalesItemId", "售后明细必填"));
+        }
+        if (request.batchId() == null) {
+            errors.add(new ApiFieldError("batchId", "批次必填"));
+        }
+        if (request.quantity() == null || request.quantity() < 1) {
+            errors.add(new ApiFieldError("quantity", "数量必须大于 0"));
+        }
+        failIfInvalid(errors);
+
+        var item = reference.afterSalesItem(request.afterSalesItemId())
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "售后明细不存在"));
+        var batch = batchRepository.lockByIds(List.of(request.batchId())).stream().findFirst()
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "库存批次不存在",
+                        List.of(new ApiFieldError("batchId", "批次不存在"))));
+        if (!InventoryNodes.SHIPPABLE.equals(batch.node())) {
+            throw new ApiException(ErrorCode.VALIDATION_INVALID, "售后补发只能领用成品批次（可发货）",
+                    List.of(new ApiFieldError("batchId", "批次工序为 " + batch.node())));
+        }
+        if (batch.productId() != item.productId()) {
+            throw new ApiException(ErrorCode.VALIDATION_INVALID, "批次商品与售后明细商品不一致",
+                    List.of(new ApiFieldError("batchId", "批次商品 " + batch.productNo()
+                            + "，售后明细商品 " + item.productNo())));
+        }
+        if (batch.quantity() < request.quantity()) {
+            throw new ApiException(ErrorCode.STOCK_INSUFFICIENT, "库存不足",
+                    List.of(new ApiFieldError("quantity", "批次 " + batch.batchNo() + " 可用 "
+                            + batch.quantity() + "，需求 " + request.quantity())));
+        }
+
+        var audit = auditContext.current();
+        var movement = new InventoryMovementRow(null,
+                SequenceAllocator.format("IM", sequenceAllocator.next("inventory_movements"), 6),
+                TYPE_AFTER_SALES_ALLOCATION, java.time.LocalDate.now(), SOURCE_AFTER_SALES,
+                request.afterSalesItemId(), 0L, null, request.reason(), audit.adminUsername(), null);
+        long movementId = movementRepository.insertMovement(movement, audit.requestId(),
+                audit.idempotencyKey());
+        int before = batch.quantity();
+        int after = before - request.quantity();
+        long lineId = movementRepository.insertLine(new InventoryMovementLineRow(null, movementId, batch.id(),
+                DIRECTION_OUT, request.quantity(), before, after, batch.productId(), batch.node(),
+                batch.seamState(), null, "售后补发领用"), audit.requestId());
+        batchRepository.updateQuantity(batch, after, audit.requestId());
+        afterSalesLedger.registerInflow(item.afterSalesItemId(), "INVENTORY_INFLOW", request.quantity(),
+                com.yumi.orders.ledger.AfterSalesLedger.SOURCE_INVENTORY, movementId, lineId,
+                java.time.LocalDate.now(), audit.adminUsername(), "售后库存领用接入", audit.requestId());
+        return listMovements(null, null, null, null).stream()
+                .filter(view -> view.id() == movementId).findFirst().orElseThrow();
+    }
+
     /** 冲销未被后续事实消费的流水：新增反向流水并保留完整关联历史，原流水不可改删。 */
     @Transactional
     public InventoryViews.MovementView reverseMovement(long movementId, String reason) {
@@ -289,6 +353,13 @@ public class InventoryService {
                     batch.productId(), batch.node(), batch.seamState(), line.orderItemId(), "冲销原流水"),
                     audit.requestId());
             batchRepository.updateQuantity(batch, after, audit.requestId());
+        }
+        if (SOURCE_AFTER_SALES.equals(original.sourceType())) {
+            int total = lines.stream().mapToInt(InventoryMovementLineRow::quantity).sum();
+            afterSalesLedger.registerReversal(original.sourceId(), total,
+                    com.yumi.orders.ledger.AfterSalesLedger.SOURCE_INVENTORY, reversalId, 0L,
+                    java.time.LocalDate.now(), audit.adminUsername(), "售后库存领用冲销：" + reason,
+                    audit.requestId());
         }
         return listMovements(null, null, null, null).stream()
                 .filter(view -> view.id() == reversalId).findFirst().orElseThrow();

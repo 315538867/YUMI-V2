@@ -50,4 +50,20 @@ public class EmployeeEligibilityService {
         }
         return new EmployeeSnapshot(employee.getEmployeeNo(), employee.getName());
     }
+
+    /**
+     * 只校验在职（其他排班不绑定工序，工种校验无意义）：离职返回 {@code EMPLOYEE_NOT_ELIGIBLE}。
+     *
+     * @throws ApiException NOT_FOUND           员工不存在
+     * @throws ApiException EMPLOYEE_NOT_ELIGIBLE 员工离职
+     */
+    @Transactional(readOnly = true)
+    public EmployeeSnapshot requireActive(Long employeeId) {
+        var employee = employees.findById(employeeId)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "员工不存在"));
+        if (!Employee.STATUS_ACTIVE.equals(employee.getStatus())) {
+            throw new ApiException(ErrorCode.EMPLOYEE_NOT_ELIGIBLE);
+        }
+        return new EmployeeSnapshot(employee.getEmployeeNo(), employee.getName());
+    }
 }

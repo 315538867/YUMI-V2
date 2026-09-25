@@ -76,6 +76,8 @@
 
 ### 6. API 契约矩阵
 
+> 错误码口径（2026-09-25 按实现校正）：矩阵中原先登记的 `STATE_DISABLED`、`SNAPSHOT_FAILED`、`STOCK_NEGATIVE`、`FACT_IMMUTABLE`、`SOURCE_ALREADY_CONSUMED`、`MIGRATION_INVALID` **在实现中从未返回**——对应行为或由其他错误码承载（如负数调整返回 `VALIDATION_INVALID`、重复冲销返回 `CONFLICT_DUPLICATE`、来源唯一由数据库唯一键保证），或结构上不可达（快照/迁移失败属启动期或数据库故障，应用直接失败而不返回该码）。已按下表逐行改为**实现实际返回**的码。
+
 以下是实现前必须冻结的最小命令/查询面；每个路径都必须在对应 spec 和 tasks 中有 Requirement/Scenario、后端、前端和测试追踪。
 
 | 能力 | 方法与路径 | 认证/幂等 | 成功结果 | 主要拒绝码 |
@@ -83,14 +85,14 @@
 | 登录 | `POST /api/session` | 匿名/否 | 会话与管理员摘要 | `AUTH_INVALID` |
 | 商品试算 | `POST /api/products/preview`、`POST /api/products/{id}/preview` | 管理员/不要求幂等键（只读，精确豁免写过滤器） | 200；完整计算结果，金额/比例字符串，不产生业务写入 | `AUTH_REQUIRED`, `VALIDATION_INVALID`, `NOT_FOUND`, `CONFLICT_VERSION` |
 | 公式说明 | `GET /api/settings/formulas` | 管理员/否 | 200；按业务分组的只读公式目录、输入/单位、舍入规则和固定示例，不产生业务写入 | `AUTH_REQUIRED`, `NOT_FOUND` |
-| 商品/客户/员工 | `GET/POST/PATCH /api/products|customers|employees` | 管理员/写入幂等 | 当前资料与编号 | `VALIDATION_INVALID`, `STATE_DISABLED`, `CONFLICT_DUPLICATE` |
+| 商品/客户/员工 | `GET/POST/PATCH /api/products|customers|employees` | 管理员/写入幂等 | 当前资料与编号 | `VALIDATION_INVALID`（含停用商品被新订单引用）, `CONFLICT_DUPLICATE` |
 | 订单 | `GET/POST /api/orders`、`GET /api/orders/{id}`、`PATCH /api/orders/{id}` | 管理员/草稿写入幂等 | 草稿、明细、金额 | `STATE_NOT_EDITABLE`, `QUANTITY_INVALID` |
-| 确认 | `POST /api/orders/{id}/confirm` | 管理员/必须幂等 | 快照与已确认订单 | `STATE_NOT_CONFIRMABLE`, `SNAPSHOT_FAILED` |
+| 确认 | `POST /api/orders/{id}/confirm` | 管理员/必须幂等 | 快照与已确认订单 | `STATE_NOT_CONFIRMABLE`（快照写入失败属数据库故障，由 500 兜底，不单独返回错误码） |
 | 变更 | `POST /api/orders/{id}/change-orders`、`POST /api/order-changes/{id}/confirm` | 管理员/必须幂等 | 变更及新投影 | `STATE_NOT_CHANGEABLE`, `QUANTITY_BELOW_SHIPPED`, `REFUND_PENDING` |
 | 订单取消 | `POST /api/orders/{id}/cancel` | 管理员/必须幂等 | 已取消或拒绝 | `STATE_CANCEL_NOT_ALLOWED`, `QUANTITY_REQUIRES_DISPOSITION` |
 | 履约视图 | `GET /api/orders/{id}/fulfillment` | 管理员/否 | Q/E、工序、需求和发货派生状态 | `ORDER_NOT_FOUND` |
-| 库存 | `GET/POST /api/inventory/batches`、`POST /api/inventory/adjustments` | 管理员/写入幂等 | 批次和流水 | `STOCK_NEGATIVE`, `FACT_IMMUTABLE` |
-| 领用 | `POST /api/inventory-allocations`、`POST /api/inventory-allocations/{id}/cancel` | 管理员/必须幂等 | 领用、反向流水、履约接入 | `STOCK_INSUFFICIENT`, `SOURCE_ALREADY_CONSUMED`, `STATE_CANNOT_CANCEL` |
+| 库存 | `GET/POST /api/inventory/batches`、`POST /api/inventory/adjustments` | 管理员/写入幂等 | 批次和流水 | `VALIDATION_INVALID`（负数/非法调整）, `CONFLICT_DUPLICATE`（重复冲销） |
+| 领用 | `POST /api/inventory-allocations`、`POST /api/inventory-allocations/{id}/cancel` | 管理员/必须幂等 | 领用、反向流水、履约接入 | `STOCK_INSUFFICIENT`, `STATE_CANNOT_CANCEL`（同一来源重复接入由来源唯一键保证） |
 | 生产计划 | `GET/POST /api/production-plans`、`POST /api/production-plans/{id}/cancel` | 管理员/写入幂等 | 计划与等待上游状态 | `EMPLOYEE_NOT_ELIGIBLE`, `SOURCE_INSUFFICIENT`, `STATE_NOT_CANCELABLE` |
 | 核验 | `POST /api/production-plans/{id}/verify` | 管理员/必须幂等 | 一次性核验与来源 | `VERIFICATION_EQUATION_INVALID`, `STATE_ALREADY_VERIFIED`, `QUANTITY_NOT_EXECUTABLE` |
 | 返工/重做 | `POST /api/rework-sources`、`POST /api/remake-sources` | 管理员/必须幂等 | 来源余额与计划入口 | `REWORK_TARGET_INVALID`, `REMAKE_REASON_REQUIRED` |
@@ -104,7 +106,7 @@
 | 查询导出 | `GET /api/reports/{type}`、`GET .../export` | 管理员/否 | 服务端事实导出 | `REPORT_TYPE_INVALID` |
 | 全局设置 | `GET/PATCH /api/settings` | 管理员/写入幂等 | 单价与默认值（胶水/色浆单价、损耗率、四项单件费用默认） | `VALIDATION_INVALID` |
 | 静态数据 | `GET /api/settings/static-data`、`GET /api/settings/static-data/{code}`、`POST .../{code}/items`、`PATCH/DELETE .../items/{id}` | 管理员/写入幂等 | 类别清单与条目：星级/包装档位/缝边种类由用户自建，员工工种仅可改名与启停 | `VALIDATION_INVALID`, `CONFLICT_DUPLICATE`, `CONFLICT_REFERENCED` |
-| 健康/迁移 | `GET /actuator/health/liveness|readiness` | 受保护运维 | 健康结果 | `MIGRATION_INVALID` |
+| 健康/迁移 | `GET /actuator/health/liveness|readiness` | 受保护运维 | 健康结果 | 迁移校验失败时**应用启动即失败**（不提供服务，等价于「就绪失败且不接受业务写入」） |
 
 ### 7. 前端页面、路由和操作矩阵
 

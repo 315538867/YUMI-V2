@@ -60,7 +60,7 @@ public final class CustomerDtos {
     }
 
     /**
-     * 详情 = 客户视图 + 只读汇总骨架（任务 2.6）；summary 之外不追加任何余额字段。
+     * 详情 = 客户视图 + 只读汇总（任务 2.6，由订单与收退款事实实时聚合）；summary 之外不追加任何余额字段。
      */
     public record CustomerDetail(
             long id,

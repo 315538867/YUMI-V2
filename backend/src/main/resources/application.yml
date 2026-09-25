@@ -19,6 +19,12 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+        # 慢查询（任务 9.5）：JPA/Hibernate 执行超过该阈值的语句按 WARN 打出 SQL 与耗时，
+        # 供日志检索与告警；MySQL 服务端慢查询日志（slow_query_log/long_query_time）另在运维侧开启。
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: 500
   jackson:
     time-zone: Asia/Shanghai
 
@@ -34,11 +40,14 @@ management:
     web:
       base-path: /api/actuator
       exposure:
-        include: health
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+      # 暴露各健康组件与详情（含 fileStorage 可写性检查），供运维与验收核对
+      show-components: always
+      show-details: always
       group:
         readiness:
           include: readinessState,db

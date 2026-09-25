@@ -32,6 +32,10 @@ import {
   type OrderDetail,
 } from '../../api/orders';
 import { describeApiError } from '../../api/errors';
+import { printCurrentPage } from '../../lib/print';
+import { ShipmentPanel } from './ShipmentPanel';
+import { SettlementPanel } from './SettlementPanel';
+import { AfterSalesPanel } from './AfterSalesPanel';
 
 /**
  * 订单详情（任务 3.12）：订单内一组只读多 Tab（总览 / 商品与履约 / 发货与售后 / 资金与利润 / 订单资料与变更），
@@ -214,30 +218,17 @@ export function OrderDetailPage() {
       key: 'shipment',
       label: '发货与售后',
       children: (
-        <Alert
-          type="info"
-          showIcon
-          title="发货与售后在阶段六/八实现"
-          description="本 Tab 只读展示已确认发货批次与售后台账；阶段六/八上线前没有数据，页面不提供录入入口。"
-        />
+        <>
+          <ShipmentPanel order={order} />
+          <Divider />
+          <AfterSalesPanel order={order} />
+        </>
       ),
     },
     {
       key: 'finance',
       label: '资金与利润',
-      children: (
-        <Descriptions size="small" column={1} bordered items={[
-          { key: 'goods', label: '商品金额', children: order.goodsAmount },
-          { key: 'seam', label: '缝边收费', children: order.seamAmount },
-          { key: 'discount', label: '整单优惠', children: order.discountAmount },
-          { key: 'receivable', label: '应收', children: <b>{order.receivableAmount}</b> },
-          { key: 'goodsCost', label: '商品成本', children: order.goodsCostAmount },
-          { key: 'seamCost', label: '缝边成本', children: order.seamCostAmount },
-          { key: 'cost', label: '总成本', children: order.costAmount },
-          { key: 'profit', label: '预计利润', children: <b>{order.profitAmount}</b> },
-          { key: 'payments', label: '收款 / 退款', children: '阶段七实现（不可变资金事实）' },
-        ]} />
-      ),
+      children: <SettlementPanel order={order} />,
     },
     {
       key: 'records',
@@ -313,6 +304,7 @@ export function OrderDetailPage() {
             </Button>
           )}
           {(isDraft || isConfirmed) && <Button danger onClick={() => setCancelOpen(true)}>取消订单</Button>}
+          <Button onClick={() => void printCurrentPage()}>打印 / PDF</Button>
           <Button onClick={() => navigate('/orders')}>返回列表</Button>
         </Space>
       }

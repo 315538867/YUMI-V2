@@ -89,6 +89,15 @@ public class OrderSnapshotRepository {
                 """, confirmedBy, requestId, orderId, expectedVersion);
     }
 
+    /** 关闭订单：置主状态并记录关闭人与时间（已关闭不得重开，由服务层保证）。 */
+    public int markClosed(long orderId, String closedBy, String requestId) {
+        return jdbcTemplate.update("""
+                UPDATE orders SET status = 'CLOSED', closed_at = UTC_TIMESTAMP(6), closed_by = ?,
+                    version = version + 1, updated_at = UTC_TIMESTAMP(6), request_id = ?
+                WHERE id = ? AND status = 'CONFIRMED'
+                """, closedBy, requestId, orderId);
+    }
+
     public void markCancelled(long orderId, String cancelledBy, String reason, String requestId) {
         jdbcTemplate.update("""
                 UPDATE orders SET status = 'CANCELLED', cancelled_at = UTC_TIMESTAMP(6), cancelled_by = ?,

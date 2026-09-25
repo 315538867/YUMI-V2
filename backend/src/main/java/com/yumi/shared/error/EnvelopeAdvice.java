@@ -28,6 +28,12 @@ public class EnvelopeAdvice implements ResponseBodyAdvice<Object> {
         if (body == null || body instanceof ApiEnvelope) {
             return body;
         }
+        // 导出例外：文本/文件类响应（如 `text/csv` 台账导出）不套信封——导出内容是文件而非业务负载，
+        // 与 `204` 同属统一信封的例外；JSON 业务响应一律照旧包装。
+        if (contentType != null && ("text".equalsIgnoreCase(contentType.getType())
+                || org.springframework.http.MediaType.APPLICATION_OCTET_STREAM.isCompatibleWith(contentType))) {
+            return body;
+        }
         HttpServletRequest servletRequest = ((ServletServerHttpRequest) request).getServletRequest();
         return ApiEnvelope.ok(body, RequestIdFilter.currentId(servletRequest));
     }

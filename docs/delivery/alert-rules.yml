@@ -1,0 +1,136 @@
+# 生产告警规则（任务 9.5）：Prometheus 规则文件，由运维侧加载到 Prometheus/Alertmanager。
+# 规则只引用**应用真实暴露**的指标名（`GET /api/actuator/prometheus`，见 runbook §4 的核对记录），
+# 外部依赖的指标在注释中标注来源，避免「规则引用不存在的指标」这种静默失效。
+groups:
+  - name: yumi-http
+    rules:
+      # 5xx 计数（应用自定义指标，标签为 method/status/uri，uri 为路由模板）
+      - alert: YumiHttp5xx
+        expr: sum(rate(yumi_http_server_errors_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HTTP 5xx 速率偏高（{{ $value }} req/s）"
+          runbook: "docs/delivery/release-and-backup-runbook.md"
+
+      - alert: YumiHttp5xxRatio
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.001) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP 5xx 占比超过 2%"
+
+      - alert: YumiReadinessDown
+        expr: up{job="yumi-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "应用实例不可抓取（进程/端口/就绪异常）"
+
+  - name: yumi-db-pool
+    rules:
+      # 连接池耗尽：等待获取连接的线程持续存在
+      - alert: YumiDbPoolPending
+        expr: hikaricp_connections_pending > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库连接池出现等待（pending={{ $value }}）"
+
+      - alert: YumiDbPoolExhausted
+        expr: hikaricp_connections_active / clamp_min(hikaricp_connections_max, 1) > 0.9
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "数据库连接池使用率超过 90%"
+
+      - alert: YumiDbConnTimeout
+        expr: increase(hikaricp_connections_timeout_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "出现获取数据库连接超时"
+
+  - name: yumi-host
+    rules:
+      # 磁盘：文件与数据库所在分区剩余空间
+      - alert: YumiDiskLow
+        expr: disk_free_bytes / clamp_min(disk_total_bytes, 1) < 0.15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "磁盘剩余空间低于 15%"
+
+      - alert: YumiDiskCritical
+        expr: disk_free_bytes / clamp_min(disk_total_bytes, 1) < 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "磁盘剩余空间低于 5%（备份与迁移会失败）"
+
+      - alert: YumiHeapPressure
+        expr: |
+          sum(jvm_memory_used_bytes{area="heap"})
+            / clamp_min(sum(jvm_memory_max_bytes{area="heap"}), 1) > 0.9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM 堆使用率超过 90%"
+
+  - name: yumi-files-backup
+    rules:
+      # 文件不可写：应用自定义指标（1 可写 / 0 不可写，抓取时实时判定）
+      - alert: YumiFileStorageUnwritable
+        expr: yumi_file_storage_writable == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "文件存储目录不可写（上传与附件读取会失败）"
+
+      # 备份新鲜度与失败：由 backup.sh 写 Prometheus 文本文件，node_exporter textfile collector 采集
+      - alert: YumiBackupStale
+        expr: time() - yumi_backup_last_success_timestamp_seconds > 93600
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "超过 26 小时没有成功备份"
+
+      - alert: YumiBackupFailed
+        expr: increase(yumi_backup_failures_total[1h]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "备份失败（检查 backup.sh 退出码与日志）"
+
+  - name: yumi-mysql
+    rules:
+      # 慢查询：需 mysqld_exporter（外部指标，不在应用端点内）；MySQL 侧需开启慢查询日志
+      - alert: YumiMySqlSlowQueries
+        expr: increase(mysql_global_status_slow_queries[10m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL 慢查询增多（需 mysqld_exporter + 慢查询日志）"
+
+      - alert: YumiMySqlConnections
+        expr: mysql_global_status_threads_connected / clamp_min(mysql_global_variables_max_connections, 1) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL 连接数接近上限（需 mysqld_exporter）"
