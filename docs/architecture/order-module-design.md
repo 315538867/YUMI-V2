@@ -7,7 +7,7 @@
 
 ## 1. 范围
 
-**本阶段做**：订单表结构（8 张）、订单编号、草稿创建/查询/编辑、明细 Q/E 与金额/成本/利润、确认校验与单事务快照、共同数量初始化与履约视图、订单变更草稿与确认（含减单不变量）、订单取消、订单多维只读状态、`/orders`、`/orders/new`、`/orders/:id`、`/orders/:id/changes/:changeId` 四个正式路由，以及 3.14/3.15 的测试与人工验收。
+**本阶段做**：订单表结构（8 张）、订单编号、草稿创建/查询/编辑、明细订购数量/缝边数量与金额/成本/利润、确认校验与单事务快照、共同数量初始化与履约视图、订单变更草稿与确认（含减单不变量）、订单取消、订单多维只读状态、`/orders`、`/orders/new`、`/orders/:id`、`/orders/:id/changes/:changeId` 四个正式路由，以及 3.14/3.15 的测试与人工验收。
 
 **本阶段不做**：库存领用、生产计划与核验、返工/重做、发货、收退款、售后、报表导出、关闭（阶段四–九）。表中为这些阶段预留的列（见 §3.7/§3.8）**本阶段只建列与约束、不写入**；不建空实现、不建占位服务。
 
@@ -56,8 +56,8 @@ CHECK：`discount_amount >= 0`、`discount_amount <= goods_amount + seam_amount`
 | --- | --- |
 | `order_id` / `line_no` | FK + 明细序号；唯一键 `uk_order_items_order_line (order_id, line_no)` |
 | `product_id` / `product_no` / `product_name` | 商品引用与识别快照（商品改名不影响订单显示） |
-| `quantity` | 当前有效订购数量 **Q** |
-| `seam_quantity` | 当前缝边数量 **E** |
+| `quantity` | 当前有效订购数量 |
+| `seam_quantity` | 当前缝边数量（不得超过订购数量，0 表示不缝边剪袋） |
 | `unit_price` / `goods_amount` | 商品成交单价 / 商品金额 = `unit_price × quantity` |
 | `seam_type_id` / `seam_type_name` | 缝边种类引用 + 名称快照，可空＝不缝边剪袋 |
 | `seam_unit_cost` / `seam_fee` | 种类成本单价快照（成本与提示）/ 缝边收费单价 |
@@ -67,7 +67,7 @@ CHECK：`discount_amount >= 0`、`discount_amount <= goods_amount + seam_amount`
 | `note` | 明细备注 |
 
 索引：`idx_order_items_order`、`idx_order_items_product`、`idx_order_items_seam_type`（缝边种类删除守卫用）。  
-CHECK：`seam_quantity <= quantity`（Q/E 检查）、`quantity >= 0`、`seam_quantity >= 0`。
+CHECK：`seam_quantity <= quantity`（缝边数量不得超过订购数量）、`quantity >= 0`、`seam_quantity >= 0`。
 
 > 明细不通过删除重建改变历史身份：草稿阶段可增删行；已确认后只能由变更单改数量/价格/缝边或标记移除，行与历史保留。
 
@@ -99,7 +99,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 
 ### 3.8 `order_item_fulfillment_balances`（明细当前投影）
 
-`order_item_id` 唯一。列：`order_id`、`required_quantity`（当前有效需求 Q）、`making_inflow`/`packing_inflow`/`seam_inflow`（各工序有效流入）、`making_planned`/`packing_planned`/`seam_planned`（有效计划占用）、`verified_processed`（已核验处理）、`rework_pending`/`remake_pending`（待安排）、`shippable_quantity`（可发货）、`shipped_quantity`（累计有效发货）、`finished_surplus_quantity`（成品余量）。
+`order_item_id` 唯一。列：`order_id`、`required_quantity`（当前有效需求＝订购数量）、`making_inflow`/`packing_inflow`/`seam_inflow`（各工序有效流入）、`making_planned`/`packing_planned`/`seam_planned`（有效计划占用）、`verified_processed`（已核验处理）、`rework_pending`/`remake_pending`（待安排）、`shippable_quantity`（可发货）、`shipped_quantity`（累计有效发货）、`finished_surplus_quantity`（成品余量）。
 
 只允许领域服务在写 `fulfillment_entries` 的同一事务内更新；阶段三只写 `required_quantity` 与订单需求/变更事实，其余列由阶段四/五/六写入。阶段九提供按事实重建并与本表比对的一致性检查。
 
@@ -139,13 +139,13 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 
 ## 5. 数量口径与共同数量
 
-沿用 `domain-and-quantity-model.md` §5：`不缝边需求 = Q − E`、`制作共同需求 = Q`、`捏毛装袋共同需求 = Q`、`缝边剪袋需求 = E`、`最终交付需求 = Q`，**不得按工序相加**。
+沿用 `domain-and-quantity-model.md` §5：`不缝边需求 = 订购数量 − 缝边数量`、`制作共同需求 = 订购数量`、`捏毛装袋共同需求 = 订购数量`、`缝边剪袋需求 = 缝边数量`、`最终交付需求 = 订购数量`，**不得按工序相加**。
 
 阶段三落地的部分：
 
-1. 确认时对每条明细写入 `required_quantity = Q` 与一条 `ORDER_DEMAND` 履约事实（节点 `SHIPPABLE`、方向 `IN`），作为需求基线；
+1. 确认时对每条明细写入 `required_quantity = 订购数量` 与一条 `ORDER_DEMAND` 履约事实（节点 `SHIPPABLE`、方向 `IN`），作为需求基线；
 2. 变更确认时按数量差写入 `ORDER_CHANGE` 事实（增为正、减为负）并同步 `required_quantity` 与 `order_items.quantity`；
-3. `GET /api/orders/{id}/fulfillment` 返回 `Q`/`E`/不缝边需求/最终交付需求与四层进度，其中工序流入、可发货、累计发货在本阶段恒为 0（阶段四–六写入），**不用 0 伪造状态**：派生状态按事实判定为「未开始/未发货」。
+3. `GET /api/orders/{id}/fulfillment` 返回订购数量/缝边数量/不缝边需求/最终交付需求与四层进度，其中工序流入、可发货、累计发货在本阶段恒为 0（阶段四–六写入），**不用 0 伪造状态**：派生状态按事实判定为「未开始/未发货」。
 4. 派生状态由事实计算，不提供手工状态列：主状态、排产状态、执行条件、生产进度、需求处理状态、发货进度（§7）。
 
 ## 6. 状态机与合法转换
@@ -153,7 +153,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 `orders.status`：`DRAFT` →（确认）→ `CONFIRMED` →（关闭）→ `CLOSED`；`DRAFT` →（取消）→ `CANCELLED`；`CONFIRMED` →（无任何履约事实时取消）→ `CANCELLED`。`CANCELLED`/`CLOSED` 为终态，**不可重开**。
 
 - 草稿可编辑（`PATCH /api/orders/{id}`）；非草稿返回 `STATE_NOT_EDITABLE`。
-- 确认要求：至少一条明细、商品存在且启用、`E ≤ Q`、金额一致、交期合法（`expected_delivery_date` 不早于 `order_date`）、客户与收货齐全；不满足返回 `STATE_NOT_CONFIRMABLE` / `VALIDATION_INVALID`。
+- 确认要求：至少一条明细、商品存在且启用、缝边数量 ≤ 订购数量、金额一致、交期合法（`expected_delivery_date` 不早于 `order_date`）、客户与收货齐全；不满足返回 `STATE_NOT_CONFIRMABLE` / `VALIDATION_INVALID`。
 - 变更仅对 `CONFIRMED` 且未取消/关闭的订单开放；草稿直接改，不走变更单。
 - 取消守卫：草稿直接取消；已确认仅在**无任何履约事实**（阶段七起追加“无款项事实”）时可取消，否则返回 `STATE_CANCEL_NOT_ALLOWED`。
 - 并发：`orders`/`order_items` 用 `@Version` 乐观锁，版本失配返回 `CONFLICT_VERSION`；确认与变更确认在同一事务内完成并重读校验。
@@ -183,7 +183,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 | 订单详情 | `GET /api/orders/{id}` | 否 | 订单、明细、金额、快照（已确认时）、草稿库存计划与派生状态 | `NOT_FOUND` |
 | 编辑草稿 | `PATCH /api/orders/{id}` | 写入幂等 | 整体重算金额后的草稿；`inventoryPlan` 非空整体替换、空列表清空、不传保持原值 | `STATE_NOT_EDITABLE`, `VALIDATION_INVALID`, `CONFLICT_VERSION` |
 | 确认 | `POST /api/orders/{id}/confirm` | 必须幂等 | 单事务快照 + 已确认订单；入参 `transferShortageToProduction` 表示管理员明确将计划缺口转生产 | `STATE_NOT_CONFIRMABLE`, `SNAPSHOT_FAILED`, `STOCK_INSUFFICIENT`, `CONFLICT_VERSION` |
-| 履约视图 | `GET /api/orders/{id}/fulfillment` | 否 | Q/E、共同数量、四层进度与派生状态 | `NOT_FOUND` |
+| 履约视图 | `GET /api/orders/{id}/fulfillment` | 否 | 订购数量/缝边数量、共同数量、四层进度与派生状态 | `NOT_FOUND` |
 | 变更草稿 | `POST /api/orders/{id}/change-orders`、`GET/PATCH /api/order-changes/{id}` | 写入幂等 | 变更草稿（前后值 + 超出处理） | `STATE_NOT_CHANGEABLE`, `QUANTITY_REQUIRES_DISPOSITION` |
 | 变更确认 | `POST /api/order-changes/{id}/confirm` | 必须幂等 | 应用后订单 + 新投影 | `QUANTITY_BELOW_SHIPPED`, `CONFLICT_VERSION` |
 | 取消 | `POST /api/orders/{id}/cancel` | 必须幂等 | 已取消订单 + 取消人/时间/原因 | `STATE_CANCEL_NOT_ALLOWED` |
@@ -195,7 +195,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 | 路由 | 页面 | 关键点 |
 | --- | --- | --- |
 | `/orders` | 订单列表 | 主状态/生产进度/发货进度分列；筛选紧凑排列；显式「新建订单」入口 |
-| `/orders/new` | 步骤化全页工作区 | 步骤：客户与收货 → 商品明细与 Q/E → 金额与优惠 → 库存计划（可选）→ 确认复核；金额只读展示服务端值；缝边默认值取商品；计划步骤按明细行选批次（显示工序/缝边/现有数量）并提示「不占用库存」，确认遇缺口时给出缺口明细与「缺口转生产并确认」 |
+| `/orders/new` | 步骤化全页工作区 | 步骤：客户与收货 → 商品明细与数量 → 金额与优惠 → 库存计划（可选）→ 确认复核；金额只读展示服务端值；缝边默认值取商品；计划步骤按明细行选批次（显示工序/缝边/现有数量）并提示「不占用库存」，确认遇缺口时给出缺口明细与「缺口转生产并确认」 |
 | `/orders/:id` | 订单详情（只读多 Tab） | 总览 / 商品与履约 / 发货与售后 / 资金与利润 / 资料与变更；Tab 不新增路由；总览用可容纳 12+ 明细的简表；履约按阶段卡片；查看不预置表单，新建/编辑/处理走显式入口 |
 | `/orders/:id/changes/:changeId` | 变更确认操作页 | 明确列出变更前后、已发货下限、在途超出处理、待退款影响、确认后不可覆盖 |
 
@@ -227,7 +227,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 1. **订单级优惠的作用面**：确认按 §4 口径 `应收 = 商品金额 + 缝边收费 − 优惠`，优惠不进入成本、利润允许为负（**用户 2026-09-24 确认“作用于整单应收”**）。
 2. **变更单编号前缀** `CO`（示例 `CO00001`）可用（随评审通过）。
 3. **明细允许同一商品多行**（不同缝边/价格），规格要求总览可容纳 12+ 明细（随评审通过）。
-4. **`E = 0` 视为不缝边剪袋**：`seam_type_id`/`seam_fee`/`seam_unit_cost` 存 NULL 或 0，避免“选了种类但数量为 0”的歧义；要缝边则 `E ≥ 1`（**用户 2026-09-24 确认“E=0 视为不缝边剪袋”**）。
+4. **缝边数量为 0 视为不缝边剪袋**：`seam_type_id`/`seam_fee`/`seam_unit_cost` 存 NULL 或 0，避免“选了种类但数量为 0”的歧义；要缝边则缝边数量 ≥ 1（**用户 2026-09-24 确认“缝边数量为 0 视为不缝边剪袋”**）。
 
 ### 实施状态（2026-09-24）
 
@@ -249,7 +249,7 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 | 3.3 | FP-ORDER-01..09 与 `calculation/order` | 基线算例逐字段字符串比对；客户端派生金额被忽略 |
 | 3.4 | 确认校验 + 单事务快照 | 确认后快照逐字段一致；不自动建计划 |
 | 3.5 | 确认原子性测试 | 任一校验失败整笔回滚、无部分快照；重复幂等键返回同一订单 |
-| 3.6 | 共同数量初始化 + `GET /api/orders/{id}/fulfillment` | Q/E 与共同数量不按工序相加；派生进度而非手工状态 |
+| 3.6 | 共同数量初始化 + `GET /api/orders/{id}/fulfillment` | 订购数量/缝边数量与共同数量不按工序相加；派生进度而非手工状态 |
 | 3.7 | 变更草稿与确认 | 前后值结构化落库；新增/改/移除三类路径 |
 | 3.8 | 减单不变量 | 低于累计发货拒绝；超出在制/合格逐项处理 |
 | 3.9 | 取消 | 草稿可取消；无事实的已确认可取消；有事实拒绝且不删历史 |
@@ -257,6 +257,6 @@ CHECK：`change_type = 'ADD'` 时 `order_item_id IS NULL`，`UPDATE`/`REMOVE` �
 | 3.11 | `/orders`、`/orders/new` | 步骤化工作区、服务端金额权威 |
 | 3.12 | `/orders/:id` 只读多 Tab | 单组订单页签、总览容纳 12+ 明细、查看与操作分离 |
 | 3.13 | `/orders/:id/changes/:changeId` | 变更前后、已发货下限、超出处理、待退款影响 |
-| 3.14 | 领域/HTTP/MySQL 测试 | 覆盖快照、Q/E、金额字符串、并发、减单下限、余量、取消、投影重建、状态派生 |
+| 3.14 | 领域/HTTP/MySQL 测试 | 覆盖快照、订购数量/缝边数量、金额字符串、并发、减单下限、余量、取消、投影重建、状态派生 |
 | 3.15 | 阶段人工验收 | `humanVisualConclusion.checklist`，状态 `pending-user-signoff` |
 

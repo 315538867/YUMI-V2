@@ -245,7 +245,7 @@ class OrderInventoryPlanTest {
 
     // ---------- 工具 ----------
 
-    /** 两条明细（Q=10、Q=10）+ 可选计划片段；金额全部由服务端计算。 */
+    /** 两条明细（订购数量=10、订购数量=10）+ 可选计划片段；金额全部由服务端计算。 */
     private org.springframework.test.web.servlet.ResultActions createOrder(String planFragment) throws Exception {
         var body = """
                 {"customerId":%d,"orderDate":"2026-09-25",

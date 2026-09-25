@@ -62,17 +62,17 @@
 
 | 标识 | 名称 | 输入与单位 | 表达式 | 舍入节点 | 结果含义 |
 | --- | --- | --- | --- | --- | --- |
-| FP-ORDER-01 | 明细商品金额 | 成交单价（元/件）、数量 Q | `unitPrice × quantity` | scale4 HALF_UP | 单条明细商品金额 |
-| FP-ORDER-02 | 明细缝边收费 | 缝边收费单价（元/件）、缝边数量 E | `seamFee × seamQuantity` | scale4 HALF_UP | 单条明细缝边应收 |
-| FP-ORDER-03 | 明细商品成本 | 商品单件成本（不缝边剪袋口径）、数量 Q | `unitCost × quantity` | scale4 HALF_UP | 单条明细商品成本 |
-| FP-ORDER-04 | 明细缝边成本 | 缝边种类成本单价（元/件，允许 0）、缝边数量 E | `seamUnitCost × seamQuantity` | scale4 HALF_UP | 单条明细缝边成本 |
+| FP-ORDER-01 | 明细商品金额 | 成交单价（元/件）、订购数量 | `unitPrice × quantity` | scale4 HALF_UP | 单条明细商品金额 |
+| FP-ORDER-02 | 明细缝边收费 | 缝边收费单价（元/件）、缝边数量 | `seamFee × seamQuantity` | scale4 HALF_UP | 单条明细缝边应收 |
+| FP-ORDER-03 | 明细商品成本 | 商品单件成本（不缝边剪袋口径）、订购数量 | `unitCost × quantity` | scale4 HALF_UP | 单条明细商品成本 |
+| FP-ORDER-04 | 明细缝边成本 | 缝边种类成本单价（元/件，允许 0）、缝边数量 | `seamUnitCost × seamQuantity` | scale4 HALF_UP | 单条明细缝边成本 |
 | FP-ORDER-05 | 订单商品金额 | 各明细商品金额 | Σ 明细商品金额 | scale4 HALF_UP | 订单商品应收 |
 | FP-ORDER-06 | 订单缝边收费 | 各明细缝边收费 | Σ 明细缝边收费 | scale4 HALF_UP | 订单缝边应收 |
 | FP-ORDER-07 | 订单应收 | 商品金额、缝边收费、整单优惠 | `goodsAmount + seamAmount − discountAmount` | scale4 HALF_UP | 客户应付；优惠只作用于应收 |
 | FP-ORDER-08 | 订单总成本 | 各明细商品成本与缝边成本 | Σ（明细商品成本 + 明细缝边成本） | scale4 HALF_UP | 商品成本与缝边成本分列可见 |
 | FP-ORDER-09 | 订单利润 | 订单应收、订单总成本 | `receivableAmount − costAmount` | scale4 HALF_UP | 允许为负 |
 
-口径约束：整单优惠必须非负且不超过「商品金额 + 缝边收费」（越界由计算模块拒绝并映射为字段级 400）；商品成本取**下单/编辑当时**的商品 `total_cost` 快照，确认时再冻结进明细快照；缝边数量 `E = 0` 视为不缝边剪袋，缝边单价与成本按 0 传入。
+口径约束：整单优惠必须非负且不超过「商品金额 + 缝边收费」（越界由计算模块拒绝并映射为字段级 400）；商品成本取**下单/编辑当时**的商品 `total_cost` 快照，确认时再冻结进明细快照；缝边数量为 0 视为不缝边剪袋，缝边单价与成本按 0 传入。
 
 上述标识在实现中的位置与测试编号见第 5 节。
 

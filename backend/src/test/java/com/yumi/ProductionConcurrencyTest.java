@@ -80,7 +80,7 @@ class ProductionConcurrencyTest {
                     1, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """, customerId);
         orderId = jdbcTemplate.queryForObject("SELECT id FROM orders WHERE order_no = 'TCC0001'", Long.class);
-        // Q=12：可容纳两条各 6 件的计划，用于可执行上限竞争
+        // 订购数量=12：可容纳两条各 6 件的计划，用于可执行上限竞争
         jdbcTemplate.update("""
                 INSERT INTO order_items (order_id, line_no, product_id, product_no, product_name,
                     quantity, seam_quantity, unit_price, goods_amount, unit_cost, goods_cost_amount,
@@ -176,7 +176,7 @@ class ProductionConcurrencyTest {
     @Test
     void executableLimitRaceAllowsOnlyOneVerification() throws Exception {
         // 下游工序（捏毛装袋）有效流入只有 6，两条各 6 件的计划中只有一条能核验
-        // （首道制作的有效流入是订单需求 Q，不用于本用例）
+        // （首道制作的有效流入是订单需求（订购数量），不用于本用例）
         jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET packing_inflow = 6 "
                 + "WHERE order_item_id = ?", orderItemId);
         long first = createNormalPlan("PACKING_BAG", packerId, LocalDate.now(), 6);

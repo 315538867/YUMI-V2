@@ -396,7 +396,7 @@ export function ShipmentPanel({ order }: { order: OrderDetail }) {
                     columns={[
                       { title: '#', dataIndex: 'lineNo', width: 50 },
                       { title: '商品', render: (_, row) => `${row.productNo} ${row.productName}` },
-                      { title: '订购 Q', dataIndex: 'quantity', width: 80, align: 'right' },
+                      { title: '订购数量', dataIndex: 'quantity', width: 90, align: 'right' },
                       {
                         title: '本次发货数量',
                         key: 'shipQuantity',

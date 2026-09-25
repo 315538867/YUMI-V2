@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 任务 3.1 订单模块迁移断言：八张订单表、业务编号唯一、Q/E 检查、优惠上限、
+ * 任务 3.1 订单模块迁移断言：八张订单表、业务编号唯一、订购数量/缝边数量检查、优惠上限、
  * 变更明细目标一致性、来源唯一消费与关键索引；Hibernate {@code ddl-auto: validate} 由上下文启动保证。
  */
 @SpringBootTest

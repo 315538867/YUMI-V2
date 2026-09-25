@@ -169,8 +169,8 @@ export function OrderDetailPage() {
         columns={[
           { title: '#', dataIndex: 'lineNo', width: 50 },
           { title: '商品', render: (_, row) => `${row.productNo} ${row.productName}` },
-          { title: '订购 Q', dataIndex: 'quantity', width: 80 },
-          { title: '缝边 E', dataIndex: 'seamQuantity', width: 80 },
+          { title: '订购数量', dataIndex: 'quantity', width: 80 },
+          { title: '缝边数量', dataIndex: 'seamQuantity', width: 80 },
           { title: '已发', dataIndex: 'shipped', width: 70 },
           { title: '剩余需求', dataIndex: 'undelivered', width: 90 },
           { title: '商品金额', key: 'goods', width: 110, align: 'right', render: (_, row) => order.items.find(item => item.id === row.orderItemId)?.goodsAmount ?? '—' },
@@ -192,9 +192,9 @@ export function OrderDetailPage() {
         <Col span={12} key={item.orderItemId}>
           <Card size="small" title={`#${item.lineNo} ${item.productNo} ${item.productName}`}>
             <Descriptions size="small" column={2} items={[
-              { key: 'making', label: '制作（共同需求 Q）', children: `${item.makingRequired} / 已流入 ${item.makingInflow}` },
-              { key: 'packing', label: '捏毛装袋（共同需求 Q）', children: `${item.packingRequired} / 已流入 ${item.packingInflow}` },
-              { key: 'seam', label: '缝边剪袋（需求 E）', children: `${item.seamRequired} / 已流入 ${item.seamInflow}` },
+              { key: 'making', label: '制作（按订购数量）', children: `${item.makingRequired} / 已流入 ${item.makingInflow}` },
+              { key: 'packing', label: '捏毛装袋（按订购数量）', children: `${item.packingRequired} / 已流入 ${item.packingInflow}` },
+              { key: 'seam', label: '缝边剪袋（按缝边数量）', children: `${item.seamRequired} / 已流入 ${item.seamInflow}` },
               { key: 'final', label: '最终交付需求', children: item.finalRequired },
               { key: 'shippable', label: '当前可发货', children: item.shippable },
               { key: 'shipped', label: '累计有效发货', children: item.shipped },

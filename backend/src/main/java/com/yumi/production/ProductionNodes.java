@@ -52,7 +52,7 @@ public final class ProductionNodes {
         };
     }
 
-    /** 工序总需求来源：缝边剪袋按冻结 E，其余按当前有效订购数量 Q。 */
+    /** 工序总需求来源：缝边剪袋按冻结的缝边数量，其余按当前有效订购数量。 */
     public static boolean usesSeamQuantity(String node) {
         return SEAM_CUTTING.equals(node);
     }

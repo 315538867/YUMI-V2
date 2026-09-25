@@ -11,7 +11,7 @@
 - 为六份 capability spec 提供可测试的行为、输入、输出、拒绝条件和状态约束。
 - 为每项业务能力冻结 HTTP 方法、路径、认证、幂等键、请求/响应重点、成功状态和错误码。
 - 为每个阶段冻结页面/路由/操作入口，明确订单内部组件不得被误建成顶级模块；订单详情采用一组订单内多 Tab，视觉基线为常规 Ant Design 后台管理布局、全页白色底、浅色侧栏与顶部面包屑，使用现成组件并通过按钮层级、Tag 样式、间距、边框和主题 token 表达层次，不并排展示 A/B 方案或重复订单页签。
-- 保持共同数量 Q/E、库存领用一次扣减、生产核验等式、订单关闭条件和售后独立台账；已确认发货后即可受理对应已发部分售后。
+- 保持共同数量（订购数量与缝边数量）、库存领用一次扣减、生产核验等式、订单关闭条件和售后独立台账；已确认发货后即可受理对应已发部分售后。
 - 让实现任务同时指向 Requirement/Scenario、正式文档章节、后端包/Flyway、API、前端、自动化测试和人工验收。
 - 以 Java 21、Spring Boot 3.5.x、Spring Modulith、Spring Data JPA、Flyway、Maven、MySQL 8.x、JUnit 5、Testcontainers 为实现基线。
 
@@ -90,7 +90,7 @@
 | 确认 | `POST /api/orders/{id}/confirm` | 管理员/必须幂等 | 快照与已确认订单 | `STATE_NOT_CONFIRMABLE`（快照写入失败属数据库故障，由 500 兜底，不单独返回错误码） |
 | 变更 | `POST /api/orders/{id}/change-orders`、`POST /api/order-changes/{id}/confirm` | 管理员/必须幂等 | 变更及新投影 | `STATE_NOT_CHANGEABLE`, `QUANTITY_BELOW_SHIPPED`, `REFUND_PENDING` |
 | 订单取消 | `POST /api/orders/{id}/cancel` | 管理员/必须幂等 | 已取消或拒绝 | `STATE_CANCEL_NOT_ALLOWED`, `QUANTITY_REQUIRES_DISPOSITION` |
-| 履约视图 | `GET /api/orders/{id}/fulfillment` | 管理员/否 | Q/E、工序、需求和发货派生状态 | `ORDER_NOT_FOUND` |
+| 履约视图 | `GET /api/orders/{id}/fulfillment` | 管理员/否 | 订购数量/缝边数量、工序、需求和发货派生状态 | `ORDER_NOT_FOUND` |
 | 库存 | `GET/POST /api/inventory/batches`、`POST /api/inventory/adjustments` | 管理员/写入幂等 | 批次和流水 | `VALIDATION_INVALID`（负数/非法调整）, `CONFLICT_DUPLICATE`（重复冲销） |
 | 领用 | `POST /api/inventory-allocations`、`POST /api/inventory-allocations/{id}/cancel` | 管理员/必须幂等 | 领用、反向流水、履约接入 | `STOCK_INSUFFICIENT`, `STATE_CANNOT_CANCEL`（同一来源重复接入由来源唯一键保证） |
 | 生产计划 | `GET/POST /api/production-plans`、`POST /api/production-plans/{id}/cancel` | 管理员/写入幂等 | 计划与等待上游状态 | `EMPLOYEE_NOT_ELIGIBLE`, `SOURCE_INSUFFICIENT`, `STATE_NOT_CANCELABLE` |
@@ -119,7 +119,7 @@ React 页面必须由业务入口驱动，Electron 复用相同路由和 API；�
 | `/catalog/customers` | 客户 | 新建、重复提示、编辑、详情汇总 | 不自动合并重复客户 |
 | `/catalog/employees` | 员工 | 工种（显示名称、提交 code）、离职、重新入职、历史 | 离职或无资格员工不能新排班 |
 | `/orders` | 订单列表 | 筛选、新建、打开订单 | 主状态/生产/发货进度分列 |
-| `/orders/new` | 订单步骤工作区 | 客户、明细、Q/E、金额、收货、确认 | 服务端金额和快照权威 |
+| `/orders/new` | 订单步骤工作区 | 客户、明细、订购数量与缝边数量、金额、收货、确认 | 服务端金额和快照权威 |
 | `/orders/:id` | 订单详情 | 总览、商品与履约、发货与售后、资金与利润、资料与变更 Tab；显式进入变更、取消、发货、收退款、售后、关闭操作 | 总览可核对 12+ 明细；履约按阶段看事实；只读与操作分离；已确认发货可受理售后 |
 | `/orders/:id/changes/:changeId` | 变更确认操作 | 变更前后、超出处理、确认 | 减单必须逐项处理余量；确认后回到订单只读详情 |
 | `/inventory` | 库存工作区 | 批次、流水、调整、领用 | 领用扣一次，发货不二扣；订单内低频领用就近进入 |
@@ -147,7 +147,7 @@ React 页面必须由业务入口驱动，Electron 复用相同路由和 API；�
 
 - [契约矩阵与实现漂移] → 每个 API 必须同时有 spec 场景、后端任务、前端入口、HTTP 测试和完成证据；缺任一项不得勾选任务。
 - [订单模块过大] → 只在 `orders` 内拆内部组件，使用公开应用服务和模块边界测试，禁止把物理表误当顶级模块。
-- [数量重复计算] → 以领域数量模型的 Q/E 和事实重建测试为门禁；工序数量不得相加，发货不得再次扣库存。
+- [数量重复计算] → 以领域数量模型的订购数量/缝边数量口径和事实重建测试为门禁；工序数量不得相加，发货不得再次扣库存。
 - [并发超卖] → 事务内锁权威余额和来源行，Testcontainers 覆盖领用、核验、发货、关闭和超额预占竞争。
 - [前端无法到达验收入口] → 人工验收只能使用正式路由；预览路由不作为完成证据。
 - [数据库迁移不可逆] → 发布前临时库校验，已执行版本不得修改，失败时停止发布并保留恢复点。

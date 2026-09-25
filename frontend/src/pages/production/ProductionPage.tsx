@@ -227,7 +227,7 @@ export function ProductionPage() {
       setOrderItems(
         order.items.map(item => ({
           value: item.id,
-          label: `#${item.lineNo} ${item.productNo} ${item.productName}（Q=${item.quantity}／E=${item.seamQuantity}）`,
+          label: `#${item.lineNo} ${item.productNo} ${item.productName}（订购 ${item.quantity}／缝边 ${item.seamQuantity}）`,
         })),
       );
       form.setFieldValue('orderItemId', undefined);

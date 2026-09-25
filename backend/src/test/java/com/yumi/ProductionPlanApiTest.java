@@ -69,7 +69,7 @@ class ProductionPlanApiTest {
                 """);
         long customerId = jdbcTemplate.queryForObject(
                 "SELECT id FROM customers WHERE customer_no = 'TCR001'", Long.class);
-        // Q=10、E=4 的已确认订单
+        // 订购数量=10、缝边数量=4 的已确认订单
         jdbcTemplate.update("""
                 INSERT INTO orders (order_no, customer_id, customer_name, status, order_date, recipient_name,
                     recipient_phone, region, address, goods_amount, seam_amount, discount_amount,
@@ -154,7 +154,7 @@ class ProductionPlanApiTest {
         assertThat(count("fulfillment_entries")).as("计划创建不产生履约事实").isEqualTo(factsBefore);
         assertThat(count("inventory_movements")).as("计划创建不产生库存事实").isZero();
 
-        // 缝边剪袋的总需求是冻结的 E=4，不是 Q
+        // 缝边剪袋的总需求是冻结的缝边数量=4，不是订购数量
         createPlan("SEAM_CUTTING", "2026-09-25", cutterId, 4)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.nodeDemand").value(4));

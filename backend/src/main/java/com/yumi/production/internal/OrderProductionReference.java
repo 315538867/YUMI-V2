@@ -20,7 +20,7 @@ import java.util.Map;
 public class OrderProductionReference {
 
     /**
-     * 明细生产上下文：Q 为当前有效订购数量，E 为确认时冻结的缝边数量，
+     * 明细生产上下文：订购数量取当前有效值，缝边数量取确认时冻结值，
      * 三个 inflow 来自订单履约投影（由库存接入与生产核验共同推进）。
      */
     public record OrderItemContext(long orderItemId, long orderId, String orderNo, String status,
@@ -28,7 +28,7 @@ public class OrderProductionReference {
                                    int quantity, int seamQuantity,
                                    int makingInflow, int packingInflow, int seamInflow) {
 
-        /** 该工序总需求：缝边剪袋按冻结 E，制作与捏毛装袋按 Q（`domain-and-quantity-model.md` §4.1）。 */
+        /** 该工序总需求：缝边剪袋按冻结的缝边数量，制作与捏毛装袋按订购数量（`domain-and-quantity-model.md` §4.1）。 */
         public int demand(String node) {
             return ProductionNodes.usesSeamQuantity(node) ? seamQuantity : quantity;
         }
@@ -44,7 +44,7 @@ public class OrderProductionReference {
 
         /**
          * 该工序的**有效流入**（可执行数量的基数）：首道制作没有上游工序，
-         * 其流入来自订单实际生产缺口（即 Q，`domain-and-quantity-model.md` §6）；其余工序取上游合格流入与库存接入累计。
+         * 其流入来自订单实际生产缺口（即订购数量，`domain-and-quantity-model.md` §6）；其余工序取上游合格流入与库存接入累计。
          */
         public int effectiveInflow(String node) {
             return ProductionNodes.MAKING.equals(node) ? quantity : inflow(node);

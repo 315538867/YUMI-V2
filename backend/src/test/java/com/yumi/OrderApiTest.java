@@ -112,7 +112,7 @@ class OrderApiTest {
         assertThat(data.path("orderNo").asText()).matches("YM\\d{5}");
         assertThat(data.path("status").asText()).isEqualTo("DRAFT");
         assertThat(data.path("version").asLong()).isZero();
-        // 明细：Q=10、E=4；商品金额 250.0000、缝边收费 8.0000、商品成本 181.2000、缝边成本 5.0000
+        // 明细：订购数量=10、缝边数量=4；商品金额 250.0000、缝边收费 8.0000、商品成本 181.2000、缝边成本 5.0000
         var item = data.path("items").get(0);
         assertThat(item.path("quantity").asInt()).isEqualTo(10);
         assertThat(item.path("seamQuantity").asInt()).isEqualTo(4);
@@ -156,7 +156,7 @@ class OrderApiTest {
         assertThat(data.path("items").get(0).path("seamUnitCost").asText()).isEqualTo("1.2500");
         assertThat(data.path("items").get(0).path("seamFee").asText()).isEqualTo("2.0000");
 
-        // 不缝边剪袋（E=0）：缝边字段一律为空或 0
+        // 不缝边剪袋（缝边数量=0）：缝边字段一律为空或 0
         var noSeam = createDraft("""
                 {"customerId":%d,"orderDate":"2026-09-24","items":[{"productId":%d,"quantity":3,"seamQuantity":0}]}
                 """.formatted(customerId, productId));
@@ -172,7 +172,7 @@ class OrderApiTest {
         expectValidation("""
                 {"customerId":%d,"orderDate":"2026-09-24","items":[{"productId":%d,"quantity":0}]}
                 """.formatted(customerId, productId), "items[0].quantity");
-        // E > Q
+        // 缝边数量 > 订购数量
         expectValidation("""
                 {"customerId":%d,"orderDate":"2026-09-24","items":[{"productId":%d,"quantity":2,"seamQuantity":3}]}
                 """.formatted(customerId, productId), "items[0].seamQuantity");

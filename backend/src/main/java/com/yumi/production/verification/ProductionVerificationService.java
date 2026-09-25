@@ -27,7 +27,7 @@ import java.util.List;
  * <pre>
  * 本次完成 = 合格 + 返工 + 报废        未完成 = 计划数量 − 本次完成
  * </pre>
- * 合格按冻结流程流入下一节点：制作→捏毛装袋；捏毛装袋按冻结 E 分流到缝边剪袋与可发货；缝边剪袋→可发货。
+ * 合格按冻结流程流入下一节点：制作→捏毛装袋；捏毛装袋按冻结的缝边数量分流到缝边剪袋与可发货；缝边剪袋→可发货。
  * 返工生成待安排返工来源（默认回到同工序），报废生成待安排重做来源（默认从报废工序开始），
  * 两者都不自动创建计划、都不增加订单需求。
  *
@@ -218,7 +218,7 @@ public class ProductionVerificationService {
         }
     }
 
-    /** 合格数量的分流：捏毛装袋按冻结 E 分到缝边剪袋与可发货，其余工序直接进下一节点。 */
+    /** 合格数量的分流：捏毛装袋按冻结的缝边数量分到缝边剪袋与可发货，其余工序直接进下一节点。 */
     private static List<ProductionVerificationViews.FlowView> qualifiedFlows(
             String node, int qualified, OrderProductionReference.OrderItemContext context) {
         if (qualified <= 0) {

@@ -166,7 +166,7 @@
 | 计划状态和执行状态必须分离 | 5.2、5.x | `ExecutableCalculator`、计划读模型 | `production_plans.status` + 派生量 | `/production` 列表 | `ProductionPlanApiTest` |
 | 生产计划只能一次核验 | 5.4 | `ProductionVerificationService` | `uk_production_verifications_plan`（V10） | 核验工作区 | `ProductionVerificationTest` |
 | 待执行计划取消必须恢复来源 | 5.8 | `ProductionPlanCancellationService` | 来源 `arranged_quantity` 回退 | `/production` 取消入口 | `ProductionPlanApiTest` |
-| 工序合格必须按冻结流程流转 | 5.5 | `qualifiedFlows`（捏毛装袋按 E 分流） | `making/packing/seam_inflow` | 履约 Tab | `ProductionVerificationTest` |
+| 工序合格必须按冻结流程流转 | 5.5 | `qualifiedFlows`（捏毛装袋按缝边数量分流） | `making/packing/seam_inflow` | 履约 Tab | `ProductionVerificationTest` |
 | 返工必须受目标矩阵和来源余额限制 | 5.6 | `ReworkSourceService`、`ProductionNodes.canRework` | `rework_sources` | `/production` 返工来源 | `ProductionSourceTest` |
 | 报废重做必须保留原报废事实 | 5.7 | `RemakeSourceService` | `remake_sources` | `/production` 重做来源 | `ProductionSourceTest` |
 | 未完成数量必须返回对应待处理来源 | 5.9 | `handleIncomplete` + 提醒 | `production_reminders`（V10） | `/production` 提醒工作台 | `ProductionReminderTest` |

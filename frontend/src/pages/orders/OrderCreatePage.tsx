@@ -67,10 +67,10 @@ interface BatchHint {
   quantity: number;
 }
 
-const STEPS = ['客户与收货', '商品明细与 Q/E', '金额与优惠', '库存计划（可选）', '确认复核'];
+const STEPS = ['客户与收货', '商品明细与数量', '金额与优惠', '库存计划（可选）', '确认复核'];
 
 /**
- * 订单步骤化全页工作区（任务 3.11 / 4.8）：客户/收货 → 商品明细与 Q/E → 金额与优惠 →
+ * 订单步骤化全页工作区（任务 3.11 / 4.8）：客户/收货 → 商品明细与数量 → 金额与优惠 →
  * 库存计划（可选） → 确认复核。
  * 金额一律取服务端保存后的返回值，页面不做任何客户端金额计算，也不允许覆盖服务端结果；
  * 库存计划只是参考、不占用库存，确认时由服务端按批次聚合重验余额。
@@ -477,7 +477,7 @@ export function OrderCreatePage() {
                     ),
                   },
                   {
-                    title: '数量 Q',
+                    title: '订购数量',
                     key: 'quantity',
                     width: 100,
                     render: (_, row) => (
@@ -491,7 +491,7 @@ export function OrderCreatePage() {
                     ),
                   },
                   {
-                    title: '缝边数量 E',
+                    title: '缝边数量',
                     key: 'seamQuantity',
                     width: 110,
                     render: (_, row) => (
@@ -506,7 +506,7 @@ export function OrderCreatePage() {
                     ),
                   },
                   {
-                    title: '缝边种类（E>0 必填）',
+                    title: '缝边种类（有缝边数量时必填）',
                     key: 'seamTypeId',
                     width: 180,
                     render: (_, row) => (
@@ -589,7 +589,7 @@ export function OrderCreatePage() {
                 style={{ marginTop: 12 }}
                 type="info"
                 showIcon
-                title="制作与捏毛装袋按数量 Q，缝边剪袋按 E，最终交付按 Q；三个工序不叠加计算。"
+                title="制作与捏毛装袋按订购数量，缝边剪袋按缝边数量，最终交付按订购数量；三个工序不叠加计算。"
               />
             </>
           )}
@@ -726,8 +726,8 @@ export function OrderCreatePage() {
                     columns={[
                       { title: '#', dataIndex: 'lineNo', width: 50 },
                       { title: '商品', render: (_, row) => `${row.productNo} ${row.productName}` },
-                      { title: 'Q', dataIndex: 'quantity', width: 60 },
-                      { title: 'E', dataIndex: 'seamQuantity', width: 60 },
+                      { title: '订购数量', dataIndex: 'quantity', width: 80 },
+                      { title: '缝边数量', dataIndex: 'seamQuantity', width: 80 },
                       { title: '商品金额', dataIndex: 'goodsAmount', width: 110, align: 'right' },
                       { title: '缝边收费', dataIndex: 'seamAmount', width: 110, align: 'right' },
                       { title: '商品成本', dataIndex: 'goodsCostAmount', width: 110, align: 'right' },

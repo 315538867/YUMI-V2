@@ -118,7 +118,7 @@ class OrderFulfillmentChangeTest {
                 .andExpect(jsonPath("$.data.items[0].makingRequired").value(10))
                 .andExpect(jsonPath("$.data.items[0].packingRequired").value(10))
                 .andExpect(jsonPath("$.data.items[0].seamRequired").value(4))
-                // 最终交付需求是 Q，不是 Q+Q+E
+                // 最终交付需求是订购数量，不是订购数量+订购数量+缝边数量
                 .andExpect(jsonPath("$.data.items[0].finalRequired").value(10))
                 .andExpect(jsonPath("$.data.items[0].undelivered").value(10))
                 .andExpect(jsonPath("$.data.items[0].makingInflow").value(0))

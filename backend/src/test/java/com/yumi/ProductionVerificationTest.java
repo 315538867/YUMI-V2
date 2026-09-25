@@ -179,7 +179,7 @@ class ProductionVerificationTest {
 
     @Test
     void splitsPackingBagQualifiedByFrozenSeamQuantity() throws Exception {
-        // 捏毛装袋已有 10 件流入（制作合格或库存接入），冻结 E=4
+        // 捏毛装袋已有 10 件流入（制作合格或库存接入），冻结缝边数量=4
         jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET packing_inflow = 10 "
                 + "WHERE order_item_id = ?", orderItemId);
         long planId = createPlan("PACKING_BAG", packerId, 10);
@@ -227,7 +227,7 @@ class ProductionVerificationTest {
                 .andExpect(jsonPath("$.code").value("VERIFICATION_EQUATION_INVALID"));
 
         // 可执行上限在事务内重算：下游工序（捏毛装袋）流入只有 5，完成 10 超限
-        // （首道制作的有效流入是订单需求 Q，不受 making_inflow 影响）
+        // （首道制作的有效流入是订单需求（订购数量），不受 making_inflow 影响）
         jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET packing_inflow = 5 "
                 + "WHERE order_item_id = ?", orderItemId);
         long packingPlanId = createPlan("PACKING_BAG", packerId, 10);

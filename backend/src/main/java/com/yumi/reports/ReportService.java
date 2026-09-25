@@ -90,7 +90,7 @@ public class ReportService {
      * 履约投影 vs 履约事实：各工序流入、可发货与累计发货必须等于事实汇总。
      *
      * 列对应关系（`domain-and-quantity-model.md` §6）：`making_inflow` 是**流入制作**的量，制作是首道工序、
-     * 有效流入取 Q 而不落列，故该列恒为 0；`packing_inflow` = 流入捏毛装袋（库存接入 + 上游合格）；
+     * 有效流入取订购数量而不落列，故该列恒为 0；`packing_inflow` = 流入捏毛装袋（库存接入 + 上游合格）；
      * `seam_inflow` = 流入缝边剪袋；`shippable_quantity` = 流入可发货（不含 `ORDER_DEMAND` 需求登记）− 发货消耗 + 作废回退。
      * 初版把三列各错位一个节点且漏查可发货，已在本任务修正（由 9.7 恢复演练的一致性核对发现）。
      */

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 /**
  * order_items 表一行：当前有效明细值。
- * {@code seamTypeId} 为空即视为不缝边剪袋（E=0 时缝边字段一律为空或 0）。
+ * {@code seamTypeId} 为空即视为不缝边剪袋（缝边数量=0 时缝边字段一律为空或 0）。
  */
 public record OrderItemRow(
         Long id,

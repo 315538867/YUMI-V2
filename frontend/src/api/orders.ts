@@ -89,7 +89,7 @@ export interface OrderDetail {
   inventoryPlan: OrderPlanLineView[];
 }
 
-/** 明细入参：E=0 即不缝边剪袋，此时缝边字段被服务端忽略。 */
+/** 明细入参：缝边数量为 0 即不缝边剪袋，此时缝边种类/收费被服务端忽略。 */
 export interface OrderItemRequest {
   productId: number;
   quantity: number;

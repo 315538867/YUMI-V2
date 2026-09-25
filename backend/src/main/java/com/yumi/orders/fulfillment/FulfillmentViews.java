@@ -2,8 +2,8 @@ package com.yumi.orders.fulfillment;
 
 /**
  * 履约视图（任务 3.6）：共同数量按工序分流展示，禁止按工序相加。
- * `makingRequired`/`packingRequired`/`finalRequired` 均为 Q，`seamRequired` 为 E，
- * `noSeamRequired` 为 Q − E；最终交付需求始终是 Q，不是 Q + Q + E。
+ * `makingRequired`/`packingRequired`/`finalRequired` 均为订购数量，`seamRequired` 为缝边数量，
+ * `noSeamRequired` 为订购数量 − 缝边数量；最终交付需求始终是订购数量，不是订购数量 + 订购数量 + 缝边数量。
  */
 public final class FulfillmentViews {
 

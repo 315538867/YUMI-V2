@@ -359,7 +359,7 @@ export function OrderChangePage() {
             },
           },
           {
-            title: '数量 Q（前 → 后）',
+            title: '数量（前 → 后）',
             key: 'quantity',
             width: 170,
             render: (_, item) => {
@@ -380,7 +380,7 @@ export function OrderChangePage() {
             },
           },
           {
-            title: '缝边数量 E（前 → 后）',
+            title: '缝边数量（前 → 后）',
             key: 'seamQuantity',
             width: 170,
             render: (_, item) => {
