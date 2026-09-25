@@ -10,7 +10,8 @@ import java.math.RoundingMode;
  * glueGrams=round(weight*(1+loss))；胶水/色浆=克重*单价(4)；
  * 工作日标准数量=floor(工作日小时数*60/std)；有效工时产量=floor(工作日小时数*60*制品有效工时率/std)；
  * 星级人工=(时薪*工作日小时数)/有效工时产量(4)（产量=0 → 0）；
- * 包装=档位整数分钟*(时薪/60)+商品包装提成(4)；total=material+labor+other(4)；参考售价=total/0.7(4)；
+ * 包装=档位整数分钟*(时薪/60)+商品包装提成(4)；total=material+labor+other(4)；
+ * 参考售价=total/(1−目标利润率)(4)（目标利润率来自全局设置）；
  * 派生利润=sale−total(4)、毛利率=(sale−total)/sale(6)（sale=0 → 0）。
  * 三类工序人工费统一由全局时薪派生：制品按「时薪×工作日小时数 ÷ 有效工时产量」（工作日小时数与
  * 制品有效工时率都来自全局设置；制品工序不可能排满整个工作日，故按有效工时率折算的产量计标准产量）；
@@ -21,7 +22,6 @@ import java.math.RoundingMode;
  */
 public final class ProductPricing {
 
-    private static final BigDecimal MARGIN_DIVISOR = new BigDecimal("0.7");
     private static final BigDecimal MINUTES_PER_HOUR = new BigDecimal("60");
     private static final int MONEY_SCALE = 4;
     private static final int RATIO_SCALE = 6;
@@ -39,6 +39,7 @@ public final class ProductPricing {
             BigDecimal hourlyWage,
             BigDecimal workdayHours,
             BigDecimal makingEffectiveHourRate,
+            BigDecimal targetMarginRate,
             BigDecimal glueUnitPrice,
             BigDecimal colorpasteUnitPrice,
             BigDecimal boxLaborFee,
@@ -106,7 +107,7 @@ public final class ProductPricing {
         BigDecimal other = DecimalPolicy.money(in.transportPackingFee().add(in.dailySundriesFee())
                 .add(in.rentUtilitiesFee()).add(in.moldAmortFee()));
         BigDecimal total = DecimalPolicy.money(material.add(labor).add(other));
-        BigDecimal referencePrice = referencePrice(total);
+        BigDecimal referencePrice = referencePrice(total, in.targetMarginRate());
 
         BigDecimal profit = estimatedProfit(in.salePrice(), total);
         BigDecimal margin = estimatedMarginRate(in.salePrice(), total);
@@ -140,16 +141,25 @@ public final class ProductPricing {
      * 缝边剪袋变体预算（FP-PROD-20/21，单件口径）：总成本 = 不缝边剪袋总成本 + 单件缝边人工成本；
      * 参考售价 = 变体总成本 ÷ 0.7。缝边价格按商品填写的收费单价原样回传，不参与成本。
      */
-    public static SeamBudget seamBudget(BigDecimal productTotalCost, BigDecimal seamUnitCost, BigDecimal seamFee) {
+    public static SeamBudget seamBudget(BigDecimal productTotalCost, BigDecimal seamUnitCost, BigDecimal seamFee,
+                                        BigDecimal targetMarginRate) {
         BigDecimal unitCost = DecimalPolicy.money(seamUnitCost == null ? BigDecimal.ZERO : seamUnitCost);
         BigDecimal fee = DecimalPolicy.money(seamFee == null ? BigDecimal.ZERO : seamFee);
         BigDecimal total = DecimalPolicy.money(productTotalCost.add(unitCost));
-        return new SeamBudget(unitCost, fee, total, referencePrice(total));
+        return new SeamBudget(unitCost, fee, total, referencePrice(total, targetMarginRate));
     }
 
-    /** 读时派生：参考售价 = 成本 ÷ 0.7（scale4）。 */
-    public static BigDecimal referencePrice(BigDecimal totalCost) {
-        return DecimalPolicy.money(totalCost.divide(MARGIN_DIVISOR, MONEY_SCALE, RoundingMode.HALF_UP));
+    /**
+     * 读时派生：参考售价 = 成本 ÷ (1 − 目标利润率)（scale4）。目标利润率为 0–1 比例，来自全局设置；
+     * 缺省或 ≥ 1（配置异常）时按 0 处理，避免除零。
+     */
+    public static BigDecimal referencePrice(BigDecimal totalCost, BigDecimal targetMarginRate) {
+        BigDecimal rate = targetMarginRate == null ? BigDecimal.ZERO : targetMarginRate;
+        BigDecimal divisor = BigDecimal.ONE.subtract(rate);
+        if (divisor.signum() <= 0) {
+            divisor = BigDecimal.ONE;
+        }
+        return DecimalPolicy.money(totalCost.divide(divisor, MONEY_SCALE, RoundingMode.HALF_UP));
     }
 
     /** 读时派生：estimatedProfit = sale − total（scale4）。 */

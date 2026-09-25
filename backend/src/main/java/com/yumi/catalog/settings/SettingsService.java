@@ -44,6 +44,8 @@ public class SettingsService {
     private static final String LOSS_SETTING = "loss_rate_default";
     public static final String HOUR_RATE_KEY = "makingEffectiveHourRate";
     private static final String HOUR_RATE_SETTING = "making_effective_hour_rate";
+    public static final String MARGIN_KEY = "targetMarginRate";
+    private static final String MARGIN_SETTING = "target_margin_rate";
 
     private final JdbcTemplate jdbcTemplate;
     private final AuditContext auditContext;
@@ -88,7 +90,8 @@ public class SettingsService {
                 money(byKey, "packaging_commission_default"),
                 money(byKey, "hourly_wage"),
                 money(byKey, "workday_hours"),
-                ratio6(byKey, HOUR_RATE_SETTING));
+                ratio6(byKey, HOUR_RATE_SETTING),
+                percent6(byKey, MARGIN_SETTING));
         return new SettingsViews.SettingsView(values, starLevels(), tiers());
     }
 
@@ -104,7 +107,8 @@ public class SettingsService {
             var column = MONEY_KEYS.get(key);
             var isLoss = LOSS_KEY.equals(key);
             var isHourRate = HOUR_RATE_KEY.equals(key);
-            if (column == null && !isLoss && !isHourRate) {
+            var isMargin = MARGIN_KEY.equals(key);
+            if (column == null && !isLoss && !isHourRate && !isMargin) {
                 throw new ApiException(ErrorCode.VALIDATION_INVALID, "未知设置项：" + key,
                         List.of(new ApiFieldError(key, "未知设置项")));
             }
@@ -123,9 +127,14 @@ public class SettingsService {
                 throw new ApiException(ErrorCode.VALIDATION_INVALID, "制品有效工时率必须在 0 与 1 之间",
                         List.of(new ApiFieldError(key, "必须大于 0 且不超过 1")));
             }
+            if (isMargin && parsed.compareTo(new BigDecimal("100")) >= 0) {
+                throw new ApiException(ErrorCode.VALIDATION_INVALID, "目标利润率必须小于 100%",
+                        List.of(new ApiFieldError(key, "必须小于 100")));
+            }
             var isRatio = isLoss || isHourRate;
             var normalized = (isRatio ? DecimalPolicy.ratio(parsed) : DecimalPolicy.money(parsed)).toPlainString();
-            updates.put(isLoss ? LOSS_SETTING : isHourRate ? HOUR_RATE_SETTING : column, normalized);
+            updates.put(isLoss ? LOSS_SETTING : isHourRate ? HOUR_RATE_SETTING
+                    : isMargin ? MARGIN_SETTING : column, normalized);
             data.put(key, normalized);
         }
         if (updates.isEmpty()) {

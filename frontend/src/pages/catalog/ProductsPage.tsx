@@ -553,9 +553,9 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
               <tr><td>材料成本</td><td><b>{cell(preview, 'materialCost')}</b></td></tr>
               <tr>
                 <td>
-                  制品人工费（工作日 {displayHours(settings?.workdayHours)}h×
+                  制品人工费（工作日 {trimmed(settings?.workdayHours)}h×
                   {preview.result?.qty8h ?? '—'}件 / 有效工时{' '}
-                  {displayHours(effectiveHours(settings))}h×{preview.result?.qty6h ?? '—'}件）
+                  {trimmed(effectiveHours(settings))}h×{preview.result?.qty6h ?? '—'}件）
                 </td>
                 <td>{cell(preview, 'productLaborFee')}</td>
               </tr>
@@ -564,13 +564,13 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
               <tr><td>人工成本</td><td><b>{cell(preview, 'laborCost')}</b></td></tr>
               <tr><td>其他成本（运输/杂费/房租/模具）</td><td><b>{cell(preview, 'otherCost')}</b></td></tr>
               <tr><td>单件总成本（不缝边剪袋）</td><td><b>{cell(preview, 'totalCost')}</b></td></tr>
-              <tr><td>参考售价（不缝边剪袋，成本 ÷ 0.7）</td><td>{cell(preview, 'referencePrice')}</td></tr>
+              <tr><td>参考售价（不缝边剪袋，按目标利润率 {trimmed(settings?.targetMarginRate)}%）</td><td>{cell(preview, 'referencePrice')}</td></tr>
               <tr><td>预计利润</td><td><b>{cell(preview, 'estimatedProfit')}</b></td></tr>
               <tr><td>预计利润率</td><td><b>{cell(preview, 'estimatedMarginRatePercent')}</b></td></tr>
               <tr>
                 <td className="preview-section" colSpan={2}>缝边剪袋变体（含缝边成本，单件）</td>
               </tr>
-              <tr><td>缝边种类成本单价（元/件）</td><td>{seamCell(preview, 'seamUnitCost')}</td></tr>
+              <tr><td>单件缝边人工成本（元/件，缝边标准分钟 × 时薪 ÷ 60）</td><td>{seamCell(preview, 'seamUnitCost')}</td></tr>
               <tr><td>缝边价格（元/件）</td><td>{seamCell(preview, 'seamFee')}</td></tr>
               <tr><td>缝边剪袋变体总成本</td><td><b>{seamCell(preview, 'totalCost')}</b></td></tr>
               <tr><td>缝边剪袋变体参考售价</td><td>{seamCell(preview, 'referencePrice')}</td></tr>
@@ -619,9 +619,9 @@ function seamCell(
   return `${snapshot.result.seamBudget[field]}${suffix}`;
 }
 
-/** 展示用小时数：取设置值并去掉多余小数（如 8 → 8、7.5 → 7.5）。 */
-function displayHours(hours: string | undefined): string {
-  return hours === undefined ? '—' : String(Number(Number(hours).toFixed(2)));
+/** 展示用数值：去掉多余小数（8 → 8、7.5 → 7.5、30.000000 → 30）。 */
+function trimmed(value: string | undefined): string {
+  return value === undefined ? '—' : String(Number(Number(value).toFixed(2)));
 }
 
 /** 制品有效工时 = 工作日小时数 × 制品有效工时率（仅用于展示标签，成本一律由服务端计算）。 */

@@ -240,12 +240,14 @@
 | `hourly_wage` | 时薪（元/小时） | **15.000000** |
 | `workday_hours` | 工作日小时数（小时/天） | **8.000000** |
 | `making_effective_hour_rate` | 制品有效工时率（0–1，工作日中可用于制品的产出比例） | **0.750000** |
+| `target_margin_rate` | 目标利润率（百分数，30 = 30%） | **30.000000** |
 
 预置值等于当前硬编码效果（`MINUTE_RATE = 0.25 元/分钟`、`LABOR_BASE = 120 元`、`360 分钟`），若预置 0 会让三类人工费全部归零，故取现有效值而非 0。
 
 - **制品星级**：单件制品人工费 = (时薪 × 工作日小时数) ÷ 有效工时产量，其中 **有效工时产量 = `floor(工作日小时数 × 60 × 制品有效工时率 ÷ 星级标准分钟)`**；另有参考列 **工作日标准数量 = `floor(工作日小时数 × 60 ÷ 星级标准分钟)`**（不参与人工费）。用户口径：**正常工作时间由「工作日小时数」给出，但星级只影响制品工序，而制品工序不可能排满整个工作日，故按有效工时产出计标准产量**。默认值（8 小时、0.75）下 = `floor(360 ÷ 星级分钟)`、`120 ÷ 该产量`，与现行逐位一致。
 - **包装档位**：单件包装人工费 = 档位标准分钟 × 时薪 ÷ 60 + 商品包装提成（`FP-PROD-08`）。
 - **缝边**：单件缝边人工成本 = 缝边标准分钟 × 时薪 ÷ 60（见 13.1，`FP-PROD-20/21`、`FP-ORDER-04`）。
+- **参考售价**（不区分工序）：参考售价 = 单件总成本 ÷ (1 − 目标利润率)（`FP-PROD-15`；目标利润率 30% 时即 ÷ 0.7）。
 
 **制品有效工时率只作用于制品（星级）人工费**（2026-09-25 用户明确「只针对制品」）：包装与缝边是"按分钟计件"的工序人工，直接用 `标准分钟 × 时薪 ÷ 60`，不乘有效工时率。因此默认值下包装（6 分钟 → `6×0.25+提成`）与缝边（5 分钟 → `1.25` 元）数字全部不变。
 
@@ -275,7 +277,7 @@
 
 1. 原 `V1`–`V14` 按版本顺序合并为 **`V1__yumi_v2_schema.sql`**（章节横幅保留原版本号与文件名，便于对照历史证据）；旧文件删除。原 `V6__packaging_commission_default.sql` 的全局参数插入随之内联。
 2. 结构变更直接写进该文件：`seam_types.cost_price` → **`std_minutes INT UNSIGNED`**；`packaging_tiers.std_minutes`、`products.packaging_std_minutes` 由 `DECIMAL(9,3)` 改 **`INT UNSIGNED`**；`products` 新增 `seam_std_minutes`、`seam_type_cost_price` 改名 `seam_unit_cost`；`work_types` 删除 `active`。
-3. 全局参数默认值写进 SQL（用户要求「读取现在表里的」）：`glue_unit_price 0.034000`、`colorpaste_unit_price 0.002400`、`loss_rate_default 20.000000`、`box_labor_default 0.500000`、`transport_packing_default 0.200000`、`sundries_default 0.500000`、`rent_utilities_default 0.800000`、`packaging_commission_default 0.500000`、**`hourly_wage 15.000000`、`workday_hours 8.000000`、`making_effective_hour_rate 0.750000`**。
+3. 全局参数默认值写进 SQL（用户要求「读取现在表里的」）：`glue_unit_price 0.034000`、`colorpaste_unit_price 0.002400`、`loss_rate_default 20.000000`、`box_labor_default 0.500000`、`transport_packing_default 0.200000`、`sundries_default 0.500000`、`rent_utilities_default 0.800000`、`packaging_commission_default 0.500000`、**`hourly_wage 15.000000`、`workday_hours 8.000000`、`making_effective_hour_rate 0.750000`、`target_margin_rate 30.000000`**。
 4. 重建会清掉库内既有业务数据（含原自建的缝边种类与包装档位），静态数据回到种子（星级 5 条、工种 4 条、包装档位 6 分钟档 1 条）；用户已确认可接受。
 
 ### 13.7 影响与需重新验收

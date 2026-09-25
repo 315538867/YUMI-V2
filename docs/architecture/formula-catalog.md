@@ -30,7 +30,7 @@
 
 ## 3. 商品公式目录
 
-公式语义与常量见 `formula-management-design.md` 第 5 节；**2026-09-25 起**时薪、工作日小时数与制品有效工时率为全局设置（`hourly_wage`、`workday_hours`、`making_effective_hour_rate`），0.7 目标毛利率除数仍为命名常量。
+公式语义与常量见 `formula-management-design.md` 第 5 节；**2026-09-25 起**时薪、工作日小时数、制品有效工时率与目标利润率均为全局设置（`hourly_wage`、`workday_hours`、`making_effective_hour_rate`、`target_margin_rate`），商品侧不再有硬编码的业务常量。
 
 | 标识 | 名称 | 输入与单位 | 表达式 | 舍入节点 | 结果含义 |
 | --- | --- | --- | --- | --- | --- |
@@ -46,7 +46,7 @@
 | FP-PROD-12 | 人工成本 | 星级人工、包装人工、装箱人工 | `productLaborFee + packagingLaborFee + boxLaborFee` | scale4 HALF_UP | 人工分项 |
 | FP-PROD-13 | 其他成本 | 运输包装、日常杂费、房租水电、模具摊销 | 四项相加 | scale4 HALF_UP | 其他分项 |
 | FP-PROD-14 | 单件总成本 | 三项成本 | `materialCost + laborCost + otherCost` | scale4 HALF_UP | 基础单件成本 |
-| FP-PROD-15 | 参考售价 | 单件总成本 | `totalCost / 0.7` | scale4 HALF_UP | 按目标毛利率反推售价 |
+| FP-PROD-15 | 参考售价 | 单件总成本、目标利润率 | `totalCost / (1 − 目标利润率)` | scale4 HALF_UP | 按目标利润率反推售价 |
 | FP-PROD-16 | 预计利润 | 成交价、单件总成本 | `salePrice − totalCost` | scale4 HALF_UP | 读时派生，允许为负 |
 | FP-PROD-17 | 预计利润率 | 成交价、单件总成本 | `salePrice = 0 → 0`，否则 `(salePrice − totalCost) / salePrice` | scale6 HALF_UP | 读时派生比例 |
 | FP-PROD-18 | 损耗率回显百分比 | 内部损耗比例 | `lossRate × 100` | scale6 HALF_UP | 接口回显百分比文本 |

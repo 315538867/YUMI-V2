@@ -147,11 +147,27 @@ class ProductPricingBaselineTest {
     }
 
     @Test
+    void targetMarginRateDrivesReferencePrice() {
+        // 成本 10：利润率 30% → 10 ÷ 0.7 = 14.2857；50% → 10 ÷ 0.5 = 20.0000；0% → 10 ÷ 1 = 10.0000
+        plain(input().star(0).targetMarginRate("0.3").salePrice("0")
+                .weight(0).compute().referencePrice(), "0.0000");
+        var atThirty = ProductPricing.referencePrice(new BigDecimal("10.0000"), new BigDecimal("0.3"));
+        var atFifty = ProductPricing.referencePrice(new BigDecimal("10.0000"), new BigDecimal("0.5"));
+        var atZero = ProductPricing.referencePrice(new BigDecimal("10.0000"), BigDecimal.ZERO);
+        var atInvalid = ProductPricing.referencePrice(new BigDecimal("10.0000"), new BigDecimal("1.5"));
+
+        plain(atThirty, "14.2857");
+        plain(atFifty, "20.0000");
+        plain(atZero, "10.0000");
+        plain(atInvalid, "10.0000");
+    }
+
+    @Test
     void seamBudgetAddsSeamUnitCostWithoutTouchingProductCost() {
         // 缝边剪袋变体（FP-PROD-20/21）：不缝边剪袋总成本 1.0000 + 种类成本单价 1.2500 = 2.2500；
         // 2.25/0.7 = 3.2142857… → 3.2143；缝边价格 2.0000 只作收费展示，不进成本
         var seam = ProductPricing.seamBudget(new BigDecimal("1.0000"),
-                new BigDecimal("1.2500"), new BigDecimal("2.0000"));
+                new BigDecimal("1.2500"), new BigDecimal("2.0000"), new BigDecimal("0.3"));
 
         plain(seam.seamUnitCost(), "1.2500");
         plain(seam.seamFee(), "2.0000");
@@ -162,7 +178,7 @@ class ProductPricingBaselineTest {
     @Test
     void seamBudgetTreatsMissingSeamTypeCostAndFeeAsZero() {
         // 缝边种类成本单价允许为 0；商品未填缝边价格按 0，变体总成本回到不缝边剪袋口径
-        var seam = ProductPricing.seamBudget(new BigDecimal("16.2200"), null, null);
+        var seam = ProductPricing.seamBudget(new BigDecimal("16.2200"), null, null, new BigDecimal("0.3"));
 
         plain(seam.seamUnitCost(), "0.0000");
         plain(seam.seamFee(), "0.0000");
@@ -190,6 +206,7 @@ class ProductPricingBaselineTest {
         private BigDecimal hourlyWage = new BigDecimal("15");
         private BigDecimal workdayHours = new BigDecimal("8");
         private BigDecimal makingEffectiveHourRate = new BigDecimal("0.75");
+        private BigDecimal targetMarginRate = new BigDecimal("0.3");
         private BigDecimal glueUnitPrice = BigDecimal.ZERO;
         private BigDecimal colorpasteUnitPrice = BigDecimal.ZERO;
         private BigDecimal boxLaborFee = BigDecimal.ZERO;
@@ -227,6 +244,11 @@ class ProductPricingBaselineTest {
 
         Builder workdayHours(String value) {
             this.workdayHours = new BigDecimal(value);
+            return this;
+        }
+
+        Builder targetMarginRate(String value) {
+            this.targetMarginRate = new BigDecimal(value);
             return this;
         }
 
@@ -278,6 +300,7 @@ class ProductPricingBaselineTest {
         ProductPricing.Result compute() {
             return ProductPricing.compute(new ProductPricing.Inputs(weightG, lossRate, stdMinutes,
                     tierStdMinutes, packagingCommission, hourlyWage, workdayHours, makingEffectiveHourRate,
+                    targetMarginRate,
                     glueUnitPrice, colorpasteUnitPrice, boxLaborFee,
                     transportPackingFee, dailySundriesFee, rentUtilitiesFee, moldAmortFee, salePrice));
         }

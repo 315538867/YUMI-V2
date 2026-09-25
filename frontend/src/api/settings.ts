@@ -17,6 +17,8 @@ export interface SettingsValues {
   workdayHours: Money;
   /** 制品有效工时率（0–1 比例，如 0.750000）：制品人工费按有效工时产量计 */
   makingEffectiveHourRate: string;
+  /** 目标利润率（百分数，如 30.000000 表示 30%）：参考售价 = 单件总成本 ÷ (1 − 该率) */
+  targetMarginRate: string;
 }
 
 export interface StarLevel {

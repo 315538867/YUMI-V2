@@ -6,7 +6,7 @@ export type ProductStatus = 'ACTIVE' | 'DISABLED';
 
 /**
  * 缝边剪袋变体预算（单件口径，公式 FP-PROD-20/21）：商品自身成本按不缝边剪袋口径保存，
- * 该变体单列展示「不缝边剪袋总成本 + 缝边种类成本单价」，不写入商品快照。
+ * 该变体单列展示「不缝边剪袋总成本 + 单件缝边人工成本（缝边标准分钟 × 时薪 ÷ 60）」，不写入商品快照。
  */
 export interface SeamBudget {
   seamUnitCost: Money;

@@ -62,6 +62,11 @@ public class CatalogReference {
         return DecimalPolicy.ratio(setting("making_effective_hour_rate"));
     }
 
+    /** 目标利润率（0–1 比例，scale6）：参考售价 = 单件总成本 ÷ (1 − 该率)；库内按百分数存储。 */
+    public BigDecimal targetMarginRate() {
+        return DecimalPolicy.percentToRatio(setting("target_margin_rate"));
+    }
+
     public Optional<StarLevel> starLevelById(long id) {
         var level = jdbcTemplate.query(
                 "SELECT id, name, std_minutes FROM star_levels WHERE id = ?",

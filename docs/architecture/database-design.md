@@ -290,7 +290,7 @@
 
 ## 15. Flyway 迁移与测试门禁
 
-迁移文件位于 `backend/src/main/resources/db/migration`，按 `V<版本>__<说明>.sql` 命名。已经在任何共享环境执行过的版本迁移不得修改；修正必须新增更高版本迁移。**上线前**（开发期、未部署到任何共享环境）允许在清库重建的前提下改写早期迁移为最终结构（2026-09-24 已按此重写 `V4`/`V5`：新增 `seam_types`/`work_types`，`packaging_tiers` 去提成并预置 6 分钟档，`products` 去缝边数量/成本列并新增缝边默认值四列，`packaging_commission` 语义改为商品提成，`employee_work_types` 改 `work_type_id`），上线后该禁止条款立即生效。`V6` 为 2.23 追加的全局参数（`packaging_commission_default`、`hourly_wage`、`workday_hours`、`making_effective_hour_rate`）。**2026-09-25**：用户确认「把所有 Flyway 版本压缩到一个」，原 V1–V14 已合并为**单一基线** `V1__yumi_v2_schema.sql`（章节横幅保留原版本号便于对照历史证据），空库执行即得完整结构。
+迁移文件位于 `backend/src/main/resources/db/migration`，按 `V<版本>__<说明>.sql` 命名。已经在任何共享环境执行过的版本迁移不得修改；修正必须新增更高版本迁移。**上线前**（开发期、未部署到任何共享环境）允许在清库重建的前提下改写早期迁移为最终结构（2026-09-24 已按此重写 `V4`/`V5`：新增 `seam_types`/`work_types`，`packaging_tiers` 去提成并预置 6 分钟档，`products` 去缝边数量/成本列并新增缝边默认值四列，`packaging_commission` 语义改为商品提成，`employee_work_types` 改 `work_type_id`），上线后该禁止条款立即生效。`V6` 为 2.23 追加的全局参数（`packaging_commission_default`、`hourly_wage`、`workday_hours`、`making_effective_hour_rate`、`target_margin_rate`）。**2026-09-25**：用户确认「把所有 Flyway 版本压缩到一个」，原 V1–V14 已合并为**单一基线** `V1__yumi_v2_schema.sql`（章节横幅保留原版本号便于对照历史证据），空库执行即得完整结构。
 
 每次数据库变更必须具备：
 

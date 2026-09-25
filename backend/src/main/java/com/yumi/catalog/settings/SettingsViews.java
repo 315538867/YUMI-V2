@@ -13,7 +13,8 @@ public final class SettingsViews {
                              String boxLaborDefault, String transportPackingDefault,
                              String sundriesDefault, String rentUtilitiesDefault,
                              String packagingCommissionDefault, String hourlyWage,
-                             String workdayHours, String makingEffectiveHourRate) {
+                             String workdayHours, String makingEffectiveHourRate,
+                             String targetMarginRate) {
     }
 
     public record StarLevelView(long id, String name, int stdMinutes) {

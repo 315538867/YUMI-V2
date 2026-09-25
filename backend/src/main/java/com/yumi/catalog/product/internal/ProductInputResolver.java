@@ -100,6 +100,7 @@ public class ProductInputResolver {
         var inputs = new ProductPricing.Inputs(request.weightG(), globalLossRate(), starLevel.stdMinutes(),
                 tier == null ? null : tier.stdMinutes(), commission,
                 reference.hourlyWage(), reference.workdayHours(), reference.makingEffectiveHourRate(),
+                reference.targetMarginRate(),
                 gluePrice, colorpastePrice, box, transport,
                 reference.moneySetting("sundries_default"), reference.moneySetting("rent_utilities_default"),
                 mold, DecimalPolicy.money(request.salePrice()));
@@ -223,6 +224,7 @@ public class ProductInputResolver {
         var inputs = new ProductPricing.Inputs(weightG, globalLossRate(), starLevel.stdMinutes(),
                 tier == null ? null : tier.stdMinutes(), commission,
                 reference.hourlyWage(), reference.workdayHours(), reference.makingEffectiveHourRate(),
+                reference.targetMarginRate(),
                 gluePrice, colorpastePrice, box, transport,
                 reference.moneySetting("sundries_default"), reference.moneySetting("rent_utilities_default"),
                 mold, sale);

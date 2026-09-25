@@ -305,6 +305,11 @@ export function SettingsPage() {
                         <Input placeholder="如 0.750000（工作日小时数 × 该率 = 制品有效工时）" />
                       </Form.Item>
                     </Col>
+                    <Col span={8}>
+                      <Form.Item name="targetMarginRate" label="目标利润率（%）" rules={[{ required: true }]}>
+                        <Input placeholder="如 30（参考售价 = 单件总成本 ÷ (1 − 该率)）" />
+                      </Form.Item>
+                    </Col>
                   </Row>
                   <Button type="primary" loading={saving} onClick={() => void saveValues()}>
                     保存单价与默认值

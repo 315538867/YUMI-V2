@@ -60,6 +60,7 @@ class SettingsApiTest {
         // 时薪、工作日小时数与制品有效工时率是三类人工费的派生基数，清零会让后续用例的人工费/产量全为 0 → 恢复 SQL 默认值
         jdbcTemplate.update("UPDATE catalog_settings SET setting_value = 15.000000 WHERE setting_key = 'hourly_wage'");
         jdbcTemplate.update("UPDATE catalog_settings SET setting_value = 8.000000 WHERE setting_key = 'workday_hours'");
+        jdbcTemplate.update("UPDATE catalog_settings SET setting_value = 30.000000 WHERE setting_key = 'target_margin_rate'");
         jdbcTemplate.update(
                 "UPDATE catalog_settings SET setting_value = 0.750000 WHERE setting_key = 'making_effective_hour_rate'");
         jdbcTemplate.update("DELETE FROM packaging_tiers WHERE tier_name LIKE '验收档位%'");

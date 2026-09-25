@@ -116,8 +116,9 @@ class CatalogMigrationTest {
         assertThat(baseline).contains("('hourly_wage', 15.000000");
         assertThat(baseline).contains("('workday_hours', 8.000000");
         assertThat(baseline).contains("('making_effective_hour_rate', 0.750000");
+        assertThat(baseline).contains("('target_margin_rate', 30.000000");
         assertThat(jdbcTemplate.queryForList("SELECT setting_key FROM catalog_settings", String.class))
-                .contains("hourly_wage", "workday_hours", "making_effective_hour_rate");
+                .contains("hourly_wage", "workday_hours", "making_effective_hour_rate", "target_margin_rate");
     }
 
     private boolean tableExists(String tableName) {

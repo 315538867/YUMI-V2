@@ -404,7 +404,7 @@ INSERT INTO packaging_tiers (tier_name, std_minutes, created_at, updated_at) VAL
 -- 原 V6__packaging_commission_default.sql
 -- ==========================================================================================
 
--- 追加的全局参数（元/件、元/小时、小时、比例）：默认值取自清库前库内实际值
+-- 追加的全局参数（元/件、元/小时、小时、比例、百分数）：默认值取自清库前库内实际值
 -- （2026-09-25 用户确认「全局参数在 SQL 中加默认值、读取现在表里的」）
 -- 1) 包装提成：商品表单取此全局值作默认、可修改（对应真实核算表的「打包提成」参数）
 -- 2) 时薪：制品/包装/缝边三类人工费的统一派生基数
@@ -412,11 +412,13 @@ INSERT INTO packaging_tiers (tier_name, std_minutes, created_at, updated_at) VAL
 -- 4) 制品有效工时率：正常工作时间由「工作日小时数」给出，但星级只影响制品工序、
 --    制品工序不可能排满整个工作日，故制品人工费按有效工时产出计
 --    （有效工时产量 = floor(工作日小时数 × 60 × 该率 ÷ 星级标准分钟)）
+-- 5) 目标利润率（百分数，30 = 30%）：参考售价 = 单件总成本 ÷ (1 − 该率)
 INSERT INTO catalog_settings (setting_key, setting_value, created_at, updated_at) VALUES
     ('packaging_commission_default', 0.500000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)),
     ('hourly_wage', 15.000000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)),
     ('workday_hours', 8.000000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)),
-    ('making_effective_hour_rate', 0.750000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6));
+    ('making_effective_hour_rate', 0.750000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)),
+    ('target_margin_rate', 30.000000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6));
 
 -- ==========================================================================================
 -- 原 V7__orders.sql

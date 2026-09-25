@@ -84,7 +84,7 @@ public class ProductService {
         return toPreview(resolved);
     }
 
-    private static ProductPreview toPreview(ProductInputResolver.Resolved resolved) {
+    private ProductPreview toPreview(ProductInputResolver.Resolved resolved) {
         var in = resolved.inputs();
         var pricing = ProductPricing.compute(in);
         return new ProductPreview(pricing.glueGrams(), pricing.glueCost(), pricing.colorpasteCost(),
@@ -99,12 +99,13 @@ public class ProductService {
     }
 
     /** 缝边剪袋变体预算：未选默认缝边剪袋类型（默认不缝边剪袋）时为 null，不伪造零值。 */
-    private static SeamBudgetView seamBudget(Long seamTypeId, BigDecimal seamUnitCost, BigDecimal seamFee,
-                                            BigDecimal productTotalCost) {
+    private SeamBudgetView seamBudget(Long seamTypeId, BigDecimal seamUnitCost, BigDecimal seamFee,
+                                      BigDecimal productTotalCost) {
         if (seamTypeId == null) {
             return null;
         }
-        return SeamBudgetView.of(ProductPricing.seamBudget(productTotalCost, seamUnitCost, seamFee));
+        return SeamBudgetView.of(ProductPricing.seamBudget(productTotalCost, seamUnitCost, seamFee,
+                reference.targetMarginRate()));
     }
 
     /** 利润率展示文本：比例 → 百分比并去掉无意义尾零，如 0.351200 → 35.12%。 */
