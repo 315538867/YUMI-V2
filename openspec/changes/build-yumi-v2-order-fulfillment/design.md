@@ -11,7 +11,7 @@
 - 为六份 capability spec 提供可测试的行为、输入、输出、拒绝条件和状态约束。
 - 为每项业务能力冻结 HTTP 方法、路径、认证、幂等键、请求/响应重点、成功状态和错误码。
 - 为每个阶段冻结页面/路由/操作入口，明确订单内部组件不得被误建成顶级模块；订单详情采用一组订单内多 Tab，视觉基线为常规 Ant Design 后台管理布局、全页白色底、浅色侧栏与顶部面包屑，使用现成组件并通过按钮层级、Tag 样式、间距、边框和主题 token 表达层次，不并排展示 A/B 方案或重复订单页签。
-- 保持共同数量（订购数量与缝边数量）、库存领用一次扣减、生产核验等式、订单关闭条件和售后独立台账；已确认发货后即可受理对应已发部分售后。
+- 保持共同数量（订购数量与缝边数量）、库存领用一次扣减、生产任务逐明细核验等式、订单关闭条件和售后独立台账；已确认发货后即可受理对应已发部分售后。
 - 让实现任务同时指向 Requirement/Scenario、正式文档章节、后端包/Flyway、API、前端、自动化测试和人工验收。
 - 以 Java 21、Spring Boot 3.5.x、Spring Modulith、Spring Data JPA、Flyway、Maven、MySQL 8.x、JUnit 5、Testcontainers 为实现基线。
 
@@ -26,7 +26,7 @@
 
 ### 1. 一个 change，九个有依赖阶段
 
-保持 `platform-foundation`、`master-data-management`、`order-lifecycle`、`inventory-management`、`production-management`、订单发货、收退款与关闭、售后、reporting/operations 的九阶段顺序。阶段五可以提前创建等待上游计划，但库存接入场景依赖阶段四；阶段六依赖库存和生产；阶段八依赖库存、生产、发货和退款。每项任务必须在 `tasks.md` 中写明前置任务和完成证据。
+保持 `platform-foundation`、`master-data-management`、`order-lifecycle`、`inventory-management`、`production-management`、订单发货、收退款与关闭、售后、reporting/operations 的九阶段顺序。阶段五可以提前创建等待上游的生产任务，但库存接入场景依赖阶段四；阶段六依赖库存和生产；阶段八依赖库存、生产、发货和退款。每项任务必须在 `tasks.md` 中写明前置任务和完成证据。
 
 ### 2. 业务 API 使用命令端点，不提供通用状态覆盖
 
@@ -40,7 +40,7 @@
 
 ### 4. 单库事务拥有者是发起业务命令的应用服务
 
-订单确认、订单变更确认、库存领用/取消、生产核验、发货确认/作废/更正、收退款、售后核验/补发、订单关闭和超额预占均在一个 Spring `@Transactional` 事务内完成。事务内以稳定顺序锁定订单明细履约余额、库存批次、返工/重做来源余额、计划或资金投影；使用 `@Version`、`PESSIMISTIC_WRITE`/`FOR UPDATE`、唯一约束和幂等键。失败必须整体回滚。
+订单确认、订单变更确认、库存领用/取消、生产任务创建/取消、生产任务逐明细核验、发货确认/作废/更正、收退款、售后核验/补发、订单关闭和超额预占均在一个 Spring `@Transactional` 事务内完成。事务内以稳定顺序锁定订单明细履约余额、库存批次、返工来源余额、生产任务明细或资金投影；普通生产任务类型仅为 `NORMAL`/`REWORK`，明细保存来源、明线/暗线、标准分钟和标准工时快照，`NORMAL` 按产品当日产能校验，`REWORK` 不占正常产能；超额是独立预占，不是普通生产任务类型。使用 `@Version`、`PESSIMISTIC_WRITE`/`FOR UPDATE`、唯一约束和幂等键。失败必须整体回滚。
 
 ### 5. 事实不可变，投影可重建
 
@@ -93,15 +93,14 @@
 | 履约视图 | `GET /api/orders/{id}/fulfillment` | 管理员/否 | 订购数量/缝边数量、工序、需求和发货派生状态 | `ORDER_NOT_FOUND` |
 | 库存 | `GET/POST /api/inventory/batches`、`POST /api/inventory/adjustments` | 管理员/写入幂等 | 批次和流水 | `VALIDATION_INVALID`（负数/非法调整）, `CONFLICT_DUPLICATE`（重复冲销） |
 | 领用 | `POST /api/inventory-allocations`、`POST /api/inventory-allocations/{id}/cancel` | 管理员/必须幂等 | 领用、反向流水、履约接入 | `STOCK_INSUFFICIENT`, `STATE_CANNOT_CANCEL`（同一来源重复接入由来源唯一键保证） |
-| 生产计划 | `GET/POST /api/production-plans`、`POST /api/production-plans/{id}/cancel` | 管理员/写入幂等 | 计划与等待上游状态 | `EMPLOYEE_NOT_ELIGIBLE`, `SOURCE_INSUFFICIENT`, `STATE_NOT_CANCELABLE` |
-| 核验 | `POST /api/production-plans/{id}/verify` | 管理员/必须幂等 | 一次性核验与来源 | `VERIFICATION_EQUATION_INVALID`, `STATE_ALREADY_VERIFIED`, `QUANTITY_NOT_EXECUTABLE` |
-| 返工/重做 | `POST /api/rework-sources`、`POST /api/remake-sources` | 管理员/必须幂等 | 来源余额与计划入口 | `REWORK_TARGET_INVALID`, `REMAKE_REASON_REQUIRED` |
-| 超额 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify` | 管理员/必须幂等 | 预占或计划调整提醒 | `OVERTIME_DATE_INVALID`, `OVERTIME_RESERVATION_EXCEEDED` |
+| 生产任务 | `GET/POST /api/production-tasks`、`POST /api/production-tasks/{id}/items/{itemId}/cancel` | 管理员/写入幂等 | 多订单多产品任务、`NORMAL`/`REWORK` 类型、明线/暗线、任务明细与等待上游状态 | `EMPLOYEE_NOT_ELIGIBLE`, `SOURCE_INSUFFICIENT`, `STATE_NOT_CANCELABLE`, `REWORK_SOURCE_INVALID` |
+| 逐明细核验 | `POST /api/production-tasks/{id}/verify` | 管理员/必须幂等 | 一次性逐明细核验、完成/合格/返工/报废事实、返工来源与数量回转 | `VERIFICATION_EQUATION_INVALID`, `STATE_ALREADY_VERIFIED`, `QUANTITY_NOT_EXECUTABLE`, `SCRAP_QUANTITY_INVALID` |
+| 超额预占与其他排班 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify`、`POST /api/other-schedule-tasks`、`POST /api/other-schedule-tasks/{id}/verify` | 管理员/必须幂等 | 独立超额预占或任务调整提醒、其他排班工时核验；超额不进入普通生产任务类型 | `OVERTIME_DATE_INVALID`, `OVERTIME_RESERVATION_EXCEEDED`, `WORKING_MINUTES_INVALID` |
 | 发货 | `GET/POST /api/orders/{id}/shipments`、`POST /api/orders/{id}/shipments/{shipmentId}/confirm` | 管理员/必须幂等 | 冻结发货快照 | `SHIPMENT_EXCEEDS_AVAILABLE`, `SHIPMENT_EXCEEDS_DEMAND` |
 | 发货作废/更正 | `POST .../void`、`POST .../corrections`、`PATCH .../logistics` | 管理员/必须幂等 | 反向事实或等量替代 | `STATE_CLOSED_REQUIRES_CORRECTION`, `CORRECTION_REPLACEMENT_REQUIRED`, `SHIPMENT_AFTER_SALES_LINKED` |
 | 收款/退款 | `POST /api/orders/{id}/payments`、`POST /api/orders/{id}/refunds` | 管理员/必须幂等 | 不可变资金事实；售后退款单列于订单结清 | `PAYMENT_DRAFT_FORBIDDEN`, `REFUND_EXCEEDS_RECEIPTS`, `REFUND_REFERENCE_REQUIRED` |
 | 关闭 | `POST /api/orders/{id}/close` | 管理员/必须幂等 | 已关闭或条件明细 | `CLOSE_FULFILLMENT_PENDING`, `CLOSE_SETTLEMENT_PENDING`, `CLOSE_REFUND_PENDING` |
-| 售后 | `POST /api/orders/{id}/after-sales`、`POST .../{caseId}/verify-return` | 管理员/必须幂等 | 关联有效已确认发货批次明细的独立售后台账 | `AFTER_SALES_SOURCE_INVALID`, `AFTER_SALES_QUANTITY_EXCEEDED`, `AFTER_SALES_EQUATION_INVALID` |
+| 售后 | `POST /api/orders/{id}/after-sales`、`POST .../{caseId}/verify-return` | 管理员/必须幂等 | 关联有效已确认发货批次明细的独立售后台账；发货可用数量依赖生产任务明细产出 | `AFTER_SALES_SOURCE_INVALID`, `AFTER_SALES_QUANTITY_EXCEEDED`, `AFTER_SALES_EQUATION_INVALID` |
 | 售后补发 | `POST .../{caseId}/replacement-shipments`、`POST .../confirm` | 管理员/必须幂等 | 售后已补发增加，原订单不变 | `AFTER_SALES_REPLACEMENT_INSUFFICIENT` |
 | 查询导出 | `GET /api/reports/{type}`、`GET .../export` | 管理员/否 | 服务端事实导出 | `REPORT_TYPE_INVALID` |
 | 全局设置 | `GET/PATCH /api/settings` | 管理员/写入幂等 | 单价与默认值（胶水/色浆单价、损耗率、四项单件费用默认） | `VALIDATION_INVALID` |
@@ -123,8 +122,10 @@ React 页面必须由业务入口驱动，Electron 复用相同路由和 API；�
 | `/orders/:id` | 订单详情 | 总览、商品与履约、发货与售后、资金与利润、资料与变更 Tab；显式进入变更、取消、发货、收退款、售后、关闭操作 | 总览可核对 12+ 明细；履约按阶段看事实；只读与操作分离；已确认发货可受理售后 |
 | `/orders/:id/changes/:changeId` | 变更确认操作 | 变更前后、超出处理、确认 | 减单必须逐项处理余量；确认后回到订单只读详情 |
 | `/inventory` | 库存工作区 | 批次、流水、调整、领用 | 领用扣一次，发货不二扣；订单内低频领用就近进入 |
-| `/production` | 生产工作台 | 排班、等待上游、核验、提醒 | 未完成和超额提醒独立可处理 |
-| `/production/plans/:id/verify` | 核验操作 | 完成/合格/返工/报废 | 等式与一次核验错误可见 |
+| `/production` | 生产工作台 | 查看多订单多产品任务、明线/暗线、等待上游、提醒 | 未完成、超额和其他排班提醒独立可处理 |
+| `/production/tasks/new` | 生产任务新建 | 选择多个订单/产品明细、`NORMAL`/`REWORK`、来源、执行员工、工序与日期，提交任务 | 全页工作区可一次配置多条任务明细；正常任务显示产能与标准工时约束，返工任务不占正常产能 |
+| `/production/tasks/:id` | 生产任务只读详情 | 查看任务头、全部任务明细、来源、明线/暗线、标准分钟/标准工时、核验事实 | 只读详情，不预置编辑表单；每条明细的核验状态与数量事实可追溯 |
+| `/production/tasks/:id/verify` | 多明细核验操作 | 按任务明细填写完成、合格、返工、报废数量与返工来源，提交一次性核验 | 逐明细校验等式；报废事实和数量回转可见；已核验任务不可重复核验 |
 | `/reports` | 台账与导出 | 查询、导出、打印/PDF | 导出无物流字段 |
 | `/settings` | 全局设置 | 「单价与默认值」设置值；「静态数据」Tab 先列类别（星级/包装档位/缝边种类/员工工种）、再按类别管理条目；「公式说明」只读 Tab | 全局变更不回溯既有商品快照；类别不可增删改名、被引用条目禁删、改名不回溯；公式说明可查看输入、单位、舍入和示例，但不能编辑或改变运行时公式 |
 | Electron shell | 桌面壳 | 打印、文件选择、窗口 | 不直连数据库、不复制业务规则 |
@@ -133,11 +134,11 @@ React 页面必须由业务入口驱动，Electron 复用相同路由和 API；�
 
 ### 7.1 售后来源和结清口径
 
-创建售后必须引用已确认且有效的发货批次明细，并在事务内锁定该明细的有效已发余额与售后已占用量；新受理量不能超过剩余可受理量。售后可在订单仍部分履约时并行进行；原发货已被有效售后引用时，不得直接作废或更正为无效来源。订单结清净额为累计订单收款减累计订单变更退款，订单待退款为 `max(累计订单收款 - 当前有效应收 - 累计订单变更退款, 0)`；售后退款独立关联售后单，进入累计实际净收，不冲减结清净额、不产生新的订单待收/待退。全部退款仍不得超过累计订单收款。订单关闭重验只使用订单结清口径，售后占用和售后退款不改变原订单履约、应收或主状态。
+创建售后必须引用已确认且有效的发货批次明细，并在事务内锁定该明细的有效已发余额与售后已占用量；新受理量不能超过剩余可受理量。售后可在订单仍部分履约时并行进行；原发货已被有效售后引用时，不得直接作废或更正为无效来源。售后来源只追溯有效发货批次明细，生产任务明细不直接成为售后来源，但任务明细产出是发货可用数量的上游事实。订单结清净额为累计订单收款减累计订单变更退款，订单待退款为 `max(累计订单收款 - 当前有效应收 - 累计订单变更退款, 0)`；售后退款独立关联售后单，进入累计实际净收，不冲减结清净额、不产生新的订单待收/待退。全部退款仍不得超过累计订单收款。订单关闭重验只使用订单结清口径，售后占用和售后退款不改变原订单履约、应收或主状态。
 
 ### 8. 数据库与 Flyway 设计
 
-数据库表按顶级模块归属：`identity`、`catalog`、`orders`、`inventory`、`production`、`files`。`shipments`、`payments`、`refunds`、`after_sales_*` 和履约表虽独立建表，仍由 `orders` 拥有。金额为 `DECIMAL(19,4)`，比例为 `DECIMAL(9,6)`，数量为非负整数；唯一约束覆盖业务编号、一次核验、来源消费、幂等键和订单状态转换。Flyway 是唯一结构来源，Hibernate 仅 `ddl-auto: validate`。
+数据库表按顶级模块归属：`identity`、`catalog`、`orders`、`inventory`、`production`、`files`。生产侧统一以 `production_tasks` 和 `task_items` 承载多订单多产品 `NORMAL`/`REWORK` 任务、来源及逐明细事实；超额预占、其他排班和提醒按各自事实表承载，不把超额伪装成普通生产任务类型。`shipments`、`payments`、`refunds`、`after_sales_*` 和履约表虽独立建表，仍由 `orders` 拥有。金额为 `DECIMAL(19,4)`，比例为 `DECIMAL(9,6)`，数量为非负整数；唯一约束覆盖业务编号、一次逐明细核验、返工来源消费、幂等键和订单状态转换。Flyway 是唯一结构来源，Hibernate 仅 `ddl-auto: validate`。
 
 ### 9. 测试和人工证据
 

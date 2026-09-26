@@ -1,324 +1,667 @@
-# 生产模块施工文档（阶段五：生产计划、核验、返工、重做与超额提醒）
+# 生产模块施工文档（阶段五：生产任务、核验、返工与超额提醒）
 
-日期：2026-09-25  
-修改人：chen  
-状态：**待评审**；按 `openspec/changes/build-yumi-v2-order-fulfillment/tasks.md` 的 5.1–5.17 逐条实施，逐项证据回填该文件。  
-上游依据：`docs/architecture/domain-and-quantity-model.md`（§5–§7 流程分流/有效流入/生产核验、§11 超额任务、§14 不变量）、`docs/architecture/database-design.md` §8（生产模块表）、§12–§15（编号、索引、约束、Flyway 门禁）、`specs/production-management/spec.md`（Requirement/Scenario）、`design.md` §4/§5/§6/§7（事务、事实不可变、API 与前端矩阵）。
+日期：2026-09-25
+修改人：chen
+状态：**待评审、待实施**。本文是阶段五的施工基线，不代表功能已经落地；不得以本文伪造代码、迁移、接口或测试已完成的证据。
+上游依据：`docs/architecture/domain-and-quantity-model.md`、`docs/architecture/database-design.md`、`specs/production-management/spec.md`、`design.md`。如上游文档与本文冲突，以本文件列明的最终口径为阶段五实施输入，并在实施前同步评估受影响的上游契约。
 
-## 1. 范围
+---
 
-**本阶段做**：10 张生产表（V10 迁移）、生产计划编号 `PN` 与其他排班编号 `OS`、正常/返工/重做/超额四类计划的创建与查询、待安排与当前可执行计算、一次性核验与逐工序合格流转、返工来源与重做来源、待执行计划取消与来源恢复、未完成待处理（重新安排/部分安排/暂不安排）、超额预占与超额提醒处理、其他排班与一次性工时核验及更正、`/production` 工作台与 `/production/plans/:id/verify` 核验页，以及 5.16/5.17 的测试与人工验收。
+## 1. 目标、范围与阶段边界
 
-**本阶段不做**：发货（阶段六）、收退款与关闭（阶段七）、售后核验与售后补发（阶段八，本阶段只保留计划类型枚举与来源校验入口）、成品余量与减单超出处置（阶段七）、工资与工时结算（延期，本阶段只落工时事实）、报表导出（阶段九）。**不建空实现、不建占位服务。**
+### 1.1 本阶段目标
 
-**不改动阶段三/四既有表结构**（初稿曾提议拆 `verified_processed`，已否决）：按工序的「已核验处理」由**生产事实**汇总得到（`SUM(production_verifications.completed_quantity) GROUP BY node`），而不是给投影表加三个分项列。理由：①「已核验处理」的事实来源就是核验表，投影列只是缓存，按事实汇总天然满足「所有汇总均可从来源事实重建」；②避免改阶段三/四的 `FulfillmentRepository`、`OrderStatuses`、`FulfillmentViews`、前端与既有测试；③`verified_processed` 继续作为**全部工序合计**由阶段五在核验的同一事务内累加，订单侧生产进度口径不变。阶段五只**写入**既有的投影列（`making_planned`/`packing_planned`/`seam_planned`、`verified_processed`、`rework_pending`/`remake_pending`），不增删列。
+阶段五建立以**生产任务头（production task header）+ 生产任务明细（task items）**为核心的生产组织与事实登记模型，支持：
 
-## 2. 编号
+- 一个任务同时承载多个订单、多个订单明细、多个产品和多个工序明细；
+- 按明细安排正常生产和返工；超额使用独立预占记录，不作为生产任务类型；
+- 批量核验时一个页面一次提交，后端逐明细校验并在一个事务内原子提交；
+- 以实际合格事实、兼容库存和报废回转等事实计算下游当前可执行流入；
+- 以不可变报废事实和数量回转事实支撑后续正常排产；
+- 保留阶段八售后生产的类型与边界，但不在阶段五实现售后业务；
+- 保留超额任务的未来任务关联、预占和合格后的未来调整提醒；
+- 独立记录其他排班的分钟事实，不把其他排班混入商品数量流转。
 
-| 空间 | 前缀 | 宽度 | 示例 | `number_sequences.sequence_key` |
-| --- | --- | --- | --- | --- |
-| 生产计划 | `PN` | 6 | `PN000001` | `production_plans` |
-| 其他排班 | `OS` | 6 | `OS000001` | `other_schedules` |
+### 1.2 本阶段做
 
-沿用既有 `SequenceAllocator`（事务内锁定序列行并递增），业务编号列建唯一索引。核验、来源、预占、提醒、工时更正不单独编号（用 id + 所属计划/排班追溯）。
+1. 生产任务头、任务明细、明细核验事实、来源余额、报废事实、数量回转事实、超额预占和提醒的领域模型；
+2. `NORMAL`、`REWORK` 的任务边界校验，以及独立超额预占和阶段八售后来源的边界校验；
+3. 产品模具数量、日批次数、最大日容量及按产品/日期/工序的正常容量校验；
+4. 正常排产、返工来源排产、历史计划占用、未完成回退和明细取消；
+5. 多明细批量核验、逐明细原子校验及工序正常流向；
+6. 报废不可变事实与发生工序数量回转；
+7. 超额任务原有预占边界，但关联改为任务/明细；
+8. 其他排班总分钟事实、核验和更正事实；
+9. 生产工作台、统一新建页、只读任务详情页和多明细核验页；
+10. 阶段五 API、事务锁、幂等、错误码和不做项。
 
-## 3. 表结构
+### 1.3 本阶段不做
 
-数量为 `INT UNSIGNED`（非负）；所有表带 `version`、`created_at`、`updated_at`、`created_by`、`updated_by`、`request_id`、`idempotency_key`（不适用者写 NULL）。本阶段无金额列。
+- 阶段六发货；
+- 阶段七收退款、关闭和成品余量处置；
+- 阶段八售后核验、售后补发和售后生产来源的实际创建；阶段五只保留类型边界和来源校验接口约束；
+- 生产核验结果的冲销、改写或一般性更正；
+- 自动排产、甘特图、长期产能预测和自动调度；
+- 工资结算、绩效计算和报表导出；
+- 其他排班与商品数量、库存数量、订单履约数量之间的联动。
 
-### 3.1 `production_plans`（生产计划）
+阶段五不新增空实现或占位服务。所有尚未实现的内容必须标记为待实施，不得写成已完成。
 
-| 列 | 类型 | 说明 |
+---
+
+## 2. 核心领域模型
+
+### 2.1 任务头与任务明细
+
+生产任务由一个任务头和一个或多个任务明细组成：
+
+```text
+production_task
+  └── production_task_item (one or more)
+```
+
+**任务头是组织和共同信息容器，不参与数量流转。**任务头不得保存用来计算订单履约、来源余额、工序流入或产能占用的汇总数量。所有数量事实、计划占用、核验、来源消费、回退和状态判定都以任务明细为最小事实边界。
+
+#### 任务头共同字段
+
+| 字段 | 口径 |
+| --- | --- |
+| `id` / `task_no` | 主键 / 生产任务业务编号，唯一；编号前缀建议 `PT`，具体宽度按序列规范实施 |
+| `task_date` | 任务日期；明细默认继承，任务头日期不能替代明细事实日期 |
+| `employee_id` / `employee_name` | 员工引用与姓名快照；姓名快照用于历史可读性 |
+| `node` | 工序快照；一个任务头只组织同一工序的明细 |
+| `task_type` | 仅 `NORMAL`、`REWORK`；阶段八售后生产不得伪装成普通任务 |
+| `note` | 任务共同备注 |
+| 审计字段 | `version`、创建/更新人、时间、`request_id`、`idempotency_key` 等 |
+
+任务头创建后，`task_no`、日期、员工快照、工序和类型属于共同组织信息；如要改变影响事实归属的内容，应取消可执行明细后新建任务，不通过修改任务头转移已发生事实。
+
+#### 任务明细字段
+
+| 字段 | 口径 |
+| --- | --- |
+| `id` / `item_no` | 明细主键 / 任务内明细编号 |
+| `task_id` | 所属任务头 |
+| `order_id` / `order_item_id` / `product_id` | 订单、订单明细、产品引用 |
+| 产品与订单快照 | 产品名称、规格及订单所需的关键冻结字段，按实施数据库设计落库 |
+| `planned_quantity` | 本明细计划数量，必须大于零；任务头不保存替代数量 |
+| `source_type` / `source_id` | `ORDER`、`REWORK_SOURCE`、阶段八售后来源等；正常任务使用订单需求/正常可安排额度，返工使用显式返工来源 |
+| `standard_minutes` | 按工序冻结的单件标准分钟快照 |
+| `estimated_minutes` | 所有 `NORMAL` 明细均为 `planned_quantity * standard_minutes`；返工不生成虚构正常工时 |
+| `capacity_snapshot` | 创建时冻结的产品模具数量、日批次数、工作日小时、制作有效率等相关能力快照 |
+| `time_snapshot` | 创建时冻结的工作日分钟、标准分钟、估算分钟及计算依据 |
+| `verification_fact` | 核验后关联不可变核验事实；不在明细上覆盖历史核验结果 |
+| `status` | `PENDING`、`VERIFIED`、`CANCELLED` |
+| 取消字段 | `cancelled_at`、`cancelled_by`、`cancel_reason` |
+| 审计字段 | `version`、创建/更新人、时间、`request_id`、`idempotency_key` 等 |
+
+任务明细的 `order_id`、`order_item_id`、`product_id`、工序、类型、来源归属和计划数量在创建后不可任意编辑。待执行明细如需变更，按取消并重新安排处理；不得以修改历史明细的方式改变数量事实。
+
+### 2.2 类型边界
+
+| 类型 | 用途 | 来源与数量规则 | 产能/工时规则 |
+| --- | --- | --- | --- |
+| `NORMAL` | 普通生产排产 | 来自订单需求、库存跳过工序后的缺口、同工序报废回转等正常可执行额度 | 参与正常产品容量校验；计算估算分钟 |
+| `REWORK` | 发生工序内部的返工流程 | 只能从已存在的返工事实显式创建来源，再从来源安排，可拆为多个返工明细 | 不占普通产能；不计正常工时；不产生虚构正常工时 |
+| 阶段八售后专用类型 | 售后返工、售后补发等 | 只能由阶段八售后来源创建，阶段五不得把普通订单来源伪装成售后来源 | 按阶段八规则实施，阶段五只保留边界与拒绝非法来源 |
+
+任务头是阶段五统一的生产组织容器。一个任务头可以包含多个订单和多个产品，但每个任务明细只对应一个订单明细、一个产品、一个来源边界和一个计划数量。
+
+### 2.3 任务头派生状态
+
+任务头状态不持久化为可手工覆盖的事实，按其明细状态和核验事实派生：
+
+- **已排班**：至少一个明细待执行，且尚未出现进行中或核验结果；
+- **进行中**：已有执行记录或部分核验输入，但仍有可执行明细；
+- **待核验**：至少一个明细已达到核验入口条件，且尚未完成核验；
+- **部分核验**：任务内部分明细已核验、部分仍待核验；
+- **已核验**：所有非取消明细均已核验，且至少存在一个已核验明细；
+- **已取消**：全部明细均为 `CANCELLED`。
+
+任务头不得单独调用状态更新接口。单个待执行明细可以取消；只有全部明细取消后，任务头才派生为已取消。
+
+---
+
+## 3. 数据结构与不可变事实
+
+以下为阶段五实施时必须具备的逻辑表/聚合边界。字段名可按最终数据库命名规范调整，但不得改变事实含义。
+
+### 3.1 `production_tasks`
+
+保存任务头共同字段：`task_no`、日期、员工/姓名快照、工序、`task_type`、备注、审计字段和版本字段。
+
+约束：
+
+- `task_no` 唯一；
+- `task_type` 只允许 `NORMAL`、`REWORK`；超额预占和阶段八售后生产使用独立事实边界；
+- 任务头不保存可用于数量流转的 `quantity`、`completed_quantity` 或来源余额；
+- 任务头删除采用逻辑状态派生，不物理删除已经关联事实的任务。
+
+### 3.2 `production_task_items`
+
+保存任务明细的订单/产品归属、计划数量、来源、标准分钟、估算分钟、能力/时间快照、状态、取消信息及审计字段。
+
+关键约束：
+
+- `planned_quantity > 0`；
+- 明细只能属于一个任务头；
+- `NORMAL` 明细不能指向返工来源；
+- `REWORK` 明细必须指向仍有余额的返工来源；
+- 明细状态只能沿 `PENDING → VERIFIED` 或 `PENDING → CANCELLED` 转换；
+- 已核验或已取消明细不得再次安排、核验或取消。
+
+### 3.3 `production_verifications`
+
+核验事实以明细为唯一核验边界，一条明细最多一条有效核验记录。字段至少包括：
+
+- `task_item_id`、订单/产品冗余引用、工序；
+- `planned_quantity` 快照；
+- `completed_quantity`、`qualified_quantity`、`rework_quantity`、`scrap_quantity`、`incomplete_quantity`；
+- 核验备注、操作人、核验时间和审计字段。
+
+不变量：
+
+```text
+completed_quantity = qualified_quantity + rework_quantity + scrap_quantity
+incomplete_quantity = planned_quantity - completed_quantity
+```
+
+其中 `completed_quantity` 不得超过该明细在事务内重新计算的当前可执行上限。核验事实不可覆盖、不可物理删除；阶段五不提供生产核验的随意更正接口。
+
+### 3.4 `rework_sources`
+
+返工事实由核验产生，返工来源由管理员基于已存在的返工事实或上一轮返工事实显式创建，最小归属为“原核验明细 + 发生工序 + 返工轮次”。来源应保存：
+
+- 原任务明细与核验事实引用；
+- 订单、订单明细、产品和发生工序；
+- `total_quantity`、`arranged_quantity`；
+- `round_no`、`previous_source_id`；
+- 原因、版本与审计字段。
+
+来源余额为：
+
+```text
+available_quantity = total_quantity - arranged_quantity
+```
+
+已创建的返工来源可以拆成多个 `REWORK` 明细；每个明细消费来源余额并单独核验。返工明细再次出现返工时，管理员基于新的返工事实显式创建下一轮返工来源，并通过 `previous_source_id` 串联。返工不恢复普通订单需求、不进入普通产能容量、不计正常工时。
+
+阶段五不采用任何基于工序顺序的旧返工目标限制。返工是在发生问题的工序内部完成的流程：`REWORK` 明细的工序就是发生返工的工序；返工合格后沿该工序的原正常流向进入下一节点。
+
+### 3.5 `scrap_records`
+
+报废记录是不可变事实。每条记录至少保存：
+
+- 来源任务明细、核验事实、订单/订单明细/产品；
+- 报废发生工序；
+- 报废数量、原因、操作人、时间和请求幂等信息。
+
+报废记录不得被修改或删除，不产生任何新的普通订单需求，不产生返工或其他替代来源，不形成上游合格事实，也不形成库存合格事实。
+
+### 3.6 `production_quantity_returns`
+
+数量回转是独立的不可变事实，用于记录报废数量回到发生报废工序的普通待安排/可执行额度。至少保存：
+
+- `scrap_record_id`、订单/订单明细/产品、发生工序；
+- `returned_quantity`、已被后续 `NORMAL` 明细分配的数量；
+- 可分配余额、分配明细引用、创建人和时间。
+
+回转余额可被后续 `NORMAL` 明细分配。新的正常日期才重新占用当日产品容量；报废发生日期的已用资源不会因为回转而被追溯重排。
+
+### 3.7 `overtime_preemptions`
+
+超额预占关联 `overtime_task_item_id` 与未来 `NORMAL` 任务明细。保存预占数量、状态、释放信息和审计信息。
+
+约束：
+
+- 超额任务只能在执行当天创建；来源必须是未来日期的正常任务明细；
+- 同一超额明细与同一未来明细的有效预占不可重复；
+- 有效预占合计不得超过未来明细当前可被预占的数量；
+- 预占不修改未来正常明细原计划数量，不产生工序流入或完成事实；
+- 超额核验只有合格数量可以产生未来调整提醒；返工和报废不能作为未来计划减少依据。
+
+### 3.8 提醒与其他排班
+
+`production_reminders` 只用于工作台提示，不是数量事实来源。待处理未完成、超额待核验和未来调整提醒均可从明细、核验、来源和预占事实重建。
+
+`other_schedules` 与 `other_schedule_verifications` 保存员工、日期、小时/分钟、总分钟、核验和更正事实。其他排班独立计算总分钟，不关联商品、订单、库存、来源、任务明细或履约事实。
+
+---
+
+## 4. 产品能力、标准分钟与时间快照
+
+### 4.1 产品能力字段
+
+产品新增：
+
+| 字段 | 口径 |
+| --- | --- |
+| `moldQuantity` | 同一模具批次可并行生产的数量，必须为正整数 |
+| `dailyBatchLimit` | 每日允许的批次数，必须为正整数 |
+| `dailyMaxCapacity` | 派生值：`moldQuantity * dailyBatchLimit` |
+
+`dailyMaxCapacity` 是正常制品按产品、日期、工序和 `NORMAL` 类型汇总计划数量的硬约束上限。只有未取消的正常制品计划占用该资源；历史计划即使已经核验，仍属于该日期的历史资源占用，不能因为核验完成而释放当天排班资源。`REWORK` 不占用该产能。
+
+### 4.2 正常产能硬约束
+
+制品的正常计划数量按以下维度汇总：
+
+```text
+SUM(NORMAL planned_quantity)
+GROUP BY product_id, plan_date, node
+WHERE item.status <> CANCELLED
+```
+
+汇总结果不得超过对应产品的 `dailyMaxCapacity`。订单、产品或任务头不同不能绕过该约束；跨多个任务头、多个订单的明细必须合并计算。取消明细后，已取消数量不再计入当日有效计划占用，但历史核验事实仍永久保留。
+
+### 4.3 冻结标准分钟
+
+标准分钟不得从工作日分钟、日最大产能或员工可用时间倒推。创建明细时冻结以下单件标准分钟：
+
+- 制品：冻结产品星级对应的标准分钟；
+- 捏毛装袋：冻结包装档位对应的标准分钟；
+- 缝边：冻结订单确认的缝边种类对应的标准分钟。
+
+所有工序的 `NORMAL` 明细都计算：
+
+```text
+estimated_minutes = planned_quantity * standard_minutes
+```
+
+`standard_minutes` 和计算依据必须进入明细快照，使产品星级、包装档位、缝边种类或配置变化不改写历史任务。
+
+### 4.4 工作日容量与提示
+
+- 制品容量：`workday_hours * 60 * making_effective_rate`；
+- 其他工序容量：`workday_hours * 60`；
+- `NORMAL` 明细按 `estimated_minutes` 汇总，和对应容量比较；
+- 超出或不足均为提示，不改变产品 `dailyMaxCapacity` 的正常硬约束；
+- `REWORK` 不计入正常工时和正常容量，不为返工构造正常工时；
+- `OVERTIME` 的预占和提醒不修改未来正常明细的原计划或标准分钟。
+
+任务明细保留创建时的能力和时间快照，后续工作日配置变化只影响新的任务，不追溯改写历史任务。
+
+---
+
+## 5. 数量流转：明线、暗线与事实边界
+
+### 5.1 基本原则
+
+计划只是组织安排，不是工序实际流入。实际流入只能来自已登记的事实：
+
+- 上游实际合格流入；
+- 兼容库存接入；
+- 同工序报废数量回转；
+- 对首道制作，订单需求扣除库存已满足部分和可跳过制作的部分后的实际缺口；
+- 对返工，明确的返工来源余额。
+
+不得用上游计划数冒充下游实际流入，不得用所有核验数量的简单总和计算可执行额度。
+
+### 5.2 正常需求与正常待安排
+
+各工序需求必须按产品、订单明细的实际业务口径计算，不把制作、捏毛装袋、缝边三个阶段数量相加为订单数量。
+
+正常待安排数量按明细工序计算：
+
+```text
+normal_pending
+= normal_demand
+- 未取消 NORMAL 明细 planned_quantity
+- 已核验正常处理数量
++ 可分配数量回转余额
+```
+
+其中已核验正常处理数量必须按工序、订单明细和来源边界汇总，不能把返工核验、售后核验或其他排班分钟混入。未完成或取消的正常明细，其尚未完成部分不形成已处理事实，回到该工序的普通待安排额度。
+
+### 5.3 当前可执行流入
+
+当前可执行流入是当前事务中根据事实计算的可用数量：
+
+```text
+current_executable
+= 实际合格流入
++ 兼容库存接入
++ 同工序报废回转可分配余额
+- 已核验处理数量
+- 其他待执行 NORMAL 明细已经分配的可执行数量
+```
+
+计划创建允许先占用正常待安排数量，即使当前上游尚未形成实际流入；该明细显示等待上游。核验时必须重新锁定并计算当前可执行量，完成数量超过可执行量则拒绝。
+
+下游核验上限只能来自上述当前可执行事实，不能使用上游计划数量。普通排产额度与返工来源余额必须分开汇总，禁止将全部 `production_verifications` 直接 `SUM` 后作为负额度。
+
+### 5.4 首道制作缺口
+
+首道制作的正常缺口不是笼统地使用订购总量覆盖库存已经满足的部分。计算时必须考虑：
+
+1. 订单明细实际需求；
+2. 已有兼容库存可以跳过制作的数量；
+3. 已有回转数量；
+4. 已发生的正常制作合格、未完成和取消回退；
+5. 当前仍有效的正常任务占用。
+
+只有扣除库存已满足部分后的实际制作缺口才能形成制作 `NORMAL` 的正常待安排量。库存直接进入下游工序时，不重复要求制作计划或制作核验。
+
+### 5.5 正常流向
+
+正常核验合格按原工序流向下一节点：
+
+| 核验工序 | 合格事实去向 |
+| --- | --- |
+| `MAKING` | 进入 `PACKING_BAG` 的实际合格流入 |
+| `PACKING_BAG` | 按订单冻结的缝边种类分流到 `SEAM_CUTTING`，其余进入可发货事实 |
+| `SEAM_CUTTING` | 进入可发货事实 |
+
+`REWORK` 在发生工序内部处理；返工合格后沿该工序的同一正常流向进入下一节点。返工本身不制造新的正常需求，不回写为普通计划已完成，也不占正常产能。
+
+---
+
+## 6. 核验规则与批量原子性
+
+### 6.1 批量核验入口
+
+前端在一个核验页面提交任务内多个待核验明细。后端必须：
+
+1. 校验任务头存在、员工和工序上下文一致；
+2. 按明细逐条加载并锁定 `PENDING` 明细；
+3. 逐条重新计算来源余额、当前可执行流入、已占用数量和产能相关事实；
+4. 逐条校验核验等式、数量上限、来源合法性和状态；
+5. 任一明细失败则整批回滚，不产生任何部分核验、流入、返工来源、报废记录、数量回转或提醒；
+6. 全部明细通过后，在同一事务内写入所有核验事实及派生事实；
+7. 使用幂等键保证重复提交返回第一次成功结果，不重复生成事实。
+
+批量只是提交边界，不是放宽校验边界。后端不得只校验任务头总量，也不得用任务头状态代替明细校验。
+
+### 6.2 单明细核验等式
+
+每个明细最多一次核验：
+
+```text
+completed = qualified + rework + scrap
+incomplete = planned - completed
+```
+
+所有数量必须为非负整数，`completed <= planned`，且 `completed` 不得超过当前事务重新计算的可执行上限。`incomplete` 由后端计算并落事实，前端提交值只能作为展示校验，不能作为可信来源。
+
+核验类型与来源必须匹配：
+
+- `NORMAL` 明细只核验普通正常流入；
+- `REWORK` 明细只核验自身返工来源余额；
+- 阶段八售后类型只能使用阶段八来源；
+- 其他排班使用独立分钟核验，不进入本数量等式。
+
+### 6.3 返工来源显式创建
+
+当明细核验产生 `rework_quantity > 0` 时，事务只记录当前明细、发生工序和返工数量事实，不自动生成可安排来源。管理员随后必须基于该返工事实显式创建返工来源：
+
+- 来源归属当前核验明细和发生工序；
+- 来源总量不得超过对应返工事实的未建来源额度；
+- 已创建来源可拆成多个 `REWORK` 明细安排；
+- `REWORK` 明细核验合格后按原工序正常流向继续；
+- `REWORK` 明细再次产生返工时，必须基于新返工事实显式创建下一轮来源；
+- 返工来源的可安排余额与正常待安排额度完全分离。
+
+未完成数量按来源类型回退：
+
+- `NORMAL`：未完成部分回到该工序普通待安排额度，并产生未完成提醒；
+- `REWORK`：未完成部分回到原返工来源的已安排余额；
+- 阶段八售后类型：按阶段八来源边界处理，阶段五不得改写售后额度。
+
+### 6.4 报废处理
+
+核验产生报废时，事务内必须同时写入：
+
+1. 不可变 `scrap_records`；
+2. `production_quantity_returns`，记录数量回到发生报废工序的普通待安排/可执行额度；
+3. 后续可供 `NORMAL` 明细分配的回转余额。
+
+报废不得：
+
+- 产生任何替代计划来源或替代类型；
+- 增加订单需求；
+- 生成上游合格事实；
+- 生成库存合格事实；
+- 直接产生新的任务；
+- 释放报废发生日期已经占用的正常资源。
+
+后续重新安排必须创建 `NORMAL` 明细，使用新的正常日期重新参与该日期的产品容量和时间校验。
+
+### 6.5 超额核验
+
+超额任务的核验仍遵守普通核验等式。未完成部分释放对应未来明细的预占；只有合格部分形成未来调整提醒，提醒建议按预占顺序分摊且不超过各未来明细的预占数量。返工、报废和未完成不作为未来正常计划减少依据。
+
+---
+
+## 7. 取消、来源余额与状态投影
+
+### 7.1 明细取消
+
+只能取消单个仍为 `PENDING` 的明细，并必须记录原因、操作人和时间。取消事务内：
+
+- 明细转为 `CANCELLED`；
+- 释放该明细尚未消费的正常额度、返工来源余额或超额预占；
+- 不删除已经存在的核验、报废、回转或审计事实；
+- 不改变其他明细；
+- 任务头只有在所有明细均取消后才派生为已取消。
+
+已核验明细不能通过取消撤销已发生事实。错误结果按后续明确的更正/冲销流程处理，阶段五不实现通用生产核验更正。
+
+### 7.2 状态与投影
+
+明细事实状态只有：
+
+- `PENDING`：可执行、等待上游或等待核验；
+- `VERIFIED`：已有一次不可变核验事实；
+- `CANCELLED`：未执行明细被取消。
+
+任务头状态完全派生，不提供人工选择状态的写接口。待安排、当前可执行、来源余额和提醒均应能够从明细、核验、库存接入、流入、报废和回转事实重建；投影字段只能作为查询优化，不能成为唯一事实来源。
+
+---
+
+## 8. 超额任务与未来计划提醒
+
+### 8.1 创建边界
+
+- 只能在执行当天创建超额预占；
+- 来源只能是未来日期的 `NORMAL` 任务明细；
+- 每条来源必须明确关联未来任务明细和预占数量；
+- 预占合计不能超过来源明细尚未被其他有效预占的数量；
+- 超额任务不修改未来正常明细原计划、不提前减少未来需求、不产生流入。
+
+### 8.2 核验后的处理
+
+- 超额明细未完成部分释放对应预占；
+- 合格数量按预占顺序形成未来调整提醒；
+- 返工、报废不形成未来计划减少提醒；
+- 合格数量为零时，超额待核验提醒转为无需调整；
+- 提醒是待处理事项，不是未来计划数量变更事实；
+- 未来计划是否调整必须通过明确的计划调整命令并保留审计记录，不能由核验事务隐式修改未来原计划。
+
+---
+
+## 9. API 契约
+
+阶段五统一使用任务资源。写接口必须支持 `Idempotency-Key`；重复请求返回首次成功结果，不重复消费来源或生成事实。
+
+| 能力 | 方法与路径 | 说明 | 主要拒绝码 |
+| --- | --- | --- | --- |
+| 任务列表 | `GET /api/production-tasks` | 按日期、员工、订单、产品、工序、类型、状态筛选；返回任务头、明细、待安排、当前可执行和提示 | `AUTH_REQUIRED`, `NOT_FOUND` |
+| 创建任务 | `POST /api/production-tasks` | 一次创建任务头及一个或多个明细；逐明细校验员工资格、来源、产能和标准分钟快照 | `VALIDATION_INVALID`, `EMPLOYEE_NOT_ELIGIBLE`, `SOURCE_INSUFFICIENT`, `CAPACITY_EXCEEDED`, `CONFLICT_VERSION` |
+| 任务详情 | `GET /api/production-tasks/{id}` | 只读返回任务头、明细、来源、快照、核验和派生状态 | `NOT_FOUND` |
+| 取消明细 | `POST /api/production-tasks/{id}/items/{itemId}/cancel` | 只能取消待执行明细，恢复对应余额 | `STATE_NOT_CANCELABLE`, `NOT_FOUND`, `CONFLICT_VERSION` |
+| 批量核验 | `POST /api/production-tasks/{id}/verify` | 一次提交多个明细；后端逐明细校验，整批原子提交 | `VERIFICATION_EQUATION_INVALID`, `QUANTITY_NOT_EXECUTABLE`, `STATE_ALREADY_VERIFIED`, `SOURCE_INSUFFICIENT`, `CONFLICT_VERSION` |
+| 返工来源任务 | `POST /api/rework-sources/{id}/tasks` | 从返工来源余额创建一个或多个 `REWORK` 明细；不接受普通任务类型冒充 | `SOURCE_INSUFFICIENT`, `VALIDATION_INVALID`, `EMPLOYEE_NOT_ELIGIBLE` |
+| 查询返工来源 | `GET /api/rework-sources`、`GET /api/rework-sources/{id}` | 返回发生工序、轮次、已安排、余额及关联明细 | `NOT_FOUND` |
+| 查询报废事实 | `GET /api/production-scraps`、`GET /api/production-scraps/{id}` | 查询不可变报废记录 | `NOT_FOUND` |
+| 查询数量回转 | `GET /api/production-quantity-returns` | 查询发生工序、回转数量、已分配数量和可分配余额 | `NOT_FOUND` |
+| 超额预占 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify` | 独立创建和核验超额预占；来源关联未来 `NORMAL` 任务明细，不进入生产任务类型 | `OVERTIME_DATE_INVALID`, `OVERTIME_RESERVATION_EXCEEDED`, `VERIFICATION_EQUATION_INVALID` |
+| 其他排班 | `GET/POST /api/other-schedules`、`POST /api/other-schedules/{id}/verify`、`POST /api/other-schedules/{id}/cancel`、`POST /api/other-schedules/{id}/corrections` | 独立分钟事实，不产生商品数量 | `VERIFICATION_EQUATION_INVALID`, `STATE_NOT_CANCELABLE`, `VALIDATION_INVALID` |
+
+阶段八接入时，售后生产接口必须使用阶段八专用来源和权限边界；不得通过普通 `production-tasks` 请求绕过售后来源校验。阶段五不承诺售后来源已存在，也不写入售后业务事实。
+
+统一响应信封、鉴权、版本冲突和幂等约定沿用 `design.md`，但接口路径以本节为准。
+
+---
+
+## 10. 前端页面与工作台
+
+### 10.1 路由
+
+| 路由 | 页面 | 关键行为 |
 | --- | --- | --- |
-| `id` / `plan_no` | BIGINT UNSIGNED / CHAR(6) | 主键 / 业务编号，唯一 |
-| `plan_type` | VARCHAR(32) | `NORMAL` / `REWORK` / `REMAKE` / `OVERTIME` / `AFTER_SALES_REWORK` / `AFTER_SALES_REPLACEMENT` |
-| `order_id` / `order_item_id` | BIGINT UNSIGNED | 订单明细引用（售后两类在阶段八接入时同样挂原订单明细） |
-| `after_sales_case_id` | BIGINT UNSIGNED NULL | 售后单引用（阶段八写入；阶段五恒 NULL） |
-| `node` | VARCHAR(32) | `MAKING` / `PACKING_BAG` / `SEAM_CUTTING`（其他排班不走本表） |
-| `plan_date` | DATE | 计划日期 |
-| `employee_id` / `employee_name` | BIGINT UNSIGNED / VARCHAR(100) | 执行员工引用 + 姓名快照（员工改名不影响历史计划） |
-| `quantity` | INT UNSIGNED | 计划数量 |
-| `status` | VARCHAR(16) | `PENDING` / `VERIFIED` / `CANCELLED` |
-| `source_type` | VARCHAR(32) | `ORDER`（正常）/ `REWORK_SOURCE` / `REMAKE_SOURCE` / `NONE`（超额，来源是预占集合） |
-| `source_id` / `source_line_id` | BIGINT UNSIGNED | 来源记录；无明细行用 0（不用 NULL，保证唯一键对「无明细来源」生效） |
-| `note` | VARCHAR(500) NULL | 备注 |
-| `cancelled_at` / `cancelled_by` / `cancel_reason` | DATETIME(6) / VARCHAR(100) / VARCHAR(500) NULL | 取消信息 |
+| `/production` | 生产工作台 | 日期横向周历；按员工、工序、任务类型和状态查看任务与明细；显示等待上游、待核验、未完成和提醒 |
+| `/production/tasks/new` | 全页统一新建 | 在同一页面选择任务头共同信息并添加多个订单/产品/明细；逐明细展示来源、标准分钟、估算分钟、容量提示；不预置虚构任务 |
+| `/production/tasks/:id` | 只读任务详情 | 展示任务头、明细、来源、快照、核验事实、返工/报废/回转关联及派生状态；不把查看页面变成编辑表单 |
+| `/production/tasks/:id/verify` | 多明细核验 | 一次提交任务内多个明细；逐明细填写合格、返工、报废和备注；显示等式、当前可执行上限和失败明细定位 |
 
-索引：`uk_production_plans_plan_no`、`idx_production_plans_date_node`、`idx_production_plans_employee`、`idx_production_plans_item`、`idx_production_plans_status`、`idx_production_plans_source (source_type, source_id)`。  
-CHECK：`quantity > 0`、`status IN (...)`、`plan_type IN (...)`。
+### 10.2 工作台交互原则
 
-**核心归属字段创建后不可编辑**：`plan_type`、`order_item_id`、`node`、`source_*`、`quantity` 不可改；只有**待执行的正常计划**可通过 `production_plan_adjustments` 调整日期、员工、数量与备注（§3.2）。返工/重做/超额计划的归属与数量不可调整，需要变更时取消后重建（来源余额随取消恢复）。
+- 工作台采用横向周历展示日期，不把单日列表当作唯一导航；
+- 统一新建入口为 `/production/tasks/new`，不按来源类型拆成多个隐藏入口；
+- 来源、额度和可执行余额在任务明细上下文中解释展示，不要求用户先理解来源模型才能进入新建；
+- 返工来源、报废事实和数量回转作为查询/分配信息展示，不作为前置导航知识；
+- 任务头显示派生状态，明细显示事实状态，禁止手工下拉覆盖；
+- 超额提醒附着于受影响的未来正常任务明细；
+- `REWORK` 明确标记为发生工序内部返工，不显示为普通产能任务；
+- 页面必须区分“计划数量”“实际流入”“当前可执行”“本次完成”和“回转余额”。
+
+视觉基线沿用订单和库存页的整体组件规范，但本文件只定义业务结构，不伪造已完成的视觉验收或前端实现证据。
+
+---
+
+## 11. 事务、锁定顺序与幂等
+
+### 11.1 事务拥有者
+
+以下命令由生产模块应用服务在一个事务内完成：
+
+- 创建任务及其明细；
+- 取消明细；
+- 批量核验；
+- 从返工来源创建任务明细；
+- 超额任务创建、核验和提醒处理；
+- 其他排班核验和分钟更正事实写入。
+
+跨模块写入订单履约、库存接入或流入事实时，必须通过已登记的模块接口，在同一事务中完成；不得在生产模块复制订单数量规则。
+
+### 11.2 锁定顺序
+
+所有竞争资源使用锁定读。建议固定顺序如下：
+
+1. 锁定任务头（批量核验时先锁任务头）；
+2. 按 `item_id` 升序锁定任务明细；
+3. 锁定对应订单明细/履约余额和库存接入事实；
+4. 按来源 id 升序锁定返工来源或数量回转余额；
+5. 锁定报废记录关联的可分配回转记录；
+6. 创建或核验超额任务时锁定预占记录及未来正常任务明细；
+7. 最后写入核验、来源、报废、回转和提醒事实。
+
+创建任务没有既有任务明细可锁定时，必须锁定所有涉及的订单明细、库存/履约余额、返工来源或回转余额，再进行容量和来源校验。所有竞争性查询必须使用 `FOR UPDATE` 或等价锁定读，不能依赖普通快照读。
 
-**注意**：本表**不设** `(source_type, source_id, node)` 唯一键。同一来源可拆成多条计划（部分安排），来源余额由来源表的 `total − arranged` 扣减保证不超支；这与 `fulfillment_entries` 的「每笔来源只接入一次」是两回事（后者约束的是**流入事实**）。
-
-### 3.2 `production_plan_adjustments`（待执行正常计划调整历史）
-
-`plan_id`、`adjustment_type`（`DATE` / `EMPLOYEE` / `QUANTITY` / `NOTE` / `COMBINED`）、`before_*` / `after_*`（日期、员工 id + 姓名快照、数量、备注，按类型取用）、`reason`、操作人与时间。只允许 `status = PENDING` 且 `plan_type = NORMAL` 的计划调整；调整不产生核验、库存或履约事实。
-
-**唯一写入入口是 5.12 的超额提醒处理**（`POST /api/production-reminders/overtime/{id}/adjust-plan`）——`database-design.md` §8 把本表定义为「待执行正常计划的调整历史」，而 tasks 5.x 中没有独立的计划调整接口；不另开 `POST /api/production-plans/{id}/adjustments`（避免同一动作两个入口）。
-
-数量调整的可安排上限：调整后数量不得超过该明细该工序的**待安排数量 + 本计划原数量**（调整只在本计划已占用的额度内增减，不抢其他计划的额度）。
-
-### 3.3 `production_verifications`（一次性核验）
-
-`plan_id` 唯一（`uk_production_verifications_plan`）、`order_id` / `order_item_id`（冗余便于按明细查询）、`node`、`completed_quantity`、`qualified_quantity`、`rework_quantity`、`scrap_quantity`、`incomplete_quantity`、`verify_note`、`verified_by` / `verified_at`、审计列。
-
-CHECK：`completed_quantity = qualified_quantity + rework_quantity + scrap_quantity`。  
-`incomplete_quantity = 计划数量 − completed_quantity` 跨表，由应用在同一事务内计算写入并断言（数据库层用触发器不可移植，按 `database-design.md` §14「或等价触发前应用校验」处理）。
-
-### 3.4 `rework_sources`（返工来源）
-
-`verification_id`（原核验）、`order_id` / `order_item_id`、`found_node`（发现问题的工序）、`target_node`（返工目标工序）、`total_quantity`、`arranged_quantity`（已安排，含待执行与已核验）、`round_no`（返工次数，从 1 起）、`previous_source_id`（上一返工来源，可空）、`reason`、`version`。
-
-唯一键 `uk_rework_sources_target (verification_id, target_node)`：同一次核验的同一目标工序只有一条来源（数量在来源内累加，避免重复来源）。  
-CHECK：`arranged_quantity <= total_quantity`、`total_quantity > 0`。  
-可安排余额 = `total_quantity − arranged_quantity`。
-
-**核验不自动生成来源**（2026-09-25 实施中订正）：核验只把返工数量记入「返工待安排」额度，来源由 5.6 按**目标工序显式创建**——否则自动生成的默认来源会吃掉全部额度，使「显式选择前序工序」无额度可用。同一核验下所有来源的 `total_quantity` 合计不得超过该核验的返工数量（应用层校验）。
-
-### 3.5 `remake_sources`（报废重做来源）
-
-`verification_id`（原报废核验）、`order_id` / `order_item_id`、`scrap_node`（报废工序）、`start_node`（重做起始工序）、`total_quantity`、`arranged_quantity`、`reason`（`start_node = MAKING` 时必填）、`version`。
-
-唯一键 `uk_remake_sources_target (verification_id, start_node)`：同一次核验的同一重做起始工序只有一条来源（与返工对称）。  
-可安排余额 = `total_quantity − arranged_quantity`。原报废事实永久保留，重做**不恢复**原报废数量、**不增加**订单需求。
-
-**核验不自动生成来源**（同 §3.4）：来源由 5.7 按**起始工序显式创建**，默认取报废工序；选择从 `MAKING` 开始时必须填写原因。同一核验下所有来源的 `total_quantity` 合计不得超过该核验的报废数量。
-
-### 3.6 `overtime_preemptions`（超额预占）
-
-`overtime_plan_id`（超额任务计划）、`future_plan_id`（未来正常计划）、`order_id` / `order_item_id`（冗余）、`node`、`preempted_quantity`、`status`（`ACTIVE` / `RELEASED`）、`released_at` / `released_by` / `release_reason`、审计列。
-
-唯一键 `uk_overtime_preemptions_pair (overtime_plan_id, future_plan_id)`：同一超额任务对同一未来计划只有一条预占。  
-CHECK：`preempted_quantity > 0`。  
-不变量（应用在同一事务内加锁校验）：`Σ 某未来计划的有效预占 ≤ 该未来计划当前可选数量`，其中
-
-```text
-未来计划当前可选数量 = 该计划计划数量 − 其他有效预占合计
-```
-
-预占**不修改**未来计划原始数量、不产生工序流入或完成。
-
-### 3.7 `production_reminders`（工作台提醒）
-
-`reminder_type`（`INCOMPLETE` 未完成待处理 / `OVERTIME_PENDING_VERIFY` 超额待核验 / `PLAN_ADJUSTMENT` 计划待调整）、`order_id` / `order_item_id`、`node`、`plan_id`（可空）、`verification_id`（可空）、`preemption_id`（可空）、`future_plan_id`（可空，计划待调整时指向受影响的未来计划）、`quantity`、`status`（`OPEN` / `HANDLED`）、`handling_type`（`RESCHEDULED` / `PARTIAL` / `DEFERRED` / `ADJUSTED` / `NO_ADJUSTMENT`，可空）、`handled_quantity`（部分安排时记录已重新安排数量）、`reason`、`handled_by` / `handled_at`、审计列。
-
-索引：`idx_production_reminders_type_status`、`idx_production_reminders_item`、`idx_production_reminders_plan`。  
-**提醒只辅助工作台，不是数量事实来源**：所有数量以计划、核验、来源与预占为准，提醒可重建。
-
-### 3.8 `other_schedules`（其他排班）
-
-`id` / `schedule_no`（`OS` 编号，唯一）、`schedule_date`、`employee_id` / `employee_name`、`hours`、`minutes`（0–59）、`total_minutes`、`status`（`PENDING` / `VERIFIED` / `CANCELLED`）、`note`、取消信息、审计列。
-
-CHECK：`minutes BETWEEN 0 AND 59`、`hours >= 0`、`total_minutes = hours * 60 + minutes`、`total_minutes > 0`。  
-其他排班**只保存总分钟与工时事实**，不产生商品、库存或订单履约事实，也不占用任何待安排来源。
-
-### 3.9 `other_schedule_verifications`（其他排班一次性工时核验）
-
-`schedule_id` 唯一、`total_minutes`、`note`、`verified_by` / `verified_at`、审计列。每排班最多一条有效核验。
-
-### 3.10 `other_schedule_time_corrections`（工时更正）
-
-`verification_id`、`schedule_id`、`before_total_minutes`、`after_total_minutes`、`reason`、操作人与时间。更正**不修改**原核验，只追加更正事实；有效工时取「原核验 + 最新更正」。
-
-### 3.11 `after_sales_production_sources`（售后生产来源，任务 8.4/8.5）
-
-`after_sales_item_id`（售后明细，唯一来源）、`order_id` / `order_item_id`（原订单与明细，用于员工资格与商品快照）、`purpose`（`REWORK` / `REPLACEMENT`）、`node`（目标工序）、`total_quantity`、`arranged_quantity`、`reason`、审计列。
-
-唯一键 `uk_after_sales_production_sources_target (after_sales_item_id, purpose, node)`；CHECK：`total_quantity > 0`、`arranged_quantity <= total_quantity`、`purpose IN ('REWORK','REPLACEMENT')`。外键指向 `after_sales_items` / `orders` / `order_items`。
-
-**额度与占用**（施工口径见 `after-sales-module-design.md` §4.3）：售后返工额度 = 退回核验的返工数量；售后补发生产额度 = 补发需求 − 已补发 − 可补发。售后计划不写 `order_item_fulfillment_balances` 的计划占用列，占用只记在本表的 `arranged_quantity`；核验合格写售后台账事实（`PRODUCTION_INFLOW`），未完成与取消退回本表余额。
-
-### 3.12 `order_item_fulfillment_balances`：不改结构，只写既有投影列
-
-**不增删列**。阶段五在同一事务内维护以下既有列，使订单侧派生状态与履约视图保持正确：
-
-| 列 | 阶段五写入口径 |
-| --- | --- |
-| `making_planned` / `packing_planned` / `seam_planned` | 该明细该工序 `status = PENDING` 的计划数量合计（排产状态用） |
-| `verified_processed` | 该明细**全部工序**累计已核验的本次完成数量（生产进度用，口径不变） |
-| `rework_pending` / `remake_pending` | 该明细当前可安排返工/重做余额（来源表 `total − arranged` 的汇总，展示用） |
-| `making_inflow` / `packing_inflow` / `seam_inflow` / `shippable_quantity` | 经 `FulfillmentLedger.applyInflow` 按核验节点增减（阶段四已具备） |
-
-按工序的「已核验处理」**不落投影**：由 `production_verifications` 按 `(order_item_id, node)` 汇总，供 §4.2 的待安排与可执行计算（生产模块自身的权威口径）。
-
-## 4. 数量口径
-
-### 4.1 工序总需求
-
-| 工序 | 总需求 |
-| --- | --- |
-| 制作 `MAKING` | `Q`（`required_quantity`，随订单变更更新） |
-| 捏毛装袋 `PACKING_BAG` | `Q` |
-| 缝边剪袋 `SEAM_CUTTING` | `E`（确认时冻结的 `order_items.seam_quantity`） |
-
-**不得相加**：制作、捏毛装袋、缝边剪袋是同一批需求的阶段（`domain-and-quantity-model.md` §5）。
-
-### 4.2 待安排与当前可执行
-
-```text
-待安排数量
-= 当前工序总需求
-− 该工序有效待执行计划占用（production_plans 中 status = PENDING 的 quantity 合计）
-− 该工序已核验处理数量（production_verifications 按 node 汇总的 completed_quantity）
-```
-
-```text
-当前可执行数量
-= 该工序有效流入累计
-− 该工序已核验处理数量（同上，按 node 汇总核验事实）
-− 已分配给其他待执行计划且当前已具备执行条件的数量
-```
-
-**有效流入的口径**：`制作`（首道工序）没有上游工序，其有效流入**取订单实际生产缺口（即订单订购数量）**（`domain-and-quantity-model.md` §6「首道制作的正常流入来自订单实际生产缺口」）；`捏毛装袋` / `缝边剪袋` 取上游合格流入与库存接入的累计（`packing_inflow` / `seam_inflow`）。因此**制作计划不会「等待上游」**，而下游工序在没有上游流入时显示等待上游（实施中订正：初版对制作也读 `making_inflow`，而该列不会被任何命令写入，导致制作计划永远无法核验）。
-
-「当前已具备执行条件」= 该待执行计划按其自身可执行量判定为可执行（即 `可执行数量 > 0`）。计算时按计划 `plan_date, id` 升序依次扣减，保证同一明细同一工序的多个待执行计划之间不重复占用同一份可执行量。
-
-- 创建计划**允许**使用待安排数量（即使当前可执行数量不足）→ 计划显示「等待上游」；
-- **核验时必须重新计算**当前可执行数量（事务内加锁后），实际完成数量不得超过它，否则 `QUANTITY_NOT_EXECUTABLE`；
-- 返工/重做计划的待安排上限来自**来源余额**（§3.4/§3.5），不走上式。
-
-### 4.3 核验与逐工序流转
-
-```text
-本次完成数量 = 合格数量 + 返工数量 + 报废数量
-未完成数量 = 计划数量 − 本次完成数量
-```
-
-合格数量按冻结流程流入下一节点（`domain-and-quantity-model.md` §5/§6）：
-
-| 核验工序 | 合格流入 |
-| --- | --- |
-| `MAKING` | 全部进 `packing_inflow` |
-| `PACKING_BAG` | 按冻结的缝边数量分流：缝边部分进 `seam_inflow`，其余进 `shippable_quantity` |
-| `SEAM_CUTTING` | 全部进 `shippable_quantity` |
-
-捏毛装袋分流的缝边部分：
-
-```text
-缝边分流数量 = clamp(缝边数量 − 核验前 seam_inflow 累计, 0, 本次合格数量)
-不缝边分流数量 = 本次合格数量 − 缝边分流数量
-```
-
-`clamp` 下限 0 的原因：库存领用可以直接接入缝边剪袋（阶段四），`seam_inflow` 可能已由库存接入填满甚至超过缝边数量，此时捏毛装袋合格全部进可发货。
-
-其余结果：
-
-- **返工**：按 `found_node = 本次核验工序` 生成/累加 `rework_sources`（目标工序由创建返工计划时选定，见 §4.4），不自动进入普通计划；
-- **报废**：终止原件流转，生成/累加 `remake_sources`（起始工序默认等于报废工序），**不自动**创建重做计划；
-- **未完成**：按计划类型恢复对应待安排来源——正常计划回到「待安排数量」（不写额外记录，待安排本身是派生量）+ 生成 `INCOMPLETE` 提醒；返工/重做计划把未完成数量回退来源的 `arranged_quantity`。
-
-**核验结果不可修改**，错误一律用更正事实处理（本阶段更正只覆盖其他排班工时；生产核验的更正随阶段八售后/更正流程，不在本阶段实现）。
-
-### 4.4 返工目标矩阵
-
-| 发现问题工序 | 允许的返工目标工序 |
-| --- | --- |
-| `MAKING` | `MAKING` |
-| `PACKING_BAG` | `PACKING_BAG`、`MAKING` |
-| `SEAM_CUTTING` | `SEAM_CUTTING`、`PACKING_BAG`、`MAKING` |
-
-即「只能选择发现问题工序或其前序」。计划数量不得超过来源可安排余额，否则 `SOURCE_INSUFFICIENT`；目标不合法返回 `REWORK_TARGET_INVALID`。返工计划核验后若再产生返工，`round_no` 递增并记 `previous_source_id`。
-
-### 4.5 报废重做
-
-起始工序默认等于报废工序；选择从 `MAKING` 开始时**必须**填写原因（前序材料不可用等），否则 `REMAKE_REASON_REQUIRED`。重做是替代品生产：原报废数量**不恢复**、订单需求**不增加**、原报废事实永久保留。
-
-### 4.6 超额任务与预占
-
-- 只在**执行当天**创建（`plan_date = 今天`），否则 `OVERTIME_DATE_INVALID`；来源只能是**未来日期**的正常计划（不能重复选择当天正常任务）；
-- 从未来正常计划选择**尚未预占**数量，逐条明确来源计划（跨订单/跨商品时每条仍带来源计划），超出返回 `OVERTIME_RESERVATION_EXCEEDED`；
-- 预占不修改未来计划原始数量、不产生工序流入或完成；
-- 核验后：未完成部分释放预占（`RELEASED`）；**只有合格数量**按 §4.3 正常写入履约事实；合格数量 > 0 → 对每个受影响的未来计划生成 `PLAN_ADJUSTMENT` 提醒，**建议减少数量 = 合格数量按预占顺序分摊**（绝不超过该计划上的预占量）；合格数量 = 0 → 核验前生成的 `OVERTIME_PENDING_VERIFY` 提醒自动置为 `HANDLED`（`NO_ADJUSTMENT`，原因「零合格，无需调整」），不生成计划减少建议；合格数量 > 0 时待核验提醒置为 `HANDLED`/`SUPERSEDED`（已由计划待调整提醒接管）；
-- 超额任务自身的返工/报废按独立来源处理（走 §4.4/§4.5），**不作为**未来计划减少的依据，也不进入普通「未完成待处理」区域。
-
-**调整计划的边界**（5.12）：`newQuantity` 必须 **≥ 1**——`production_plans` 有 `CHECK (quantity > 0)`，且保留一条数量为 0 的待执行计划没有业务含义、会破坏「有效计划占用」口径；若某计划确实无需生产，应改用 `POST /api/production-plans/{id}/cancel`。`production_plan_adjustments` 的 `before_quantity`/`after_quantity`/`reason` 与操作人留痕，计划占用投影按差值同步。
-
-### 4.7 其他排班工时
-
-```text
-总分钟 = 小时 × 60 + 分钟        （分钟 0–59，总分钟 > 0）
-```
-
-一次性核验；已核验后录错用 `other_schedule_time_corrections` 追加更正（原核验不动）。不产生任何商品、库存或履约数量。
-
-## 5. 状态与派生
-
-- **计划状态**（`production_plans.status`）：待执行 `PENDING` / 已核验 `VERIFIED` / 已取消 `CANCELLED`；只允许 `PENDING → VERIFIED`（核验）与 `PENDING → CANCELLED`（取消，须原因）。
-- **执行条件**（派生）：该工序 `当前可执行数量 > 0` → 可执行，否则等待上游。
-- **排产状态 / 生产进度 / 需求处理状态 / 发货进度**：沿用阶段三的 `OrderStatuses.derive`（生产进度改用三工序已核验合计，见 §3.11）。
-- **其他排班状态**：待执行 / 已核验 / 已取消。
-- 所有状态由事实派生或经明确命令转换，**不提供手工下拉框直接改状态**。
-
-## 6. API 契约（阶段五）
-
-| 能力 | 方法与路径 | 幂等 | 成功结果 | 主要拒绝码 |
-| --- | --- | --- | --- | --- |
-| 计划列表/详情 | `GET /api/production-plans`、`GET /api/production-plans/{id}` | 否 | 按日期/员工/订单/工序/状态筛选；含待安排、当前可执行、等待上游与派生状态 | `AUTH_REQUIRED`, `NOT_FOUND` |
-| 创建计划 | `POST /api/production-plans` | 写入幂等 | `PN` 编号计划（正常/返工/重做/超额/售后两类） | `EMPLOYEE_NOT_ELIGIBLE`, `SOURCE_INSUFFICIENT`, `REWORK_TARGET_INVALID`, `OVERTIME_DATE_INVALID`, `VALIDATION_INVALID` |
-| 取消计划 | `POST /api/production-plans/{id}/cancel` | 必须幂等 | 已取消计划 + 来源恢复 | `STATE_NOT_CANCELABLE` |
-| 核验 | `POST /api/production-plans/{id}/verify` | 必须幂等 | 一次性核验 + 分流事实 | `VERIFICATION_EQUATION_INVALID`, `STATE_ALREADY_VERIFIED`, `QUANTITY_NOT_EXECUTABLE` |
-| 返工来源 | `GET/POST /api/rework-sources`、`POST /api/rework-sources/{id}/plans` | 写入幂等 | 来源余额 / 从来源创建计划 | `REWORK_TARGET_INVALID`, `SOURCE_INSUFFICIENT`, `CONFLICT_DUPLICATE` |
-| 重做来源 | `GET/POST /api/remake-sources`、`POST /api/remake-sources/{id}/plans` | 写入幂等 | 来源余额 / 从来源创建计划 | `REMAKE_REASON_REQUIRED`, `SOURCE_INSUFFICIENT`, `CONFLICT_DUPLICATE`, `VALIDATION_INVALID` |
-| 未完成待处理 | `GET /api/production-reminders/incomplete`、`POST .../{id}/reschedule`、`POST .../{id}/defer` | 写入幂等 | 提醒状态 + 已安排/余量 | `QUANTITY_INVALID`, `STATE_NOT_CANCELABLE` |
-| 超额任务 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify` | 必须幂等 | 预占或计划调整提醒 | `OVERTIME_DATE_INVALID`, `OVERTIME_RESERVATION_EXCEEDED`, `VERIFICATION_EQUATION_INVALID` |
-| 超额提醒 | `GET /api/production-reminders/overtime`、`POST .../{id}/adjust-plan`、`POST .../{id}/no-adjustment` | 写入幂等 | 调整留痕 / 提醒已处理 | `STATE_NOT_CANCELABLE`, `VALIDATION_INVALID` |
-| 其他排班 | `GET/POST /api/other-schedules`、`POST /api/other-schedules/{id}/verify`、`POST /api/other-schedules/{id}/cancel`、`POST /api/other-schedules/{id}/corrections` | 写入幂等 | `OS` 编号排班 / 一次性工时核验 / 更正事实 | `VERIFICATION_EQUATION_INVALID`, `STATE_ALREADY_VERIFIED`, `STATE_NOT_CANCELABLE`, `VALIDATION_INVALID` |
-| 售后生产来源 | `GET /api/after-sales/{caseId}/production-sources`、`POST .../production-sources/plans` | 写入幂等 | 来源额度 / `PN` 售后计划（`AFTER_SALES_REWORK` / `AFTER_SALES_REPLACEMENT`） | `SOURCE_INSUFFICIENT`, `VALIDATION_INVALID`, `EMPLOYEE_NOT_ELIGIBLE` |
-
-幂等：写命令要求 `Idempotency-Key`，重复键返回首次成功结果；只读查询不要求。响应统一信封（`design.md` §2）。  
-`design.md` §6 尚未登记「其他排班」行（该能力来自 `production-management` 的「记录其他排班」Scenario 与任务 5.13）——**实施时同步补 `design.md` §6 一行**，不改其余契约。
-
-## 7. 前端页面要点（正式路由）
-
-| 路由 | 页面 | 关键点 |
-| --- | --- | --- |
-| `/production` | 生产工作台 | 顶部日期/员工/订单/工序/状态紧凑筛选；一组页签：**计划**（按日期与员工分组的计划行，行内显示计划/待安排/当前可执行、可执行或等待上游 Tag、行内「调整」「取消」「核验」入口）、**等待上游**（独立筛选视图）、**未完成待处理**（独立区域，行内「重新安排」「部分安排」「暂不安排」）、**返工/重做来源**（来源余额与「创建计划」入口）、**其他排班**（工时录入与核验/更正）；超额提醒**附着在受影响的未来排班行**上并带行内「调整计划」「无需调整」；新建计划从右上角显式按钮进入弹窗；页面无预置表单 |
-| `/production/plans/:id/verify` | 核验操作页 | 清晰区分「计划数量 / 当前可执行 / 等待数量」与「本次完成 / 合格 / 返工 / 报废 / 未完成」；等式不成立与超可执行时错误码定位到对应字段；已核验计划只读展示核验事实 |
-
-视觉基线：与订单/库存页一致——全页白底 + 浅色侧栏 + 顶部面包屑 + 单组页签，使用 Ant Design 现成组件表达层级，不在同页并排 A/B 方案；`/production/plans/:id/verify` 是**显式操作状态**的独立页面（与 `/orders/:id/changes/:changeId` 同性质），只读事实不预置表单。
-
-## 8. 模块边界、事务与锁定
-
-- **模块归属**：`production` 顶级模块（`com.yumi.production`，`package-info.java` 已声明 `@ApplicationModule`），子包按 `plan` / `verification` / `source` / `overtime` / `reminder` / `otherschedule` 划分，内部实现放各自 `internal`。
-- **依赖方向**：`production → orders`（只经 `com.yumi.orders.ledger.FulfillmentLedger` 这一 `@NamedInterface` 登记事实）与 `production → catalog`（员工资格）。**不得**出现 `orders → production` 的 Java 依赖；订单侧如需生产数据，一律走只读 SQL 引用类（同阶段四 `InventoryPlanReference` 的做法）。
-- **跨模块只读引用**：`production` 侧新增 `OrderProductionReference`（只读 `order_items` / `order_item_fulfillment_balances` / 冻结 `E`），不复制订单业务规则；`orders` 侧如需展示生产进度，只读 `production_plans` / `production_verifications`。
-- **员工资格**：创建计划时校验员工在职且具备对应工种（`MAKING`/`PACKING_BAG`/`SEAM_CUTTING`；其他排班不校验工种但校验在职）。资格由 `catalog` 的员工应用服务判定，`production` 不复制资格规则；不合格返回 `EMPLOYEE_NOT_ELIGIBLE`。
-- **事务拥有者**：计划创建、调整、取消、核验、来源创建/从来源创建计划、未完成提醒处理、超额创建/核验/提醒处理、其他排班核验/更正，均由 `production` 的应用服务在一个 `@Transactional` 内完成；跨模块写入（`FulfillmentLedger` 登记事实 + 投影）在同一事务内。
-- **锁定顺序（防死锁）**：计划行 → `order_item_fulfillment_balances` → `rework_sources` / `remake_sources` → `overtime_preemptions`。计划创建没有计划行可锁，只锁履约余额。**售后计划**（8.4/8.5）的顺序为计划行 → `after_sales_items` → `after_sales_production_sources`，且不锁履约余额（售后数量不进订单侧）。所有竞争资源的读取都必须用**锁定读**（`FOR UPDATE`）：MySQL REPEATABLE READ 下普通 SELECT 走事务首次读建立的快照，并发事务会看不到对方刚提交的行而双双通过校验（5.16 并发测试实测复现并修复：超额预占、待安排、可执行上限三处）。
-- **幂等**：写命令要求 `Idempotency-Key`；核验、取消、超额创建/核验为「必须幂等」。
-
-## 9. 不变量与错误码
-
-1. 各工序数量不相加为订单数量（§4.1）；
-2. 同一来源数量不能被两个计划或两个订单重复消费（来源余额 `total − arranged` 加锁校验）；
-3. 库存领用与发货不能重复扣库存（阶段四/六，本阶段只登记生产合格事实）；
-4. 每计划最多一次有效核验（`uk_production_verifications_plan`）；
-5. 核验等式成立且不超过事务内重算的当前可执行数量；
-6. 报废不自动减少客户需求，重做不增加订单需求（§4.5）；
-7. 返工/重做不增加订单数量；
-8. 已确认事实不通过物理删除修正（计划取消只改状态 + 恢复来源，核验/来源/更正事实永久保留）；
-9. 未完成数量必须按计划类型回到对应待安排来源（§4.3）；
-10. 超额预占不修改未来计划原始数量、不产生流入或完成（§4.6）；
-11. 其他排班不产生商品、库存或订单履约事实（§3.8）；
-12. 所有汇总均可从来源事实重建（提醒、待安排、来源余额）。
-
-错误码：沿用 `design.md` §3 分层，本阶段涉及 `VALIDATION_INVALID`、`NOT_FOUND`、`CONFLICT_VERSION`、`STATE_ALREADY_VERIFIED`、`STATE_NOT_CANCELABLE`、`STATE_NOT_EDITABLE`、`QUANTITY_INVALID`、`QUANTITY_NOT_EXECUTABLE`、`VERIFICATION_EQUATION_INVALID`、`REWORK_TARGET_INVALID`、`REMAKE_REASON_REQUIRED`、`SOURCE_INSUFFICIENT`、`EMPLOYEE_NOT_ELIGIBLE`、`OVERTIME_DATE_INVALID`、`OVERTIME_RESERVATION_EXCEEDED`；**不新增错误码**（全部已在 `ErrorCode` 中登记）。
-
-## 10. 不做项
-
-- 不做生产核验的更正/冲销（随阶段八售后与更正流程）；
-- 不做返工/重做来源的更正或作废（只支持取消其待执行计划以恢复余额）；
-- 不做其他排班的多员工/多工序排班与工资结算（工资延期，本阶段只落工时事实）；
-- 不做超额任务的历史追溯性调整（预占只按创建当时校验，后续未来计划被改动按提醒人工处理）；
-- 不做 `/production` 的甘特图、产能规划或自动排产（本阶段是人工排班 + 事实登记）；
-- 不新增计算模块公式（本阶段无金额公式；工时是整数分钟，不涉及 `DecimalPolicy`）。
-
-## 11. 待确认项（2026-09-25 待评审）
-
-1. ~~`verified_processed` 拆分~~ **已定稿（2026-09-25，实施中发现更优解）**：**不改既有表结构**，按工序的已核验处理由 `production_verifications` 按 node 汇总（§3.11）。原提议的「拆成三个分项列」被否决——按事实汇总无需改阶段三/四代码，且天然可重建。
-2. **返工来源的粒度**（§3.4）：按 `(verification_id, target_node)` 唯一。`database-design.md` §8 已写明来源含「目标工序」，故为**规格规定**，非开放项。
-3. **重做来源的起始工序**（§3.5）：写在来源上（一次核验一条来源）。`database-design.md` §8 已写明来源含「重做起始工序」，故为**规格规定**，非开放项。
-4. **超额任务形态**（§4.6）：一次任务一个工序 + 多条未来计划来源。`database-design.md` §8 的 `overtime_preemptions` 为「超额计划 + 未来正常计划 + 预占数量」，即一计划对多未来计划，故为**规格规定**，非开放项。
-5. **售后两类计划类型**（§1）：阶段五只保留枚举与资格校验入口，创建请求在缺售后来源时返回 `VALIDATION_INVALID`，实际创建随阶段八接入。**待确认**（阶段边界）。
-6. **其他排班是否校验工种**：推荐**在职即可**（其他排班不绑定工序，工种校验无意义）。**待确认**（影响 5.13 的一条校验）。
+阶段八售后任务使用售后来源和售后明细的独立锁定顺序，不得借普通订单履约余额实现售后额度。
+
+### 11.3 幂等与并发
+
+- 所有写命令要求 `Idempotency-Key`；
+- 数据库唯一约束与幂等记录共同保证重复请求不重复写事实；
+- 批量核验的幂等键以任务和请求为边界，重复提交返回首次成功结果；
+- 发生版本冲突时返回 `CONFLICT_VERSION`，不得静默覆盖其他事务；
+- 并发创建任务、消费来源、分配回转、核验明细和预占未来明细时，必须在锁内重新计算余额和上限；
+- 任一明细失败，批量事务整体回滚。
+
+---
+
+## 12. 模块边界与错误码
+
+### 12.1 模块边界
+
+- `production` 负责任务、明细、核验、返工来源、报废、数量回转、超额预占、提醒和其他排班事实；
+- `orders` 负责订单需求、订单明细和履约事实的所有权；生产模块只能通过约定的只读引用和履约事实接口访问；
+- `catalog` 负责员工在职与工种资格、产品星级、包装档位、缝边种类和标准分钟配置；
+- `inventory` 负责库存事实和兼容库存接入；
+- `after-sales` 在阶段八拥有售后来源和售后生产边界；
+- 其他排班不向任何订单或商品模块产生数量事实。
+
+不得出现 `orders → production` 的业务规则反向依赖。订单侧展示生产进度时使用只读查询或投影引用，不调用生产写服务。
+
+### 12.2 错误码
+
+阶段五至少需要覆盖以下既有分层错误：
+
+- `VALIDATION_INVALID`
+- `NOT_FOUND`
+- `CONFLICT_VERSION`
+- `STATE_ALREADY_VERIFIED`
+- `STATE_NOT_CANCELABLE`
+- `STATE_NOT_EDITABLE`
+- `QUANTITY_INVALID`
+- `QUANTITY_NOT_EXECUTABLE`
+- `VERIFICATION_EQUATION_INVALID`
+- `SOURCE_INSUFFICIENT`
+- `EMPLOYEE_NOT_ELIGIBLE`
+- `CAPACITY_EXCEEDED`
+- `OVERTIME_DATE_INVALID`
+- `OVERTIME_RESERVATION_EXCEEDED`
+- `AFTER_SALES_SOURCE_INVALID`
+
+如现有错误码已能表达同一拒绝原因，优先复用，不为前端文案重复新增错误码。错误响应必须指出任务明细、字段和事实冲突位置，尤其是批量核验中的失败明细。
+
+---
+
+## 13. 不变量与实施验收口径
+
+1. 任务头只保存共同组织信息，不参与任何数量流转；任务明细是最小事实边界。
+2. 一个任务可包含多个订单、多个产品和多个明细；每个明细仍只有一个订单明细、产品、工序、类型和来源边界。
+3. 明细核验满足 `completed = qualified + rework + scrap`，并满足 `incomplete = planned - completed`。
+4. 每个明细最多一次核验；批量核验逐明细校验、整批原子提交。
+5. `NORMAL` 的计划数量按产品、日期、工序和类型汇总，未取消计划不得超过 `moldQuantity * dailyBatchLimit`；历史核验计划仍占用历史资源。
+6. `REWORK` 不占普通产能、不计正常工时、不产生虚构正常工时；返工合格沿原工序正常流向。
+7. 标准分钟来自冻结的产品星级、包装档位或缝边种类；不得用工作日分钟或最大产能反推。
+8. 所有 `NORMAL` 明细计算 `estimated_minutes`；容量超出或不足只提示，不改变正常硬约束。
+9. 下游可执行上限只能来自实际合格、兼容库存、同工序回转等当前事实，不能来自上游计划数。
+10. 首道制作缺口扣除库存已满足和跳过工序部分，不以订购总量笼统覆盖。
+11. 普通排产额度与返工来源额度分开计算，不得将全部核验数量直接求和作为负额度。
+12. 核验返工量先形成不可变返工事实；管理员基于事实显式创建发生工序返工来源，来源可拆多个返工明细；返工再次返工须显式创建下一轮来源。
+13. 报废事实不可变；报废不增加订单需求、不产生上游合格或库存事实、不产生替代类型；数量回转只回到发生报废工序的普通可安排/可执行额度。
+14. 后续使用回转余额必须创建 `NORMAL` 明细，并由新的正常日期重新占用资源。
+15. 取消只针对单个待执行明细；任务头仅在全部明细取消时派生为已取消。
+16. 超额预占关联任务/明细，不改未来原计划；只有合格才产生未来调整提醒，返工和报废不减少未来计划。
+17. 其他排班只产生独立总分钟事实，不产生商品数量、库存事实或订单履约事实。
+18. 所有汇总都能从不可变或可追溯事实重建；投影、提醒和派生状态不能成为唯一事实来源。
+19. 所有竞争资源使用统一锁定顺序和锁定读；写命令幂等，批量失败整体回滚。
+20. 阶段八售后来源、权限和事实边界不得被普通生产任务绕过。
+
+实施验收应覆盖上述不变量、并发消费、重复提交、批量回滚、取消回退、返工轮次、报废回转、历史资源占用、库存跳过工序、超额提醒和其他排班隔离。当前文档只定义验收口径，不声称任何测试数量、迁移或实现已经完成。
+
+---
+
+## 14. 不做项与后续阶段接口
+
+- 不提供普通生产核验的编辑、冲销或物理删除；
+- 不提供来源数量的手工改写；来源余额只能由创建、核验、取消、未完成回退和回转分配事实改变；
+- 不提供自动选择员工、自动选择来源或自动排产；
+- 不把来源/额度作为用户进入生产任务页面前必须掌握的导航概念；
+- 不把任务头数量当作订单履约数量；
+- 不以核验完成释放历史日期正常排班资源；
+- 不以返工或报废推导未来正常计划减少；
+- 不把其他排班分钟转换成商品数量；
+- 不在阶段五实现阶段八售后业务流程；
+- 不恢复已废弃的替代生产模型或基于工序顺序限制返工目标的模型；
+- 不保留任何未经证实的实施结论。
+
+阶段八接入时，应复用任务头/任务明细的组织能力，但由售后模块提供来源、额度、权限、核验和履约边界；阶段五不得预先写入售后事实或扩张普通订单需求。
+
+---
+
+## 15. 待评审清单
+
+以下项目在实施前需要由架构、领域和数据库负责人确认，但不改变本文已经明确的最终业务口径：
+
+1. `task_no`、`item_no` 的最终编号前缀、宽度及序列表名；
+2. 产品能力字段和标准分钟快照在现有 catalog 表中的最终列名与迁移顺序；
+3. 生产任务、明细、核验、返工来源、报废和数量回转表的审计字段统一模板；
+4. 订单履约投影列的维护方式，确保按事实可重建且不把返工混入普通处理；
+5. 阶段八专用类型和来源接口的最终命名、权限和模块依赖登记；
+6. 前端周历和任务明细批量核验的交互细节及错误定位展示。
+
+上述清单是待评审事项，不是已完成事项。本文在评审通过前保持“待评审、待实施”状态。

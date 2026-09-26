@@ -720,145 +720,171 @@
       confirmedOn: 2026-09-25
       conclusion: 已按清单逐项核对并签字：第 4 步「库存计划（可选）」带出草稿计划、批次下拉标签可读、改动后保存并重新打开仍是改动后的值、确认成功；缺口样例出现按批次聚合的缺口告警与两个显式出口且不自动补缺。
 
-## 5. 阶段五：生产计划、核验、返工、重做与超额提醒（依赖阶段三；库存接入依赖阶段四）
+## 5. 阶段五：生产任务、暗线事实、核验流转与排班工作台（依赖阶段三；库存流入依赖阶段四）
 
-**施工文档**：`docs/architecture/production-module-design.md`（2026-09-25 新建，状态「待评审」）——含 10 张生产表逐列、待安排/可执行/流转/返工矩阵/重做/超额/工时口径、状态派生、API 契约、前端要点、模块边界与锁定顺序、不变量与错误码，以及 §11 的待确认项。**5.1 已实施（不依赖任何待确认项）；5.2 起按 5.x 逐条推进。** 初稿提议的「拆 `verified_processed` 投影列」已否决：按工序的已核验处理改由 `production_verifications` 按 node 汇总，**不改阶段三/四既有表结构与代码**。
+本阶段以 `specs/production-management/spec.md` 为唯一行为契约。所有任务均为未实施任务；不得以旧阶段五条目的实现记录、测试数量、人工验收或文档证据替代本阶段的新实现与新验收。生产任务采用“一个任务头 + 多条任务明细”，明线计划与暗线事实分离；所有数量、状态、产能和工时由服务端事务内重算。
 
-- [x] 5.1 编写 Flyway 迁移创建 `production_plans/production_plan_adjustments/production_verifications/rework_sources/remake_sources/overtime_preemptions/production_reminders/other_schedules/other_schedule_verifications/other_schedule_time_corrections`，落实唯一核验和来源余额约束。
-  - 证据：Requirement/Scenario：`production-management` 全部 Requirement（本任务落实其事实表与约束）。正式文档：`docs/architecture/database-design.md` §8、`docs/architecture/production-module-design.md` §3、`docs/architecture/domain-and-quantity-model.md` §5–§7/§11。文件：`backend/src/main/resources/db/migration/V10__production.sql`（新增）、`backend/src/test/java/com/yumi/ProductionMigrationTest.java`（新增，8 用例）。表：`production_plans`、`production_plan_adjustments`、`production_verifications`、`rework_sources`、`remake_sources`、`overtime_preemptions`、`production_reminders`、`other_schedules`、`other_schedule_verifications`、`other_schedule_time_corrections`。API/路由：不适用（本任务只建表）。事务/锁定/幂等键：本任务不涉及；锁定顺序见施工文档 §8。Flyway：新增 `V10`（不改写既有迁移，空库重建后 V1→V10 全部成功）。
-  - 关键断言（8 用例全绿）：①十张表齐备；②`plan_no`/`schedule_no` 为 `char(8)`、`quantity`/`total_minutes` 为 `int unsigned`、`plan_date` 为 `date`；③唯一键齐备——计划编号 `uk_production_plans_plan_no`、**每计划最多一次核验** `uk_production_verifications_plan`、返工目标 `uk_rework_sources_target`、重做核验 `uk_remake_sources_verification`、预占配对 `uk_overtime_preemptions_pair`、排班编号、工时核验；④外键齐备——计划→订单/明细/员工、核验→计划/订单/明细、返工→核验/明细/上一返工、重做→核验/明细、预占→超额计划/未来计划、提醒→计划/核验/预占/未来计划、排班→员工、工时更正→核验/排班；⑤关键索引齐备——`idx_production_plans_date_node`/`employee`/`item`/`source`、`idx_overtime_preemptions_future`、`idx_production_reminders_type_status`；⑥CHECK 拒绝非法数据——核验等式 `completed = qualified + rework + scrap`、来源余额 `total > 0 AND arranged <= total`、预占数量 `> 0`、其他排班分钟 `0–59` 与 `total_minutes = hours*60 + minutes AND > 0`、提醒类型与状态枚举、更正后总分钟 `> 0`；重复计划编号/重复核验/重复返工目标/重复重做来源/重复预占配对均被唯一键拒绝。
-  - **如实记录（建表口径订正）**：首版把 `plan_no`/`schedule_no` 建成 `CHAR(6)`，但 `SequenceAllocator.format(prefix, value, 6)` 产出 **8 字符**（同库存 `IB000001`/`IM000001` 的既有口径）→ 首跑 4 个用例报 `Data truncation: Data too long for column 'plan_no'`，改为 `CHAR(8)` 后通过。施工文档 §2 的「宽度 6」指序号位宽，与 `CHAR(8)` 一致。
-  - 阶段门禁（清库重建后）：后端 `YUMI_DB_PASSWORD=<钥匙串> ./mvnw test` 退出码 0，**230 测试 0 失败 0 错误**（阶段四 222 → 本任务 +8）；Flyway 空库 `Successfully applied 10 migrations ... now at version v10`；`openspec validate --strict` valid。
-  - 人工证据：不适用（建表属机器证据）。
-- [x] 5.2 实现生产计划查询/创建 `GET/POST /api/production-plans`，覆盖正常、返工、重做、超额、售后返工、售后补发类型及执行员工资格；核心归属字段创建后不可编辑。
-  - 证据：Requirement/Scenario：`production-management`「生产计划必须绑定有效来源和执行资格」的 Scenario「创建等待上游计划」「无资格员工被拒绝」。正式文档：`docs/architecture/production-module-design.md` §3.1/§4.2/§6/§8、`database-design.md` §8。文件：`production/plan/ProductionPlanController.java`、`ProductionPlanService.java`、`ProductionPlanViews.java`、`CreateProductionPlanRequest.java`、`plan/internal/{ProductionPlanRow,ProductionPlanRepository}.java`、`production/internal/OrderProductionReference.java`、`production/ProductionNodes.java`；订单侧新增 `FulfillmentLedger.applyPlanned` + `FulfillmentRepository.applyPlanned`（写 `making_planned`/`packing_planned`/`seam_planned`）。API：`GET /api/production-plans`（按 dateFrom/dateTo/employeeId/node/status/orderId/orderItemId 筛选）、`GET /api/production-plans/{id}`、`POST /api/production-plans`；错误码 `VALIDATION_INVALID`（类型/工序/数量/日期/明细）、`QUANTITY_INVALID`（超待安排）、`EMPLOYEE_NOT_ELIGIBLE`、`NOT_FOUND`。表：`production_plans`（写）+ `orders`/`order_items`/`order_item_fulfillment_balances`（只读引用）。事务拥有者：`ProductionPlanService.create` 的 `@Transactional`（计划落库与订单侧计划占用投影同一事务）；锁定对象：本任务不加锁（核验/取消的加锁在 5.4/5.8）；幂等键：必须 `Idempotency-Key`。模块边界：`production → orders.ledger`（`@NamedInterface`）与 `production → catalog.employee.service/dto`（既有 `@NamedInterface`），由 `ModuleStructureTest.verify()` 守住。
-  - 口径（与 5.2 任务文字的口径取舍，如实记录）：**本接口只创建正常计划（`planType = NORMAL`）**；返工/重做/超额三类必须从各自来源创建（5.6 `POST /api/rework-sources/{id}/plans`、5.7 `POST /api/remake-sources/{id}/plans`、5.10 `POST /api/overtime-tasks`），以保证来源余额与目标矩阵在创建时即被校验——这是 5.6/5.7/5.10 自身任务文字的要求；售后两类（`AFTER_SALES_REWORK`/`AFTER_SALES_REPLACEMENT`）在阶段八接入售后来源后启用。传入其他类型返回 400 并定位 `planType`（不是占位实现，是明确拒绝并给出正确入口）。核心归属字段（`plan_type`/`order_item_id`/`node`/`source_*`/`quantity`）**无编辑接口**；待执行正常计划的日期/员工/数量/备注变更走 `production_plan_adjustments` 历史，由 5.12 的超额提醒「调整计划」写入。
-  - 关键断言（`ProductionPlanApiTest` 5 用例全绿）：①创建 → 201，`planNo` 以 `PN` 开头、`planType=NORMAL`、`status=PENDING`、`employeeName` 为员工姓名快照；②计划创建**不产生**履约事实与库存事实（`fulfillment_entries`/`inventory_movements` 数量不变），只把计划占用写入 `making_planned`；③离职或缺对应工种的员工 → 409 `EMPLOYEE_NOT_ELIGIBLE`，且不留任何计划行与计划占用；④数量超待安排 → 400 `QUANTITY_INVALID` 定位 `quantity`（消息含「待安排 N，本次计划 M」）；⑤非 NORMAL 类型 → 400 定位 `planType`；数量 0 → 400 定位 `quantity`；草稿订单 → 400 定位 `orderItemId`；⑥列表按 node/dateFrom/status/orderItemId 筛选正确。
-  - 阶段门禁：后端全量 **235 测试 0 失败 0 错误**（阶段五 5.1 后 230 → 本任务 +5）。
-  - 人工证据：不适用（接口属机器证据；页面在 5.14）。
-- [x] 5.3 实现待安排/当前可执行/等待上游计算，允许计划数量使用尚需安排总需求但核验必须受当时可执行数量限制；计划创建不产生完成、库存或履约事实。
-  - 证据：Requirement/Scenario：`production-management`「计划状态和执行状态必须分离」的 Scenario「已创建但等待上游」。正式文档：`domain-and-quantity-model.md` §6.1、`production-module-design.md` §4.2/§5。文件：`ProductionPlanService`（`schedulableQuantity`/`allocate`/`toViews`）、`ProductionPlanRepository.pendingByItemNode`/`verifiedByItemNode`/`pendingPlans`、`OrderProductionReference.OrderItemContext.demand/inflow`。API：`GET/POST /api/production-plans` 的 `nodeDemand`/`nodePending`/`nodeVerified`/`nodeInflow`/`schedulableQuantity`/`executableQuantity`/`waitingUpstream` 字段。表：`production_plans`（PENDING 占用）、`production_verifications`（按工序已核验）、`order_item_fulfillment_balances`（工序流入，只读）。
-  - 口径：`待安排数量 = 工序总需求 − 该工序 PENDING 计划占用 − 该工序已核验处理`；`当前可执行量 = 工序有效流入 − 该工序已核验处理`，再按「计划日期 + id」**升序依次分配**给待执行计划（先到先得，且不重复占用同一份可执行量）；`等待上游 = 状态 PENDING 且本计划可执行量为 0`。**已核验处理按工序从 `production_verifications` 汇总，不读订单侧投影**（施工文档 §3.11 定稿：不改阶段三/四表结构）。工序总需求：制作与捏毛装袋取订购数量，**缝边剪袋取确认时冻结的缝边数量**。创建计划允许在「待安排 > 0 但可执行 = 0」时成功（即允许排班等待上游）；核验时的可执行上限校验在 5.4。
-  - 关键断言：①**下游工序**（捏毛装袋）无上游流入时创建 10 件计划 → `nodeDemand=10`、`nodePending=10`、`schedulableQuantity=0`、`executableQuantity=0`、`waitingUpstream=true`；②缝边剪袋计划 `nodeDemand=4`（冻结的缝边数量，不是订购数量=10），且待安排用满后再建 1 件 → 400；③制作工序：第一个计划 6 件 → `executableQuantity=6`、`waitingUpstream=false`；第二个计划 4 件 → `executableQuantity=4`（先到先得，剩余 0）、`schedulableQuantity=0`；按 id 回读两个计划仍分别为 6/4（分配稳定）。
-  - **有效流入口径（2026-09-25 实施中订正，浏览器自测准备时发现）**：初版对**制作**也读 `making_inflow`，而该列不会被任何命令写入（制作是首道工序，库存接入与上游核验都不会写它）→ **制作计划永远「等待上游」、永远无法核验**，等于阶段五的主流程走不通。按 `domain-and-quantity-model.md` §6「首道制作的正常流入来自订单实际生产缺口」订正为：`制作` 的有效流入**取订单实际生产缺口（订购数量）**，`捏毛装袋`/`缝边剪袋` 取 `packing_inflow`/`seam_inflow`。据此调整 `OrderProductionReference.effectiveInflow`、计划视图的 `nodeInflow`、核验上限计算，并同步改三处测试（等待上游用例改用下游工序、可执行上限用例改用捏毛装袋流入、并发上限竞争改用捏毛装袋）。施工文档 §4.2 已记录该口径。
-  - 阶段门禁：后端全量 **235 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.4 实现 `POST /api/production-plans/{id}/verify` 一次性核验，校验完成=合格+返工+报废、未完成=计划-完成，事务内锁来源和履约余额后分流各结果。
-  - 证据：Requirement/Scenario：`production-management`「生产计划只能一次核验」的 Scenario「合法核验」「数量等式不成立」「重复核验」。正式文档：`domain-and-quantity-model.md` §7、`production-module-design.md` §4.3/§5/§8。文件：`production/verification/{ProductionVerificationController,ProductionVerificationService,ProductionVerificationViews,VerifyProductionPlanRequest}.java`、`verification/internal/ProductionVerificationRepository.java`、`plan/internal/ExecutableCalculator.java`（与 5.3 共用同一可执行口径）、`source/internal/{ReworkSourceRepository,RemakeSourceRepository}.java`、`reminder/internal/ProductionReminderRepository.java`；订单侧新增 `FulfillmentLedger.lockBalance/applyVerified/applyReworkPending/applyRemakePending`。API：`POST /api/production-plans/{id}/verify`，入参 `{completedQuantity,qualifiedQuantity,reworkQuantity,scrapQuantity,verifyNote}`（未完成由服务端算，不接受客户端提交）；错误码 `VERIFICATION_EQUATION_INVALID`（400，等式或超计划）、`QUANTITY_NOT_EXECUTABLE`（409）、`STATE_ALREADY_VERIFIED`（409）、`VALIDATION_INVALID`（已取消计划/数量为负）、`NOT_FOUND`。表：`production_verifications`、`rework_sources`、`remake_sources`、`production_reminders`、`production_plans`、`fulfillment_entries`、`order_item_fulfillment_balances`。事务拥有者：`ProductionVerificationService.verify` 的 `@Transactional`；**锁定顺序**：`FulfillmentLedger.lockBalance`（履约投影行 `FOR UPDATE`）→ `ProductionPlanRepository.findByIdForUpdate`（计划行 `FOR UPDATE`）→ 来源行；幂等键：必须 `Idempotency-Key`。
-  - 口径：等式与上限校验通过后，写核验事实 → 合格按冻结流程分流（§4.3）→ 返工/报废数量记入「待安排」额度 → 释放计划占用 + 累加已核验处理 → 处理未完成 → 计划置 `VERIFIED`。**未完成处理按计划类型分流**：正常计划生成 `INCOMPLETE` 提醒（待安排数量本身是派生量，无需回写）；返工/重做计划把未完成数量回退来源 `arranged_quantity`；超额任务与售后类型的未完成按各自口径在 5.11/阶段八接入。**核验不自动生成返工/重做来源**（实施中订正，见 5.6 证据）：只把 `rework_quantity`/`scrap_quantity` 累加进 `rework_pending`/`remake_pending` 额度，来源由 5.6/5.7 按目标工序/起始工序**显式创建**——若核验时自动建默认来源，默认来源会吃掉全部额度，使「显式选择前序工序」永远无额度可用。
-  - 关键断言（`ProductionVerificationTest` 5 用例全绿）：①制作计划核验 10=8 合格+1 返工+1 报废 → 200，`flows=[{PACKING_BAG,8}]`、`reworkSourceId`/`remakeSourceId` 均不存在、无未完成提醒；投影 `packing_inflow=8`、`making_planned` 归 0、`verified_processed=10`、`rework_pending=1`、`remake_pending=1`；`fulfillment_entries` 一条 `PRODUCTION_QUALIFIED`/`PACKING_BAG`/`IN`/8 且 `source_type=PRODUCTION`；返工/重做来源表均为 0 行；计划状态 `VERIFIED`；②等式不成立（10≠8+1+0）→ 400 `VERIFICATION_EQUATION_INVALID` 定位 `completedQuantity`；完成超计划（11>10）→ 400 同码；流入被降为 5 后完成 10 → 409 `QUANTITY_NOT_EXECUTABLE` 定位 `completedQuantity`（**事务内重算上限**）；三次失败均**不留下核验事实**且计划仍 `PENDING`；③重复核验 → 409 `STATE_ALREADY_VERIFIED` 且核验总数仍为 1；④未完成 4 件 → 生成 `INCOMPLETE`/`MAKING`/4/`OPEN` 提醒，回读该计划 `schedulableQuantity=4`、`nodeVerified=6`，剩余 4 件可重新排产。
-  - 阶段门禁：后端全量 **240 测试 0 失败 0 错误**（5.3 后 235 → 本任务 +5）。
-  - 人工证据：不适用（页面在 5.15）。
-- [x] 5.5 实现逐工序合格流转：制作→捏毛装袋；捏毛装袋按冻结的缝边数量分为不缝边可发货与缝边剪袋；缝边剪袋→可发货；不得将各工序完成相加。
-  - 证据：Requirement/Scenario：`production-management`「工序合格必须按冻结流程流转」的 Scenario「捏毛装袋合格分流」；`order-lifecycle`「工序必须共享订单明细数量」的 Scenario「缝边分流」。正式文档：`domain-and-quantity-model.md` §5/§6、`production-module-design.md` §4.3。文件：`ProductionVerificationService.qualifiedFlows`、`production/ProductionNodes.qualifiedTarget`。API：核验返回的 `flows` 列表（`{node,quantity}`）即本次分流去向。表：`fulfillment_entries`（按节点写 `PRODUCTION_QUALIFIED`）+ `order_item_fulfillment_balances`（`packing_inflow`/`seam_inflow`/`shippable_quantity`）。
-  - 口径：`制作合格 → 全部进 packing_inflow`；`缝边剪袋合格 → 全部进 shippable_quantity`；`捏毛装袋合格 → 按冻结的缝边数量分流：缝边分流 = clamp(缝边数量 − 核验前 seam_inflow, 0, 本次合格)，其余进 shippable_quantity`。下限取 0 的原因：库存领用可直接接入缝边剪袋（阶段四），`seam_inflow` 可能已填满甚至超过缝边数量。**各工序完成数量不相加**，同一批需求只换阶段。
-  - 关键断言：捏毛装袋流入 10、冻结的缝边数量=4 → 核验合格 10 → `flows=[{SEAM_CUTTING,4},{SHIPPABLE,6}]`，投影 `seam_inflow=4`、`shippable_quantity=6`（不是 10+10 相加）；制作合格 8 只进捏毛装袋，可发货仍为 0。
-  - 阶段门禁：后端全量 **240 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.15）。
-- [x] 5.6 实现返工来源查询/创建 `GET/POST /api/rework-sources` 和从来源创建计划 `POST /api/rework-sources/{id}/plans`，落实完整目标矩阵、原核验/上一返工关联、返工次数、原因及尚未安排余额；并发创建不得超过来源余额。
-  - 证据：Requirement/Scenario：`production-management`「返工必须受目标矩阵和来源余额限制」的 Scenario「合法返工目标」「非法返工目标」。正式文档：`domain-and-quantity-model.md` §6.1/§7、`production-module-design.md` §3.4/§4.4。文件：`production/source/{ReworkSourceController,ReworkSourceService,ProductionSourceViews}.java`、`source/internal/ReworkSourceRepository.java`、`production/ProductionNodes.reworkTargets/canRework`、`plan/internal/PlanWriter.java`（与 5.2/5.7/5.10 共用的计划落库）。API：`GET /api/rework-sources?orderItemId=`、`POST /api/rework-sources`（`{verificationId,targetNode,quantity,reason}`）、`POST /api/rework-sources/{id}/plans`（`{planDate,employeeId,quantity,note}`）；错误码 `REWORK_TARGET_INVALID`（400）、`SOURCE_INSUFFICIENT`（409）、`CONFLICT_DUPLICATE`（409）、`EMPLOYEE_NOT_ELIGIBLE`、`NOT_FOUND`。表：`rework_sources`、`production_plans`、`order_item_fulfillment_balances`。事务拥有者：`ReworkSourceService.create/createPlan` 的 `@Transactional`；**锁定对象**：`createPlan` 先 `findByIdForUpdate` 锁来源行再校验余额（并发创建不会超支）；幂等键：必须 `Idempotency-Key`。
-  - 口径（实施中订正，与 5.4 联动）：**核验不再自动生成返工来源**，只把返工数量累加进「返工待安排」额度；来源由本接口按**目标工序显式创建**。原因：若核验时自动建默认来源（目标=同工序），该来源会吃掉全部返工数量，`POST` 永远撞「来源总量超额度」而无法为前序工序建来源。约束：①目标工序必须落在矩阵内（制作问题只能返工制作；捏毛装袋问题可返工捏毛装袋/制作；缝边剪袋问题可返工三者）；②同一核验同一目标工序只有一条来源（唯一键）；③同一核验下所有来源总量合计不得超过该核验的返工数量；④从来源创建计划的数量不得超过来源余额（`total − arranged`），创建后 `arranged_quantity` 增加、`rework_pending` 相应减少。
-  - 关键断言（`ProductionSourceTest` 4 用例中的 2 个）：核验返工 6 件后来源表 0 行、`rework_pending=6`；建 `MAKING` 来源 3 件 → 201（`balanceQuantity=3`、`roundNo=1`）；再建同目标 → 409 `CONFLICT_DUPLICATE`；建 `SEAM_CUTTING`（后序）→ 400 `REWORK_TARGET_INVALID` 定位 `targetNode`；建 `MAKING` 4 件（合计 3+4>6）→ 409 `SOURCE_INSUFFICIENT` 定位 `quantity`；来源创建不改变 `rework_pending`（额度只在核验时计入、只在排产时消耗）。
-  - 阶段门禁：后端全量 **244 测试 0 失败 0 错误**（5.5 后 240 → 本组 5.6/5.7/5.8 共 +4）。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.7 实现报废重做来源查询/创建 `GET/POST /api/remake-sources` 和从来源创建计划 `POST /api/remake-sources/{id}/plans`，默认报废工序起始，从制作开始必须填写原因；原报废事实永久保留，重做不增加订单需求。
-  - 证据：Requirement/Scenario：`production-management`「报废重做必须保留原报废事实」的 Scenario「默认报废重做」「从制作开始重做」。正式文档：`domain-and-quantity-model.md` §7/§8、`production-module-design.md` §3.5/§4.5。文件：`production/source/{RemakeSourceController,RemakeSourceService}.java`、`source/internal/RemakeSourceRepository.java`。API：`GET /api/remake-sources?orderItemId=`、`POST /api/remake-sources`（`{verificationId,startNode,quantity,reason}`，`startNode` 缺省取报废工序）、`POST /api/remake-sources/{id}/plans`；错误码 `REMAKE_REASON_REQUIRED`（400）、`VALIDATION_INVALID`（起始工序晚于报废工序，400）、`SOURCE_INSUFFICIENT`（409）、`CONFLICT_DUPLICATE`（409）。表：`remake_sources`、`production_plans`、`order_item_fulfillment_balances`。事务/锁定/幂等键同 5.6（`createPlan` 锁来源行）。
-  - 口径：起始工序只能取报废工序**或其前序**（默认报废工序，不传即默认）；从 `MAKING` 开始**必须填写原因**（前序材料不可用等），否则 400 `REMAKE_REASON_REQUIRED`；同一核验同一起始工序只有一条来源（唯一键 `uk_remake_sources_target`，实施中由「一核验一条」改为「一核验一起始工序一条」，与返工对称——否则「显式选择从制作开始」无法表达）；同一核验下所有重做来源总量合计不得超过该核验的报废数量；从来源创建计划受余额约束。**原报废事实永久保留，重做不恢复原报废数量、不增加订单需求**（重做计划的合格数量经核验正常流入，`required_quantity` 不变）。
-  - 关键断言：核验报废 4 件后来源表 0 行、`remake_pending=4`；建 `MAKING` 来源不带原因 → 400 `REMAKE_REASON_REQUIRED` 定位 `reason`；建 `SEAM_CUTTING`（晚于报废工序捏毛装袋）→ 400 定位 `startNode`；带原因建 `MAKING` 2 件 → 201（`startNode=MAKING`、`reason` 回读一致）；同起始工序再建 → 409 `CONFLICT_DUPLICATE`；建 `MAKING` 3 件（合计 2+3>4）→ 409 `SOURCE_INSUFFICIENT`；建 `PACKING_BAG` 1 件（默认报废工序）→ 201 且与制作来源并存。
-  - 阶段门禁：后端全量 **244 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.8 实现 `POST /api/production-plans/{id}/cancel`，对应 `production-management`“待执行计划取消必须恢复来源”；仅待执行可取消，正常/返工/重做分别恢复来源，已核验返回 `STATE_NOT_CANCELABLE`。
-  - 证据：Requirement/Scenario：`production-management`「待执行计划取消必须恢复来源」的 Scenario「取消待执行返工计划」「取消已核验计划」。正式文档：`production-module-design.md` §3.1/§5/§8。文件：`production/plan/{ProductionPlanCancellationService}.java`、`plan/internal/ProductionPlanRepository.markCancelled`、`ProductionPlanController.cancel`。API：`POST /api/production-plans/{id}/cancel`（`{reason}` 必填）；错误码 `STATE_NOT_CANCELABLE`（409）、`VALIDATION_INVALID`（缺原因，400）、`NOT_FOUND`。表：`production_plans`、`rework_sources`、`remake_sources`、`order_item_fulfillment_balances`。事务拥有者：`cancel` 的 `@Transactional`；**锁定顺序**：`lockBalance` → 计划行 `FOR UPDATE` → 来源行；幂等键：必须 `Idempotency-Key`。
-  - 口径：只允许 `PENDING` 取消且必须填写原因；正常计划取消只释放计划占用（待安排数量是派生量）；返工/重做计划取消把数量退回来源 `arranged_quantity` 并同步 `rework_pending`/`remake_pending`；**已核验计划返回 `STATE_NOT_CANCELABLE`，核验与来源事实不变**；取消只改状态并保留取消人/时间/原因，原计划与来源关系不删除。超额任务的预占释放在 5.11。
-  - 关键断言：从来源建 3 件返工计划后取消 → 200 `CANCELLED`，来源余额由 0 恢复为 3、`rework_pending` 由 3 恢复为 6、`making_planned` 归 0、`cancel_reason` 回读一致；重复取消 → 409 `STATE_NOT_CANCELABLE`；缺原因 → 400 定位 `reason`；已核验计划取消 → 409 `STATE_NOT_CANCELABLE` 且状态仍 `VERIFIED`。
-  - 阶段门禁：后端全量 **244 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.9 实现未完成待处理 `GET /api/production-reminders/incomplete`、重新安排 `POST .../{id}/reschedule` 和暂不安排 `POST .../{id}/defer`；部分安排保留余量，暂不安排必须有原因且不删除待安排需求。
-  - 证据：Requirement/Scenario：`production-management`「未完成数量必须返回对应待处理来源」的 Scenario「部分完成正常计划」。正式文档：`production-module-design.md` §3.7/§4.3、`domain-and-quantity-model.md` §7。文件：`production/reminder/{ProductionReminderController,ProductionReminderService,ProductionReminderViews}.java`、`reminder/internal/ProductionReminderRepository.java`。API：`GET /api/production-reminders/incomplete`、`POST /api/production-reminders/incomplete/{id}/reschedule`（`{planDate,employeeId,quantity,note}`）、`POST .../{id}/defer`（`{reason}`）；错误码 `QUANTITY_INVALID`（超余量）、`VALIDATION_INVALID`（缺原因/字段）、`STATE_NOT_CANCELABLE`（提醒已处理）、`NOT_FOUND`、`EMPLOYEE_NOT_ELIGIBLE`。表：`production_reminders`、`production_plans`、`order_item_fulfillment_balances`。事务拥有者：`reschedule`/`defer` 的 `@Transactional`；锁定对象：提醒行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
-  - 口径：**重新安排**用满余量 → 提醒 `HANDLED`/`RESCHEDULED`；少于余量 → 状态保持 `OPEN`、`quantity` 减掉已安排量、`handling_type=PARTIAL`、`handled_quantity` 累加（**余量继续提醒**）；重新安排会新建一条正常计划并占用待安排额度。**暂不安排**原因必填、只关闭提醒，**不删除待安排需求**（待安排数量本身是派生量）。已处理提醒再操作 → 409。
-  - 关键断言（`ProductionReminderTest` 3 用例全绿）：①计划 10 件核验完成 6 件 → `GET incomplete` 返回 1 行 `MAKING`/数量 4/`OPEN`；②重新安排 3 件 → 提醒仍 `OPEN`、数量 1、`handlingType=PARTIAL`、`handledQuantity=3`，计划数 2、待执行计划量 3；③再安排 2 件 → 400 `QUANTITY_INVALID` 定位 `quantity`；④安排余下 1 件 → `HANDLED`/`RESCHEDULED`，`GET incomplete` 返回空、待执行计划量 4；⑤暂不安排缺原因 → 400 定位 `reason`，带原因 → `HANDLED`/`DEFERRED` 且原因回读一致；**暂不安排后待安排仍为 4**（需求 10 − 待执行 0 − 已核验 6），计划数仍 1（不删除需求）；⑥对已处理提醒再重新安排 → 409 `STATE_NOT_CANCELABLE`。
-  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**（5.8 后 244 → 5.9–5.12 共 +8）。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.10 实现超额任务创建 `POST /api/overtime-tasks`：仅执行当天创建，只能选择未来正常计划未预占数量，跨订单/商品时每条仍明确来源计划；预占不修改原计划数量或履约事实。
-  - 证据：Requirement/Scenario：`production-management`「超额任务只产生业务预占和人工调整提醒」的 Scenario「重复预占」「超额任务日期非法」。正式文档：`domain-and-quantity-model.md` §11、`production-module-design.md` §3.6/§4.6。文件：`production/overtime/{OvertimeTaskController,OvertimeTaskService,OvertimeTaskViews}.java`、`overtime/internal/OvertimePreemptionRepository.java`、`plan/internal/PlanWriter.java`（复用）。API：`POST /api/overtime-tasks`（`{orderItemId,node,planDate,employeeId,lines:[{futurePlanId,quantity}],note}`，计划数量 = 各来源预占之和）；错误码 `OVERTIME_DATE_INVALID`（400：非当天 / 来源非未来 / 来源非待执行正常计划）、`OVERTIME_RESERVATION_EXCEEDED`（409）、`EMPLOYEE_NOT_ELIGIBLE`、`VALIDATION_INVALID`、`NOT_FOUND`。表：`production_plans`（`plan_type=OVERTIME`）、`overtime_preemptions`、`production_reminders`。事务拥有者：`create` 的 `@Transactional`；**锁定对象**：未来计划按 id **升序 `FOR UPDATE`**（`lockFuturePlans`），并发超额任务不会各自通过可选数量校验；幂等键：必须 `Idempotency-Key`。
-  - 口径：只在**执行当天**创建（`planDate = 今天`）；来源只能是**未来日期**的**待执行正常计划**；`Σ 某未来计划的有效预占 ≤ 该计划计划数量 − 其他有效预占合计`（未来计划当前可选数量）；**预占不修改未来计划原始数量、不产生工序流入或完成**；创建时每条预占生成一条 `OVERTIME_PENDING_VERIFY` 提醒并附着在受影响的未来计划行上。超额任务自身不校验「待安排数量」（超额按定义超出计划）。
-  - 关键断言（`OvertimeTaskTest` 5 用例）：①创建 4 件超额任务（来源=明天 4 件的正常计划）→ 201、`PN` 编号、`quantity=4`、预占 1 条 `ACTIVE`/4；**未来计划数量仍 4**、`fulfillment_entries` 数量不变；生成 `OVERTIME_PENDING_VERIFY` 提醒（`future_plan_id` 正确、数量 4、`OPEN`）；②未预占余额 4−4=0，再要 8 件 → 409 `OVERTIME_RESERVATION_EXCEEDED` 定位 `lines`，未来计划数量不变；③`planDate=昨天` → 400 `OVERTIME_DATE_INVALID` 定位 `planDate`；来源为当天正常计划 → 400 同码；④零合格核验后：预占 `RELEASED`、待核验提醒 `HANDLED`/`NO_ADJUSTMENT`（原因含「零合格」）、不生成计划减少建议、提醒总数仍 1、返工/报废只进待安排额度（2/1）。
-  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.11 实现超额任务核验 `POST /api/overtime-tasks/{id}/verify`：未完成释放预占；只有合格数量写正常履约并生成未来计划待调整提醒；返工/报废按独立来源处理，不作为计划减少依据。
-  - 证据：Requirement/Scenario：`production-management`「超额任务只产生业务预占和人工调整提醒」的 Scenario「超额任务核验后提醒」「零合格超额任务」。正式文档：`production-module-design.md` §4.6。文件：`ProductionVerificationService.settleOvertime`（复用核验服务的等式/可执行/分流口径）、`OvertimeTaskController.verify`。API：`POST /api/overtime-tasks/{id}/verify`（入参与生产核验一致）；表：`production_verifications`、`overtime_preemptions`、`production_reminders`、`fulfillment_entries`。
-  - 口径：核验复用同一服务（等式、事务内重算可执行上限、按冻结流程分流）；核验后 ①**释放该任务全部有效预占**（`RELEASED`，预占只用于借用未来产能）；②待核验提醒结束——合格 > 0 置 `HANDLED`/`SUPERSEDED`（已由计划待调整接管），零合格置 `HANDLED`/`NO_ADJUSTMENT`；③合格 > 0 时按**预占顺序**把合格数量分摊到受影响未来计划，生成 `PLAN_ADJUSTMENT` 提醒（建议减少数量 = 分摊量，绝不超过该计划预占量）；④返工/报废走独立来源、只进待安排额度，**不作为**计划减少依据；⑤未完成不生成普通「未完成待处理」提醒。
-  - 关键断言：4 件超额任务核验 4 件全合格 → 200、`flows=[{PACKING_BAG,4}]`；预占 `RELEASED`；待核验提醒 `HANDLED`/`SUPERSEDED`；`GET /api/production-reminders/overtime` 返回 1 条 `PLAN_ADJUSTMENT`（`futurePlanId` 正确、数量 4 = 合格数量分摊）；`POST .../adjust-plan` 后未来计划数量由 4 改为 1、`production_plan_adjustments` 记录 `QUANTITY`/4→1/原因、`making_planned` 减 3。
-  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.12 实现超额提醒查询/处理 `GET /api/production-reminders/overtime`、`POST .../{id}/adjust-plan`、`POST .../{id}/no-adjustment`；调整保存前后值/原因/来源，无需调整必须填原因，零合格自动结束提醒。
-  - 证据：Requirement/Scenario：`production-management`「超额提醒必须支持人工处理」的 Scenario「调整未来计划」「无需调整」。正式文档：`production-module-design.md` §3.2/§3.7/§6。文件：`production/reminder/ProductionReminderService.adjustPlan/noAdjustment`、`plan/internal/ProductionPlanAdjustmentRepository.java`、`ProductionPlanRepository.updateQuantity`。API：`GET /api/production-reminders/overtime`、`POST .../{id}/adjust-plan`（`{newQuantity,reason}`）、`POST .../{id}/no-adjustment`（`{reason}`）；错误码 `VALIDATION_INVALID`（原因必填 / 提醒类型不符）、`QUANTITY_INVALID`（新数量 < 1）、`STATE_NOT_EDITABLE`（未来计划非待执行）、`STATE_NOT_CANCELABLE`（提醒已处理）。表：`production_reminders`、`production_plan_adjustments`、`production_plans`、`order_item_fulfillment_balances`。事务拥有者：`adjustPlan`/`noAdjustment` 的 `@Transactional`；锁定对象：提醒行 `FOR UPDATE` → 未来计划行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
-  - 口径：**调整计划**只允许 `PLAN_ADJUSTMENT` 提醒，写入 `production_plan_adjustments`（`before_quantity`/`after_quantity`/`reason`/操作人）并同步计划数量与计划占用投影（按差值），提醒置 `HANDLED`/`ADJUSTED`；**新数量必须 ≥ 1**——`production_plans` 有 `CHECK (quantity > 0)`，保留数量 0 的待执行计划没有业务含义，确实无需生产应改用取消计划（**实施中发现并订正**：首版允许 0，实测触发 `ck_production_plans_quantity` 500）；**无需调整**原因必填、不改计划，提醒置 `HANDLED`/`NO_ADJUSTMENT`；零合格在核验时自动结束（5.11）。
-  - 关键断言：无需调整缺原因 → 400 定位 `reason`；带原因 → `HANDLED`/`NO_ADJUSTMENT` 且**未来计划数量不变**；调整计划 → 前后值/原因留痕、计划数量与 `making_planned` 同步、提醒 `HANDLED`/`ADJUSTED`。
-  - 阶段门禁：后端全量 **252 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.13 实现其他排班创建、一次性总分钟核验、取消和工时更正；分钟 0-59、总分钟>0，确保不产生商品、库存或订单履约事实。
-  - 证据：Requirement/Scenario：`production-management`「生产计划必须绑定有效来源和执行资格」的 Scenario「记录其他排班」、「其他排班只能一次工时核验」的 Scenario「合法工时核验」「工时更正」。正式文档：`production-module-design.md` §3.8–§3.10/§4.7、`database-design.md` §8。文件：`production/otherschedule/{OtherScheduleController,OtherScheduleService,OtherScheduleViews}.java`、`otherschedule/internal/OtherScheduleRepository.java`；员工侧新增 `catalog/employee/service/EmployeeEligibilityService.requireActive`（只校验在职，其他排班不绑定工序）。API：`GET/POST /api/other-schedules`、`POST /api/other-schedules/{id}/verify`、`POST .../{id}/cancel`、`POST .../{id}/corrections`；错误码 `VALIDATION_INVALID`（分钟越界/总分钟为 0/缺原因）、`STATE_NOT_CANCELABLE`（重复核验 / 已核验不可取消）、`EMPLOYEE_NOT_ELIGIBLE`（离职）、`NOT_FOUND`。表：`other_schedules`、`other_schedule_verifications`、`other_schedule_time_corrections`（**不写任何商品/库存/履约表**）。事务拥有者：`create/verify/cancel/correct` 的 `@Transactional`；锁定对象：排班行 `FOR UPDATE`；幂等键：必须 `Idempotency-Key`。
-  - 口径：`OS` 编号；以**小时 + 0–59 分钟**录入，`总分钟 = 小时 × 60 + 分钟` 且必须大于 0；一次性核验（`uk_other_schedule_verifications_schedule`）；已核验后录错用**工时更正**追加事实（**原核验不动**，有效工时取最新更正的 after）；取消只改状态并留原因。**有效工时在未核验时为空**——不拿计划值冒充工时事实（实施中订正：初版测试期望未核验时返回计划总分钟，语义错误）。其他排班只校验员工**在职**（施工文档 §11 推荐项）。
-  - 关键断言（`OtherScheduleTest` 3 用例全绿）：①创建 1h30 → 201、`OS` 编号、`totalMinutes=90`、`PENDING`、员工姓名快照；`production_plans`/`fulfillment_entries`/`inventory_movements` 均为 0（**不产生商品、库存或履约事实**）；②分钟 60 → 400 定位 `minutes`；0h0m → 400 定位 `hours`；离职员工 → 409 `EMPLOYEE_NOT_ELIGIBLE`；③未核验时 `effectiveMinutes`/`verifiedMinutes` 为空、`corrected=false`；核验 2h → `verifiedMinutes=120`、`effectiveMinutes=120`；重复核验 → 409 且核验数仍 1；④更正为 1h45 → `verifiedMinutes` 仍 120（原核验不动）、`effectiveMinutes=105`、`corrected=true`，更正表 `before=120/after=105/reason` 正确；更正缺原因 → 400；⑤取消缺原因 → 400，带原因 → `CANCELLED` + `cancelReason`；已核验排班取消 → 409；列表按员工/状态筛选正确。
-  - 阶段门禁：后端全量 **259 测试 0 失败 0 错误**。
-  - 人工证据：不适用（页面在 5.14）。
-- [x] 5.14 实现 `/production` 正式工作台：日期/员工/订单/工序计划列表、等待上游、独立未完成区域、返工/重做来源、超额提醒附着未来排班行和行内调整操作。
-  - 证据：Requirement/Scenario：`production-management` 全部 Requirement（工作台是这些命令与查询的正式入口）；`design.md` §7（`/production` 行）。正式文档：`docs/architecture/production-module-design.md` §7。文件：新增 `frontend/src/api/production.ts`（生产/核验/来源/提醒/超额/其他排班的类型与 23 个封装函数）、`frontend/src/pages/production/ProductionPage.tsx`；`frontend/src/routes/index.tsx` 把 `/production` 占位页替换为正式页。路由：正式 `/production`（`ROUTE_PATHS` 仍 13 条，**未新增路由**）。
-  - 结构：卡片标题「生产工作台」+「数量由服务端事实派生」标签；右上角 4 个显式按钮（新建计划 / 新建超额任务 / 新建其他排班 / 刷新）；紧凑筛选（日期区间 / 员工 / 工序 / 计划状态）；一组 5 个页签：**计划**（计划编号/类型/订单明细/工序/日期/员工/计划/待安排/当前可执行/状态与等待上游 Tag/超额提醒/操作）、**等待上游**（同一列集合按 `waitingUpstream` 过滤，去掉提醒列）、**未完成待处理**（原计划/订单明细/工序/未完成数量/已安排 + 行内「重新安排」「暂不安排」）、**返工重做来源**（按订单明细查看；返工表与重做表并列展示余额 + 行内「从来源创建计划」，余额为 0 时禁用）、**其他排班**（计划工时/有效工时/状态 + 行内「核验」「取消」「更正工时」，并提示不产生商品库存履约数量）。**所有写操作收敛到一个弹窗**（14 种 kind 决定标题、字段与提交端点），**页面无预置表单**。
-  - 口径：待安排 / 当前可执行 / 等待上游一律取服务端派生值，页面不做数量算术；**超额「计划待调整」提醒附着在受影响的未来计划行上**并带行内「调整计划」「无需调整」；新建超额任务只列**未来日期**的待执行正常计划作为来源；新建计划通过「订单 → 明细」两级选择解析出 `orderItemId`；返工/重做来源的「新建来源」需填写核验 ID（来源表已展示该 ID）。
-  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（8 文件 **45 用例**）、`npm run build` 退出码 0。
-  - 人工证据（与 5.15 同批签字）：
-    humanVisualConclusion:
-      status: confirmed
-      checklist:
-        - "`/production` 有「计划 / 等待上游 / 未完成待处理 / 返工重做来源 / 其他排班」五个页签，切换不跳转、无重复页签"
-        - "计划表能同时看到计划/待安排/当前可执行三列与「等待上游」「可执行」Tag；等待上游页签只显示等待上游的计划"
-        - "新建计划、新建超额任务、新建其他排班从右上角明确按钮进入弹窗；核验/取消在计划行、重新安排/暂不安排在未完成行、从来源创建计划在来源行、核验/取消/更正在排班行，查看动作不误作提交动作"
-        - "超额「计划待调整」提醒附着在受影响的未来计划行上，并能就地「调整计划」「无需调整」"
-        - "页面无预置表单；视觉与订单/库存页一致：白底常规后管骨架、轻量 Tag、紧凑筛选、表格自适应撑满"
-      confirmedBy: chen
-      confirmedOn: 2026-09-25
-      conclusion: "用户于 2026-09-25 确认 5.14 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
-- [x] 5.15 实现 `/production/plans/:id/verify` 核验页，清晰区分计划/可执行/等待数量与完成/合格/返工/报废/未完成，错误码定位对应字段。
-  - 证据：Requirement/Scenario：`production-management`「生产计划只能一次核验」的 Scenario「合法核验」「数量等式不成立」「重复核验」。正式文档：`production-module-design.md` §4.3/§7。文件：新增 `frontend/src/pages/production/ProductionVerifyPage.tsx`、`frontend/src/pages/production/verifyMath.ts`（纯逻辑，可单测）与 `verifyMath.test.ts`；`routes/index.tsx` 把 `/production/plans/:id/verify` 占位页替换为正式页。路由：正式 `/production/plans/:id/verify`（`ROUTE_PATHS` 仍 13 条）。
-  - 结构：左栏「计划信息」（订单明细/工序/类型/日期/员工/状态与等待上游 Tag）+ 三列大字号「计划数量 / 当前可执行 / 该工序待安排」+ 说明「已核验处理 · 有效流入」；核验表单四项（本次完成/合格/返工/报废）+ 核验备注；右侧「核验结果」面板展示服务端返回的完成/合格/返工/报废/未完成与**合格分流去向** Tag。
-  - 口径：页面**不做权威数量计算**——未完成与等式只是即时提示，服务端在同一事务内重算当前可执行数量并校验等式与上限；提交前用 `canSubmit` 拦截（等式不成立或本次完成超过计划数量时禁用提交）；服务端 400/409 的 `fieldErrors` 逐字段展示（`field：message` 列表）便于定位；**已核验/已取消计划不提供核验表单**，改为提示「每计划最多一次有效核验、已核验事实不可修改」。
-  - 关键断言（`verifyMath.test.ts` 4 用例）：①等式成立判定（含全 0 合法）；②未完成 = 计划 − 完成，超计划为负；③`canSubmit` 拦截等式不成立与超计划；④缺省/非法值按 0 处理，不产生 NaN 提示。
-  - 门禁：`npm run typecheck` 退出码 0、`npm test` 退出码 0（8 文件 **45 用例**）、`npm run build` 退出码 0。
-  - 人工证据（与 5.14 同批签字）：
-    humanVisualConclusion:
-      status: confirmed
-      checklist:
-        - "核验页把「计划数量 / 当前可执行 / 该工序待安排」与「本次完成 / 合格 / 返工 / 报废 / 未完成」分区展示，一眼能分清计划值与可执行值"
-        - "等式不成立或本次完成超过计划数量时提交按钮不可点，并给出红/绿 Tag 提示"
-        - "提交后右侧显示服务端返回的核验事实与合格分流去向；已核验计划再进入该页不出现核验表单"
-        - "服务端拒绝时逐字段显示 field：message，能直接定位到出错的输入项"
-      confirmedBy: chen
-      confirmedOn: 2026-09-25
-      conclusion: "用户于 2026-09-25 确认 5.15 的人工视觉结论通过（证据见 docs/delivery/manual-acceptance-report.md §8）。"
-- [x] 5.16 编写领域和 MySQL 集成测试覆盖唯一核验、等式、可执行上限、订购数量与缝边数量流转、返工矩阵、重做原因、来源余额竞争、取消恢复、未完成提醒、超额预占竞争和零合格提醒。
-  - 证据：Requirement/Scenario：`production-management` 全部 Requirement（本任务为其测试覆盖）。正式文档：`design.md` §4（事务内稳定顺序锁定）、`production-module-design.md` §8/§9、`database-design.md` §15（并发与悲观锁测试门禁）。文件：`ProductionMigrationTest`（8：表/编号/唯一核验/来源余额/预占/分钟口径/提醒枚举）、`ProductionPlanApiTest`（5：创建/资格/待安排/可执行/筛选）、`ProductionVerificationTest`（5：等式/上限/唯一核验/分流/未完成）、`ProductionSourceTest`（4：返工矩阵/来源余额/重做原因/取消恢复）、`ProductionReminderTest`（3：部分安排/暂不安排/已处理拒绝）、`OvertimeTaskTest`（5：预占/日期/结算/零合格/无需调整）、`ProductionConcurrencyTest`（4：**来源余额竞争、超额预占竞争、可执行上限竞争、同一计划唯一核验竞争**）。API：生产计划、核验、返工/重做来源、提醒、超额任务、其他排班全部命令端点。表：阶段五全部 10 张表。
-  - **并发覆盖与实测发现的真缺陷（重要）**：`ProductionConcurrencyTest` 首跑时「超额预占竞争」出现 **两个事务都返回 201**（预占合计 8 > 可选 6，违反不变量）。根因：MySQL **REPEATABLE READ** 下普通 `SELECT` 走事务首次读建立的快照，第二个事务在锁定读之后用普通 SELECT 读预占合计，看不到对方刚提交的预占行。修复：①预占合计改为**锁定读**（`SELECT ... FOR UPDATE`，同时对该未来计划加区间锁）；②核验与取消的锁定顺序统一为**计划行 → 履约余额**，且首次读取改为锁定读（原实现先做普通 SELECT 再 `lockBalance`，快照已提前建立）；③计划创建在算「待安排数量」前先锁履约余额。修复后 4 个并发用例全部通过，`production-module-design.md` §8 的锁定顺序与「必须用锁定读」口径同步更新。
-  - 关键断言（4 用例）：①同一返工来源（总量 3）两个并发计划各 2 件 → 恰好 1 个 201、1 个 409，来源余额为 1（只扣一次）；②同一未来计划（6 件）两个并发超额任务各预占 4 → 恰好 1 个 201、1 个 409，未来计划原始数量仍 6、有效预占合计 4；③同一明细同工序有效流入 6、两条各 6 件的计划并发核验 → 恰好 1 个 200、1 个 409，核验处理合计 6、`verified_processed=6`（**不超可执行上限**）；④同一计划并发核验两次 → 恰好 1 个 200、1 个 409，核验表仍 1 行、计划为 `VERIFIED`。
-  - 阶段门禁：后端全量 **259 测试 0 失败 0 错误**（5.12 后 252 → 本组 5.13/5.16 共 +7）。
-  - 人工证据：不适用（并发属机器证据）。
-- [x] 5.17 阶段人工验收：执行正常计划、等待上游、部分核验、返工、重做、取消、超额任务和其他排班；逐项确认来源/提醒/历史可追溯，视觉结论待签字。
-  - 证据：Requirement/Scenario：`production-management` 各 Requirement。逐项实测见 `docs/delivery/manual-acceptance-report.md` §8.3（5.17 表）与 §8.7。要点：新建计划（修复缺「计划数量」字段后）创建成功 `PN000050`；「等待上游」页签存在且制作计划不等待上游；核验实时等式与未完成回退；「返工/重做来源」页签显示来源余额（总量 − 已安排）；`PN000049` 取消 → `已取消`、操作列清空；**超额任务**：来源未来计划 `PN000050`、预占 `ACTIVE`、**未来计划原数量未变**、生成 `OVERTIME_PENDING_VERIFY` 提醒、列表出现 `PN000051 超额`；其他排班 `OS000005` 计划 90 分 / 有效 120 分 / 已核验。
-  - 人工证据（用户 2026-09-25 确认）：
-    humanVisualConclusion:
-      status: confirmed
-      checklist:
-        - "正常计划可从工作台创建并核验，列表显示待安排/当前可执行/等待上游"
-        - "部分核验的未完成数量回到待安排并生成「未完成待处理」提醒"
-        - "返工/重做来源页签显示来源余额与「总量 − 已安排」口径"
-        - "取消待执行计划后状态为已取消、操作列清空"
-        - "超额任务预占未来正常计划（原数量不变）并生成「超额待核验」提醒"
-        - "其他排班只保存工时事实，不产生商品/库存/履约数量"
-      confirmedBy: chen
-      confirmedOn: 2026-09-25
-      conclusion: "用户于 2026-09-25 确认 5.17 生产阶段人工验收通过（自测证据见报告 §8.3/§8.7）。"
+- [ ] 5.1 产品字段与三道工序产能
+  - 依赖：阶段二商品/静态数据能力；阶段三订单确认快照；本任务为后续标准分钟、产能和工时的基础。
+  - Requirement/Scenario：`production-management` Requirement「产品必须提供三道工序产能和标准分钟」；Scenario「多产品产能可加总」与「缝边产能只按冻结缝边数量」。
+  - 文件/API/表：修改生产读取产品与订单快照的模块；必要时新增产品三道工序标准分钟字段及 DTO；同步产品读模型、订单确认快照读模型和生产明细视图；API 至少覆盖商品详情、订单确认快照、生产任务明细返回的 `makingStdMinutes`/`packingStdMinutes`/`seamStdMinutes`；表涉及 `products`、订单明细快照和生产任务明细。
+  - 事务/锁/幂等：商品字段写入沿用商品版本乐观锁和写命令 `Idempotency-Key`；订单确认在既有确认事务内冻结标准分钟；生产读取不写事实，不加业务锁。
+  - 关键断言：三道工序标准分钟均为正整数；订单确认后快照值不随产品修改回溯；缝边标准分钟只对应冻结缝边数量；任务明细逐条返回产品快照和标准分钟，多个订单/产品可共存。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认产品字段、产能单位和三道工序显示方式。
 
+- [ ] 5.2 任务头/明细模型迁移并删除 REMAKE
+  - 依赖：5.1；阶段三订单明细和阶段四库存/履约来源；必须先确定新模型再实现任何生产命令。
+  - Requirement/Scenario：`production-management` Requirement「生产任务必须是多订单多产品的任务头加明细」和「任务类型只能是 NORMAL 或 REWORK」；Scenario「创建多订单多产品任务」「REMAKE 被拒绝」。
+  - 文件/API/表：新增或重构生产任务头、任务明细、来源关联和状态视图；迁移 `production_plans` 及相关外键/索引，使任务头承载日期、员工、类型、备注，明细承载订单明细、产品快照、工序、数量和来源；删除 `REMAKE` 枚举、字段、端点、表映射和前端分支；统一 `GET/POST /api/production-tasks`、明细查询和任务详情 API。
+  - 事务/锁/幂等：任务头+全部明细由一个创建事务写入；按任务头、订单明细、来源稳定顺序校验唯一性；写命令强制 `Idempotency-Key`，同键重放不得重复建头或明细。
+  - 关键断言：一个任务可含多个订单、多个产品和多条明细；同订单明细/同工序/同来源重复明细返回 `CONFLICT_DUPLICATE`；`REMAKE` 请求返回 `VALIDATION_INVALID` 或 `NOT_FOUND`；失败批量创建不留任务头、明细、占用或事实；数据库和 API 均不存在 `REMAKE` 业务对象。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认任务头与明细层级、类型文案和无 REMAKE 入口。
+
+- [ ] 5.3 标准分钟与工时计算
+  - 依赖：5.1 的产品标准分钟；5.2 的任务明细与类型；全局工作日小时、时薪和工时口径由阶段二设置能力提供。
+  - Requirement/Scenario：`production-management` Requirement「产品必须提供三道工序产能和标准分钟」以及「NORMAL、REWORK」；Scenario「多产品产能可加总」「返工不消耗余额」。
+  - 文件/API/表：在 calculation/production 或生产域建立唯一标准分钟、正常标准工时和返工工时计算入口；生产任务详情、核验结果和工作台 API 返回 `normalMinutes`、`normalHours`、`reworkMinutes`、`reworkHours`；不新增可编辑工时事实表，使用任务明细快照和核验事实派生。
+  - 事务/锁/幂等：纯计算入口无事务和锁；任务创建/核验在所属写事务内调用；写命令使用统一幂等过滤器。
+  - 关键断言：`NORMAL` 正常分钟=数量×工序标准分钟；`REWORK` 正常分钟和正常工时均为 0；返工内部工时与正常工时分栏展示且不进入正常产能；金额/分钟/小时不使用客户端浮点结果；同一输入在任务、核验和追溯页面逐项一致。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认正常工时与返工工时的展示标签和单位。
+
+- [ ] 5.4 正常产能约束
+  - 依赖：5.2 任务头/明细；5.3 标准分钟与工时；阶段二员工在职/工种资格和全局工作日口径。
+  - Requirement/Scenario：`production-management` Requirement「正常任务必须遵守日期、员工和产能约束」；Scenario「正常产能不足」「返工不消耗余额」。
+  - 文件/API/表：实现正常产能计算、查询和校验服务；`POST/PATCH /api/production-tasks` 和明细追加/调整命令返回 `capacityMinutes`、`usedNormalMinutes`、`remainingNormalMinutes`；使用生产任务明细、取消事实、计划调整事实，不把返工计入统计。
+  - 事务/锁/幂等：创建/调整/取消正常任务事务内按员工+日期锁定产能来源和有效 `NORMAL` 明细，使用锁定读重算；锁定顺序固定为员工日期容量→任务头→明细；写命令必须带 `Idempotency-Key`。
+  - 关键断言：在职且具备工序资格才可创建；正常分钟超过余额返回 `CAPACITY_INSUFFICIENT` 且整批回滚；并发创建不会超额；返工创建不改变正常已用/剩余分钟；取消正常任务释放占用但保留历史。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认按员工/日期展示的产能余额。
+
+- [ ] 5.5 多订单多产品任务创建
+  - 依赖：5.2 数据模型、5.3 计算、5.4 正常产能；阶段三确认订单和阶段四库存/履约查询。
+  - Requirement/Scenario：`production-management` Requirement「生产任务必须是多订单多产品的任务头加明细」与「创建、调整和取消必须在来源余额与事务边界内原子执行」；Scenario「创建多订单多产品任务」「多明细创建整批回滚」。
+  - 文件/API/表：实现 `POST /api/production-tasks`、`GET /api/production-tasks/{id}`、`GET /api/production-tasks`；请求包含任务头和 `items[]`，每条含 `orderItemId/productId/node/quantity/planType/source`；写入任务头、明细、产品/订单快照和计划占用表。
+  - 事务/锁/幂等：一个事务完成头、明细、正常占用和审计；按订单明细 id、来源 id、员工日期稳定排序锁定；幂等键按写命令回放首次结果，失败不落幂等成功事实。
+  - 关键断言：一次请求创建一个头和至少两订单/两产品明细；服务端拒绝草稿/取消订单、数量非正、工序不匹配、员工资格不足和来源不足；任一明细失败所有头/明细/占用回滚；创建不写合格、库存、履约或订单需求事实；返回员工姓名快照但员工仅为任务属性。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认多订单多产品创建表单和明细汇总。
+
+- [ ] 5.6 上游暗线可执行计算
+  - 依赖：5.5 正常任务创建；阶段三共同数量；阶段四库存接入事实；5.3 标准分钟口径。
+  - Requirement/Scenario：`production-management` Requirement「下游只能使用上游实际合格、库存或回转流入」；Scenario「下游计划可等待上游但不能核验」「上游实际合格后下游可执行」。
+  - 文件/API/表：实现暗线流入汇总和按计划日期/明细顺序分配的只读服务；生产任务查询、核验页和订单履约查询返回 `actualInflow`、`verifiedProcessed`、`executableQuantity`、`waitingUpstream`；读取 `production_verifications`、库存/履约接入事实、报废回转事实和订单共同数量。
+  - 事务/锁/幂等：只读查询不要求幂等；核验前在同一事务内锁定相关暗线事实投影/来源并重算，禁止使用普通快照读绕过并发变化。
+  - 关键断言：下游计划可在零流入时创建但只能显示等待上游；计划数量不等于可执行量；制作正常入口按订单实际缺口，后两道工序只按实际上游合格/库存/回转流入；迟到流入只能增加可执行量，不改历史计划。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认“等待上游/当前可执行/实际流入”的区分。
+
+- [ ] 5.7 逐明细批量核验
+  - 依赖：5.6 可执行计算；5.2 任务明细；阶段三履约投影；5.9/5.12 来源事实接口预留。
+  - Requirement/Scenario：`production-management` Requirement「每条明细只能核验一次，批量核验必须原子提交」；Scenario「多明细批量核验成功」「批量核验一条失败即全回滚」「重复核验被拒绝」。
+  - 文件/API/表：实现 `POST /api/production-tasks/{taskId}/verify`，请求为 `items[]`，逐条提交 `completedQuantity/qualifiedQuantity/reworkQuantity/scrapQuantity/note`；写 `production_verifications`、合格流转、返工/报废待安排额度和提醒/回转事实。
+  - 事务/锁/幂等：单一核验事务先按明细 id 升序锁定任务明细、来源/履约余额和计划行，再逐条重算；全部通过才写入；必须 `Idempotency-Key`，同一批量请求重放无重复事实。
+  - 关键断言：每条满足 `completed=qualified+rework+scrap`；未完成由服务端计算；当前可执行不足返回 `QUANTITY_NOT_EXECUTABLE`；任一明细失败全批回滚；同一明细第二次返回 `STATE_ALREADY_VERIFIED`；客户端伪造未完成/可执行字段被忽略。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认逐明细输入、批量提交和失败回显。
+
+- [ ] 5.8 正常合格流转
+  - 依赖：5.7 批量核验；订单确认冻结流程；阶段四库存接入；5.6 暗线流入。
+  - Requirement/Scenario：`production-management` Requirement「正常合格必须按冻结流程流转且不得相加」；Scenario「捏毛装袋合格分流」「制作合格不直接可发货」。
+  - 文件/API/表：实现唯一合格分流器和履约账本接口；核验响应和追溯 API 返回 `flows[]`；写 `production_qualified`/流转事实、订单履约余额和可发货投影；不得写库存流水，除非另有显式库存入库命令。
+  - 事务/锁/幂等：与5.7同一事务；按订单明细投影行升序锁定；合格流转写入受同一 `Idempotency-Key` 保护。
+  - 关键断言：制作合格只进入捏毛装袋；捏毛装袋按冻结缝边数量拆为缝边剪袋和不缝边可发货；缝边剪袋合格进入可发货；三道工序数量不得相加；重复核验不重复流转；发货前库存与履约来源可追溯。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认分流结果和“不按工序相加”提示。
+
+- [ ] 5.9 返工来源
+  - 依赖：5.7 的返工数量事实；5.2 任务/来源模型；5.6 暗线事实；阶段三订单明细快照。
+  - Requirement/Scenario：`production-management` Requirement「返工必须有显式来源和可追溯多轮链路」；Scenario「未显式创建来源不能安排返工」「合法多轮返工」的第一轮来源部分。
+  - 文件/API/表：实现 `GET/POST /api/rework-sources`；来源字段包括原核验 id、发生问题工序、总量、已安排量、余额、轮次、原因和上一来源 id；表为 `rework_sources` 及来源链索引；核验只记录返工事实，来源必须由管理员显式创建，来源创建不自动创建任务。
+  - 事务/锁/幂等：创建来源锁定原核验和返工事实额度；同一核验/轮次只允许一个来源；按来源 id 锁定并校验未建来源额度；写命令强制幂等。
+  - 关键断言：返工事实只形成可创建来源额度；来源总量不得超过未建来源额度；来源发生工序与后续 `REWORK` 任务工序一致；来源创建不改变订单需求和正常产能；原核验关联与轮次链路可追溯；重复创建返回 `CONFLICT_DUPLICATE`。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认来源列表、发生工序和余额文案。
+
+- [ ] 5.10 REWORK 任务
+  - 依赖：5.9 返工来源；5.3 工时；5.4 正常产能隔离；5.5 多明细任务创建。
+  - Requirement/Scenario：`production-management` Requirement「任务类型只能是 NORMAL 或 REWORK，返工不得占用正常产能」；Scenario「返工不占正常产能」「未显式创建来源不能安排返工」。
+  - 文件/API/表：实现 `POST /api/rework-sources/{sourceId}/tasks` 或等价统一任务创建入口的 REWORK 分支；写任务头/明细，`taskType=REWORK`，关联显式来源、发生工序、原核验和轮次；生产任务查询返回返工专属字段。
+  - 事务/锁/幂等：来源行→任务头→任务明细按稳定顺序锁定；校验来源余额后原子增加 `arrangedQuantity`；必须 `Idempotency-Key`，重复请求不重复安排。
+  - 关键断言：任务只能来自有效返工来源且工序必须与来源发生工序一致；数量超过余额返回 `SOURCE_INSUFFICIENT`；REWORK 正常产能分钟、正常工时、正常待安排占用均为 0；任务核验可在发生工序内部执行；取消可恢复来源余额；不增加订单共同需求。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认 REWORK 标签、来源关联和“非正常产能”说明。
+
+- [ ] 5.11 多轮返工
+  - 依赖：5.10 REWORK 任务；5.7 批量核验；5.9 返工来源链路。
+  - Requirement/Scenario：`production-management` Requirement「返工必须有显式来源和可追溯多轮链路」；Scenario「合法多轮返工」。
+  - 文件/API/表：扩展返工核验与来源 API，使 REWORK 核验先记录新的返工事实，再由管理员显式创建下一轮来源和任务；表保留 `parentReworkSourceId`、`originVerificationId`、`roundNo`、发生工序和原因；追溯 API 返回完整父子链。
+  - 事务/锁/幂等：多轮创建锁定当前来源、当前任务明细和原始核验；按来源链唯一顺序写入新的返工事实与显式来源；核验和来源创建各自强制幂等，批量失败全回滚。
+  - 关键断言：第一轮和第二轮事实各自不可变；第二轮只能消费上一轮来源余额；轮次连续且父子关系明确；任何一轮均不占正常产能/工时、不增加订单需求；重复消费或跨工序安排被拒绝。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认多轮父子链、轮次和回溯入口。
+
+- [ ] 5.12 报废事实与数量回转
+  - 依赖：5.7 核验；5.8 正常流转；5.6 暗线流入；5.13 未完成/取消口径。
+  - Requirement/Scenario：`production-management` Requirement「报废必须是不可变事实并支持数量回转，不存在 REMAKE」；Scenario「工序内报废数量回转」「报废不覆盖历史」。
+  - 文件/API/表：实现报废事实写入和回转服务；可使用 `production_scrap_facts`、`production_quantity_reversals` 或等价不可变事实表，记录工序、核验、数量、原因、操作人和时间；提供生产事实/订单履约追溯 API；不得创建 `remake_sources` 或 `REMAKE` 任务对象。
+  - 事务/锁/幂等：核验事务锁定任务明细、目标履约投影和回转来源，先写报废事实再写数量回转；稳定顺序锁定；写命令强制幂等。
+  - 关键断言：报废数量不覆盖核验原值、不删除合格事实、不减少客户共同需求；回转只恢复对应工序的正常可安排/流入额度；后续只能创建 NORMAL 任务；库存只有显式库存命令才变化；任何 REMAKE 字段/端点/表均不可用。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认报废原因、数量回转和历史不可变展示。
+
+- [ ] 5.13 未完成与明细取消
+  - 依赖：5.7 一次核验；5.8 流转；5.9/5.10 来源；5.12 报废回转；阶段三发货事实。
+  - Requirement/Scenario：`production-management` Requirement「未完成数量和明细取消必须保留历史并正确派生」；Scenario「部分完成后部分重新安排」「已发货明细取消被拒绝」。
+  - 文件/API/表：实现 `GET /api/production-reminders/incomplete`、重新安排、部分安排、暂不安排和明细取消命令；新增/使用 `production_reminders`、任务取消/明细取消事实和计划调整历史；返回原任务、订单明细、工序、未完成、已安排和剩余数量。
+  - 事务/锁/幂等：处理提醒锁定提醒行、来源/订单明细和新任务写入；取消明细锁定订单明细履约投影和未核验计划；所有写命令强制幂等，部分失败回滚。
+  - 关键断言：未完成=计划−本次完成；部分安排后余量继续提醒；暂不安排必须有原因且不删除需求；已发货下限阻止明细取消并返回 `QUANTITY_BELOW_SHIPPED`/`STATE_NOT_CANCELABLE`；原任务、核验、流转、报废和审计历史保留；取消明细不再产生新的正常排产。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认未完成区域、部分安排和明细取消入口。
+
+- [ ] 5.14 超额兼容
+  - 依赖：5.2 任务模型；5.4 正常产能；5.5 多明细创建；5.7 核验；5.13 未完成提醒。
+  - Requirement/Scenario：`production-management` Requirement「超额预占只能形成预占和人工调整提醒」；Scenario「超额预占余额不足」「超额合格产生调整提醒」。
+  - 文件/API/表：实现独立超额预占 API（不得把 `OVERTIME` 加入生产任务类型）；使用 `overtime_preemptions`、生产提醒和计划调整历史；支持跨订单/产品明细逐条指向未来 `NORMAL` 任务明细；未来计划原数量只读。
+  - 事务/锁/幂等：按未来任务明细 id 升序锁定并锁定读有效预占；创建、核验、释放预占和生成调整提醒分事务边界明确；所有写命令带幂等键。
+  - 关键断言：只能当天创建，来源只能是未来待执行 NORMAL 明细；有效预占不超过未来原计划未预占余额；预占不改未来数量、不写生产/库存/订单履约事实；零合格自动释放并结束提醒；只有合格生成 `PLAN_ADJUSTMENT`，返工/报废不作为计划减少依据。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认超额来源、预占余额、未来计划原值和提醒附着位置。
+
+- [ ] 5.15 其他排班
+  - 依赖：5.2 任务头可扩展属性；阶段二员工在职校验；5.3 工时口径；与商品产能隔离。
+  - Requirement/Scenario：`production-management` Requirement「其他排班只记录工时，不产生商品数量」；Scenario「合法其他排班」「工时更正」。
+  - 文件/API/表：实现统一“新建排班”入口的 OTHER 分支，以及 `GET/POST /api/other-schedules`、核验、取消、更正 API；使用 `other_schedules`、`other_schedule_verifications`、`other_schedule_time_corrections`，不得写生产任务明细、库存或履约表。
+  - 事务/锁/幂等：创建/核验/取消/更正锁定排班头并按一次核验唯一键校验；更正追加事实；写命令使用 `Idempotency-Key`。
+  - 关键断言：分钟 0–59、总分钟>0；只允许一次工时核验；未核验不显示有效工时；更正保留原核验并派生最新有效工时；离职员工返回 `EMPLOYEE_NOT_ELIGIBLE`；商品、库存、订单履约数量和正常产能均不变。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认 OTHER 表单、工时核验和更正历史。
+
+- [ ] 5.16 后端并发与幂等门禁
+  - 依赖：5.4 产能锁；5.6 暗线流入锁定读；5.7 批量核验；5.9/5.10 来源余额；5.14 预占；5.15 其他排班。
+  - Requirement/Scenario：`production-management` Requirement「写命令必须具备统一错误、幂等和并发门禁」；Scenario「同一批量核验重复提交」「并发来源安排」。
+  - 文件/API/表：新增生产域 HTTP、MySQL 和并发测试；覆盖任务创建、正常产能、下游可执行、批量核验、返工来源、REWORK、报废回转、未完成、超额预占和其他排班；检查 `idempotency_records`、审计、任务/事实/来源/提醒表。
+  - 事务/锁/幂等：明确每个命令的事务拥有者和稳定锁顺序；所有竞争校验必须锁定读；重复同键重放首次结果，同键异指纹返回 `CONFLICT_IDEMPOTENCY`；失败事务不得留下部分事实。
+  - 关键断言：来源余额、正常产能、可执行量、唯一核验、同一明细重复和超额预占在并发下均不超卖；批量核验恰好全成或全回滚；重复写请求业务事实一份、审计按既定策略可追溯；错误码和统一信封完整。
+  - 人工证据：不适用；若需查看并发结果页面，`humanVisualConclusion.status: pending-user-signoff`。
+
+- [ ] 5.17 工作台/全页统一新建
+  - 依赖：5.2 任务模型；5.4 产能；5.9/5.10 来源；5.14 超额；5.15 其他排班；阶段一共享前端路由和 API 客户端。
+  - Requirement/Scenario：`production-management` Requirement「工作台必须以日期横向周历展示统一新建排班入口」；Scenario「统一新建排班入口」「日期横向周历与员工属性」。
+  - 文件/API/表：重做正式 `/production` 工作台和全页创建/编辑/核验入口；前端 `production.ts` API 类型覆盖任务头、明细、来源、提醒、其他排班和核验；后端沿用 5.5/5.7/5.9/5.14/5.15 API；不新增来源/额度主导航。
+  - 事务/锁/幂等：前端不计算权威数量；所有提交调用后端写事务并携带幂等键；页面取消、返回和刷新不产生写入。
+  - 关键断言：工作台日期横向展示周历；员工只作为任务属性和筛选；只有一个“新建排班”入口，类型在表单内选择；来源/额度为明细或追溯信息；查看与编辑/核验分离；无预置表单和伪造数量。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认日期横向周历、员工属性、统一入口和主导航结构。
+
+- [ ] 5.18 多明细核验与追溯页
+  - 依赖：5.7 批量核验；5.8 流转；5.9–5.13 来源/报废/未完成；5.17 工作台。
+  - Requirement/Scenario：`production-management` Requirement「每条明细只能核验一次，批量核验必须原子提交」和「明线计划与暗线事实必须分离」；Scenario「多明细批量核验成功」「核验事实不覆盖原计划」。
+  - 文件/API/表：新增或改造正式任务详情/核验全页，不新增与任务头无关的顶级来源页；页面展示任务头、明细列表、计划值、实际流入、可执行、核验输入、合格分流、返工来源、报废事实、数量回转、未完成提醒、取消历史和审计追踪；API 支持批量读取和批量提交。
+  - 事务/锁/幂等：页面提交一次批量命令；后端沿用 5.7 的锁定顺序和幂等；追溯读取只读事务，按事实时间/id稳定排序。
+  - 关键断言：每条明细可独立核验状态；一条失败时页面展示整批失败且库内无部分事实；原计划数量、产品/订单快照和员工属性仍可见；事实时间线能追溯来源、父级核验、流转、报废、回转、取消和更正；三道工序数量不相加。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认多明细核验、事实时间线和来源追溯可读性。
+
+- [ ] 5.19 浏览器验收
+  - 依赖：5.1–5.18 全部实现并通过自动化门禁；必须使用正式 `/production` 路由和真实后端 API，不使用预览路由或静态数据。
+  - Requirement/Scenario：`production-management` 全部相关 Requirement；重点 Scenario「创建多订单多产品任务」「下游计划可等待上游但不能核验」「多明细批量核验成功」「合法多轮返工」「工序内报废数量回转」「统一新建排班入口」。
+  - 文件/API/表：不新增业务实现文件；验收记录实际正式路由、浏览器网络请求、后端 API、任务/明细/核验/来源/提醒/工时事实表和必要的只读数据库核对。
+  - 事务/锁/幂等：验收必须覆盖重复提交和至少一个并发/幂等路径；记录实际请求携带的 `Idempotency-Key`、响应 requestId、错误码和事务回滚结果。
+  - 关键断言：浏览器完成多订单多产品任务创建；日期横向周历和统一“新建排班”可达；员工仅为任务属性；等待上游不能核验；逐明细一次核验和批量原子回滚可观察；正常流转、REWORK、多轮返工、报废回转、未完成/明细取消、超额提醒、其他排班和追溯页均与服务端事实一致；控制台无新增错误。
+  - 人工证据：必须记录 `humanVisualConclusion`，状态固定为 `pending-user-signoff`，包含正式路由、周历、入口、明细核验、追溯和错误回显清单；用户确认后才可改为 confirmed。
+
+- [ ] 5.20 OpenSpec/文档门禁
+  - 依赖：5.1–5.19；所有代码、迁移、API、测试和页面证据必须已实际完成后执行。
+  - Requirement/Scenario：`production-management` 全部 Requirement/Scenario；`platform-foundation` 统一响应、认证、幂等和审计 Requirement；Scenario「成功与失败响应形状一致」「重复幂等请求不重复写入」。
+  - 文件/API/表：同步生产正式架构/数据库/数量模型/接口契约文档和 OpenSpec 追踪；逐项核对任务头/明细、NORMAL/REWORK、标准分钟/工时、产能、暗线流入、批量核验、流转、返工、报废回转、未完成/取消、超额、其他排班和工作台 API/表/路由。
+  - 事务/锁/幂等：文档必须列出每个写 API 的事务拥有者、锁定对象与顺序、幂等键和失败回滚边界；不得用“已完成”文字代替实际命令、退出码、测试断言或人工签字。
+  - 关键断言：`openspec validate build-yumi-v2-order-fulfillment --strict` 通过；每个 Requirement 至少有 Scenario；tasks 阶段五 5.1–5.20 均为真实未实施 `[ ]` 直到对应实现完成；文档中不存在 REMAKE 业务契约、旧的单任务头/单产品假设、返工占正常产能或下游按计划数量执行的矛盾描述；阶段五外的 tasks 原文未被改动。
+  - 人工证据：所有页面、工作台、全页核验和追溯判断保持 `humanVisualConclusion.status: pending-user-signoff`；未获用户确认不得勾选任何阶段五任务。
+
+阶段五执行顺序：5.1 → 5.2 → 5.3 → 5.4 → 5.5 → 5.6 → 5.7 → 5.8 → 5.9 → 5.10 → 5.11 → 5.12 → 5.13 → 5.14 → 5.15 → 5.16 → 5.17 → 5.18 → 5.19 → 5.20。
 ## 6. 阶段六：订单发货、物流与发货更正（依赖阶段四和五）
 
 - [x] 6.1 编写 Flyway 迁移创建 `shipments/shipment_items/shipment_source_links/shipment_logistics_changes/shipment_corrections`，落实批次编号、状态、快照、来源关联和等量更正唯一约束；表归 `orders`。
