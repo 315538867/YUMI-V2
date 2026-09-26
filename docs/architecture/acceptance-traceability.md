@@ -25,8 +25,8 @@
 | 9 | 履约视图 | `GET /api/orders/{id}/fulfillment` | 管理员/否 | `orders/order/OrderController` | `OrderConfirmationTest` |
 | 10 | 库存 | `GET/POST /api/inventory/batches`、`GET /api/inventory/summary`、`GET /api/inventory/movements`、`POST /api/inventory/adjustments`、`POST /api/inventory/movements/{id}/reverse`、`GET /api/inventory/recommendations` | 管理员/写入幂等 | `inventory/InventoryController` | `InventoryApiTest`、`InventoryMigrationTest` |
 | 11 | 领用 | `POST/GET /api/inventory-allocations`、`POST /api/inventory-allocations/{id}/cancel` | 管理员/必须幂等 | `inventory/InventoryAllocationController` | `InventoryAllocationTest`、`InventoryConcurrencyTest` |
-| 12 | 生产计划 | `GET/POST /api/production-plans`、`GET /api/production-plans/{id}`、`POST /api/production-plans/{id}/cancel` | 管理员/写入幂等 | `production/plan/*` | `ProductionPlanApiTest`、`ProductionConcurrencyTest` |
-| 13 | 核验 | `POST /api/production-plans/{id}/verify` | 管理员/必须幂等 | `production/verification/*` | `ProductionVerificationTest` |
+| 12 | 生产任务 | `GET/POST /api/production-tasks`、`GET /api/production-tasks/{id}`、`POST /api/production-tasks/{taskId}/items/{itemId}/cancel` | 管理员/写入幂等 | `production/task/*` | `ProductionTaskApiTest`、`ProductionTaskItemCancelConcurrencyTest` |
+| 13 | 核验 | `POST /api/production-tasks/{id}/verify` | 管理员/必须幂等 | `production/verification/*` | `ProductionVerificationApiTest`、`ProductionIdempotencyTest` |
 | 14 | 返工/重做 | `GET/POST /api/rework-sources`、`POST /api/rework-sources/{id}/plans`；`GET/POST /api/remake-sources`、`POST /api/remake-sources/{id}/plans` | 管理员/必须幂等 | `production/source/*` | `ProductionSourceTest` |
 | 15 | 超额 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify` | 管理员/必须幂等 | `production/overtime/*` | `OvertimeTaskTest` |
 | 16 | 发货 | `GET/POST /api/orders/{id}/shipments`、`POST /api/orders/{id}/shipments/{shipmentId}/confirm` | 管理员/必须幂等 | `orders/shipment/*` | `ShipmentApiTest`、`ShipmentConcurrencyTest` |
@@ -162,13 +162,13 @@
 
 | Requirement | 任务 | 后端 | 数据 | 前端 | 自动测试 |
 | --- | --- | --- | --- | --- | --- |
-| 生产计划必须绑定有效来源和执行资格 | 5.2–5.7、8.4/8.5 | `production/plan/*`、`production/source/*`、`production/aftersales/*` | `production_plans`、`rework_sources`、`remake_sources`（V10）、`after_sales_production_sources`（V14） | `/production`、`/production/plans/:id/verify` | `ProductionPlanApiTest`、`ProductionSourceTest`、`AfterSalesProductionTest` |
-| 计划状态和执行状态必须分离 | 5.2、5.x | `ExecutableCalculator`、计划读模型 | `production_plans.status` + 派生量 | `/production` 列表 | `ProductionPlanApiTest` |
+| 生产任务必须绑定有效来源和执行资格 | 5.2–5.14、8.4/8.5 | `production/task/*`、`production/source/*`、`production/aftersales/*` | `production_tasks`、`production_task_items`、`rework_sources`、`after_sales_production_sources`（V14） | `/production`、`/production/tasks/new`、`/production/tasks/:id/verify` | `ProductionTaskApiTest`、`ProductionReworkScrapTest`、`AfterSalesProductionTest` |
+| 任务头状态与明细事实必须分离 | 5.2、5.7 | `ProductionTaskService.derivedStatus`、`ProductionFlowService` | `production_task_items.status` + 派生量（无任务头状态列） | `/production` 列表 | `ProductionTaskApiTest`、`ProductionVerificationApiTest` |
 | 生产计划只能一次核验 | 5.4 | `ProductionVerificationService` | `uk_production_verifications_plan`（V10） | 核验工作区 | `ProductionVerificationTest` |
 | 待执行计划取消必须恢复来源 | 5.8 | `ProductionPlanCancellationService` | 来源 `arranged_quantity` 回退 | `/production` 取消入口 | `ProductionPlanApiTest` |
 | 工序合格必须按冻结流程流转 | 5.5 | `qualifiedFlows`（捏毛装袋按缝边数量分流） | `making/packing/seam_inflow` | 履约 Tab | `ProductionVerificationTest` |
 | 返工必须受目标矩阵和来源余额限制 | 5.6 | `ReworkSourceService`、`ProductionNodes.canRework` | `rework_sources` | `/production` 返工来源 | `ProductionSourceTest` |
-| 报废重做必须保留原报废事实 | 5.7 | `RemakeSourceService` | `remake_sources` | `/production` 重做来源 | `ProductionSourceTest` |
+| 报废必须保留不可变事实并只回转同工序 | 5.12 | `ProductionQuantityReturnRepository`、`ProductionScrapController` | `scrap_records`、`production_quantity_returns` | `/production/tasks/:id` 事实时间线 | `ProductionReworkScrapTest` |
 | 未完成数量必须返回对应待处理来源 | 5.9 | `handleIncomplete` + 提醒 | `production_reminders`（V10） | `/production` 提醒工作台 | `ProductionReminderTest` |
 | 超额任务只产生业务预占和人工调整提醒 | 5.10–5.11 | `production/overtime/*` | `overtime_preemptions`（V10） | `/production` 超额入口 | `OvertimeTaskTest` |
 | 超额提醒必须支持人工处理 | 5.12 | `ProductionReminderController`（overtime 两命令） | `production_reminders` | `/production` 提醒处理 | `OvertimeTaskTest`、`ProductionReminderTest` |

@@ -94,7 +94,7 @@ class Stage2IntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", "itg-price-" + System.nanoTime())
                         .content("""
-                                {"name":"%s","starLevelId":3,"salePrice":"19.9999","weightG":100,
+                                {"name":"%s","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"19.9999","weightG":100,
                                  "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0"}
                                 """.formatted(unique)))
                 .andExpect(status().isCreated())
@@ -129,7 +129,7 @@ class Stage2IntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", "itg-p-" + System.nanoTime())
                         .content("""
-                                {"name":"%s","starLevelId":1,"salePrice":"5.0000","weightG":10,
+                                {"name":"%s","starLevelId":1,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"5.0000","weightG":10,
                                  "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0"}
                                 """.formatted(pNo)))
                 .andExpect(status().isCreated())

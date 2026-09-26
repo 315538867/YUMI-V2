@@ -35,7 +35,7 @@ class ProductPreviewApiTest {
 
     /** 钉死算例：weight=270、loss=20%、三星(std15)、seam=5、sale=25、无包装档位。 */
     private static final String PREVIEW_BODY = """
-            {"starLevelId":3,"salePrice":"25.0000","weightG":270,"lossRatePercent":"20",
+            {"starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"25.0000","weightG":270,"lossRatePercent":"20",
              "seamMinutes":"5","seamDefaultFee":"0",
              "boxLaborFee":"0.5","transportPackingFee":"0.3","dailySundriesFee":"0.2",
              "rentUtilitiesFee":"0.4","moldAmortFee":"0.1"}
@@ -304,7 +304,7 @@ class ProductPreviewApiTest {
 
     private JsonNode create(String name) throws Exception {
         var body = """
-                {"name":"%s","starLevelId":3,"salePrice":"25.0000","weightG":270,"lossRatePercent":"20",
+                {"name":"%s","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"25.0000","weightG":270,"lossRatePercent":"20",
                  "seamMinutes":"5","seamDefaultFee":"0",
                  "boxLaborFee":"0.5","transportPackingFee":"0.3","dailySundriesFee":"0.2",
                  "rentUtilitiesFee":"0.4","moldAmortFee":"0.1"}

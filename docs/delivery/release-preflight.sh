@@ -58,7 +58,7 @@ mysql -h "$DB_HOST" -u "$DB_USER" -N -B "$DB_NAME" -e "
   SELECT CONCAT('orders=', (SELECT COUNT(*) FROM orders),
                 ' balances=', (SELECT COUNT(*) FROM order_item_fulfillment_balances),
                 ' batches=', (SELECT COUNT(*) FROM inventory_batches),
-                ' plans=', (SELECT COUNT(*) FROM production_plans),
+                ' production_tasks=', (SELECT COUNT(*) FROM production_tasks),
                 ' settlements=', (SELECT COUNT(*) FROM order_settlement_balances),
                 ' after_sales=', (SELECT COUNT(*) FROM after_sales_cases));"
 

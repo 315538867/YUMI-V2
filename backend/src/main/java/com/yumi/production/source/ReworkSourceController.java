@@ -1,5 +1,6 @@
 package com.yumi.production.source;
 
+import com.yumi.production.task.ProductionTaskViews;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,7 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 返工来源 API（任务 5.6）：来源查询/创建与从来源创建计划。 */
+/**
+ * 返工来源 API（阶段五 5.9–5.11）：核验不隐式创建来源，管理员必须基于返工事实显式创建后再安排返工任务。
+ */
 @RestController
 @RequestMapping("/api/rework-sources")
 public class ReworkSourceController {
@@ -24,21 +27,30 @@ public class ReworkSourceController {
     }
 
     @GetMapping
-    public List<ProductionSourceViews.ReworkSourceView> list(@RequestParam Long orderItemId) {
-        return service.list(orderItemId);
+    public List<ReworkSourceViews.ReworkSourceView> list(
+            @RequestParam(required = false) Long orderItemId,
+            @RequestParam(required = false) String node,
+            @RequestParam(required = false) String status) {
+        return service.list(orderItemId, node, status);
+    }
+
+    @GetMapping("/{id}")
+    public ReworkSourceViews.ReworkSourceView get(@PathVariable long id) {
+        return service.get(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ProductionSourceViews.ReworkSourceView create(
-            @RequestBody ProductionSourceViews.CreateReworkSourceRequest request) {
+    public ReworkSourceViews.ReworkSourceView create(
+            @RequestBody ReworkSourceService.CreateRequest request) {
         return service.create(request);
     }
 
-    @PostMapping("/{id}/plans")
+    /** 从来源余额创建 REWORK 任务明细：工序强制等于来源发生工序。 */
+    @PostMapping("/{id}/tasks")
     @ResponseStatus(HttpStatus.CREATED)
-    public com.yumi.production.plan.ProductionPlanViews.PlanView createPlan(
-            @PathVariable long id, @RequestBody ProductionSourceViews.CreateSourcePlanRequest request) {
-        return service.createPlan(id, request);
+    public ProductionTaskViews.TaskView createTask(@PathVariable long id,
+                                                   @RequestBody ReworkSourceService.CreateTaskRequest request) {
+        return service.createTask(id, request);
     }
 }

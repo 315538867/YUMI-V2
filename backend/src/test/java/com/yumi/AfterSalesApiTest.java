@@ -58,9 +58,9 @@ class AfterSalesApiTest {
                 """, USERNAME, passwordEncoder.encode(PASSWORD));
         jdbcTemplate.update("""
                 INSERT INTO products (product_no, name, status, star_level_id, star_name, star_std_minutes,
-                    sale_price, weight_g, total_cost, version, created_at, updated_at)
+                    sale_price, weight_g, total_cost, mold_quantity, daily_batch_limit, version, created_at, updated_at)
                 VALUES ('TAS001', 'TST-售后商品', 'ACTIVE', (SELECT MIN(id) FROM star_levels), '一星', 5,
-                    10.0000, 100, 6.0000, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                    10.0000, 100, 6.0000, 10, 5, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """);
         long productId = jdbcTemplate.queryForObject(
                 "SELECT id FROM products WHERE product_no = 'TAS001'", Long.class);

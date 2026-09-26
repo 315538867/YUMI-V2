@@ -5,11 +5,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 生产提醒 API（任务 5.9/5.12）：未完成待处理与超额提醒的查询与人工处理。 */
+/**
+ * 工作台提醒 API（阶段五 5.13）：未完成待处理列表与「暂不安排」处理。
+ * 重新安排仍走 `POST /api/production-tasks` 创建新的 NORMAL 明细，不修改原任务明细。
+ */
 @RestController
 @RequestMapping("/api/production-reminders")
 public class ProductionReminderController {
@@ -21,36 +25,19 @@ public class ProductionReminderController {
     }
 
     @GetMapping("/incomplete")
-    public List<ProductionReminderViews.IncompleteReminderView> listIncomplete() {
-        return service.listIncomplete();
+    public List<ProductionReminderService.ReminderView> listIncomplete(
+            @RequestParam(required = false) Long orderItemId,
+            @RequestParam(required = false) String node) {
+        return service.listIncomplete(orderItemId, node);
     }
 
-    @PostMapping("/incomplete/{id}/reschedule")
-    public ProductionReminderViews.IncompleteReminderView reschedule(
-            @PathVariable long id, @RequestBody ProductionReminderViews.RescheduleRequest request) {
-        return service.reschedule(id, request);
+    @PostMapping("/{id}/defer")
+    public ProductionReminderService.ReminderView defer(@PathVariable long id,
+                                                        @RequestBody DeferRequest request) {
+        return service.defer(id, request.reason());
     }
 
-    @PostMapping("/incomplete/{id}/defer")
-    public ProductionReminderViews.IncompleteReminderView defer(
-            @PathVariable long id, @RequestBody ProductionReminderViews.DeferRequest request) {
-        return service.defer(id, request);
-    }
-
-    @GetMapping("/overtime")
-    public List<ProductionReminderViews.OvertimeReminderView> listOvertime() {
-        return service.listOvertime();
-    }
-
-    @PostMapping("/overtime/{id}/adjust-plan")
-    public ProductionReminderViews.OvertimeReminderView adjustPlan(
-            @PathVariable long id, @RequestBody ProductionReminderViews.AdjustPlanRequest request) {
-        return service.adjustPlan(id, request);
-    }
-
-    @PostMapping("/overtime/{id}/no-adjustment")
-    public ProductionReminderViews.OvertimeReminderView noAdjustment(
-            @PathVariable long id, @RequestBody ProductionReminderViews.NoAdjustmentRequest request) {
-        return service.noAdjustment(id, request);
+    /** 暂不安排入参：原因必填。 */
+    public record DeferRequest(String reason) {
     }
 }

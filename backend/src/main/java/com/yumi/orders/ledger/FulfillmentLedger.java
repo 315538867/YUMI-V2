@@ -63,11 +63,6 @@ public class FulfillmentLedger {
         repository.applyReworkPending(orderItemId, quantity, increase, requestId);
     }
 
-    /** 同步投影：增减「重做待安排」（重做来源创建/安排/取消时调用）。 */
-    public void applyRemakePending(long orderItemId, int quantity, boolean increase, String requestId) {
-        repository.applyRemakePending(orderItemId, quantity, increase, requestId);
-    }
-
     /** 是否已被后续生产/核验/返工/余量/发货事实消费。 */
     public boolean hasDownstreamConsumption(long orderItemId, long afterEntryId) {
         return repository.hasDownstreamConsumption(orderItemId, afterEntryId);

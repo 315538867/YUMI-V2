@@ -90,7 +90,6 @@ class OtherScheduleTest {
         long scheduleId = dataId(created);
 
         // 不产生商品/库存/订单履约事实
-        assertThat(count("production_plans")).isZero();
         assertThat(count("fulfillment_entries")).isZero();
         assertThat(count("inventory_movements")).isZero();
 

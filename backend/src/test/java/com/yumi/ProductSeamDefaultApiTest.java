@@ -37,7 +37,7 @@ class ProductSeamDefaultApiTest {
 
     /** 钉死算例：三星 std=15、270g、损耗 20%、成交价 25、无包装档位、其他成本 0.9 → 不缝边剪袋总成本 16.1200。 */
     private static final String BASE_FIELDS = """
-            "starLevelId":3,"salePrice":"25.0000","weightG":270,
+            "starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"25.0000","weightG":270,
             "boxLaborFee":"0.5","transportPackingFee":"0.3","moldAmortFee":"0"
             """;
 

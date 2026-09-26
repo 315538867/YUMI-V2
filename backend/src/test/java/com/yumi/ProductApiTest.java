@@ -99,7 +99,7 @@ class ProductApiTest {
 
     private String createBody(String name) {
         return """
-                {"name":"%s","starLevelId":3,"salePrice":"25.0000","weightG":270,"lossRatePercent":"20",
+                {"name":"%s","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"25.0000","weightG":270,"lossRatePercent":"20",
                  "seamMinutes":"5","seamDefaultFee":"0",
                  "boxLaborFee":"0.5","transportPackingFee":"0.3","dailySundriesFee":"0.2",
                  "rentUtilitiesFee":"0.4","moldAmortFee":"0.1"}
@@ -157,7 +157,7 @@ class ProductApiTest {
                         .header("Idempotency-Key", key())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"starLevelId":3,"salePrice":"1.0000","weightG":100,"lossRatePercent":"0",
+                                {"starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"1.0000","weightG":100,"lossRatePercent":"0",
                                  "seamMinutes":"0","seamDefaultFee":"0"}
                                 """))
                 .andExpect(status().isBadRequest())
@@ -169,7 +169,7 @@ class ProductApiTest {
                         .header("Idempotency-Key", key())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"   ","starLevelId":3,"salePrice":"1.0000","weightG":100,
+                                {"name":"   ","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"1.0000","weightG":100,
                                  "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0"}
                                 """))
                 .andExpect(status().isBadRequest())
@@ -314,7 +314,7 @@ class ProductApiTest {
                         .header("Idempotency-Key", key())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"TST-坏图","starLevelId":3,"salePrice":"1.0000","weightG":100,
+                                {"name":"TST-坏图","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"1.0000","weightG":100,
                                  "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0",
                                  "imageFileId":999999991}
                                 """))
@@ -328,7 +328,7 @@ class ProductApiTest {
                         .header("Idempotency-Key", key())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"TST-好图","starLevelId":3,"salePrice":"1.0000","weightG":100,
+                                {"name":"TST-好图","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"1.0000","weightG":100,
                                  "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0",
                                  "imageFileId":%d}
                                 """.formatted(fileId)))

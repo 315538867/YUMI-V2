@@ -70,6 +70,11 @@ export interface ProductDetail extends ProductSummary {
   referencePrice: Money;
   estimatedProfit: Money;
   estimatedMarginRate: string;
+  /** 生产产能：同一模具批次并行生产数量与每日批次数（正整数） */
+  moldQuantity: number;
+  dailyBatchLimit: number;
+  /** 服务端派生：模具数量 × 每日批次数，不落库 */
+  dailyMaxCapacity: number;
   version: number;
   createdAt?: string;
   updatedAt?: string;
@@ -92,6 +97,10 @@ export interface ProductWriteRequest {
   transportPackingFee?: Money;
   moldAmortFee?: Money;
   imageFileId?: number;
+  /** 模具数量（正整数，必填） */
+  moldQuantity: number;
+  /** 每日批次数（正整数，必填） */
+  dailyBatchLimit: number;
 }
 
 export function listProducts(params: { status?: string; name?: string } = {}): Promise<ProductSummary[]> {

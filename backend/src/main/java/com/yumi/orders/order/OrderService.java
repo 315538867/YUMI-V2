@@ -270,8 +270,15 @@ public class OrderService {
         failIfInvalid(errors);
 
         var audit = auditContext.current();
+        var makingEffectiveHourRate = reference.makingEffectiveHourRate();
+        var workdayHours = reference.workdayHours();
         for (var item : items) {
-            snapshotRepository.insertItemSnapshot(order, item, products.get(item.id()),
+            var product = products.get(item.id());
+            var production = new OrderSnapshotRepository.ProductionParams(
+                    product.packagingStdMinutes(), seamStdMinutes(item),
+                    makingEffectiveHourRate, workdayHours,
+                    product.moldQuantity(), product.dailyBatchLimit());
+            snapshotRepository.insertItemSnapshot(order, item, product, production,
                     flowOf(item), audit.requestId());
             fulfillmentRepository.insertEntry(order.id(), item.id(), "ORDER_DEMAND", "SHIPPABLE", "IN",
                     item.quantity(), "ORDER", order.id(), item.id(), order.orderDate(),
@@ -292,6 +299,14 @@ public class OrderService {
         return item.seamQuantity() > 0
                 ? "制作 → 捏毛装袋 → 缝边剪袋 → 可发货"
                 : "制作 → 捏毛装袋 → 可发货";
+    }
+
+    /** 缝边种类标准分钟：确认时冻结进生产参数快照，未选缝边种类时为 null。 */
+    private Integer seamStdMinutes(OrderItemRow item) {
+        if (item.seamTypeId() == null) {
+            return null;
+        }
+        return reference.seamType(item.seamTypeId()).map(OrderReference.SeamType::stdMinutes).orElse(null);
     }
 
     /** 金额自洽：由明细重算的汇总必须与订单表头逐项一致（防部分写入与篡改）。 */

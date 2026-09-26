@@ -170,7 +170,7 @@ POST /orders
 POST /orders/{id}/confirm
 POST /orders/{id}/change-orders
 POST /order-changes/{id}/confirm
-POST /production-plans/{id}/verify
+POST /production-tasks/{id}/verify
 POST /inventory-allocations
 POST /orders/{orderId}/shipments/{shipmentId}/confirm
 POST /orders/{id}/close

@@ -263,8 +263,8 @@ class OrderInventoryPlanTest {
     private long insertProduct(String productNo, String name) {
         jdbcTemplate.update("""
                 INSERT INTO products (product_no, name, status, star_level_id, star_name, star_std_minutes,
-                    sale_price, weight_g, total_cost, version, created_at, updated_at)
-                VALUES (?, ?, 'ACTIVE', (SELECT MIN(id) FROM star_levels), '一星', 5, 10.0000, 100, 6.0000, 0,
+                    sale_price, weight_g, total_cost, mold_quantity, daily_batch_limit, version, created_at, updated_at)
+                VALUES (?, ?, 'ACTIVE', (SELECT MIN(id) FROM star_levels), '一星', 5, 10.0000, 100, 6.0000, 10, 5, 0,
                     UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """, productNo, name);
         return jdbcTemplate.queryForObject("SELECT id FROM products WHERE product_no = ?", Long.class, productNo);

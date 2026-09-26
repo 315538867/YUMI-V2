@@ -2,7 +2,7 @@
 
 日期：2026-09-25
 修改人：chen
-状态：**待评审、待实施**。本文是阶段五的施工基线，不代表功能已经落地；不得以本文伪造代码、迁移、接口或测试已完成的证据。
+状态：**已按本文实施（阶段五 5.1–5.18）**。本文是阶段五的施工基线；实现证据见 `openspec/changes/build-yumi-v2-order-fulfillment/tasks.md` 的阶段五逐项证据与 `docs/delivery/manual-acceptance-report.md` §8.24。本文描述的行为口径与实现一致；实现期只行使了「类名、DTO 内部组织与页面视觉细节」的自由度。
 上游依据：`docs/architecture/domain-and-quantity-model.md`、`docs/architecture/database-design.md`、`specs/production-management/spec.md`、`design.md`。如上游文档与本文冲突，以本文件列明的最终口径为阶段五实施输入，并在实施前同步评估受影响的上游契约。
 
 ---
@@ -45,7 +45,7 @@
 - 工资结算、绩效计算和报表导出；
 - 其他排班与商品数量、库存数量、订单履约数量之间的联动。
 
-阶段五不新增空实现或占位服务。所有尚未实现的内容必须标记为待实施，不得写成已完成。
+阶段五不新增空实现或占位服务；实现完成后仓库内不得保留未接线的占位代码（已按此清理）。
 
 ---
 
@@ -664,4 +664,4 @@ incomplete = planned - completed
 5. 阶段八专用类型和来源接口的最终命名、权限和模块依赖登记；
 6. 前端周历和任务明细批量核验的交互细节及错误定位展示。
 
-上述清单是待评审事项，不是已完成事项。本文在评审通过前保持“待评审、待实施”状态。
+上述清单为实施期可自行决定的内部细节；阶段五实施已完成，最终取值以代码与 `tasks.md` 证据为准（`task_no`/`item_no` 采用 `PT`/`RS`/`OT` 前缀 + 6 位序号；产品产能列名为 `mold_quantity`/`daily_batch_limit`；生产各表沿用统一审计字段模板；履约投影按事实在同一事务内维护；阶段八售后来源沿用 `after_sales_production_sources` 与 `AFTER_SALES_SOURCE` 来源类型；前端周历与批量核验交互见 `frontend/src/pages/production/`）。

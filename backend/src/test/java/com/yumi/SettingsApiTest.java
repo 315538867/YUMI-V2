@@ -161,7 +161,7 @@ class SettingsApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
                         .content("""
-                                {"name":"设置快照新-%d","starLevelId":3,"salePrice":"10.0000","weightG":100,
+                                {"name":"设置快照新-%d","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"10.0000","weightG":100,
                                  "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0"}
                                 """.formatted(System.nanoTime())))
                 .andExpect(status().isCreated())
@@ -302,7 +302,7 @@ class SettingsApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
                         .content("""
-                                {"name":"%s%d","starLevelId":%d,"salePrice":"10.0000","weightG":100,
+                                {"name":"%s%d","starLevelId":%d,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"10.0000","weightG":100,
                                  "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0"}
                                 """.formatted(prefix, System.nanoTime(), starLevelId)))
                 .andExpect(status().isCreated())
@@ -317,7 +317,7 @@ class SettingsApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", key())
                         .content("""
-                                {"name":"%s%d","starLevelId":1,"salePrice":"10.0000","weightG":100,
+                                {"name":"%s%d","starLevelId":1,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"10.0000","weightG":100,
                                  "lossRatePercent":"0",
                                  "packagingTierId":%d,"packagingCommission":"0.3000"}
                                 """.formatted(prefix, System.nanoTime(), tierId)))

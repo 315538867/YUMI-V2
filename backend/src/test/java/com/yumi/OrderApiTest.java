@@ -72,9 +72,9 @@ class OrderApiTest {
         jdbcTemplate.update("""
                 INSERT INTO products (product_no, name, status, star_level_id, star_name, star_std_minutes,
                     sale_price, weight_g, total_cost, reference_price, seam_type_id, seam_type_name,
-                    seam_std_minutes, seam_unit_cost, seam_fee, version, created_at, updated_at)
+                    seam_std_minutes, seam_unit_cost, seam_fee, mold_quantity, daily_batch_limit, version, created_at, updated_at)
                 VALUES ('TP0002', 'TST-订单商品', 'ACTIVE', (SELECT MIN(id) FROM star_levels), '一星', 5,
-                    25.0000, 100, 18.1200, 25.8857, ?, 'TST-订单缝边种类', 5, 1.2500, 2.0000, 0,
+                    25.0000, 100, 18.1200, 25.8857, ?, 'TST-订单缝边种类', 5, 1.2500, 2.0000, 10, 5, 0,
                     UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """, seamTypeId);
         productId = jdbcTemplate.queryForObject(

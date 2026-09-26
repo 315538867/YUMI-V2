@@ -58,7 +58,7 @@
 
 #### Scenario: 正常产能不足
 - **WHEN** 员工当日剩余正常产能为 30 分钟，而请求创建 40 分钟的 `NORMAL` 任务
-- **THEN** 系统返回 `CAPACITY_INSUFFICIENT`，不创建任务、不写计划占用，其他明细也不因该失败请求而部分写入
+- **THEN** 系统返回 `CAPACITY_EXCEEDED`，不创建任务、不写计划占用，其他明细也不因该失败请求而部分写入
 
 #### Scenario: 返工不消耗余额
 - **WHEN** 员工当日正常产能已满，管理员为同一员工创建合法 20 分钟 `REWORK` 任务
@@ -202,7 +202,7 @@
 
 ### Requirement: 写命令必须具备统一错误、幂等和并发门禁
 
-所有生产写命令 SHALL 使用统一响应信封、认证、`Idempotency-Key`、请求 ID和审计。重复幂等键必须返回首次结果且不得重复写事实；同键不同请求返回 `CONFLICT_IDEMPOTENCY`。涉及数量、来源、产能和核验的事务必须使用稳定锁定顺序和锁定读，确保失败事务无部分事实。错误码至少包括：`VALIDATION_INVALID`、`AUTH_REQUIRED`、`NOT_FOUND`、`CONFLICT_IDEMPOTENCY`、`CONFLICT_DUPLICATE`、`CONFLICT_VERSION`、`EMPLOYEE_NOT_ELIGIBLE`、`CAPACITY_INSUFFICIENT`、`QUANTITY_INVALID`、`QUANTITY_NOT_EXECUTABLE`、`SOURCE_INSUFFICIENT`、`SOURCE_INVALID`、`VERIFICATION_EQUATION_INVALID`、`STATE_ALREADY_VERIFIED`、`STATE_NOT_CANCELABLE`、`STATE_NOT_EDITABLE`、`OVERTIME_DATE_INVALID`、`OVERTIME_RESERVATION_EXCEEDED`。
+所有生产写命令 SHALL 使用统一响应信封、认证、`Idempotency-Key`、请求 ID和审计。重复幂等键必须返回首次结果且不得重复写事实；同键不同请求返回 `CONFLICT_IDEMPOTENCY`。涉及数量、来源、产能和核验的事务必须使用稳定锁定顺序和锁定读，确保失败事务无部分事实。错误码至少包括：`VALIDATION_INVALID`、`AUTH_REQUIRED`、`NOT_FOUND`、`CONFLICT_IDEMPOTENCY`、`CONFLICT_DUPLICATE`、`CONFLICT_VERSION`、`EMPLOYEE_NOT_ELIGIBLE`、`CAPACITY_EXCEEDED`、`QUANTITY_INVALID`、`QUANTITY_NOT_EXECUTABLE`、`SOURCE_INSUFFICIENT`、`SOURCE_INVALID`、`VERIFICATION_EQUATION_INVALID`、`STATE_ALREADY_VERIFIED`、`STATE_NOT_CANCELABLE`、`STATE_NOT_EDITABLE`、`OVERTIME_DATE_INVALID`、`OVERTIME_RESERVATION_EXCEEDED`。
 
 #### Scenario: 同一批量核验重复提交
 - **WHEN** 客户端使用同一管理员、同一路径、同一请求指纹和同一个 `Idempotency-Key` 重复提交批量核验

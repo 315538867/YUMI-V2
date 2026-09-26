@@ -9,6 +9,7 @@ import java.math.BigDecimal;
  * refreshGlobalReferences=true 时星级、包装档位与材料单价全部按当前全局重算；
  * 默认缝边剪袋类型未传＝保持原值，clearSeamType=true 才清空为“默认不缝边剪袋”（与 seamTypeId 互斥）；
  * reason 可选入变更日志。
+ * 模具数量与每日批次数未传＝保持原值，传值必须为正整数（阶段五 5.1）。
  */
 public record UpdateProductRequest(
         Long version,
@@ -28,5 +29,7 @@ public record UpdateProductRequest(
         Long imageFileId,
         Boolean refreshMaterialPrices,
         Boolean refreshGlobalReferences,
+        Integer moldQuantity,
+        Integer dailyBatchLimit,
         String reason) {
 }

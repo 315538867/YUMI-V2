@@ -37,24 +37,38 @@ public class OrderSnapshotRepository {
                 order.profitAmount(), confirmedBy, requestId);
     }
 
+    /** 生产参数快照（阶段五 5.1）：确认时冻结，生产域只读本快照，不回溯当前商品或全局设置。 */
+    public record ProductionParams(Integer packagingStdMinutes, Integer seamStdMinutes,
+                                   java.math.BigDecimal makingEffectiveHourRate,
+                                   java.math.BigDecimal workdayHours,
+                                   int moldQuantity, int dailyBatchLimit) {
+    }
+
     public void insertItemSnapshot(OrderRow order, OrderItemRow item, OrderReference.Product product,
-                                   String flow, String requestId) {
+                                   ProductionParams production, String flow, String requestId) {
         jdbcTemplate.update("""
                 INSERT INTO order_item_snapshots (order_id, order_item_id, line_no, product_id, product_no,
                     product_name, product_note, image_file_id, star_level_id, star_name, star_std_minutes,
-                    quantity, seam_quantity, unit_price, goods_amount, seam_type_id, seam_type_name,
-                    seam_unit_cost, seam_fee, seam_amount, unit_cost, goods_cost_amount, seam_cost_amount,
+                    packaging_std_minutes, quantity, seam_quantity, unit_price, goods_amount, seam_type_id,
+                    seam_type_name, seam_std_minutes, seam_unit_cost, seam_fee, seam_amount,
+                    making_effective_hour_rate, workday_hours, mold_quantity, daily_batch_limit,
+                    unit_cost, goods_cost_amount, seam_cost_amount,
                     glue_grams, glue_cost, colorpaste_cost, material_cost, product_labor_fee,
                     packaging_labor_fee, box_labor_fee, labor_cost, other_cost, total_cost, flow, note,
                     created_at, updated_at, request_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)
                 """,
                 order.id(), item.id(), item.lineNo(), item.productId(), product.productNo(), product.name(),
                 product.note(), product.imageFileId(), product.starLevelId(), product.starName(),
-                product.starStdMinutes(), item.quantity(), item.seamQuantity(), item.unitPrice(),
-                item.goodsAmount(), item.seamTypeId(), item.seamTypeName(), item.seamUnitCost(), item.seamFee(),
-                item.seamAmount(), item.unitCost(), item.goodsCostAmount(), item.seamCostAmount(),
+                product.starStdMinutes(), production.packagingStdMinutes(), item.quantity(),
+                item.seamQuantity(), item.unitPrice(),
+                item.goodsAmount(), item.seamTypeId(), item.seamTypeName(), production.seamStdMinutes(),
+                item.seamUnitCost(), item.seamFee(), item.seamAmount(),
+                production.makingEffectiveHourRate(), production.workdayHours(), production.moldQuantity(),
+                production.dailyBatchLimit(),
+                item.unitCost(), item.goodsCostAmount(), item.seamCostAmount(),
                 product.glueGrams(), product.glueCost(), product.colorpasteCost(), product.materialCost(),
                 product.productLaborFee(), product.packagingLaborFee(), product.boxLaborFee(),
                 product.laborCost(), product.otherCost(), product.totalCost(), flow, item.note(), requestId);

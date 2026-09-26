@@ -90,7 +90,7 @@ public class FulfillmentService {
                 item.quantity(), item.quantity(), item.seamQuantity(), item.quantity(),
                 makingInflow, packingInflow, seamInflow,
                 makingPlanned, packingPlanned, seamPlanned, verified,
-                balance == null ? 0 : balance.reworkPending(), balance == null ? 0 : balance.remakePending(),
+                balance == null ? 0 : balance.reworkPending(),
                 balance == null ? 0 : balance.shippableQuantity(), shipped,
                 balance == null ? 0 : balance.finishedSurplusQuantity(),
                 item.quantity() - shipped, derived);

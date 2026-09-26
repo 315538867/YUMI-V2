@@ -39,9 +39,9 @@ class OrderMigrationTest {
                 "SELECT id FROM customers WHERE customer_no = 'TC0001'", Long.class);
         jdbcTemplate.update("""
                 INSERT INTO products (product_no, name, status, star_level_id, star_name, star_std_minutes,
-                    sale_price, weight_g, version, created_at, updated_at)
+                    sale_price, weight_g, mold_quantity, daily_batch_limit, version, created_at, updated_at)
                 VALUES ('TP0001', 'TST-订单迁移商品', 'ACTIVE', (SELECT MIN(id) FROM star_levels), '一星', 5,
-                    10.0000, 100, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                    10.0000, 100, 10, 5, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """);
         productId = jdbcTemplate.queryForObject(
                 "SELECT id FROM products WHERE product_no = 'TP0001'", Long.class);

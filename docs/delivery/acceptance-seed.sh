@@ -1,5 +1,5 @@
 set -euo pipefail
-API=http://127.0.0.1:18090
+API=${API:-http://127.0.0.1:18090}
 JAR=/tmp/yumi-acc-cookies.txt
 PW=$(security find-generic-password -s yumi-v2-local-test -w)
 DB() { mysql --default-character-set=utf8mb4 -h 127.0.0.1 -u yumi_v2_test -p"$PW" yumi_v2_test -N -s -e "$1" 2>/dev/null; }
@@ -22,13 +22,18 @@ DELETE FROM shipment_logistics_changes WHERE shipment_id IN (SELECT s.id FROM sh
 DELETE FROM shipment_corrections WHERE original_shipment_id IN (SELECT s.id FROM shipments s JOIN orders o ON o.id=s.order_id JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
 DELETE FROM shipment_items WHERE shipment_id IN (SELECT s.id FROM shipments s JOIN orders o ON o.id=s.order_id JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
 DELETE FROM shipments WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
+SET @acc_tasks := (SELECT GROUP_CONCAT(DISTINCT task_id) FROM production_task_items WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%'));
 DELETE FROM production_reminders WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
 DELETE FROM overtime_preemptions WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
-DELETE FROM remake_sources WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
+DELETE FROM overtime_tasks WHERE id IN (SELECT task_id FROM overtime_task_items WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%'));
+DELETE FROM overtime_task_items WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
+DELETE FROM production_quantity_returns WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
+DELETE FROM scrap_records WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
+DELETE FROM rework_sources WHERE previous_source_id IS NOT NULL AND order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
 DELETE FROM rework_sources WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
 DELETE FROM production_verifications WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
-DELETE FROM production_plan_adjustments WHERE plan_id IN (SELECT p.id FROM production_plans p JOIN orders o ON o.id=p.order_id JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
-DELETE FROM production_plans WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
+DELETE FROM production_task_items WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
+DELETE FROM production_tasks WHERE @acc_tasks IS NOT NULL AND FIND_IN_SET(id, @acc_tasks);
 DELETE FROM inventory_allocation_lines WHERE batch_id IN (SELECT b.id FROM inventory_batches b JOIN products p ON p.id=b.product_id WHERE p.name LIKE '验收-%');
 DELETE FROM inventory_movement_lines WHERE batch_id IN (SELECT b.id FROM inventory_batches b JOIN products p ON p.id=b.product_id WHERE p.name LIKE '验收-%');
 DELETE FROM inventory_allocations WHERE order_id IN (SELECT o.id FROM orders o JOIN customers c ON c.id=o.customer_id WHERE c.name LIKE '验收-%');
@@ -62,13 +67,13 @@ TIER=$(curl -s -b "$JAR" "$API/api/settings/static-data/PACKAGING_TIER" | j "dat
 # 缝边种类名称在类别内唯一：先复用已存在条目，保证脚本可反复重铺
 SEAM=$(DB "SELECT id FROM seam_types WHERE name='验收-标准缝边' LIMIT 1;")
 if [ -z "$SEAM" ]; then
-  SEAM=$(curl -s -b "$JAR" -X POST "$API/api/settings/static-data/SEAM_TYPE/items" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"name":"验收-标准缝边","costPrice":"1.2500"}' | j "data.id")
+  SEAM=$(curl -s -b "$JAR" -X POST "$API/api/settings/static-data/SEAM_TYPE/items" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"name":"验收-标准缝边","stdMinutes":"5"}' | j "data.id")
 fi
 
 echo "=== 客户/商品/员工 ==="
 CUST=$(curl -s -b "$JAR" -X POST "$API/api/customers" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"name":"验收-生产客户","defaultRecipient":"张三","defaultRecipientPhone":"13800000000","defaultRegion":"华东","defaultAddress":"上海市浦东新区示例路 1 号"}' | j "data.id")
-P1=$(curl -s -b "$JAR" -X POST "$API/api/products" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"name\":\"验收-生产商品甲\",\"starLevelId\":$STAR,\"salePrice\":\"25.0000\",\"weightG\":270,\"packagingTierId\":$TIER}" | j "data.id")
-P2=$(curl -s -b "$JAR" -X POST "$API/api/products" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"name\":\"验收-生产商品乙\",\"starLevelId\":$STAR,\"salePrice\":\"18.0000\",\"weightG\":200,\"packagingTierId\":$TIER}" | j "data.id")
+P1=$(curl -s -b "$JAR" -X POST "$API/api/products" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"name\":\"验收-生产商品甲\",\"starLevelId\":$STAR,\"salePrice\":\"25.0000\",\"weightG\":270,\"packagingTierId\":$TIER,\"moldQuantity\":10,\"dailyBatchLimit\":5}" | j "data.id")
+P2=$(curl -s -b "$JAR" -X POST "$API/api/products" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"name\":\"验收-生产商品乙\",\"starLevelId\":$STAR,\"salePrice\":\"18.0000\",\"weightG\":200,\"packagingTierId\":$TIER,\"moldQuantity\":10,\"dailyBatchLimit\":5}" | j "data.id")
 emp() { curl -s -b "$JAR" -X POST "$API/api/employees" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"name\":\"$1\",\"firstHireDate\":\"$TODAY\",\"workTypes\":[\"$2\"]}" | j "data.id"; }
 MAKER=$(emp "验收-制作员工" MAKING); PACKER=$(emp "验收-包装员工" PACKING_BAG); CUTTER=$(emp "验收-缝边员工" SEAM_CUTTING)
 
@@ -82,25 +87,33 @@ echo "=== 库存领用（制作 4 → 捏毛装袋）==="
 BATCH=$(curl -s -b "$JAR" -X POST "$API/api/inventory/batches" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"productId\":$P1,\"node\":\"MAKING\",\"seamState\":\"NONE\",\"quantity\":4,\"inventoryDate\":\"$TODAY\"}" | j "data.id")
 curl -s -b "$JAR" -X POST "$API/api/inventory-allocations" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"orderId\":$ORDER,\"reason\":\"验收领用\",\"lines\":[{\"batchId\":$BATCH,\"orderItemId\":$ITEM1,\"quantity\":4,\"targetNode\":\"PACKING_BAG\"}]}" | j "data.status"
 
-plan() { curl -s -b "$JAR" -X POST "$API/api/production-plans" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"planType\":\"NORMAL\",\"orderItemId\":$1,\"node\":\"$2\",\"planDate\":\"$3\",\"employeeId\":$4,\"quantity\":$5}"; }
-echo "=== 计划与核验 ==="
-MP=$(plan "$ITEM1" MAKING "$TODAY" "$MAKER" 10 | j "data.id")
-PP=$(plan "$ITEM1" PACKING_BAG "$TODAY" "$PACKER" 4 | j "data.id")
-SP=$(plan "$ITEM1" SEAM_CUTTING "$TODAY" "$CUTTER" 4 | j "data.id")
-curl -s -b "$JAR" -X POST "$API/api/production-plans/$MP/verify" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"completedQuantity":6,"qualifiedQuantity":6,"reworkQuantity":0,"scrapQuantity":0}' | j "data.incompleteReminderId"
-VP=$(plan "$ITEM2" MAKING "$TOMORROW" "$MAKER" 6 | j "data.id")
-VID=$(curl -s -b "$JAR" -X POST "$API/api/production-plans/$VP/verify" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"completedQuantity":6,"qualifiedQuantity":3,"reworkQuantity":2,"scrapQuantity":1}' | j "data.id")
-curl -s -b "$JAR" -X POST "$API/api/rework-sources" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"verificationId\":$VID,\"targetNode\":\"MAKING\",\"quantity\":2}" >/dev/null
-# 明天 4 件未来计划（超额任务来源）
-plan "$ITEM1" MAKING "$TOMORROW" "$MAKER" 4 >/dev/null
+WT_MAKING=$(DB "SELECT id FROM work_types WHERE code='MAKING';")
+WT_PACKING=$(DB "SELECT id FROM work_types WHERE code='PACKING_BAG';")
+WT_SEAM=$(DB "SELECT id FROM work_types WHERE code='SEAM_CUTTING';")
+# 生产任务：一个任务头 + 一条明细（$1=orderItemId $2=workTypeId $3=taskDate $4=employeeId $5=quantity）
+task() { curl -s -b "$JAR" -X POST "$API/api/production-tasks" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"taskDate\":\"$3\",\"employeeId\":$4,\"workTypeId\":$2,\"taskType\":\"NORMAL\",\"items\":[{\"orderItemId\":$1,\"plannedQuantity\":$5,\"sourceType\":\"ORDER\"}]}"; }
+# 逐明细核验：$1=taskId $2=taskItemId $3=合格 $4=返工 $5=报废
+verify() { curl -s -b "$JAR" -X POST "$API/api/production-tasks/$1/verify" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"items\":[{\"taskItemId\":$2,\"qualifiedQuantity\":$3,\"reworkQuantity\":$4,\"scrapQuantity\":$5}]}"; }
+echo "=== 生产任务与核验 ==="
+MT=$(task "$ITEM1" "$WT_MAKING" "$TODAY" "$MAKER" 10); MTASK=$(echo "$MT" | j "data.id"); MITEM=$(echo "$MT" | j "data.items.0.id")
+PT=$(task "$ITEM1" "$WT_PACKING" "$TODAY" "$PACKER" 4); PTASK=$(echo "$PT" | j "data.id"); PITEM=$(echo "$PT" | j "data.items.0.id")
+ST=$(task "$ITEM1" "$WT_SEAM" "$TODAY" "$CUTTER" 4); STASK=$(echo "$ST" | j "data.id"); SITEM=$(echo "$ST" | j "data.items.0.id")
+verify "$MTASK" "$MITEM" 6 0 0 | j "data.items.0.incompleteReminderId"
+VT=$(task "$ITEM2" "$WT_MAKING" "$TOMORROW" "$MAKER" 6); VTASK=$(echo "$VT" | j "data.id"); VITEM=$(echo "$VT" | j "data.items.0.id")
+verify "$VTASK" "$VITEM" 3 2 1 >/dev/null
+VID=$(DB "SELECT id FROM production_verifications WHERE task_item_id=$VITEM;")
+# 返工来源必须由管理员基于返工事实显式创建
+curl -s -b "$JAR" -X POST "$API/api/rework-sources" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"originVerificationId\":$VID,\"quantity\":2,\"reason\":\"验收-返工\"}" >/dev/null
+# 明天 4 件未来正常任务明细（超额任务来源）
+task "$ITEM1" "$WT_MAKING" "$TOMORROW" "$MAKER" 4 >/dev/null
 
 echo "=== 其他排班（已核验 120 分钟）==="
 SCH=$(curl -s -b "$JAR" -X POST "$API/api/other-schedules" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"scheduleDate\":\"$TODAY\",\"employeeId\":$PACKER,\"hours\":1,\"minutes\":30,\"note\":\"验收-打包杂活\"}" | j "data.id")
 curl -s -b "$JAR" -X POST "$API/api/other-schedules/$SCH/verify" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"hours":2,"minutes":0}' | j "data.effectiveMinutes"
 
 echo "=== 生产流转至可发货并部分发货（8.12 前提：部分发货且订单仍已确认）==="
-curl -s -b "$JAR" -X POST "$API/api/production-plans/$PP/verify" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"completedQuantity":4,"qualifiedQuantity":4,"reworkQuantity":0,"scrapQuantity":0}' >/dev/null
-curl -s -b "$JAR" -X POST "$API/api/production-plans/$SP/verify" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d '{"completedQuantity":4,"qualifiedQuantity":4,"reworkQuantity":0,"scrapQuantity":0}' >/dev/null
+verify "$PTASK" "$PITEM" 4 0 0 >/dev/null
+verify "$STASK" "$SITEM" 4 0 0 >/dev/null
 SHIP=$(curl -s -b "$JAR" -X POST "$API/api/orders/$ORDER/shipments" -H 'Content-Type: application/json' -H "Idempotency-Key: $(key)" -d "{\"shipmentDate\":\"$TODAY\",\"freight\":\"8.0000\",\"carrier\":\"顺丰\",\"trackingNo\":\"SF-ACCEPT-0001\",\"items\":[{\"orderItemId\":$ITEM1,\"quantity\":4}]}" | j "data.id")
 curl -s -b "$JAR" -X POST "$API/api/orders/$ORDER/shipments/$SHIP/confirm" -H "Idempotency-Key: $(key)" | j "data.status"
 
@@ -109,7 +122,7 @@ curl -s -b "$JAR" -X POST "$API/api/orders/$ORDER/payments" -H 'Content-Type: ap
 
 echo "=== 状态 ==="
 DB "SELECT CONCAT('订单 ',order_no,' ',status) FROM orders WHERE id=$ORDER;
-SELECT CONCAT('计划 ',plan_no,' ',plan_type,' ',node,' ',plan_date,' 数量 ',quantity,' ',status) FROM production_plans WHERE order_id=$ORDER ORDER BY id;
+SELECT CONCAT('任务 ',t.task_no,' ',t.task_type,' ',t.task_date,' 明细 ',i.node,' 计划 ',i.planned_quantity,' ',i.status) FROM production_task_items i JOIN production_tasks t ON t.id=i.task_id WHERE i.order_id=$ORDER ORDER BY i.id;
 SELECT CONCAT('提醒 ',reminder_type,' 数量 ',quantity,' ',status) FROM production_reminders ORDER BY id;
 SELECT CONCAT('履约 明细 ',order_item_id,' 需求 ',required_quantity,' 可发货 ',shippable_quantity,' 已发 ',shipped_quantity) FROM order_item_fulfillment_balances WHERE order_id=$ORDER;
 SELECT CONCAT('发货 ',shipment_no,' ',status) FROM shipments WHERE order_id=$ORDER;

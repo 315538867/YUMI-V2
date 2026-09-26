@@ -78,10 +78,10 @@ class OrderConfirmationTest {
                     sale_price, weight_g, total_cost, glue_grams, glue_cost, colorpaste_cost, material_cost,
                     product_labor_fee, packaging_labor_fee, box_labor_fee, labor_cost, other_cost,
                     seam_type_id, seam_type_name, seam_std_minutes, seam_unit_cost, seam_fee,
-                    version, created_at, updated_at)
+                    mold_quantity, daily_batch_limit, version, created_at, updated_at)
                 VALUES ('TP0003', 'TST-确认商品', '商品说明', 'ACTIVE', (SELECT MIN(id) FROM star_levels),
                     '一星', 5, 25.0000, 100, 18.1200, 324, 3.2400, 6.4800, 9.7200, 5.0000, 2.0000, 0.5000,
-                    7.5000, 0.9000, ?, 'TST-确认缝边种类', 5, 1.2500, 2.0000, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                    7.5000, 0.9000, ?, 'TST-确认缝边种类', 5, 1.2500, 2.0000, 10, 5, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """, seamTypeId);
         productId = jdbcTemplate.queryForObject(
                 "SELECT id FROM products WHERE product_no = 'TP0003'", Long.class);

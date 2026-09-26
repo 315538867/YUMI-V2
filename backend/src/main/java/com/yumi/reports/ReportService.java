@@ -212,17 +212,17 @@ public class ReportService {
                     FROM inventory_batches b
                     """, "b.inventory_date", null, " ORDER BY b.id");
             case ReportTypes.PRODUCTION -> new Source("""
-                    SELECT p.plan_no planNo, p.plan_type planType, o.order_no orderNo, i.line_no lineNo,
-                           i.product_name productName, p.node, p.plan_date planDate,
-                           p.employee_name employeeName, p.quantity, p.status,
+                    SELECT t.task_no planNo, t.task_type planType, o.order_no orderNo, i.item_no lineNo,
+                           i.product_name productName, i.node, t.task_date planDate,
+                           t.employee_name_snapshot employeeName, i.planned_quantity quantity, i.status,
                            v.completed_quantity completedQuantity, v.qualified_quantity qualifiedQuantity,
                            v.rework_quantity reworkQuantity, v.scrap_quantity scrapQuantity,
                            v.incomplete_quantity incompleteQuantity
-                    FROM production_plans p
-                    JOIN orders o ON o.id = p.order_id
-                    JOIN order_items i ON i.id = p.order_item_id
-                    LEFT JOIN production_verifications v ON v.plan_id = p.id
-                    """, "p.plan_date", "p.order_id", " ORDER BY p.plan_date, p.id");
+                    FROM production_task_items i
+                    JOIN production_tasks t ON t.id = i.task_id
+                    JOIN orders o ON o.id = i.order_id
+                    LEFT JOIN production_verifications v ON v.task_item_id = i.id
+                    """, "t.task_date", "i.order_id", " ORDER BY t.task_date, i.id");
             case ReportTypes.SHIPMENT -> new Source("""
                     SELECT s.shipment_no shipmentNo, o.order_no orderNo, o.customer_name customerName,
                            s.status, s.shipment_date shipmentDate, si.line_no lineNo, si.product_no productNo,

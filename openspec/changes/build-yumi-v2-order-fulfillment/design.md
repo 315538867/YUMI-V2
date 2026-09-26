@@ -93,9 +93,9 @@
 | 履约视图 | `GET /api/orders/{id}/fulfillment` | 管理员/否 | 订购数量/缝边数量、工序、需求和发货派生状态 | `ORDER_NOT_FOUND` |
 | 库存 | `GET/POST /api/inventory/batches`、`POST /api/inventory/adjustments` | 管理员/写入幂等 | 批次和流水 | `VALIDATION_INVALID`（负数/非法调整）, `CONFLICT_DUPLICATE`（重复冲销） |
 | 领用 | `POST /api/inventory-allocations`、`POST /api/inventory-allocations/{id}/cancel` | 管理员/必须幂等 | 领用、反向流水、履约接入 | `STOCK_INSUFFICIENT`, `STATE_CANNOT_CANCEL`（同一来源重复接入由来源唯一键保证） |
-| 生产任务 | `GET/POST /api/production-tasks`、`POST /api/production-tasks/{id}/items/{itemId}/cancel` | 管理员/写入幂等 | 多订单多产品任务、`NORMAL`/`REWORK` 类型、明线/暗线、任务明细与等待上游状态 | `EMPLOYEE_NOT_ELIGIBLE`, `SOURCE_INSUFFICIENT`, `STATE_NOT_CANCELABLE`, `REWORK_SOURCE_INVALID` |
-| 逐明细核验 | `POST /api/production-tasks/{id}/verify` | 管理员/必须幂等 | 一次性逐明细核验、完成/合格/返工/报废事实、返工来源与数量回转 | `VERIFICATION_EQUATION_INVALID`, `STATE_ALREADY_VERIFIED`, `QUANTITY_NOT_EXECUTABLE`, `SCRAP_QUANTITY_INVALID` |
-| 超额预占与其他排班 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify`、`POST /api/other-schedule-tasks`、`POST /api/other-schedule-tasks/{id}/verify` | 管理员/必须幂等 | 独立超额预占或任务调整提醒、其他排班工时核验；超额不进入普通生产任务类型 | `OVERTIME_DATE_INVALID`, `OVERTIME_RESERVATION_EXCEEDED`, `WORKING_MINUTES_INVALID` |
+| 生产任务 | `GET/POST /api/production-tasks`、`POST /api/production-tasks/{id}/items/{itemId}/cancel` | 管理员/写入幂等 | 多订单多产品任务、`NORMAL`/`REWORK` 类型、明线/暗线、任务明细与等待上游状态 | `EMPLOYEE_NOT_ELIGIBLE`, `CAPACITY_EXCEEDED`, `SOURCE_INSUFFICIENT`, `SOURCE_INVALID`, `STATE_NOT_CANCELABLE` |
+| 逐明细核验 | `POST /api/production-tasks/{id}/verify` | 管理员/必须幂等 | 一次性逐明细核验、完成/合格/返工/报废事实、返工来源与数量回转 | `VERIFICATION_EQUATION_INVALID`, `STATE_ALREADY_VERIFIED`, `QUANTITY_NOT_EXECUTABLE`, `VALIDATION_INVALID` |
+| 超额预占与其他排班 | `POST /api/overtime-tasks`、`POST /api/overtime-tasks/{id}/verify`、`POST /api/other-schedules`、`POST /api/other-schedules/{id}/verify` | 管理员/必须幂等 | 独立超额预占或任务调整提醒、其他排班工时核验；超额不进入普通生产任务类型 | `OVERTIME_DATE_INVALID`, `OVERTIME_RESERVATION_EXCEEDED`, `VALIDATION_INVALID` |
 | 发货 | `GET/POST /api/orders/{id}/shipments`、`POST /api/orders/{id}/shipments/{shipmentId}/confirm` | 管理员/必须幂等 | 冻结发货快照 | `SHIPMENT_EXCEEDS_AVAILABLE`, `SHIPMENT_EXCEEDS_DEMAND` |
 | 发货作废/更正 | `POST .../void`、`POST .../corrections`、`PATCH .../logistics` | 管理员/必须幂等 | 反向事实或等量替代 | `STATE_CLOSED_REQUIRES_CORRECTION`, `CORRECTION_REPLACEMENT_REQUIRED`, `SHIPMENT_AFTER_SALES_LINKED` |
 | 收款/退款 | `POST /api/orders/{id}/payments`、`POST /api/orders/{id}/refunds` | 管理员/必须幂等 | 不可变资金事实；售后退款单列于订单结清 | `PAYMENT_DRAFT_FORBIDDEN`, `REFUND_EXCEEDS_RECEIPTS`, `REFUND_REFERENCE_REQUIRED` |

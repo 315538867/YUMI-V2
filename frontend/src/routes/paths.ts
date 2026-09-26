@@ -10,7 +10,9 @@ export const ROUTE_PATHS = [
   '/orders/:id/changes/:changeId',
   '/inventory',
   '/production',
-  '/production/plans/:id/verify',
+  '/production/tasks/new',
+  '/production/tasks/:id',
+  '/production/tasks/:id/verify',
   '/reports',
   '/settings',
 ] as const;

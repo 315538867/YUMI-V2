@@ -224,7 +224,7 @@ class ProductSnapshotMatrixTest {
 
             // 商品显式覆盖 → 0.8：6×0.25+0.8 = 2.3000
             var overridden = create("""
-                    {"name":"TST-提成覆盖","starLevelId":3,"salePrice":"25.0000","weightG":270,
+                    {"name":"TST-提成覆盖","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"25.0000","weightG":270,
                      "lossRatePercent":"20","packagingTierId":%d,"packagingCommission":"0.8000",
                      "boxLaborFee":"0.5","transportPackingFee":"0.3","dailySundriesFee":"0.2",
                      "rentUtilitiesFee":"0.4","moldAmortFee":"0.1"}
@@ -256,7 +256,7 @@ class ProductSnapshotMatrixTest {
     private String createBody(String name, String salePrice, Long tierId) {
         var tier = tierId == null ? "" : ",\"packagingTierId\":" + tierId;
         return """
-                {"name":"%s","starLevelId":3,"salePrice":"%s","weightG":270,"lossRatePercent":"20",
+                {"name":"%s","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"%s","weightG":270,"lossRatePercent":"20",
                  "seamMinutes":"5","seamDefaultFee":"0"%s,
                  "boxLaborFee":"0.5","transportPackingFee":"0.3","dailySundriesFee":"0.2",
                  "rentUtilitiesFee":"0.4","moldAmortFee":"0.1"}

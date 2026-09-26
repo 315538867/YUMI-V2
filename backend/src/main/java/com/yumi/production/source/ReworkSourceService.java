@@ -1,142 +1,158 @@
 package com.yumi.production.source;
 
-import com.yumi.catalog.employee.dto.EmployeeSnapshot;
-import com.yumi.catalog.employee.service.EmployeeEligibilityService;
 import com.yumi.identity.AuditContext;
 import com.yumi.orders.ledger.FulfillmentLedger;
-import com.yumi.production.ProductionNodes;
-import com.yumi.production.plan.ProductionPlanService;
-import com.yumi.production.plan.ProductionPlanViews;
-import com.yumi.production.plan.internal.PlanWriter;
-import com.yumi.production.source.internal.ReworkSourceRepository;
+import com.yumi.production.task.ProductionTaskService;
+import com.yumi.production.task.ProductionTaskViews;
+import com.yumi.production.task.internal.ProductionTaskRepository;
 import com.yumi.production.verification.internal.ProductionVerificationRepository;
+import com.yumi.production.source.internal.ReworkSourceRepository;
+import com.yumi.production.source.internal.ReworkSourceRow;
 import com.yumi.shared.error.ApiException;
 import com.yumi.shared.error.ApiFieldError;
 import com.yumi.shared.error.ErrorCode;
+import com.yumi.shared.numbering.SequenceAllocator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 返工来源应用服务（任务 5.6）：来源创建（受目标矩阵与核验返工数量约束）与从来源创建计划（受来源余额约束）。
+ * 返工来源应用服务（阶段五 5.9–5.11）：核验只记录返工事实，来源必须由管理员显式创建。
  *
- * 口径（`domain-and-quantity-model.md` §6.1/§7，施工文档 §3.4/§4.4）：
- * 核验时已自动生成「默认回到同工序」的来源；本接口用于显式为更早的前序工序另建来源。
- * 同一核验下所有返工来源的总量合计不得超过该核验的返工数量；同一 (核验, 目标工序) 只有一条来源。
- * 从来源创建计划时先锁来源行再校验余额，并发创建不会超支。
+ * <p>来源归属「原核验明细 + 发生工序 + 返工轮次」；总量不得超过该返工事实尚未建来源的数量；
+ * 可拆成多个 `REWORK` 明细；返工再次返工时基于新的返工事实创建下一轮来源并通过 `previous_source_id` 串联。
+ * 阶段五不采用任何基于工序顺序的返工目标限制——返工在发生问题的工序内部完成。
  */
 @Service
 public class ReworkSourceService {
 
+    private static final String TYPE_REWORK = "REWORK";
+    private static final String SOURCE_REWORK = "REWORK_SOURCE";
+
     private final ReworkSourceRepository repository;
     private final ProductionVerificationRepository verificationRepository;
-    private final ProductionPlanService planService;
-    private final PlanWriter planWriter;
-    private final EmployeeEligibilityService eligibility;
+    private final ProductionTaskRepository taskRepository;
+    private final ProductionTaskService taskService;
     private final FulfillmentLedger ledger;
+    private final SequenceAllocator sequenceAllocator;
     private final AuditContext auditContext;
 
     public ReworkSourceService(ReworkSourceRepository repository,
                                ProductionVerificationRepository verificationRepository,
-                               ProductionPlanService planService, PlanWriter planWriter,
-                               EmployeeEligibilityService eligibility, FulfillmentLedger ledger,
+                               ProductionTaskRepository taskRepository,
+                               ProductionTaskService taskService,
+                               FulfillmentLedger ledger,
+                               SequenceAllocator sequenceAllocator,
                                AuditContext auditContext) {
         this.repository = repository;
         this.verificationRepository = verificationRepository;
-        this.planService = planService;
-        this.planWriter = planWriter;
-        this.eligibility = eligibility;
+        this.taskRepository = taskRepository;
+        this.taskService = taskService;
         this.ledger = ledger;
+        this.sequenceAllocator = sequenceAllocator;
         this.auditContext = auditContext;
     }
 
-    public List<ProductionSourceViews.ReworkSourceView> list(Long orderItemId) {
-        return repository.findByItem(orderItemId).stream().map(ReworkSourceService::toView).toList();
+    /** 创建返工来源入参：原核验、数量、原因，可选上一轮来源。 */
+    public record CreateRequest(Long originVerificationId, Integer quantity, String reason,
+                                Long previousSourceId) {
+    }
+
+    /** 从来源安排返工任务入参：头共同信息 + 明细数量（产品、订单、工序、轮次由来源解析）。 */
+    public record CreateTaskRequest(LocalDate taskDate, Long employeeId, String note, List<TaskItem> items) {
+    }
+
+    public record TaskItem(Integer plannedQuantity) {
     }
 
     @Transactional
-    public ProductionSourceViews.ReworkSourceView create(ProductionSourceViews.CreateReworkSourceRequest request) {
-        var errors = new java.util.ArrayList<ApiFieldError>();
-        var verification = request.verificationId() == null ? null
-                : verificationRepository.findById(request.verificationId()).orElse(null);
-        if (verification == null) {
-            errors.add(new ApiFieldError("verificationId", "核验记录不存在"));
+    public ReworkSourceViews.ReworkSourceView create(CreateRequest request) {
+        if (request.originVerificationId() == null) {
+            throw fieldError("originVerificationId", "原核验必填");
         }
         if (request.quantity() == null || request.quantity() < 1) {
-            errors.add(new ApiFieldError("quantity", "返工数量必须大于 0"));
+            throw fieldError("quantity", "返工来源数量必须大于 0");
         }
-        failIfInvalid(errors);
-
-        if (verification.reworkQuantity() <= 0) {
-            throw new ApiException(ErrorCode.VALIDATION_INVALID, "该核验没有返工数量",
-                    List.of(new ApiFieldError("verificationId", "核验返工数量为 0")));
+        var verificationRow = verificationRepository.findById(request.originVerificationId())
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "核验事实不存在"));
+        if (verificationRow.reworkQuantity() < 1) {
+            throw new ApiException(ErrorCode.SOURCE_INVALID, "该核验没有返工事实",
+                    List.of(new ApiFieldError("originVerificationId", "核验返工数量为 0")));
         }
-        if (!ProductionNodes.canRework(verification.node(), request.targetNode())) {
-            throw new ApiException(ErrorCode.REWORK_TARGET_INVALID, "返工目标工序不合法",
-                    List.of(new ApiFieldError("targetNode", "发现问题工序 " + verification.node()
-                            + " 只能返工 " + String.join("/", ProductionNodes.reworkTargets(verification.node())))));
+        var taskItem = taskRepository.findItemByIdForUpdate(verificationRow.taskItemId())
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "任务明细不存在"));
+        // 锁定同一原核验上已创建的来源（按 id 升序），重算「未建来源额度」
+        var existing = repository.findByOriginVerificationForUpdate(verificationRow.id());
+        int sourced = existing.stream().mapToInt(ReworkSourceRow::totalQuantity).sum();
+        int remaining = verificationRow.reworkQuantity() - sourced;
+        if (request.quantity() > remaining) {
+            throw new ApiException(ErrorCode.SOURCE_INSUFFICIENT, "返工事实剩余未建来源数量不足",
+                    List.of(new ApiFieldError("quantity", "可建来源 " + remaining + "，本次 " + request.quantity())));
         }
-        int already = repository.totalByVerification(verification.id());
-        if (already + request.quantity() > verification.reworkQuantity()) {
-            throw new ApiException(ErrorCode.SOURCE_INSUFFICIENT, "返工来源总量超过该核验的返工数量",
-                    List.of(new ApiFieldError("quantity", "该核验返工 " + verification.reworkQuantity()
-                            + "，已建来源 " + already + "，本次 " + request.quantity())));
+        int roundNo = 1;
+        if (request.previousSourceId() != null) {
+            var parent = repository.findByIdForUpdate(request.previousSourceId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "上一轮返工来源不存在"));
+            if (parent.orderItemId() != verificationRow.orderItemId()
+                    || !parent.node().equals(verificationRow.node())) {
+                throw new ApiException(ErrorCode.SOURCE_INVALID, "下一轮返工来源必须与原来源同订单明细、同工序",
+                        List.of(new ApiFieldError("previousSourceId", "来源归属不一致")));
+            }
+            roundNo = parent.roundNo() + 1;
         }
-        if (repository.findByIdForVerificationTarget(verification.id(), request.targetNode()).isPresent()) {
-            throw new ApiException(ErrorCode.CONFLICT_DUPLICATE, "该核验的该目标工序已有返工来源",
-                    List.of(new ApiFieldError("targetNode", "同一核验同一目标工序只能有一条来源")));
-        }
-
         var audit = auditContext.current();
-        long id = repository.insert(verification.id(), verification.orderId(), verification.orderItemId(),
-                verification.node(), request.targetNode(), request.quantity(), 1, null, request.reason(),
-                audit.requestId());
+        var sourceNo = SequenceAllocator.format("RS", sequenceAllocator.next("rework_sources"), 6);
+        var row = new ReworkSourceRow(null, sourceNo, verificationRow.id(), taskItem.id(),
+                taskItem.orderId(), taskItem.orderItemId(), taskItem.productId(), taskItem.node(),
+                request.quantity(), 0, roundNo, request.previousSourceId(), request.reason(), 0L);
+        long id = repository.insert(row, audit.requestId(), audit.idempotencyKey());
+        // 来源创建即从「待安排返工」转入来源额度，可重新排产
+        ledger.applyReworkPending(taskItem.orderItemId(), request.quantity(), false, audit.requestId());
         return toView(repository.findById(id).orElseThrow());
     }
 
+    public List<ReworkSourceViews.ReworkSourceView> list(Long orderItemId, String node, String status) {
+        return repository.find(orderItemId, node, status).stream().map(ReworkSourceService::toView).toList();
+    }
+
+    public ReworkSourceViews.ReworkSourceView get(long id) {
+        return toView(repository.findById(id)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "返工来源不存在")));
+    }
+
+    /** 从来源余额创建一个或多个 REWORK 明细：工序强制等于来源发生工序，不接受普通任务类型冒充。 */
     @Transactional
-    public ProductionPlanViews.PlanView createPlan(long sourceId,
-                                                   ProductionSourceViews.CreateSourcePlanRequest request) {
-        var source = repository.findByIdForUpdate(sourceId)
+    public ProductionTaskViews.TaskView createTask(long sourceId, CreateTaskRequest request) {
+        var source = repository.findById(sourceId)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "返工来源不存在"));
-        var errors = new java.util.ArrayList<ApiFieldError>();
-        if (request.quantity() == null || request.quantity() < 1) {
-            errors.add(new ApiFieldError("quantity", "计划数量必须大于 0"));
-        }
-        if (request.planDate() == null) {
-            errors.add(new ApiFieldError("planDate", "计划日期必填"));
-        }
-        if (request.employeeId() == null) {
-            errors.add(new ApiFieldError("employeeId", "执行员工必填"));
-        }
-        failIfInvalid(errors);
-        if (request.quantity() > source.balance()) {
+        if (source.availableQuantity() < 1) {
             throw new ApiException(ErrorCode.SOURCE_INSUFFICIENT, "返工来源余额不足",
-                    List.of(new ApiFieldError("quantity", "来源可安排 " + source.balance()
-                            + "，本次计划 " + request.quantity())));
+                    List.of(new ApiFieldError("sourceId", "来源已安排完毕")));
         }
-
-        EmployeeSnapshot employee = eligibility.checkEligible(request.employeeId(), source.targetNode());
-        var audit = auditContext.current();
-        long planId = planWriter.insert("REWORK", source.orderId(), source.orderItemId(), source.targetNode(),
-                request.planDate(), request.employeeId(), employee.name(), request.quantity(),
-                "REWORK_SOURCE", source.id(), 0, request.note(), audit.requestId());
-        repository.arrange(source.id(), request.quantity(), audit.requestId());
-        ledger.applyReworkPending(source.orderItemId(), request.quantity(), false, audit.requestId());
-        return planService.get(planId);
+        var workTypeId = taskRepository.workTypeId(source.node());
+        if (workTypeId == null) {
+            throw new ApiException(ErrorCode.VALIDATION_INVALID, "来源发生工序不是系统内置工种");
+        }
+        var items = request.items() == null ? List.<ProductionTaskService.ItemRequest>of()
+                : request.items().stream()
+                        .map(item -> new ProductionTaskService.ItemRequest(source.orderItemId(),
+                                item.plannedQuantity(), SOURCE_REWORK, sourceId))
+                        .toList();
+        return taskService.create(new ProductionTaskService.CreateRequest(request.taskDate(),
+                request.employeeId(), workTypeId, TYPE_REWORK, request.note(), items));
     }
 
-    static ProductionSourceViews.ReworkSourceView toView(ReworkSourceRepository.ReworkSourceRow row) {
-        return new ProductionSourceViews.ReworkSourceView(row.id(), row.verificationId(), row.orderId(),
-                row.orderItemId(), row.foundNode(), row.targetNode(), row.totalQuantity(), row.arrangedQuantity(),
-                row.balance(), row.roundNo(), row.previousSourceId(), row.reason(), row.version());
+    private static ReworkSourceViews.ReworkSourceView toView(ReworkSourceRow row) {
+        return new ReworkSourceViews.ReworkSourceView(row.id(), row.sourceNo(), row.originVerificationId(),
+                row.originTaskItemId(), row.orderId(), row.orderItemId(), row.productId(), row.node(),
+                row.totalQuantity(), row.arrangedQuantity(), row.availableQuantity(), row.roundNo(),
+                row.previousSourceId(), row.reason());
     }
 
-    private static void failIfInvalid(List<ApiFieldError> errors) {
-        if (!errors.isEmpty()) {
-            throw new ApiException(ErrorCode.VALIDATION_INVALID,
-                    ErrorCode.VALIDATION_INVALID.defaultMessage(), errors);
-        }
+    private static ApiException fieldError(String field, String message) {
+        return new ApiException(ErrorCode.VALIDATION_INVALID, ErrorCode.VALIDATION_INVALID.defaultMessage(),
+                List.of(new ApiFieldError(field, message)));
     }
 }

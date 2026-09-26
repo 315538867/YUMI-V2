@@ -142,7 +142,6 @@ export interface FulfillmentItem {
   seamPlanned: number;
   verifiedProcessed: number;
   reworkPending: number;
-  remakePending: number;
   shippable: number;
   shipped: number;
   finishedSurplus: number;

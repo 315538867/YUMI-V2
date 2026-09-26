@@ -235,6 +235,15 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
 
   useEffect(() => () => scheduler.cancel(), [scheduler]);
 
+  // 每日最大产能是服务端派生值，表单只做即时展示提示，不作为可提交字段
+  const watchedValues = (watched ?? {}) as { moldQuantity?: number; dailyBatchLimit?: number };
+  const moldQuantityValue = Number(watchedValues.moldQuantity ?? 0);
+  const dailyBatchLimitValue = Number(watchedValues.dailyBatchLimit ?? 0);
+  const dailyMaxCapacityText =
+    moldQuantityValue > 0 && dailyBatchLimitValue > 0
+      ? String(moldQuantityValue * dailyBatchLimitValue)
+      : '待填写';
+
   // 商品快照与当前全局设置的差异：驱动标签标注与“刷新为最新设置”入口（口径为不自动回溯）
   const currentStar = editing && detail ? starLevels.find(level => level.id === detail.starLevelId) : undefined;
   const starDrifted = Boolean(
@@ -473,6 +482,26 @@ function ProductEditor({ mode, onDone }: { mode: Exclude<Mode, { kind: 'list' }>
               <Col span={8}>
                 <Form.Item name="moldAmortFee" label="模具摊销费（元）">
                   <Input placeholder="如 0.0000（无全局默认）" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="moldQuantity"
+                  label="模具数量（件/模）"
+                  rules={[{ required: true, message: '请输入模具数量' }]}
+                  extra="同一模具批次可并行生产的数量，正整数"
+                >
+                  <InputNumber min={1} precision={0} style={{ width: '100%' }} placeholder="如 10" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="dailyBatchLimit"
+                  label="每日批次数（次/天）"
+                  rules={[{ required: true, message: '请输入每日批次数' }]}
+                  extra={`每日最大产能 ${dailyMaxCapacityText} 件（模具数量 × 每日批次数，服务端派生）`}
+                >
+                  <InputNumber min={1} precision={0} style={{ width: '100%' }} placeholder="如 6" />
                 </Form.Item>
               </Col>
               <Col span={8}>

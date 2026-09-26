@@ -70,7 +70,7 @@ mysql -h "$DB_HOST" -u "$DB_USER" -N -B "$TARGET_DB" -e "
   SELECT CONCAT('orders=', (SELECT COUNT(*) FROM orders),
                 ' order_items=', (SELECT COUNT(*) FROM order_items),
                 ' inventory_batches=', (SELECT COUNT(*) FROM inventory_batches),
-                ' production_plans=', (SELECT COUNT(*) FROM production_plans),
+                ' production_tasks=', (SELECT COUNT(*) FROM production_tasks),
                 ' shipments=', (SELECT COUNT(*) FROM shipments),
                 ' payments=', (SELECT COUNT(*) FROM payments),
                 ' after_sales_cases=', (SELECT COUNT(*) FROM after_sales_cases));"

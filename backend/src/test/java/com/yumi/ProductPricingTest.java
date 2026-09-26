@@ -35,7 +35,7 @@ class ProductPricingTest {
 
     /** 钉死算例公共参数：weight=270、loss=20%、star=3(std15)、seam=5、sale=25、无包装档位。 */
     private static final String PINNED_BODY = """
-            {"name":"%s","starLevelId":3,"salePrice":"%s","weightG":270,"lossRatePercent":"20",
+            {"name":"%s","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"%s","weightG":270,"lossRatePercent":"20",
              "seamMinutes":"5","seamDefaultFee":"0",
              "boxLaborFee":"0.5","transportPackingFee":"0.3","dailySundriesFee":"0.2",
              "rentUtilitiesFee":"0.4","moldAmortFee":"0.1"}
@@ -248,7 +248,7 @@ class ProductPricingTest {
                 "SELECT id FROM packaging_tiers WHERE tier_name = ?", Long.class, "TST-tier-" + uuid);
         try {
             var body = """
-                    {"name":"TST-包装档","starLevelId":3,"salePrice":"25.0000","weightG":270,
+                    {"name":"TST-包装档","starLevelId":3,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"25.0000","weightG":270,
                      "lossRatePercent":"20","packagingTierId":%d,"packagingCommission":"0.2000",
                      "boxLaborFee":"0.5","transportPackingFee":"0.3","dailySundriesFee":"0.2",
                      "rentUtilitiesFee":"0.4","moldAmortFee":"0.1"}
@@ -272,7 +272,7 @@ class ProductPricingTest {
                 """);
         try {
             var body = """
-                    {"name":"TST-零产量","starLevelId":5,"salePrice":"10.0000","weightG":100,
+                    {"name":"TST-零产量","starLevelId":5,"moldQuantity":10,"dailyBatchLimit":5,"salePrice":"10.0000","weightG":100,
                      "lossRatePercent":"0","seamMinutes":"0","seamDefaultFee":"0",
                      "boxLaborFee":"0","transportPackingFee":"0","dailySundriesFee":"0",
                      "rentUtilitiesFee":"0","moldAmortFee":"0"}

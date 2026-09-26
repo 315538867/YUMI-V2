@@ -127,6 +127,7 @@ public class ProductService {
         if (request.imageFileId() != null && !reference.fileExists(request.imageFileId())) {
             errors.add(new ApiFieldError("imageFileId", "图片文件不存在"));
         }
+        validateCapacity(request.moldQuantity(), request.dailyBatchLimit(), errors);
         var resolved = resolver.forCreate(request, errors);
         var in = resolved.inputs();
 
@@ -147,7 +148,8 @@ public class ProductService {
                 in.boxLaborFee(), in.transportPackingFee(), in.dailySundriesFee(),
                 in.rentUtilitiesFee(), in.moldAmortFee(),
                 pricing.materialCost(), pricing.laborCost(), pricing.otherCost(),
-                pricing.totalCost(), pricing.referencePrice(), 0L);
+                pricing.totalCost(), pricing.referencePrice(),
+                request.moldQuantity(), request.dailyBatchLimit(), 0L);
         long id = repository.insert(row, audit.requestId(), audit.idempotencyKey());
         return toDetail(withId(row, id));
     }
@@ -173,6 +175,10 @@ public class ProductService {
         if (request.imageFileId() != null && !reference.fileExists(request.imageFileId())) {
             errors.add(new ApiFieldError("imageFileId", "图片文件不存在"));
         }
+        int moldQuantity = request.moldQuantity() != null ? request.moldQuantity() : existing.moldQuantity();
+        int dailyBatchLimit = request.dailyBatchLimit() != null
+                ? request.dailyBatchLimit() : existing.dailyBatchLimit();
+        validateCapacity(moldQuantity, dailyBatchLimit, errors);
         var resolved = resolver.forUpdate(request, existing, errors);
         if (request.version() != existing.version()) {
             throw new ApiException(ErrorCode.CONFLICT_VERSION);
@@ -197,7 +203,8 @@ public class ProductService {
                 in.boxLaborFee(), in.transportPackingFee(), in.dailySundriesFee(),
                 in.rentUtilitiesFee(), in.moldAmortFee(),
                 pricing.materialCost(), pricing.laborCost(), pricing.otherCost(),
-                pricing.totalCost(), pricing.referencePrice(), request.version());
+                pricing.totalCost(), pricing.referencePrice(),
+                moldQuantity, dailyBatchLimit, request.version());
         repository.update(updated, audit.requestId());
         changeLog.record("PRODUCT", existing.id(), existing.productNo(),
                 snapshot(existing), snapshot(updated), request.reason(),
@@ -225,7 +232,8 @@ public class ProductService {
                 existing.boxLaborFee(), existing.transportPackingFee(), existing.dailySundriesFee(),
                 existing.rentUtilitiesFee(), existing.moldAmortFee(),
                 existing.materialCost(), existing.laborCost(), existing.otherCost(),
-                existing.totalCost(), existing.referencePrice(), existing.version());
+                existing.totalCost(), existing.referencePrice(),
+                existing.moldQuantity(), existing.dailyBatchLimit(), existing.version());
         repository.update(updated, audit.requestId());
         changeLog.record("PRODUCT", existing.id(), existing.productNo(),
                 snapshot(existing), snapshot(updated), reason,
@@ -250,6 +258,12 @@ public class ProductService {
         map.put("salePrice", row.salePrice());
         map.put("weightG", row.weightG());
         map.put("totalCost", row.totalCost());
+        // 版本快照同时保留产能与工序标准分钟，供商品历史和生产任务追溯
+        map.put("moldQuantity", row.moldQuantity());
+        map.put("dailyBatchLimit", row.dailyBatchLimit());
+        map.put("starStdMinutes", row.starStdMinutes());
+        map.put("packagingStdMinutes", row.packagingStdMinutes());
+        map.put("seamStdMinutes", row.seamStdMinutes());
         map.put("version", row.version());
         return map;
     }
@@ -267,6 +281,7 @@ public class ProductService {
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
+                row.moldQuantity(), row.dailyBatchLimit(),
                 row.version());
     }
 
@@ -283,6 +298,7 @@ public class ProductService {
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
+                row.moldQuantity(), row.dailyBatchLimit(),
                 version);
     }
 
@@ -310,6 +326,27 @@ public class ProductService {
                 ProductPricing.estimatedProfit(row.salePrice(), row.totalCost()),
                 ProductPricing.estimatedMarginRate(row.salePrice(), row.totalCost()),
                 seamBudget(row.seamTypeId(), row.seamUnitCost(), row.seamFee(), row.totalCost()),
+                row.moldQuantity(), row.dailyBatchLimit(),
+                dailyMaxCapacity(row.moldQuantity(), row.dailyBatchLimit()),
                 row.version());
+    }
+
+    /** 每日最大产能 = 模具数量 × 每日批次数；不落库，读时派生。 */
+    static int dailyMaxCapacity(int moldQuantity, int dailyBatchLimit) {
+        return moldQuantity * dailyBatchLimit;
+    }
+
+    private static void validateCapacity(Integer moldQuantity, Integer dailyBatchLimit,
+                                         List<ApiFieldError> errors) {
+        if (moldQuantity == null) {
+            errors.add(new ApiFieldError("moldQuantity", "模具数量必填"));
+        } else if (moldQuantity < 1) {
+            errors.add(new ApiFieldError("moldQuantity", "模具数量必须为正整数"));
+        }
+        if (dailyBatchLimit == null) {
+            errors.add(new ApiFieldError("dailyBatchLimit", "每日批次数必填"));
+        } else if (dailyBatchLimit < 1) {
+            errors.add(new ApiFieldError("dailyBatchLimit", "每日批次数必须为正整数"));
+        }
     }
 }

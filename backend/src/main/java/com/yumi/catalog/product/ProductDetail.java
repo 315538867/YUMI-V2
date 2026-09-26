@@ -55,5 +55,8 @@ public record ProductDetail(
         @JsonSerialize(using = ToStringSerializer.class) BigDecimal estimatedProfit,
         @JsonSerialize(using = ToStringSerializer.class) BigDecimal estimatedMarginRate,
         SeamBudgetView seamBudget,
+        Integer moldQuantity,
+        Integer dailyBatchLimit,
+        Integer dailyMaxCapacity,
         Long version) {
 }

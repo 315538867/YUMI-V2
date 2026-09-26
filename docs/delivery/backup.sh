@@ -48,8 +48,8 @@ fi
   echo "orders=$(mysql -h "$DB_HOST" -u "$DB_USER" -N -B "$DB_NAME" -e 'SELECT COUNT(*) FROM orders')"
   echo "inventory_batches=$(mysql -h "$DB_HOST" -u "$DB_USER" -N -B "$DB_NAME" \
       -e 'SELECT COUNT(*) FROM inventory_batches')"
-  echo "production_plans=$(mysql -h "$DB_HOST" -u "$DB_USER" -N -B "$DB_NAME" \
-      -e 'SELECT COUNT(*) FROM production_plans')"
+  echo "production_tasks=$(mysql -h "$DB_HOST" -u "$DB_USER" -N -B "$DB_NAME" \
+      -e 'SELECT COUNT(*) FROM production_tasks')"
   echo "after_sales_cases=$(mysql -h "$DB_HOST" -u "$DB_USER" -N -B "$DB_NAME" \
       -e 'SELECT COUNT(*) FROM after_sales_cases')"
 } > "$TARGET/manifest.txt"

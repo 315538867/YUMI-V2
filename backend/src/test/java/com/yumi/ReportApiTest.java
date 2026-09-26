@@ -54,9 +54,9 @@ class ReportApiTest {
                 """, USERNAME, passwordEncoder.encode(PASSWORD));
         jdbcTemplate.update("""
                 INSERT INTO products (product_no, name, status, star_level_id, star_name, star_std_minutes,
-                    sale_price, weight_g, total_cost, version, created_at, updated_at)
+                    sale_price, weight_g, total_cost, mold_quantity, daily_batch_limit, version, created_at, updated_at)
                 VALUES ('TRP001', 'TST-报表商品', 'ACTIVE', (SELECT MIN(id) FROM star_levels), '一星', 5,
-                    10.0000, 100, 6.0000, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                    10.0000, 100, 6.0000, 10, 5, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """);
         long productId = jdbcTemplate.queryForObject(
                 "SELECT id FROM products WHERE product_no = 'TRP001'", Long.class);
@@ -141,29 +141,6 @@ class ReportApiTest {
                     quantity_after, product_id, node, seam_state, created_at, updated_at)
                 VALUES (?, ?, 'IN', 6, 0, 6, ?, 'SHIPPABLE', 'NONE', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """, movementId, batchId, productId);
-        // 生产计划与核验
-        jdbcTemplate.update("""
-                INSERT INTO employees (employee_no, name, status, version, created_at, updated_at)
-                VALUES ('TRE900', 'TST-报表员工', 'ACTIVE', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
-                """);
-        long employeeId = jdbcTemplate.queryForObject(
-                "SELECT id FROM employees WHERE employee_no = 'TRE900'", Long.class);
-        jdbcTemplate.update("""
-                INSERT INTO production_plans (plan_no, plan_type, order_id, order_item_id, node, plan_date,
-                    employee_id, employee_name, quantity, status, source_type, source_id, source_line_id,
-                    created_at, updated_at)
-                VALUES ('PN970001', 'NORMAL', ?, ?, 'MAKING', '2026-09-25', ?, 'TST-报表员工', 10, 'VERIFIED',
-                    'ORDER', ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
-                """, orderId, orderItemId, employeeId, orderId, orderItemId);
-        long planId = jdbcTemplate.queryForObject(
-                "SELECT id FROM production_plans WHERE plan_no = 'PN970001'", Long.class);
-        jdbcTemplate.update("""
-                INSERT INTO production_verifications (plan_id, order_id, order_item_id, node,
-                    completed_quantity, qualified_quantity, rework_quantity, scrap_quantity,
-                    incomplete_quantity, verified_by, verified_at, created_at, updated_at)
-                VALUES (?, ?, ?, 'MAKING', 10, 10, 0, 0, 0, 'tester', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6),
-                    UTC_TIMESTAMP(6))
-                """, planId, orderId, orderItemId);
         // 收款
         jdbcTemplate.update("""
                 INSERT INTO payments (payment_no, order_id, amount, business_date, method, created_at, updated_at)
@@ -180,7 +157,6 @@ class ReportApiTest {
     @AfterEach
     void cleanup() {
         var testOrders = "SELECT id FROM orders WHERE order_no = 'TRP0001'";
-        var testPlans = "SELECT id FROM production_plans WHERE order_id IN (" + testOrders + ")";
         var testBatches = "SELECT id FROM inventory_batches WHERE batch_no = 'IB970001'";
         // 售后明细引用 shipment_items，必须在删除发货明细之前清理
         var testCases = "SELECT id FROM after_sales_cases WHERE order_id IN (" + testOrders + ")";
@@ -191,8 +167,6 @@ class ReportApiTest {
                 + testItems + ")");
         jdbcTemplate.update("DELETE FROM after_sales_items WHERE case_id IN (" + testCases + ")");
         jdbcTemplate.update("DELETE FROM after_sales_cases WHERE order_id IN (" + testOrders + ")");
-        jdbcTemplate.update("DELETE FROM production_verifications WHERE plan_id IN (" + testPlans + ")");
-        jdbcTemplate.update("DELETE FROM production_plans WHERE order_id IN (" + testOrders + ")");
         jdbcTemplate.update("DELETE FROM inventory_movement_lines WHERE batch_id IN (" + testBatches + ")");
         jdbcTemplate.update("DELETE FROM inventory_batches WHERE batch_no = 'IB970001'");
         jdbcTemplate.update("DELETE FROM inventory_movements WHERE movement_no = 'IM970001'");
@@ -206,7 +180,6 @@ class ReportApiTest {
         jdbcTemplate.update("DELETE FROM orders WHERE order_no = 'TRP0001'");
         jdbcTemplate.update("DELETE FROM customers WHERE customer_no = 'TRP001'");
         jdbcTemplate.update("DELETE FROM products WHERE product_no = 'TRP001'");
-        jdbcTemplate.update("DELETE FROM employees WHERE employee_no = 'TRE900'");
         jdbcTemplate.update("DELETE FROM admin_accounts WHERE username = ?", USERNAME);
     }
 

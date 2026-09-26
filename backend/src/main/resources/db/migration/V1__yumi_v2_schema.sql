@@ -267,6 +267,10 @@ CREATE TABLE products (
     other_cost DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     total_cost DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     reference_price DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
+    -- 生产产能（阶段五 5.1）：同一模具批次可并行生产数量、每日允许批次数，均为正整数；
+    -- 最大日容量 = 模具数量 × 每日批次数，由服务端派生，不落库
+    mold_quantity INT UNSIGNED NOT NULL,
+    daily_batch_limit INT UNSIGNED NOT NULL,
     version BIGINT UNSIGNED NOT NULL DEFAULT 0,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
@@ -282,6 +286,8 @@ CREATE TABLE products (
     KEY idx_products_request_id (request_id),
     KEY idx_products_image_file (image_file_id),
     KEY idx_products_seam_type_id (seam_type_id),
+    CONSTRAINT ck_products_mold_quantity CHECK (mold_quantity > 0),
+    CONSTRAINT ck_products_daily_batch_limit CHECK (daily_batch_limit > 0),
     CONSTRAINT fk_products_image_file FOREIGN KEY (image_file_id) REFERENCES file_metadata (id),
     CONSTRAINT fk_products_seam_type FOREIGN KEY (seam_type_id) REFERENCES seam_types (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -571,15 +577,22 @@ CREATE TABLE order_item_snapshots (
     star_level_id BIGINT UNSIGNED NULL,
     star_name VARCHAR(20) NULL,
     star_std_minutes INT UNSIGNED NULL,
+    packaging_std_minutes INT UNSIGNED NULL,
     quantity INT UNSIGNED NOT NULL,
     seam_quantity INT UNSIGNED NOT NULL DEFAULT 0,
     unit_price DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     goods_amount DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     seam_type_id BIGINT UNSIGNED NULL,
     seam_type_name VARCHAR(100) NULL,
+    seam_std_minutes INT UNSIGNED NULL,
     seam_unit_cost DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     seam_fee DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     seam_amount DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
+    -- 生产参数快照（阶段五 5.1）：确认时冻结；生产域只读本快照，后续商品或全局设置变更不回溯
+    making_effective_hour_rate DECIMAL(9,6) NOT NULL,
+    workday_hours DECIMAL(19,4) NOT NULL,
+    mold_quantity INT UNSIGNED NOT NULL,
+    daily_batch_limit INT UNSIGNED NOT NULL,
     unit_cost DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     goods_cost_amount DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
     seam_cost_amount DECIMAL(19,4) NOT NULL DEFAULT 0.0000,
@@ -730,7 +743,6 @@ CREATE TABLE order_item_fulfillment_balances (
     seam_planned INT UNSIGNED NOT NULL DEFAULT 0,
     verified_processed INT UNSIGNED NOT NULL DEFAULT 0,
     rework_pending INT UNSIGNED NOT NULL DEFAULT 0,
-    remake_pending INT UNSIGNED NOT NULL DEFAULT 0,
     shippable_quantity INT UNSIGNED NOT NULL DEFAULT 0,
     shipped_quantity INT UNSIGNED NOT NULL DEFAULT 0,
     finished_surplus_quantity INT UNSIGNED NOT NULL DEFAULT 0,
@@ -952,34 +964,67 @@ CREATE TABLE order_inventory_plan_lines (
 -- 原 V10__production.sql
 -- ==========================================================================================
 
--- 生产模块（阶段五）：生产计划、一次性核验、返工/重做来源、超额预占、工作台提醒、其他排班与工时更正。
+-- 生产模块（阶段五）：生产任务头/明细、逐明细核验、显式返工来源、报废与数量回转、超额预占、
+-- 工作台提醒、其他排班与工时更正。任务头不参与数量流转，任务明细是最小事实边界。
 -- 表归属见 database-design.md §8，数量口径见 domain-and-quantity-model.md §5–§7/§11，需求见 specs/production-management/spec.md，
 -- 施工文档见 docs/architecture/production-module-design.md §3。
 -- 事实不可变：核验、来源、预占、工时核验与更正只追加；计划取消只改状态并恢复来源余额，不物理删除。
 -- 本迁移只建表与约束，不写入任何数据。
 
--- 生产计划：类型 + 订单明细 + 工序 + 日期 + 执行员工 + 计划数量
-CREATE TABLE production_plans (
+-- 生产任务头（阶段五）：一次排班操作的组织容器，**不参与任何数量流转**；
+-- 不保存 quantity / completed_quantity / 来源余额等可用于履约、来源或产能计算的汇总列。
+CREATE TABLE production_tasks (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    plan_no CHAR(8) NOT NULL,
-    -- NORMAL / REWORK / REMAKE / OVERTIME / AFTER_SALES_REWORK / AFTER_SALES_REPLACEMENT
-    plan_type VARCHAR(32) NOT NULL,
+    task_no CHAR(8) NOT NULL,
+    task_date DATE NOT NULL,
+    employee_id BIGINT UNSIGNED NOT NULL,
+    employee_name_snapshot VARCHAR(100) NOT NULL,
+    work_type_id BIGINT UNSIGNED NOT NULL,
+    work_type_name_snapshot VARCHAR(50) NOT NULL,
+    -- NORMAL / REWORK；超额预占与阶段八售后生产使用独立事实边界，不进入本列
+    task_type VARCHAR(16) NOT NULL,
+    note VARCHAR(500) NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    request_id VARCHAR(64) NULL,
+    idempotency_key VARCHAR(128) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_production_tasks_task_no (task_no),
+    KEY idx_production_tasks_date_employee (task_date, employee_id),
+    KEY idx_production_tasks_type (task_type),
+    KEY idx_production_tasks_request_id (request_id),
+    CONSTRAINT fk_production_tasks_employee FOREIGN KEY (employee_id) REFERENCES employees (id),
+    CONSTRAINT fk_production_tasks_work_type FOREIGN KEY (work_type_id) REFERENCES work_types (id),
+    CONSTRAINT ck_production_tasks_type CHECK (task_type IN ('NORMAL', 'REWORK'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 生产任务明细：最小事实边界，承载订单/产品/工序/来源/计划数量与创建时能力、时间快照
+CREATE TABLE production_task_items (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    task_id BIGINT UNSIGNED NOT NULL,
+    item_no INT UNSIGNED NOT NULL,
     order_id BIGINT UNSIGNED NOT NULL,
     order_item_id BIGINT UNSIGNED NOT NULL,
-    -- 售后单引用：阶段八接入后写入，本阶段恒 NULL（售后表尚未建立，故不建外键）
-    after_sales_case_id BIGINT UNSIGNED NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
+    product_no CHAR(6) NOT NULL,
+    product_name VARCHAR(200) NOT NULL,
     node VARCHAR(32) NOT NULL,
-    plan_date DATE NOT NULL,
-    employee_id BIGINT UNSIGNED NOT NULL,
-    employee_name VARCHAR(100) NOT NULL,
-    quantity INT UNSIGNED NOT NULL,
-    status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
-    -- 来源：ORDER（正常）/ REWORK_SOURCE / REMAKE_SOURCE / NONE（超额任务，来源是 overtime_preemptions 集合）
+    planned_quantity INT UNSIGNED NOT NULL,
+    -- ORDER（正常需求）/ REWORK_SOURCE（显式返工来源）/ QUANTITY_RETURN（同工序报废回转）/ AFTER_SALES_SOURCE（阶段八）
     source_type VARCHAR(32) NOT NULL,
-    -- 0 = 来源无明细行；用 0 而非 NULL 以保证唯一键对“无明细来源”同样生效
-    source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    source_line_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    note VARCHAR(500) NULL,
+    -- 来源明细行；ORDER 时为 order_item_id 本身，保证唯一键对正常来源同样生效
+    source_id BIGINT UNSIGNED NOT NULL,
+    -- 创建时冻结：单件标准分钟与估算分钟（REWORK 不计正常工时，估算分钟为 0）
+    standard_minutes INT UNSIGNED NOT NULL,
+    estimated_minutes BIGINT UNSIGNED NOT NULL,
+    making_effective_hour_rate DECIMAL(9,6) NOT NULL,
+    workday_hours DECIMAL(19,4) NOT NULL,
+    mold_quantity INT UNSIGNED NOT NULL,
+    daily_batch_limit INT UNSIGNED NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
     cancelled_at DATETIME(6) NULL,
     cancelled_by VARCHAR(100) NULL,
     cancel_reason VARCHAR(500) NULL,
@@ -991,64 +1036,40 @@ CREATE TABLE production_plans (
     request_id VARCHAR(64) NULL,
     idempotency_key VARCHAR(128) NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_production_plans_plan_no (plan_no),
-    KEY idx_production_plans_date_node (plan_date, node),
-    KEY idx_production_plans_employee (employee_id, plan_date),
-    KEY idx_production_plans_item (order_item_id, node),
-    KEY idx_production_plans_order (order_id),
-    KEY idx_production_plans_status (status),
-    KEY idx_production_plans_source (source_type, source_id),
-    KEY idx_production_plans_request_id (request_id),
-    CONSTRAINT fk_production_plans_order FOREIGN KEY (order_id) REFERENCES orders (id),
-    CONSTRAINT fk_production_plans_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
-    CONSTRAINT fk_production_plans_employee FOREIGN KEY (employee_id) REFERENCES employees (id),
-    CONSTRAINT ck_production_plans_quantity CHECK (quantity > 0),
-    CONSTRAINT ck_production_plans_status CHECK (status IN ('PENDING', 'VERIFIED', 'CANCELLED')),
-    CONSTRAINT ck_production_plans_type CHECK (plan_type IN ('NORMAL', 'REWORK', 'REMAKE', 'OVERTIME',
-        'AFTER_SALES_REWORK', 'AFTER_SALES_REPLACEMENT'))
+    UNIQUE KEY uk_production_task_items_item_no (task_id, item_no),
+    -- 同一任务内同一订单明细、同一工序、同一来源不得重复占用
+    UNIQUE KEY uk_production_task_items_source (task_id, order_item_id, node, source_type, source_id),
+    KEY idx_production_task_items_item_node (order_item_id, node),
+    KEY idx_production_task_items_product_node (product_id, node),
+    KEY idx_production_task_items_source_ref (source_type, source_id),
+    KEY idx_production_task_items_status (status),
+    KEY idx_production_task_items_request_id (request_id),
+    CONSTRAINT fk_production_task_items_task FOREIGN KEY (task_id) REFERENCES production_tasks (id),
+    CONSTRAINT fk_production_task_items_order FOREIGN KEY (order_id) REFERENCES orders (id),
+    CONSTRAINT fk_production_task_items_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
+    CONSTRAINT fk_production_task_items_product FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT ck_production_task_items_quantity CHECK (planned_quantity > 0),
+    CONSTRAINT ck_production_task_items_estimated CHECK (estimated_minutes >= 0),
+    CONSTRAINT ck_production_task_items_status CHECK (status IN ('PENDING', 'VERIFIED', 'CANCELLED')),
+    CONSTRAINT ck_production_task_items_source CHECK (source_type IN ('ORDER', 'REWORK_SOURCE',
+        'QUANTITY_RETURN', 'AFTER_SALES_SOURCE'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- 待执行正常计划的日期/员工/数量/备注调整历史（不产生核验、库存或履约事实）
-CREATE TABLE production_plan_adjustments (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    plan_id BIGINT UNSIGNED NOT NULL,
-    -- DATE / EMPLOYEE / QUANTITY / NOTE / COMBINED
-    adjustment_type VARCHAR(16) NOT NULL,
-    before_plan_date DATE NULL,
-    after_plan_date DATE NULL,
-    before_employee_id BIGINT UNSIGNED NULL,
-    before_employee_name VARCHAR(100) NULL,
-    after_employee_id BIGINT UNSIGNED NULL,
-    after_employee_name VARCHAR(100) NULL,
-    before_quantity INT UNSIGNED NULL,
-    after_quantity INT UNSIGNED NULL,
-    before_note VARCHAR(500) NULL,
-    after_note VARCHAR(500) NULL,
-    reason VARCHAR(500) NOT NULL,
-    created_at DATETIME(6) NOT NULL,
-    updated_at DATETIME(6) NOT NULL,
-    created_by BIGINT UNSIGNED NULL,
-    updated_by BIGINT UNSIGNED NULL,
-    request_id VARCHAR(64) NULL,
-    idempotency_key VARCHAR(128) NULL,
-    PRIMARY KEY (id),
-    KEY idx_production_plan_adjustments_plan (plan_id, id),
-    KEY idx_production_plan_adjustments_request_id (request_id),
-    CONSTRAINT fk_production_plan_adjustments_plan FOREIGN KEY (plan_id) REFERENCES production_plans (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- 一次性核验：每计划最多一条有效核验（唯一外键）
+-- 一次性核验：每条任务明细最多一条有效核验（唯一外键）
 CREATE TABLE production_verifications (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    plan_id BIGINT UNSIGNED NOT NULL,
+    task_item_id BIGINT UNSIGNED NOT NULL,
+    task_id BIGINT UNSIGNED NOT NULL,
     order_id BIGINT UNSIGNED NOT NULL,
     order_item_id BIGINT UNSIGNED NOT NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
     node VARCHAR(32) NOT NULL,
+    planned_quantity INT UNSIGNED NOT NULL,
     completed_quantity INT UNSIGNED NOT NULL,
     qualified_quantity INT UNSIGNED NOT NULL,
     rework_quantity INT UNSIGNED NOT NULL,
     scrap_quantity INT UNSIGNED NOT NULL,
-    -- 未完成 = 计划数量 − 本次完成（跨表，由应用在同一事务内计算并断言）
+    -- 未完成 = 计划数量 − 本次完成（由应用在同一事务内计算并落事实）
     incomplete_quantity INT UNSIGNED NOT NULL,
     verify_note VARCHAR(500) NULL,
     verified_by VARCHAR(100) NOT NULL,
@@ -1060,30 +1081,32 @@ CREATE TABLE production_verifications (
     request_id VARCHAR(64) NULL,
     idempotency_key VARCHAR(128) NULL,
     PRIMARY KEY (id),
-    -- 每计划最多一次有效核验
-    UNIQUE KEY uk_production_verifications_plan (plan_id),
+    UNIQUE KEY uk_production_verifications_item (task_item_id),
     KEY idx_production_verifications_item_node (order_item_id, node),
     KEY idx_production_verifications_request_id (request_id),
-    CONSTRAINT fk_production_verifications_plan FOREIGN KEY (plan_id) REFERENCES production_plans (id),
+    CONSTRAINT fk_production_verifications_task_item FOREIGN KEY (task_item_id) REFERENCES production_task_items (id),
+    CONSTRAINT fk_production_verifications_task FOREIGN KEY (task_id) REFERENCES production_tasks (id),
     CONSTRAINT fk_production_verifications_order FOREIGN KEY (order_id) REFERENCES orders (id),
     CONSTRAINT fk_production_verifications_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
-    -- 本次完成 = 合格 + 返工 + 报废
+    CONSTRAINT fk_production_verifications_product FOREIGN KEY (product_id) REFERENCES products (id),
     CONSTRAINT ck_production_verifications_equation CHECK (
         completed_quantity = qualified_quantity + rework_quantity + scrap_quantity)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- 返工来源：原核验 + 发现问题工序 + 目标工序 + 总量/已安排（余额 = 总量 − 已安排）
+-- 返工来源：管理员基于返工事实显式创建；可拆多个 REWORK 明细，支持多轮父子链。
+-- 余额 = total_quantity − arranged_quantity；阶段五不采用任何基于工序顺序的返工目标限制。
 CREATE TABLE rework_sources (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    verification_id BIGINT UNSIGNED NOT NULL,
+    source_no CHAR(8) NOT NULL,
+    origin_verification_id BIGINT UNSIGNED NOT NULL,
+    origin_task_item_id BIGINT UNSIGNED NOT NULL,
     order_id BIGINT UNSIGNED NOT NULL,
     order_item_id BIGINT UNSIGNED NOT NULL,
-    found_node VARCHAR(32) NOT NULL,
-    target_node VARCHAR(32) NOT NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
+    node VARCHAR(32) NOT NULL,
     total_quantity INT UNSIGNED NOT NULL,
     arranged_quantity INT UNSIGNED NOT NULL DEFAULT 0,
-    -- 返工次数：首次返工为 1，返工计划再返工时递增
-    round_no INT UNSIGNED NOT NULL DEFAULT 1,
+    round_no INT UNSIGNED NOT NULL,
     previous_source_id BIGINT UNSIGNED NULL,
     reason VARCHAR(500) NULL,
     version BIGINT UNSIGNED NOT NULL DEFAULT 0,
@@ -1094,31 +1117,64 @@ CREATE TABLE rework_sources (
     request_id VARCHAR(64) NULL,
     idempotency_key VARCHAR(128) NULL,
     PRIMARY KEY (id),
-    -- 同一次核验的同一目标工序只有一条来源（数量在来源内累加，避免重复来源）
-    UNIQUE KEY uk_rework_sources_target (verification_id, target_node),
-    KEY idx_rework_sources_item (order_item_id),
+    UNIQUE KEY uk_rework_sources_source_no (source_no),
+    KEY idx_rework_sources_item (order_item_id, node),
+    KEY idx_rework_sources_verification (origin_verification_id),
     KEY idx_rework_sources_previous (previous_source_id),
     KEY idx_rework_sources_request_id (request_id),
-    CONSTRAINT fk_rework_sources_verification FOREIGN KEY (verification_id) REFERENCES production_verifications (id),
+    CONSTRAINT fk_rework_sources_verification FOREIGN KEY (origin_verification_id)
+        REFERENCES production_verifications (id),
+    CONSTRAINT fk_rework_sources_task_item FOREIGN KEY (origin_task_item_id)
+        REFERENCES production_task_items (id),
     CONSTRAINT fk_rework_sources_order FOREIGN KEY (order_id) REFERENCES orders (id),
     CONSTRAINT fk_rework_sources_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
+    CONSTRAINT fk_rework_sources_product FOREIGN KEY (product_id) REFERENCES products (id),
     CONSTRAINT fk_rework_sources_previous FOREIGN KEY (previous_source_id) REFERENCES rework_sources (id),
     CONSTRAINT ck_rework_sources_quantity CHECK (total_quantity > 0 AND arranged_quantity <= total_quantity),
     CONSTRAINT ck_rework_sources_round CHECK (round_no > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- 报废重做来源：原报废核验 + 报废工序 + 重做起始工序（默认等于报废工序）
-CREATE TABLE remake_sources (
+-- 报废事实（不可变）：每条核验最多一条报废事实，不产生替代类型、不增加订单需求、不产生上游或库存合格
+CREATE TABLE scrap_records (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     verification_id BIGINT UNSIGNED NOT NULL,
+    task_item_id BIGINT UNSIGNED NOT NULL,
     order_id BIGINT UNSIGNED NOT NULL,
     order_item_id BIGINT UNSIGNED NOT NULL,
-    scrap_node VARCHAR(32) NOT NULL,
-    start_node VARCHAR(32) NOT NULL,
-    total_quantity INT UNSIGNED NOT NULL,
-    arranged_quantity INT UNSIGNED NOT NULL DEFAULT 0,
-    -- start_node = MAKING 时必填（前序材料不可用等），由应用校验
+    product_id BIGINT UNSIGNED NOT NULL,
+    node VARCHAR(32) NOT NULL,
+    scrap_quantity INT UNSIGNED NOT NULL,
     reason VARCHAR(500) NULL,
+    operator_username VARCHAR(100) NOT NULL,
+    recorded_at DATETIME(6) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    request_id VARCHAR(64) NULL,
+    idempotency_key VARCHAR(128) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_scrap_records_verification (verification_id),
+    KEY idx_scrap_records_item (order_item_id, node),
+    KEY idx_scrap_records_request_id (request_id),
+    CONSTRAINT fk_scrap_records_verification FOREIGN KEY (verification_id) REFERENCES production_verifications (id),
+    CONSTRAINT fk_scrap_records_task_item FOREIGN KEY (task_item_id) REFERENCES production_task_items (id),
+    CONSTRAINT fk_scrap_records_order FOREIGN KEY (order_id) REFERENCES orders (id),
+    CONSTRAINT fk_scrap_records_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
+    CONSTRAINT fk_scrap_records_product FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT ck_scrap_records_quantity CHECK (scrap_quantity > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 数量回转（不可变）：报废数量回到**发生报废工序**的普通可安排/可执行额度，后续只能创建 NORMAL 明细
+CREATE TABLE production_quantity_returns (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    scrap_record_id BIGINT UNSIGNED NOT NULL,
+    order_id BIGINT UNSIGNED NOT NULL,
+    order_item_id BIGINT UNSIGNED NOT NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
+    node VARCHAR(32) NOT NULL,
+    returned_quantity INT UNSIGNED NOT NULL,
+    allocated_quantity INT UNSIGNED NOT NULL DEFAULT 0,
     version BIGINT UNSIGNED NOT NULL DEFAULT 0,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
@@ -1127,21 +1183,89 @@ CREATE TABLE remake_sources (
     request_id VARCHAR(64) NULL,
     idempotency_key VARCHAR(128) NULL,
     PRIMARY KEY (id),
-    -- 同一次核验的同一重做起始工序只有一条来源（与返工对称：默认从报废工序开始，显式选择更早工序时另建来源）
-    UNIQUE KEY uk_remake_sources_target (verification_id, start_node),
-    KEY idx_remake_sources_item (order_item_id),
-    KEY idx_remake_sources_request_id (request_id),
-    CONSTRAINT fk_remake_sources_verification FOREIGN KEY (verification_id) REFERENCES production_verifications (id),
-    CONSTRAINT fk_remake_sources_order FOREIGN KEY (order_id) REFERENCES orders (id),
-    CONSTRAINT fk_remake_sources_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
-    CONSTRAINT ck_remake_sources_quantity CHECK (total_quantity > 0 AND arranged_quantity <= total_quantity)
+    UNIQUE KEY uk_production_quantity_returns_scrap (scrap_record_id),
+    KEY idx_production_quantity_returns_item (order_item_id, node),
+    KEY idx_production_quantity_returns_request_id (request_id),
+    CONSTRAINT fk_production_quantity_returns_scrap FOREIGN KEY (scrap_record_id) REFERENCES scrap_records (id),
+    CONSTRAINT fk_production_quantity_returns_order FOREIGN KEY (order_id) REFERENCES orders (id),
+    CONSTRAINT fk_production_quantity_returns_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
+    CONSTRAINT fk_production_quantity_returns_product FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT ck_production_quantity_returns_quantity CHECK (returned_quantity > 0
+        AND allocated_quantity <= returned_quantity)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- 超额预占：超额任务从未来正常计划预占数量；不修改未来计划原始数量
+-- 超额任务（独立预占边界）：只在执行当天创建，来源只能是未来日期的 NORMAL 任务明细
+CREATE TABLE overtime_tasks (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    task_no CHAR(8) NOT NULL,
+    task_date DATE NOT NULL,
+    employee_id BIGINT UNSIGNED NOT NULL,
+    employee_name_snapshot VARCHAR(100) NOT NULL,
+    work_type_id BIGINT UNSIGNED NOT NULL,
+    work_type_name_snapshot VARCHAR(50) NOT NULL,
+    note VARCHAR(500) NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    request_id VARCHAR(64) NULL,
+    idempotency_key VARCHAR(128) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_overtime_tasks_task_no (task_no),
+    KEY idx_overtime_tasks_date (task_date),
+    KEY idx_overtime_tasks_employee (employee_id),
+    KEY idx_overtime_tasks_request_id (request_id),
+    CONSTRAINT fk_overtime_tasks_employee FOREIGN KEY (employee_id) REFERENCES employees (id),
+    CONSTRAINT fk_overtime_tasks_work_type FOREIGN KEY (work_type_id) REFERENCES work_types (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 超额任务明细：自身承载一次性核验事实（PENDING → VERIFIED），不进入普通核验表与正常产能
+CREATE TABLE overtime_task_items (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    task_id BIGINT UNSIGNED NOT NULL,
+    item_no INT UNSIGNED NOT NULL,
+    order_id BIGINT UNSIGNED NOT NULL,
+    order_item_id BIGINT UNSIGNED NOT NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
+    product_no CHAR(6) NOT NULL,
+    product_name VARCHAR(200) NOT NULL,
+    node VARCHAR(32) NOT NULL,
+    planned_quantity INT UNSIGNED NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+    completed_quantity INT UNSIGNED NULL,
+    qualified_quantity INT UNSIGNED NULL,
+    rework_quantity INT UNSIGNED NULL,
+    scrap_quantity INT UNSIGNED NULL,
+    incomplete_quantity INT UNSIGNED NULL,
+    verify_note VARCHAR(500) NULL,
+    verified_by VARCHAR(100) NULL,
+    verified_at DATETIME(6) NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    request_id VARCHAR(64) NULL,
+    idempotency_key VARCHAR(128) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_overtime_task_items_item_no (task_id, item_no),
+    KEY idx_overtime_task_items_item (order_item_id, node),
+    KEY idx_overtime_task_items_status (status),
+    KEY idx_overtime_task_items_request_id (request_id),
+    CONSTRAINT fk_overtime_task_items_task FOREIGN KEY (task_id) REFERENCES overtime_tasks (id),
+    CONSTRAINT fk_overtime_task_items_order FOREIGN KEY (order_id) REFERENCES orders (id),
+    CONSTRAINT fk_overtime_task_items_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
+    CONSTRAINT fk_overtime_task_items_product FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT ck_overtime_task_items_quantity CHECK (planned_quantity > 0),
+    CONSTRAINT ck_overtime_task_items_status CHECK (status IN ('PENDING', 'VERIFIED'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 超额预占：超额明细从未来 NORMAL 任务明细预占数量；不修改未来明细原计划数量
 CREATE TABLE overtime_preemptions (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    overtime_plan_id BIGINT UNSIGNED NOT NULL,
-    future_plan_id BIGINT UNSIGNED NOT NULL,
+    overtime_task_item_id BIGINT UNSIGNED NOT NULL,
+    future_task_item_id BIGINT UNSIGNED NOT NULL,
     order_id BIGINT UNSIGNED NOT NULL,
     order_item_id BIGINT UNSIGNED NOT NULL,
     node VARCHAR(32) NOT NULL,
@@ -1157,21 +1281,23 @@ CREATE TABLE overtime_preemptions (
     request_id VARCHAR(64) NULL,
     idempotency_key VARCHAR(128) NULL,
     PRIMARY KEY (id),
-    -- 同一超额任务对同一未来计划只有一条预占
-    UNIQUE KEY uk_overtime_preemptions_pair (overtime_plan_id, future_plan_id),
+    -- 同一超额明细对同一未来明细只有一条预占
+    UNIQUE KEY uk_overtime_preemptions_pair (overtime_task_item_id, future_task_item_id),
     -- 有效预占合计的加锁索引
-    KEY idx_overtime_preemptions_future (future_plan_id, status),
+    KEY idx_overtime_preemptions_future (future_task_item_id, status),
     KEY idx_overtime_preemptions_item (order_item_id),
     KEY idx_overtime_preemptions_request_id (request_id),
-    CONSTRAINT fk_overtime_preemptions_overtime FOREIGN KEY (overtime_plan_id) REFERENCES production_plans (id),
-    CONSTRAINT fk_overtime_preemptions_future FOREIGN KEY (future_plan_id) REFERENCES production_plans (id),
+    CONSTRAINT fk_overtime_preemptions_overtime FOREIGN KEY (overtime_task_item_id)
+        REFERENCES overtime_task_items (id),
+    CONSTRAINT fk_overtime_preemptions_future FOREIGN KEY (future_task_item_id)
+        REFERENCES production_task_items (id),
     CONSTRAINT fk_overtime_preemptions_order FOREIGN KEY (order_id) REFERENCES orders (id),
     CONSTRAINT fk_overtime_preemptions_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
     CONSTRAINT ck_overtime_preemptions_quantity CHECK (preempted_quantity > 0),
     CONSTRAINT ck_overtime_preemptions_status CHECK (status IN ('ACTIVE', 'RELEASED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- 工作台提醒：只辅助工作台，不是数量事实来源（数量以计划/核验/来源/预占为准，提醒可重建）
+-- 工作台提醒：只辅助工作台，不是数量事实来源（数量以任务明细/核验/来源/预占为准，提醒可重建）
 CREATE TABLE production_reminders (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     -- INCOMPLETE / OVERTIME_PENDING_VERIFY / PLAN_ADJUSTMENT
@@ -1179,14 +1305,14 @@ CREATE TABLE production_reminders (
     order_id BIGINT UNSIGNED NOT NULL,
     order_item_id BIGINT UNSIGNED NOT NULL,
     node VARCHAR(32) NOT NULL,
-    plan_id BIGINT UNSIGNED NULL,
+    task_item_id BIGINT UNSIGNED NULL,
     verification_id BIGINT UNSIGNED NULL,
     preemption_id BIGINT UNSIGNED NULL,
-    -- 计划待调整时指向受影响的未来计划
-    future_plan_id BIGINT UNSIGNED NULL,
+    -- 计划待调整时指向受影响的未来 NORMAL 任务明细
+    future_task_item_id BIGINT UNSIGNED NULL,
     quantity INT UNSIGNED NOT NULL,
     status VARCHAR(16) NOT NULL DEFAULT 'OPEN',
-    -- RESCHEDULED / PARTIAL / DEFERRED / ADJUSTED / NO_ADJUSTMENT
+    -- RESCHEDULED / PARTIAL / DEFERRED / ADJUSTED / NO_ADJUSTMENT / SUPERSEDED
     handling_type VARCHAR(16) NULL,
     handled_quantity INT UNSIGNED NULL,
     reason VARCHAR(500) NULL,
@@ -1201,15 +1327,17 @@ CREATE TABLE production_reminders (
     PRIMARY KEY (id),
     KEY idx_production_reminders_type_status (reminder_type, status),
     KEY idx_production_reminders_item (order_item_id, node),
-    KEY idx_production_reminders_plan (plan_id),
-    KEY idx_production_reminders_future_plan (future_plan_id, status),
+    KEY idx_production_reminders_task_item (task_item_id),
+    KEY idx_production_reminders_future_task_item (future_task_item_id, status),
     KEY idx_production_reminders_request_id (request_id),
     CONSTRAINT fk_production_reminders_order FOREIGN KEY (order_id) REFERENCES orders (id),
     CONSTRAINT fk_production_reminders_item FOREIGN KEY (order_item_id) REFERENCES order_items (id),
-    CONSTRAINT fk_production_reminders_plan FOREIGN KEY (plan_id) REFERENCES production_plans (id),
-    CONSTRAINT fk_production_reminders_verification FOREIGN KEY (verification_id) REFERENCES production_verifications (id),
+    CONSTRAINT fk_production_reminders_task_item FOREIGN KEY (task_item_id) REFERENCES production_task_items (id),
+    CONSTRAINT fk_production_reminders_verification FOREIGN KEY (verification_id)
+        REFERENCES production_verifications (id),
     CONSTRAINT fk_production_reminders_preemption FOREIGN KEY (preemption_id) REFERENCES overtime_preemptions (id),
-    CONSTRAINT fk_production_reminders_future_plan FOREIGN KEY (future_plan_id) REFERENCES production_plans (id),
+    CONSTRAINT fk_production_reminders_future_task_item FOREIGN KEY (future_task_item_id)
+        REFERENCES production_task_items (id),
     CONSTRAINT ck_production_reminders_status CHECK (status IN ('OPEN', 'HANDLED')),
     CONSTRAINT ck_production_reminders_type CHECK (reminder_type IN ('INCOMPLETE', 'OVERTIME_PENDING_VERIFY',
         'PLAN_ADJUSTMENT'))

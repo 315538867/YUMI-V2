@@ -102,11 +102,6 @@ public class FulfillmentRepository {
         applyPending("rework_pending", orderItemId, quantity, increase, requestId);
     }
 
-    /** 增减「重做待安排」投影（阶段五来源创建/安排/取消）。 */
-    public void applyRemakePending(long orderItemId, int quantity, boolean increase, String requestId) {
-        applyPending("remake_pending", orderItemId, quantity, increase, requestId);
-    }
-
     private void applyPending(String column, long orderItemId, int quantity, boolean increase, String requestId) {
         var sign = increase ? "+" : "-";
         jdbcTemplate.update("UPDATE order_item_fulfillment_balances SET " + column + " = " + column + " "
@@ -115,14 +110,14 @@ public class FulfillmentRepository {
     }
 
     /**
-     * 该订单明细在指定履约事实之后是否存在下游消费事实（生产核验、返工、重做、成品余量、发货）。
+     * 该订单明细在指定履约事实之后是否存在下游消费事实（生产核验、返工、成品余量、发货）。
      * 领用取消与流水冲销据此判断“是否已被后续事实消费”。
      */
     public boolean hasDownstreamConsumption(long orderItemId, long afterEntryId) {
         var count = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM fulfillment_entries
                 WHERE order_item_id = ? AND id > ?
-                  AND entry_type IN ('PRODUCTION_QUALIFIED', 'REWORK_IN', 'REMAKE_IN',
+                  AND entry_type IN ('PRODUCTION_QUALIFIED', 'REWORK_IN',
                                      'FINISHED_SURPLUS', 'SHIPMENT_CONSUME')
                 """, Integer.class, orderItemId, afterEntryId);
         return count != null && count > 0;
@@ -165,7 +160,7 @@ public class FulfillmentRepository {
     /** 明细数量投影（阶段三只有需求列有值，其余列由阶段四–六写入）。 */
     public record BalanceRow(long orderItemId, int requiredQuantity, int makingInflow, int packingInflow,
                              int seamInflow, int makingPlanned, int packingPlanned, int seamPlanned,
-                             int verifiedProcessed, int reworkPending, int remakePending,
+                             int verifiedProcessed, int reworkPending,
                              int shippableQuantity, int shippedQuantity, int finishedSurplusQuantity) {
     }
 
@@ -173,13 +168,13 @@ public class FulfillmentRepository {
         return jdbcTemplate.query("""
                 SELECT order_item_id, required_quantity, making_inflow, packing_inflow, seam_inflow,
                        making_planned, packing_planned, seam_planned, verified_processed, rework_pending,
-                       remake_pending, shippable_quantity, shipped_quantity, finished_surplus_quantity
+                       shippable_quantity, shipped_quantity, finished_surplus_quantity
                 FROM order_item_fulfillment_balances WHERE order_id = ?
                 """, (rs, rowNum) -> new BalanceRow(rs.getLong("order_item_id"),
                 rs.getInt("required_quantity"), rs.getInt("making_inflow"), rs.getInt("packing_inflow"),
                 rs.getInt("seam_inflow"), rs.getInt("making_planned"), rs.getInt("packing_planned"),
                 rs.getInt("seam_planned"), rs.getInt("verified_processed"), rs.getInt("rework_pending"),
-                rs.getInt("remake_pending"), rs.getInt("shippable_quantity"), rs.getInt("shipped_quantity"),
+                rs.getInt("shippable_quantity"), rs.getInt("shipped_quantity"),
                 rs.getInt("finished_surplus_quantity")), orderId);
     }
 

@@ -25,7 +25,8 @@ public class ProductRepository {
             packaging_tier_id, packaging_tier_name, packaging_std_minutes, packaging_commission,
             packaging_labor_fee, seam_type_id, seam_type_name, seam_std_minutes, seam_unit_cost, seam_fee,
             box_labor_fee, transport_packing_fee, daily_sundries_fee, rent_utilities_fee,
-            mold_amort_fee, material_cost, labor_cost, other_cost, total_cost, reference_price, version
+            mold_amort_fee, material_cost, labor_cost, other_cost, total_cost, reference_price,
+            mold_quantity, daily_batch_limit, version
             """;
 
     private static final RowMapper<ProductRow> MAPPER = ProductRepository::map;
@@ -66,8 +67,9 @@ public class ProductRepository {
                     packaging_labor_fee, seam_type_id, seam_type_name, seam_std_minutes, seam_unit_cost, seam_fee,
                     box_labor_fee, transport_packing_fee, daily_sundries_fee, rent_utilities_fee,
                     mold_amort_fee, material_cost, labor_cost, other_cost, total_cost, reference_price,
+                    mold_quantity, daily_batch_limit,
                     version, created_at, updated_at, request_id, idempotency_key
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                           0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?, ?)
                 """,
                 row.productNo(), row.name(), row.note(), row.status(), row.imageFileId(),
@@ -82,6 +84,7 @@ public class ProductRepository {
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
+                row.moldQuantity(), row.dailyBatchLimit(),
                 requestId, idempotencyKey);
         var id = jdbcTemplate.queryForObject(
                 "SELECT id FROM products WHERE product_no = ?", Long.class, row.productNo());
@@ -103,6 +106,7 @@ public class ProductRepository {
                     box_labor_fee = ?, transport_packing_fee = ?, daily_sundries_fee = ?,
                     rent_utilities_fee = ?, mold_amort_fee = ?,
                     material_cost = ?, labor_cost = ?, other_cost = ?, total_cost = ?, reference_price = ?,
+                    mold_quantity = ?, daily_batch_limit = ?,
                     version = version + 1, updated_at = UTC_TIMESTAMP(6), request_id = ?
                 WHERE id = ? AND version = ?
                 """,
@@ -117,6 +121,7 @@ public class ProductRepository {
                 row.boxLaborFee(), row.transportPackingFee(), row.dailySundriesFee(),
                 row.rentUtilitiesFee(), row.moldAmortFee(),
                 row.materialCost(), row.laborCost(), row.otherCost(), row.totalCost(), row.referencePrice(),
+                row.moldQuantity(), row.dailyBatchLimit(),
                 requestId, row.id(), row.version());
         if (updated == 0) {
             throw new ApiException(ErrorCode.CONFLICT_VERSION);
@@ -172,6 +177,8 @@ public class ProductRepository {
                 rs.getBigDecimal("other_cost"),
                 rs.getBigDecimal("total_cost"),
                 rs.getBigDecimal("reference_price"),
+                rs.getInt("mold_quantity"),
+                rs.getInt("daily_batch_limit"),
                 rs.getLong("version"));
     }
     /** INT UNSIGNED 列经 MySQL 驱动 getObject 返回 Long，需按 Number 归一（可空）。 */

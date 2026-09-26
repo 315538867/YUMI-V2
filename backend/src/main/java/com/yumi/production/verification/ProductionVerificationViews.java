@@ -2,31 +2,31 @@ package com.yumi.production.verification;
 
 import java.util.List;
 
-/** 生产核验读模型（阶段五）：核验事实 + 本次分流结果，便于页面与测试逐项核对。 */
+/** 批量核验响应：逐明细结果 + 合格流向 + 未完成提醒，任务头状态重新派生。 */
 public final class ProductionVerificationViews {
 
     private ProductionVerificationViews() {
     }
 
-    /** 合格数量的分流去向：制作→捏毛装袋、捏毛装袋→缝边剪袋/可发货、缝边剪袋→可发货。 */
     public record FlowView(String node, int quantity) {
     }
 
-    public record VerificationView(
-            long id,
-            long planId,
-            String planNo,
-            long orderItemId,
-            String node,
-            int planQuantity,
+    public record ItemResultView(
+            long taskItemId,
+            int plannedQuantity,
             int completedQuantity,
             int qualifiedQuantity,
             int reworkQuantity,
             int scrapQuantity,
             int incompleteQuantity,
-            String verifyNote,
-            String verifiedBy,
             List<FlowView> flows,
             Long incompleteReminderId) {
+    }
+
+    public record VerificationView(
+            long taskId,
+            String taskNo,
+            String derivedStatus,
+            List<ItemResultView> items) {
     }
 }

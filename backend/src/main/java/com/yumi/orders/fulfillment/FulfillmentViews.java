@@ -31,7 +31,6 @@ public final class FulfillmentViews {
             int seamPlanned,
             int verifiedProcessed,
             int reworkPending,
-            int remakePending,
             int shippable,
             int shipped,
             int finishedSurplus,

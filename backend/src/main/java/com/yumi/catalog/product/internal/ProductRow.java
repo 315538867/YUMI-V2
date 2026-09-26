@@ -48,5 +48,7 @@ public record ProductRow(
         BigDecimal otherCost,
         BigDecimal totalCost,
         BigDecimal referencePrice,
+        int moldQuantity,
+        int dailyBatchLimit,
         long version) {
 }

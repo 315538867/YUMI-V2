@@ -11,9 +11,7 @@ public enum ErrorCode {
 
     VALIDATION_INVALID(HttpStatus.BAD_REQUEST, "请求参数校验失败"),
     QUANTITY_INVALID(HttpStatus.BAD_REQUEST, "数量不合法"),
-    REWORK_TARGET_INVALID(HttpStatus.BAD_REQUEST, "返工目标工序不合法"),
     VERIFICATION_EQUATION_INVALID(HttpStatus.BAD_REQUEST, "核验数量等式不成立"),
-    REMAKE_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "从制作开始重做必须填写原因"),
     OVERTIME_DATE_INVALID(HttpStatus.BAD_REQUEST, "超额任务只能在执行当天创建"),
     REPORT_TYPE_INVALID(HttpStatus.BAD_REQUEST, "不支持的报表类型"),
 
@@ -46,6 +44,8 @@ public enum ErrorCode {
 
     SOURCE_ALREADY_CONSUMED(HttpStatus.CONFLICT, "来源已被消费"),
     SOURCE_INSUFFICIENT(HttpStatus.CONFLICT, "来源余额不足"),
+    SOURCE_INVALID(HttpStatus.CONFLICT, "来源不合法"),
+    CAPACITY_EXCEEDED(HttpStatus.CONFLICT, "超过产品当日最大产能"),
 
     STOCK_NEGATIVE(HttpStatus.CONFLICT, "库存数量不得为负"),
     STOCK_INSUFFICIENT(HttpStatus.CONFLICT, "库存不足"),
