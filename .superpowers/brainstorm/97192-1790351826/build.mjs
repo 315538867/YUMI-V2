@@ -1,0 +1,2 @@
+import { build } from '/Volumes/code/YUMIV2/frontend/node_modules/rolldown/dist/index.mjs';
+await build({input:'/Volumes/code/YUMIV2/.superpowers/brainstorm/97192-1790351826/demo.jsx',platform:'browser',resolve:{alias:{'react/jsx-runtime':'/Volumes/code/YUMIV2/frontend/node_modules/react/jsx-runtime.js'}},transform:{define:{'process.env.NODE_ENV':'"production"'}},onwarn(warning){if(warning.code!=='MODULE_LEVEL_DIRECTIVE')console.warn(warning.message)},output:{file:'/Volumes/code/YUMIV2/.superpowers/brainstorm/97192-1790351826/content/demo.js',format:'iife',minify:true}});
