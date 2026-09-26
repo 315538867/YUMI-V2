@@ -724,165 +724,211 @@
 
 本阶段以 `specs/production-management/spec.md` 为唯一行为契约。所有任务均为未实施任务；不得以旧阶段五条目的实现记录、测试数量、人工验收或文档证据替代本阶段的新实现与新验收。生产任务采用“一个任务头 + 多条任务明细”，明线计划与暗线事实分离；所有数量、状态、产能和工时由服务端事务内重算。
 
-- [ ] 5.1 产品字段与三道工序产能
-  - 依赖：阶段二商品/静态数据能力；阶段三订单确认快照；本任务为后续标准分钟、产能和工时的基础。
-  - Requirement/Scenario：`production-management` Requirement「产品必须提供三道工序产能和标准分钟」；Scenario「多产品产能可加总」与「缝边产能只按冻结缝边数量」。
-  - 文件/API/表：修改生产读取产品与订单快照的模块；必要时新增产品三道工序标准分钟字段及 DTO；同步产品读模型、订单确认快照读模型和生产明细视图；API 至少覆盖商品详情、订单确认快照、生产任务明细返回的 `makingStdMinutes`/`packingStdMinutes`/`seamStdMinutes`；表涉及 `products`、订单明细快照和生产任务明细。
-  - 事务/锁/幂等：商品字段写入沿用商品版本乐观锁和写命令 `Idempotency-Key`；订单确认在既有确认事务内冻结标准分钟；生产读取不写事实，不加业务锁。
-  - 关键断言：三道工序标准分钟均为正整数；订单确认后快照值不随产品修改回溯；缝边标准分钟只对应冻结缝边数量；任务明细逐条返回产品快照和标准分钟，多个订单/产品可共存。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认产品字段、产能单位和三道工序显示方式。
+- [ ] 5.1 冻结产品产能、三道工序标准分钟和订单生产快照
+  - 依赖：阶段二商品/静态数据/全局设置；阶段三订单确认快照。先完成本项，再实现 5.2–5.5。
+  - 修改文件：`backend/src/main/resources/db/migration/V1__yumi_v2_schema.sql`；`backend/src/main/java/com/yumi/catalog/product/Product.java`、`ProductRepository.java`、`ProductService.java`、`ProductViews.java`；`backend/src/main/java/com/yumi/orders/order/OrderService.java`、`OrderRepository.java`、`OrderConfirmationSnapshot.java`；新增 `backend/src/main/java/com/yumi/production/ProductionSnapshotReader.java`。
+  - 迁移和字段：在 `products` 固定 `mold_quantity INT UNSIGNED NOT NULL`、`daily_batch_limit INT UNSIGNED NOT NULL`，增加非正值 CHECK；不落库 `daily_max_capacity`，服务端固定使用 `mold_quantity * daily_batch_limit`。订单确认快照固定保存产品名称、星级标准分钟、包装档位标准分钟、缝边种类标准分钟、制品有效工时率、工作日小时数、模具数量和每日批次数。
+  - 实现顺序：①先写 `ProductMigrationTest` 的字段、类型、非空和 CHECK 断言；②完成商品创建/编辑的正整数校验；③在订单确认事务中从确认时配置写入生产参数快照；④新增只读 `ProductionSnapshotReader`，生产域只能从订单快照读取历史参数；⑤禁止生产服务直接读取当前商品/静态数据作为既有订单任务参数。
+  - API：商品详情返回 `moldQuantity`、`dailyBatchLimit`、`dailyMaxCapacity`；订单详情和确认快照返回三道工序标准分钟及能力快照；生产任务明细后续必须返回对应快照字段。
+  - 事务/锁/幂等：商品保存沿用商品版本乐观锁和统一 `Idempotency-Key`；订单确认继续由 `OrderService.confirm` 一个事务完成快照写入；快照读取只读，不加写锁。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductCapacityTest.java`：`rejectsNonPositiveCapacityInputs`、`derivesDailyMaxCapacity`；`backend/src/test/java/com/yumi/OrderProductionSnapshotTest.java`：`confirmationFreezesProductionParameters`、`productionReadsOrderSnapshotAfterProductChange`。
+  - 完成条件：迁移断言通过；商品修改后已确认订单快照不变；同一订单明细的生产读取结果不随当前商品和静态数据变化；`dailyMaxCapacity` 只由两个产品字段派生；`mvnw -Dtest=ProductCapacityTest,OrderProductionSnapshotTest test` 退出码为 0。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认商品详情中的产能字段和生产快照展示，不因机器测试勾选本项。
 
-- [ ] 5.2 任务头/明细模型迁移并删除 REMAKE
-  - 依赖：5.1；阶段三订单明细和阶段四库存/履约来源；必须先确定新模型再实现任何生产命令。
-  - Requirement/Scenario：`production-management` Requirement「生产任务必须是多订单多产品的任务头加明细」和「任务类型只能是 NORMAL 或 REWORK」；Scenario「创建多订单多产品任务」「REMAKE 被拒绝」。
-  - 文件/API/表：新增或重构生产任务头、任务明细、来源关联和状态视图；迁移 `production_plans` 及相关外键/索引，使任务头承载日期、员工、类型、备注，明细承载订单明细、产品快照、工序、数量和来源；删除 `REMAKE` 枚举、字段、端点、表映射和前端分支；统一 `GET/POST /api/production-tasks`、明细查询和任务详情 API。
-  - 事务/锁/幂等：任务头+全部明细由一个创建事务写入；按任务头、订单明细、来源稳定顺序校验唯一性；写命令强制 `Idempotency-Key`，同键重放不得重复建头或明细。
-  - 关键断言：一个任务可含多个订单、多个产品和多条明细；同订单明细/同工序/同来源重复明细返回 `CONFLICT_DUPLICATE`；`REMAKE` 请求返回 `VALIDATION_INVALID` 或 `NOT_FOUND`；失败批量创建不留任务头、明细、占用或事实；数据库和 API 均不存在 `REMAKE` 业务对象。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认任务头与明细层级、类型文案和无 REMAKE 入口。
+- [ ] 5.2 建立生产任务头/明细模型并删除可执行 REMAKE 契约
+  - 依赖：5.1；阶段三订单明细；阶段四履约来源只读接口。未完成本项不得实现生产写命令。
+  - 修改文件：`backend/src/main/resources/db/migration/V1__yumi_v2_schema.sql`；新增 `backend/src/main/java/com/yumi/production/ProductionTask.java`、`ProductionTaskItem.java`、`ProductionTaskType.java`、`ProductionTaskItemStatus.java`、`ProductionTaskRepository.java`、`ProductionTaskItemRepository.java`；新增 `ProductionTaskController.java`、`ProductionTaskService.java`、`ProductionTaskViews.java`。
+  - 数据库固定表：`production_tasks` 保存 `id`、`task_no`、`task_date`、`employee_id`、`employee_name_snapshot`、`work_type_id`、`work_type_name_snapshot`、`task_type`、`note`、版本和审计字段；不得保存 `quantity`、`completed_quantity` 或履约汇总。`production_task_items` 保存 `task_id`、`order_id`、`order_item_id`、`product_id`、产品/订单快照、`node`、`planned_quantity`、`source_type`、`source_id`、标准分钟、估算分钟、能力/时间快照、状态、取消字段、版本和审计字段。
+  - 约束：`task_type` 只允许 `NORMAL`、`REWORK`；`planned_quantity > 0`；同一任务内同一订单明细、工序和来源不得重复；任务明细创建后不得直接修改订单、产品、工序、来源和计划数量，变更只能走取消后重新创建。
+  - 删除范围：删除生产域枚举、DTO、校验分支、数据库 CHECK、前端选项、测试数据和路由中可执行的 `REMAKE`；不得仅删除文案而保留可提交值。历史说明或拒绝测试可保留该字符串，但不能形成业务对象。
+  - API：固定 `GET /api/production-tasks`、`POST /api/production-tasks`、`GET /api/production-tasks/{id}`；列表支持 `taskDate`、`employeeId`、`workTypeId`、`taskType`、`status`、`orderId`、`productId` 筛选。
+  - 事务/锁/幂等：创建头和全部明细由 `ProductionTaskService.create` 一个事务完成；锁定对象按 `employee_id`、`order_item_id`、`source_id` 升序；写入前后统一检查 `Idempotency-Key`，失败不得保存成功幂等记录。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionTaskMigrationTest.java`：`createsTaskHeaderAndItemTables`、`rejectsInvalidTaskType`、`rejectsDuplicateTaskItem`；`ProductionTaskContractTest.java`：`acceptsMultipleOrdersAndProducts`、`rejectsRemakePayload`、`doesNotPersistPartialTaskOnItemFailure`；用 `Grep` 检查可执行生产代码中的 REMAKE 引用仅出现在拒绝测试/历史说明。
+  - 完成条件：空库基线迁移通过；一个任务头可保存多个订单、多个产品和多条明细；任务头无数量汇总列；REMAKE 请求无法进入服务层成功分支；上述测试退出码为 0。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认任务头/明细层级和无 REMAKE 入口。
 
-- [ ] 5.3 标准分钟与工时计算
-  - 依赖：5.1 的产品标准分钟；5.2 的任务明细与类型；全局工作日小时、时薪和工时口径由阶段二设置能力提供。
-  - Requirement/Scenario：`production-management` Requirement「产品必须提供三道工序产能和标准分钟」以及「NORMAL、REWORK」；Scenario「多产品产能可加总」「返工不消耗余额」。
-  - 文件/API/表：在 calculation/production 或生产域建立唯一标准分钟、正常标准工时和返工工时计算入口；生产任务详情、核验结果和工作台 API 返回 `normalMinutes`、`normalHours`、`reworkMinutes`、`reworkHours`；不新增可编辑工时事实表，使用任务明细快照和核验事实派生。
-  - 事务/锁/幂等：纯计算入口无事务和锁；任务创建/核验在所属写事务内调用；写命令使用统一幂等过滤器。
-  - 关键断言：`NORMAL` 正常分钟=数量×工序标准分钟；`REWORK` 正常分钟和正常工时均为 0；返工内部工时与正常工时分栏展示且不进入正常产能；金额/分钟/小时不使用客户端浮点结果；同一输入在任务、核验和追溯页面逐项一致。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认正常工时与返工工时的展示标签和单位。
+- [ ] 5.3 集中实现标准分钟、正常工时和返工工时计算
+  - 依赖：5.1 快照字段；5.2 明细模型；阶段二全局 `workday_hours`、`making_effective_hour_rate`。
+  - 新增文件：`backend/src/main/java/com/yumi/calculation/production/ProductionTimeCalculation.java`、`ProductionTimeCalculator.java`、`ProductionTimeResult.java`、`ProductionWorkType.java`；修改 `ProductionTaskService.java`、`ProductionVerificationService.java`、`ProductionTaskViews.java`。
+  - 固定入口：`ProductionTimeResult calculateNormal(int plannedQuantity, int standardMinutes, ProductionWorkType workType, BigDecimal makingEffectiveRate, BigDecimal workdayHours)`；`ProductionTimeResult calculateRework(int plannedQuantity, int standardMinutes)`。返回 `standardMinutes`、`normalMinutes`、`normalHours`、`capacityMinutes`、`capacityNotice`；所有金额/分钟/小时使用 `BigDecimal` 或整数分钟，不使用浮点。
+  - 公式：制作正常容量=`workday_hours × 60 × making_effective_hour_rate`；包装和缝边剪袋正常容量=`workday_hours × 60`；正常工时=`planned_quantity × standard_minutes`；REWORK 的 `normalMinutes`、`normalHours` 和正常产能占用均为 0，返工工时单独返回并不得进入正常容量。
+  - 接线要求：任务创建、任务详情、批量核验响应和工作台均调用此入口；禁止在 Controller、Repository、SQL 和前端 `production.ts` 复制公式；前端只显示服务端返回值。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionTimeCalculatorTest.java`：`calculatesMakingCapacityWithEffectiveRate`、`calculatesPackingAndSeamWithFullWorkdayMinutes`、`returnsZeroNormalCapacityForRework`、`rejectsNonPositiveQuantity`；`ProductionTimeCalculationContractTest.java`：`taskVerificationAndWorkbenchUseSameResult`。
+  - 完成条件：固定算例的中间值、最终值和舍入规则一致；任务、核验、追溯返回相同数值；REWORK 不出现在正常工时和正常产能汇总；`mvnw -Dtest=ProductionTimeCalculatorTest,ProductionTimeCalculationContractTest test` 退出码为 0。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认正常工时、返工工时和容量提示的显示名称。
 
-- [ ] 5.4 正常产能约束
-  - 依赖：5.2 任务头/明细；5.3 标准分钟与工时；阶段二员工在职/工种资格和全局工作日口径。
-  - Requirement/Scenario：`production-management` Requirement「正常任务必须遵守日期、员工和产能约束」；Scenario「正常产能不足」「返工不消耗余额」。
-  - 文件/API/表：实现正常产能计算、查询和校验服务；`POST/PATCH /api/production-tasks` 和明细追加/调整命令返回 `capacityMinutes`、`usedNormalMinutes`、`remainingNormalMinutes`；使用生产任务明细、取消事实、计划调整事实，不把返工计入统计。
-  - 事务/锁/幂等：创建/调整/取消正常任务事务内按员工+日期锁定产能来源和有效 `NORMAL` 明细，使用锁定读重算；锁定顺序固定为员工日期容量→任务头→明细；写命令必须带 `Idempotency-Key`。
-  - 关键断言：在职且具备工序资格才可创建；正常分钟超过余额返回 `CAPACITY_INSUFFICIENT` 且整批回滚；并发创建不会超额；返工创建不改变正常已用/剩余分钟；取消正常任务释放占用但保留历史。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认按员工/日期展示的产能余额。
+- [ ] 5.4 实现员工资格和 NORMAL 产能锁定校验
+  - 依赖：5.2 任务模型；5.3 计算入口；阶段二员工在职和工种资格服务。
+  - 修改文件：`backend/src/main/java/com/yumi/catalog/employee/EmployeeEligibilityService.java`；新增 `backend/src/main/java/com/yumi/production/ProductionCapacityService.java`、`ProductionCapacityRepository.java`、`ProductionCapacityView.java`；修改 `ProductionTaskService.java`、`ProductionTaskRepository.java`。
+  - 规则：员工必须在职并具备当前 `work_type_id`；NORMAL 有效计划按 `product_id + task_date + node` 汇总所有未取消明细，不能超过 `mold_quantity * daily_batch_limit`；已核验明细仍占历史日期计划；取消明细不再占用；REWORK 不参与产品日产能和正常工时。
+  - 锁定顺序：①锁员工资格行；②按 `product_id`、`task_date`、`node` 升序锁涉及产品能力和有效 NORMAL 计划来源；③按 `order_item_id` 升序锁订单履约余额；④按 `source_id` 升序锁返工/回转来源；⑤重算余额后才写任务。所有竞争性汇总必须使用 `FOR UPDATE` 或等价锁定读。
+  - API 返回：任务创建和任务详情返回 `dailyMaxCapacity`、`usedNormalQuantity`、`remainingNormalQuantity`、`capacityNotice`；容量不足固定返回 `CAPACITY_EXCEEDED`，员工不合格固定返回 `EMPLOYEE_NOT_ELIGIBLE`。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionCapacityTest.java`：`rejectsNormalPlanBeyondDailyMaxCapacity`、`keepsVerifiedHistoricalPlanInUsage`、`excludesCancelledAndReworkFromUsage`；`ProductionCapacityConcurrencyTest.java`：`twoConcurrentNormalCreatesCannotExceedCapacity`；`EmployeeEligibilityProductionTest.java`：`rejectsResignedEmployee`、`rejectsEmployeeWithoutWorkType`。
+  - 完成条件：并发创建总量不超过日产能；REWORK 创建前后 NORMAL 余额完全相同；容量超工作日分钟只产生提示而不拒绝；所有资格失败返回统一错误信封和字段定位。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认按日期/产品/工序显示的容量余额。
 
-- [ ] 5.5 多订单多产品任务创建
-  - 依赖：5.2 数据模型、5.3 计算、5.4 正常产能；阶段三确认订单和阶段四库存/履约查询。
-  - Requirement/Scenario：`production-management` Requirement「生产任务必须是多订单多产品的任务头加明细」与「创建、调整和取消必须在来源余额与事务边界内原子执行」；Scenario「创建多订单多产品任务」「多明细创建整批回滚」。
-  - 文件/API/表：实现 `POST /api/production-tasks`、`GET /api/production-tasks/{id}`、`GET /api/production-tasks`；请求包含任务头和 `items[]`，每条含 `orderItemId/productId/node/quantity/planType/source`；写入任务头、明细、产品/订单快照和计划占用表。
-  - 事务/锁/幂等：一个事务完成头、明细、正常占用和审计；按订单明细 id、来源 id、员工日期稳定排序锁定；幂等键按写命令回放首次结果，失败不落幂等成功事实。
-  - 关键断言：一次请求创建一个头和至少两订单/两产品明细；服务端拒绝草稿/取消订单、数量非正、工序不匹配、员工资格不足和来源不足；任一明细失败所有头/明细/占用回滚；创建不写合格、库存、履约或订单需求事实；返回员工姓名快照但员工仅为任务属性。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认多订单多产品创建表单和明细汇总。
+- [ ] 5.5 实现多订单多产品任务创建 API
+  - 依赖：5.2 数据模型；5.3 计算；5.4 资格和产能；阶段三确认订单、阶段四库存/履约只读接口。
+  - 修改文件：`backend/src/main/java/com/yumi/production/ProductionTaskController.java`、`ProductionTaskService.java`、`ProductionTaskViews.java`、`ProductionTaskRepository.java`、`ProductionTaskItemRepository.java`；新增 `ProductionTaskCreateRequest.java`、`ProductionTaskItemRequest.java`、`ProductionTaskView.java`。
+  - API 固定为 `POST /api/production-tasks`、`GET /api/production-tasks`、`GET /api/production-tasks/{id}`。请求固定包含：`taskDate`、`employeeId`、`workTypeId`、`taskType`、`note`、`items[]`；每条明细包含 `orderItemId`、`plannedQuantity`、`sourceType`、`sourceId`，产品、订单、工序从订单确认快照和来源边界服务端解析，不接受客户端派生数量/工时/产能。
+  - 创建顺序：①解析并校验请求；②锁员工资格；③按 `orderItemId` 升序锁订单明细履约余额；④按 `sourceId` 升序锁来源余额；⑤锁产品日期正常计划；⑥读取订单快照；⑦调用 5.3 计算入口；⑧生成任务编号；⑨写任务头；⑩按请求顺序写任务明细；⑪写审计和幂等结果。
+  - 创建不得写入：`production_verifications`、`fulfillment_entries`、`inventory_movements`、`scrap_records`、`production_quantity_returns`、`rework_sources`。等待上游只保存计划和快照，不伪造流入。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionTaskApiTest.java`：`createsOneHeaderWithMultipleOrdersAndProducts`、`returnsSnapshotsAndCapacityNotice`、`rejectsDraftOrder`、`rejectsInvalidOrderItem`、`rejectsNonPositiveQuantity`；`ProductionTaskCreationRollbackTest.java`：`rollsBackHeaderAndEarlierItemsWhenLaterItemFails`、`doesNotWriteProductionFactsOnCreate`。
+  - 完成条件：一次请求可创建一个头和至少两条不同订单/产品明细；任一明细失败时所有头、明细、计划占用和幂等成功记录均不存在；响应字段与数据库快照一致；重复同键返回首次响应且不新增任务。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认多明细创建表单和明细汇总。
 
-- [ ] 5.6 上游暗线可执行计算
-  - 依赖：5.5 正常任务创建；阶段三共同数量；阶段四库存接入事实；5.3 标准分钟口径。
-  - Requirement/Scenario：`production-management` Requirement「下游只能使用上游实际合格、库存或回转流入」；Scenario「下游计划可等待上游但不能核验」「上游实际合格后下游可执行」。
-  - 文件/API/表：实现暗线流入汇总和按计划日期/明细顺序分配的只读服务；生产任务查询、核验页和订单履约查询返回 `actualInflow`、`verifiedProcessed`、`executableQuantity`、`waitingUpstream`；读取 `production_verifications`、库存/履约接入事实、报废回转事实和订单共同数量。
-  - 事务/锁/幂等：只读查询不要求幂等；核验前在同一事务内锁定相关暗线事实投影/来源并重算，禁止使用普通快照读绕过并发变化。
-  - 关键断言：下游计划可在零流入时创建但只能显示等待上游；计划数量不等于可执行量；制作正常入口按订单实际缺口，后两道工序只按实际上游合格/库存/回转流入；迟到流入只能增加可执行量，不改历史计划。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认“等待上游/当前可执行/实际流入”的区分。
+- [ ] 5.6 实现暗线实际流入、等待上游和当前可执行量
+  - 依赖：5.5 任务创建；阶段三共同数量；阶段四库存履约接入；5.3 时间快照。
+  - 新增/修改文件：`backend/src/main/java/com/yumi/production/ProductionFlowService.java`、`ProductionFlowRepository.java`、`ProductionFlowView.java`；新增 `InventoryProductionReadPort.java`、`OrderFulfillmentReadPort.java`；修改 `ProductionTaskService.java`、`ProductionVerificationService.java`。
+  - 固定公式：`actualInflow = productionQualifiedInflow + compatibleInventoryInflow + quantityReturnBalance`；`executableQuantity = actualInflow - verifiedProcessedQuantity - otherPendingNormalAllocation`。普通计划数量不得作为实际流入；返工来源余额独立计算，不并入 NORMAL 流入。
+  - 读取范围：制作读取订单实际缺口、库存跳过制作部分和回转；捏毛装袋读取制作合格和兼容库存接入；缝边剪袋读取按订单冻结缝边数量分配后的实际流入；所有读取按事实时间、事实 id 稳定排序。
+  - API：任务列表/详情和核验读取返回 `plannedQuantity`、`actualInflow`、`verifiedProcessedQuantity`、`executableQuantity`、`waitingUpstream`；零实际流入可以创建计划，但 `waitingUpstream=true` 且可执行量为 0。
+  - 锁定要求：查询只读；核验前必须在写事务中按任务头、明细、订单履约余额、库存接入来源、数量回转来源的固定顺序锁定并重算，禁止使用普通快照读作为最终校验。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionActualInflowTest.java`：`doesNotTreatUpstreamPlanAsInflow`、`addsOnlyQualifiedAndInventoryInflow`、`separatesReworkFromNormalInflow`；`ProductionWaitingUpstreamTest.java`：`allowsPlanButRejectsVerificationWhileWaiting`；`ProductionExecutableQuantityConcurrencyTest.java`：`concurrentVerificationsCannotConsumeSameInflow`。
+  - 完成条件：上游未核验时下游可创建但不能完成核验；上游实际合格后下游可执行量按实际增加；计划值、实际流入和可执行量在接口和页面分栏显示；不存在用上游计划数放行下游核验的代码路径。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认“等待上游/实际流入/当前可执行”三种状态的视觉区分。
 
-- [ ] 5.7 逐明细批量核验
-  - 依赖：5.6 可执行计算；5.2 任务明细；阶段三履约投影；5.9/5.12 来源事实接口预留。
-  - Requirement/Scenario：`production-management` Requirement「每条明细只能核验一次，批量核验必须原子提交」；Scenario「多明细批量核验成功」「批量核验一条失败即全回滚」「重复核验被拒绝」。
-  - 文件/API/表：实现 `POST /api/production-tasks/{taskId}/verify`，请求为 `items[]`，逐条提交 `completedQuantity/qualifiedQuantity/reworkQuantity/scrapQuantity/note`；写 `production_verifications`、合格流转、返工/报废待安排额度和提醒/回转事实。
-  - 事务/锁/幂等：单一核验事务先按明细 id 升序锁定任务明细、来源/履约余额和计划行，再逐条重算；全部通过才写入；必须 `Idempotency-Key`，同一批量请求重放无重复事实。
-  - 关键断言：每条满足 `completed=qualified+rework+scrap`；未完成由服务端计算；当前可执行不足返回 `QUANTITY_NOT_EXECUTABLE`；任一明细失败全批回滚；同一明细第二次返回 `STATE_ALREADY_VERIFIED`；客户端伪造未完成/可执行字段被忽略。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认逐明细输入、批量提交和失败回显。
+- [ ] 5.7 实现逐明细一次核验和批量原子提交
+  - 依赖：5.6 可执行量；5.2 明细状态；5.9/5.12 事实表定义。
+  - 修改文件：`backend/src/main/java/com/yumi/production/ProductionTaskController.java`、`ProductionVerificationService.java`、`ProductionVerificationRepository.java`、`ProductionTaskRepository.java`、`ProductionTaskItemRepository.java`；新增 `ProductionVerifyRequest.java`、`ProductionVerifyItemRequest.java`、`ProductionVerificationView.java`。
+  - API 固定为 `POST /api/production-tasks/{taskId}/verify`。请求只能提交 `items[]`，每条为 `taskItemId`、`qualifiedQuantity`、`reworkQuantity`、`scrapQuantity`、`note`；服务端计算 `completedQuantity` 和 `incompleteQuantity`，忽略客户端提交的派生值。
+  - 固定事务顺序：①锁任务头；②按 `taskItemId` 升序锁全部明细；③按 `order_item_id` 升序锁订单履约投影；④按来源 id 升序锁返工来源/回转来源/库存接入来源；⑤逐条重算当前可执行量；⑥逐条验证状态、数量和等式；⑦全部通过后写核验及派生事实；⑧写幂等成功结果。
+  - 等式和状态：`completed = qualified + rework + scrap`；`incomplete = planned - completed`；每条明细只能从 `PENDING` 到 `VERIFIED` 一次；空数组、重复明细 id、负数、超过计划或超过可执行量分别返回字段错误。
+  - 回滚范围：`production_verifications`、正常流转履约事实、返工事实、报废事实、数量回转、提醒、来源消费、任务明细状态、投影更新和幂等成功记录全部同事务回滚。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionVerificationApiTest.java`：`verifiesMultipleItemsInOneRequest`、`rejectsSecondVerification`、`rejectsInvalidEquation`、`rejectsBeyondExecutableQuantity`；`ProductionVerificationAtomicityTest.java`：`rollsBackAllItemsAndDerivedFactsWhenOneItemFails`；`ProductionVerificationIdempotencyTest.java`：`replaysFirstResponseWithoutDuplicateFacts`、`rejectsSameKeyWithDifferentFingerprint`。
+  - 完成条件：成功批量核验恰好每条一份事实；任一明细失败时所有明细仍为 `PENDING` 且所有事实表行数不变；统一信封返回 `fieldErrors` 定位到 `items[i]`；重复幂等请求返回相同 `requestId`/业务结果而不重复写入。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认逐明细输入、一次提交和整批失败回显。
 
-- [ ] 5.8 正常合格流转
-  - 依赖：5.7 批量核验；订单确认冻结流程；阶段四库存接入；5.6 暗线流入。
-  - Requirement/Scenario：`production-management` Requirement「正常合格必须按冻结流程流转且不得相加」；Scenario「捏毛装袋合格分流」「制作合格不直接可发货」。
-  - 文件/API/表：实现唯一合格分流器和履约账本接口；核验响应和追溯 API 返回 `flows[]`；写 `production_qualified`/流转事实、订单履约余额和可发货投影；不得写库存流水，除非另有显式库存入库命令。
-  - 事务/锁/幂等：与5.7同一事务；按订单明细投影行升序锁定；合格流转写入受同一 `Idempotency-Key` 保护。
-  - 关键断言：制作合格只进入捏毛装袋；捏毛装袋按冻结缝边数量拆为缝边剪袋和不缝边可发货；缝边剪袋合格进入可发货；三道工序数量不得相加；重复核验不重复流转；发货前库存与履约来源可追溯。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认分流结果和“不按工序相加”提示。
+- [ ] 5.8 实现正常合格分流和履约账本接入
+  - 依赖：5.7 批量核验；订单确认缝边快照；阶段四库存履约台账。
+  - 修改文件：`backend/src/main/java/com/yumi/production/ProductionFlowService.java`、`ProductionFlowRepository.java`、`ProductionVerificationService.java`；订单侧 `backend/src/main/java/com/yumi/orders/ledger/FulfillmentLedger.java`、`FulfillmentRepository.java`；新增 `ProductionFlowView.java`。
+  - 固定流向：`MAKING` 合格写入 `PACKING_BAG` 实际流入；`PACKING_BAG` 合格按订单确认快照中的缝边数量拆分为 `SEAM_CUTTING` 和 `SHIPPABLE`；`SEAM_CUTTING` 合格写入 `SHIPPABLE`。缝边数量不能从当前商品读取，也不能把三道工序数量相加。
+  - 事实字段：每条流转事实保存来源核验 id、来源任务明细 id、订单明细 id、来源节点、目标节点、数量、事实时间和操作人；履约来源唯一键防止同一核验重复流转；发货前不写 `inventory_movements`。
+  - 事务/锁：与 5.7 使用同一核验事务；先锁订单明细履约投影，再写来源履约事实和投影；锁定顺序按 `order_item_id` 升序；不得在流转服务外再开新事务。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionFlowTest.java`：`makingQualifiedFlowsOnlyToPacking`、`packingSplitsByFrozenSeamQuantity`、`seamQualifiedFlowsToShippable`；`ProductionFulfillmentLedgerTest.java`：`storesTraceableSourceFacts`、`doesNotWriteInventoryMovement`、`doesNotSumThreeNodesAsOrderQuantity`。
+  - 完成条件：三道工序端到端数量和缝边分流一致；`inventory_movements` 数量在生产核验前后不变；履约事实可以按核验/任务明细/订单明细反向追溯；重复核验不会增加第二份流转。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认分流结果、来源标签和不相加提示。
 
-- [ ] 5.9 返工来源
-  - 依赖：5.7 的返工数量事实；5.2 任务/来源模型；5.6 暗线事实；阶段三订单明细快照。
-  - Requirement/Scenario：`production-management` Requirement「返工必须有显式来源和可追溯多轮链路」；Scenario「未显式创建来源不能安排返工」「合法多轮返工」的第一轮来源部分。
-  - 文件/API/表：实现 `GET/POST /api/rework-sources`；来源字段包括原核验 id、发生问题工序、总量、已安排量、余额、轮次、原因和上一来源 id；表为 `rework_sources` 及来源链索引；核验只记录返工事实，来源必须由管理员显式创建，来源创建不自动创建任务。
-  - 事务/锁/幂等：创建来源锁定原核验和返工事实额度；同一核验/轮次只允许一个来源；按来源 id 锁定并校验未建来源额度；写命令强制幂等。
-  - 关键断言：返工事实只形成可创建来源额度；来源总量不得超过未建来源额度；来源发生工序与后续 `REWORK` 任务工序一致；来源创建不改变订单需求和正常产能；原核验关联与轮次链路可追溯；重复创建返回 `CONFLICT_DUPLICATE`。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认来源列表、发生工序和余额文案。
+- [ ] 5.9 实现返工事实与显式返工来源
+  - 依赖：5.7 的 `rework_quantity` 核验事实；5.2 来源模型。
+  - 修改文件：`backend/src/main/resources/db/migration/V1__yumi_v2_schema.sql`；新增 `ReworkSource.java`、`ReworkSourceRepository.java`、`ReworkSourceService.java`、`ReworkSourceController.java`、`ReworkSourceViews.java`；修改 `ProductionVerificationService.java`。
+  - 表固定为 `rework_sources`，字段为 `id`、`source_no`、`origin_verification_id`、`origin_task_item_id`、`order_id`、`order_item_id`、`product_id`、`node`、`total_quantity`、`arranged_quantity`、`round_no`、`previous_source_id`、`reason`、审计字段和版本；唯一约束为来源编号，父来源和原核验外键必须存在。
+  - API 固定为 `GET /api/rework-sources`、`GET /api/rework-sources/{id}`、`POST /api/rework-sources`。请求为 `originVerificationId`、`quantity`、`reason`、可选 `previousSourceId`；核验接口不得隐式调用来源创建。
+  - 规则：来源总量不得超过原核验返工事实中尚未建来源的数量；`availableQuantity = totalQuantity - arrangedQuantity`；来源发生工序来自原核验，不接受客户端改写；来源创建不创建任务、不改变订单需求、不改变正常产能。
+  - 事务/锁：`ReworkSourceService.create` 锁原核验、原任务明细和已有同源来源，按来源 id 升序重算未建来源额度；一个事务写来源和审计；必须 `Idempotency-Key`。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ReworkSourceApiTest.java`：`createsExplicitSourceFromReworkFact`、`rejectsQuantityBeyondUnallocatedFact`、`rejectsCrossNodeSource`、`doesNotCreateTaskAutomatically`；`ReworkSourceCreationRollbackTest.java`：`rollsBackSourceAndAuditOnFailure`。
+  - 完成条件：返工事实和返工来源分离；同一事实剩余量被并发创建时不超额；来源余额能由事实重建；来源列表返回发生工序、轮次、父来源和余额。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认来源列表、发生工序、已安排和剩余文案。
 
-- [ ] 5.10 REWORK 任务
-  - 依赖：5.9 返工来源；5.3 工时；5.4 正常产能隔离；5.5 多明细任务创建。
-  - Requirement/Scenario：`production-management` Requirement「任务类型只能是 NORMAL 或 REWORK，返工不得占用正常产能」；Scenario「返工不占正常产能」「未显式创建来源不能安排返工」。
-  - 文件/API/表：实现 `POST /api/rework-sources/{sourceId}/tasks` 或等价统一任务创建入口的 REWORK 分支；写任务头/明细，`taskType=REWORK`，关联显式来源、发生工序、原核验和轮次；生产任务查询返回返工专属字段。
-  - 事务/锁/幂等：来源行→任务头→任务明细按稳定顺序锁定；校验来源余额后原子增加 `arrangedQuantity`；必须 `Idempotency-Key`，重复请求不重复安排。
-  - 关键断言：任务只能来自有效返工来源且工序必须与来源发生工序一致；数量超过余额返回 `SOURCE_INSUFFICIENT`；REWORK 正常产能分钟、正常工时、正常待安排占用均为 0；任务核验可在发生工序内部执行；取消可恢复来源余额；不增加订单共同需求。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认 REWORK 标签、来源关联和“非正常产能”说明。
+- [ ] 5.10 实现 REWORK 任务创建和来源余额消费
+  - 依赖：5.9；5.3 返工工时；5.4 正常产能隔离。
+  - 修改文件：`ProductionTaskController.java`、`ProductionTaskService.java`、`ReworkSourceService.java`；新增 `ReworkTaskCreateRequest.java`。
+  - API 固定为 `POST /api/rework-sources/{sourceId}/tasks`；请求为 `taskDate`、`employeeId`、`note`、`items[]`，每条只提交 `plannedQuantity`。服务端从来源解析订单、产品、工序、轮次和快照，强制生成 `taskType=REWORK`。
+  - 事务顺序：①锁员工资格；②锁返工来源；③锁来源已有安排明细；④重算 `availableQuantity`；⑤调用 5.3 返工计算；⑥写任务头和明细；⑦增加来源 `arranged_quantity`；⑧写审计和幂等记录。任一步失败全部回滚。
+  - 规则：REWORK 工序必须等于来源发生工序；来源余额不足返回 `SOURCE_INSUFFICIENT`；不得指向普通订单需求来源；不得进入产品正常产能、正常待安排、正常工时或订单共同需求。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ReworkTaskApiTest.java`：`createsReworkTaskFromExplicitSource`、`rejectsQuantityBeyondSourceBalance`、`rejectsWrongWorkType`、`replaysIdempotentArrangement`；`ReworkTaskCapacityIsolationTest.java`：`doesNotChangeNormalCapacityOrOrderDemand`、`cancelReturnsSourceBalance`。
+  - 完成条件：只能从显式返工来源创建；来源安排余额精确增加；REWORK 任务查询显示来源和轮次；正常产能和正常工时投影不变；重复请求不重复建任务或扣余额。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认 REWORK 标签、来源关联和非正常产能说明。
 
-- [ ] 5.11 多轮返工
-  - 依赖：5.10 REWORK 任务；5.7 批量核验；5.9 返工来源链路。
-  - Requirement/Scenario：`production-management` Requirement「返工必须有显式来源和可追溯多轮链路」；Scenario「合法多轮返工」。
-  - 文件/API/表：扩展返工核验与来源 API，使 REWORK 核验先记录新的返工事实，再由管理员显式创建下一轮来源和任务；表保留 `parentReworkSourceId`、`originVerificationId`、`roundNo`、发生工序和原因；追溯 API 返回完整父子链。
-  - 事务/锁/幂等：多轮创建锁定当前来源、当前任务明细和原始核验；按来源链唯一顺序写入新的返工事实与显式来源；核验和来源创建各自强制幂等，批量失败全回滚。
-  - 关键断言：第一轮和第二轮事实各自不可变；第二轮只能消费上一轮来源余额；轮次连续且父子关系明确；任何一轮均不占正常产能/工时、不增加订单需求；重复消费或跨工序安排被拒绝。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认多轮父子链、轮次和回溯入口。
+- [ ] 5.11 实现多轮返工父子来源链
+  - 依赖：5.10；5.7 批量核验；5.9 来源表。
+  - 修改文件：`ProductionVerificationService.java`、`ReworkSourceService.java`、`ReworkSourceRepository.java`、`ReworkSourceViews.java`；扩展 `rework_sources` 的 `round_no`、`previous_source_id`、`origin_verification_id` 索引。
+  - 流程固定为：第一轮 NORMAL 核验产生返工事实→管理员创建第一轮来源→创建 REWORK 任务→REWORK 核验产生新的返工事实→管理员基于该新事实创建第二轮来源→创建第二轮 REWORK 任务。不得直接从原订单需求创建第二轮来源。
+  - 规则：子来源 `round_no = parent.round_no + 1`；`previous_source_id` 必须指向上一轮来源；父来源、子来源、核验和任务明细均不可覆盖；每轮发生工序必须保持一致；返工合格沿原工序正常流向，但不回写普通计划完成量。
+  - 锁/幂等：创建下一轮来源时锁当前 REWORK 核验、当前任务明细、上一轮来源和同源已有来源；按 `source_id` 升序；核验和来源创建使用各自幂等键，不在一个请求中隐式创建下一轮来源。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/MultiRoundReworkTest.java`：`createsTwoExplicitReworkRounds`、`linksParentAndChildSources`、`rejectsSecondRoundFromOrderDemand`、`rejectsCrossNodeRound`、`keepsNormalCapacityAndDemandUnchanged`。
+  - 完成条件：至少两轮链路完整落库；第二轮只能消费上一轮来源余额；父子来源和轮次连续；任一轮事实不可变；追溯读取可按父子链返回完整时间线。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认多轮父子链和回溯入口。
 
-- [ ] 5.12 报废事实与数量回转
-  - 依赖：5.7 核验；5.8 正常流转；5.6 暗线流入；5.13 未完成/取消口径。
-  - Requirement/Scenario：`production-management` Requirement「报废必须是不可变事实并支持数量回转，不存在 REMAKE」；Scenario「工序内报废数量回转」「报废不覆盖历史」。
-  - 文件/API/表：实现报废事实写入和回转服务；可使用 `production_scrap_facts`、`production_quantity_reversals` 或等价不可变事实表，记录工序、核验、数量、原因、操作人和时间；提供生产事实/订单履约追溯 API；不得创建 `remake_sources` 或 `REMAKE` 任务对象。
-  - 事务/锁/幂等：核验事务锁定任务明细、目标履约投影和回转来源，先写报废事实再写数量回转；稳定顺序锁定；写命令强制幂等。
-  - 关键断言：报废数量不覆盖核验原值、不删除合格事实、不减少客户共同需求；回转只恢复对应工序的正常可安排/流入额度；后续只能创建 NORMAL 任务；库存只有显式库存命令才变化；任何 REMAKE 字段/端点/表均不可用。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认报废原因、数量回转和历史不可变展示。
+- [ ] 5.12 实现报废事实、唯一数量回转和回转再排产
+  - 依赖：5.7；5.8；5.6；5.13。
+  - 修改文件：`backend/src/main/resources/db/migration/V1__yumi_v2_schema.sql`；新增 `ScrapRecord.java`、`ScrapRecordRepository.java`、`ProductionQuantityReturn.java`、`ProductionQuantityReturnRepository.java`、`ProductionQuantityReturnService.java`；修改 `ProductionVerificationService.java`、`ProductionFlowService.java`。
+  - 表名固定使用 `scrap_records` 和 `production_quantity_returns`，不得使用 `production_scrap_facts`、`production_quantity_reversals` 等第二套命名。`scrap_records` 保存 `verification_id`、`task_item_id`、订单/产品、发生工序、数量、原因、操作人、时间和幂等键；`production_quantity_returns` 保存 `scrap_record_id`、发生工序、回转总量、已分配量、余额、审计字段。`scrap_record_id` 在回转表唯一。
+  - 核验事务顺序：锁任务明细→锁订单履约投影→锁同工序回转余额→校验报废数量→写 `scrap_records`→写一条对应 `production_quantity_returns`→更新回转投影。每条报废必须恰好一条回转，不能重复创建。
+  - 规则：报废不修改原核验、不删除合格事实、不增加订单需求、不产生上游合格、不产生库存合格、不生成返工来源；后续消费回转余额只能创建新的 `NORMAL` 明细，并按新任务日期参与产能校验；报废发生日期的历史计划资源不释放。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionScrapReturnTest.java`：`writesScrapAndOneReturnAtomically`、`reusesReturnOnlyThroughNormalTask`、`doesNotCreateRemakeSource`、`keepsOriginalVerification`；`ProductionScrapReturnConcurrencyTest.java`：`concurrentReturnAllocationCannotOversell`、`rollsBackScrapAndReturnTogether`。
+  - 完成条件：报废和回转同事务成功/失败；并发分配余额不超卖；新的 NORMAL 明细能追溯回转来源；全仓库可执行业务代码不存在 `REMAKE` 表、枚举、端点或来源类型；测试退出码为 0。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认报废原因、数量回转和历史不可变展示。
 
-- [ ] 5.13 未完成与明细取消
-  - 依赖：5.7 一次核验；5.8 流转；5.9/5.10 来源；5.12 报废回转；阶段三发货事实。
-  - Requirement/Scenario：`production-management` Requirement「未完成数量和明细取消必须保留历史并正确派生」；Scenario「部分完成后部分重新安排」「已发货明细取消被拒绝」。
-  - 文件/API/表：实现 `GET /api/production-reminders/incomplete`、重新安排、部分安排、暂不安排和明细取消命令；新增/使用 `production_reminders`、任务取消/明细取消事实和计划调整历史；返回原任务、订单明细、工序、未完成、已安排和剩余数量。
-  - 事务/锁/幂等：处理提醒锁定提醒行、来源/订单明细和新任务写入；取消明细锁定订单明细履约投影和未核验计划；所有写命令强制幂等，部分失败回滚。
-  - 关键断言：未完成=计划−本次完成；部分安排后余量继续提醒；暂不安排必须有原因且不删除需求；已发货下限阻止明细取消并返回 `QUANTITY_BELOW_SHIPPED`/`STATE_NOT_CANCELABLE`；原任务、核验、流转、报废和审计历史保留；取消明细不再产生新的正常排产。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认未完成区域、部分安排和明细取消入口。
+- [ ] 5.13 实现未完成事实、提醒处理和明细取消
+  - 依赖：5.7；5.8；5.9/5.10；5.12；阶段六发货投影字段定义。
+  - 修改文件：`ProductionTaskService.java`、`ProductionVerificationService.java`；新增 `ProductionReminderService.java`、`ProductionReminderRepository.java`、`ProductionReminderController.java`、`ProductionTaskItemCancelRequest.java`；使用 `production_reminders` 和明细取消字段，不新增覆盖历史核验的编辑接口。
+  - API 固定为：`GET /api/production-reminders/incomplete`；`POST /api/production-tasks/{taskId}/items/{itemId}/cancel`；`POST /api/production-reminders/{id}/defer`；重新安排仍使用 `POST /api/production-tasks` 创建新 NORMAL 明细，不修改原任务明细。
+  - 规则：`incomplete = planned - completed`；NORMAL 未完成回到普通待安排并生成提醒；REWORK 未完成回到原来源 `arranged_quantity`；“暂不安排”只追加提醒处理事实和原因，不改变数量；取消只允许 `PENDING` 明细，必须原因，已核验明细不得取消。
+  - 取消锁定：先锁订单明细履约余额并读取 `shipped_quantity`，再锁任务头和明细，最后锁正常/返工/回转来源；取消后释放未消费安排，不删除原任务、核验、流转、报废、回转和审计事实。若取消会使有效安排低于已发货数量，返回 `QUANTITY_BELOW_SHIPPED`。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/ProductionIncompleteAndCancelTest.java`：`derivesIncompleteFromVerification`、`returnsNormalIncompleteToPending`、`returnsReworkIncompleteToSource`、`deferRequiresReason`、`cancelKeepsHistoricalFacts`、`rejectsVerifiedItemCancel`、`rejectsCancelBelowShippedQuantity`；`ProductionTaskItemCancelConcurrencyTest.java`：`concurrentCancelAndVerifyAllowsOneStateTransition`。
+  - 完成条件：提醒数量可由事实重建；重新安排产生新明细而不覆盖原明细；取消只影响 PENDING 明细和未消费余额；已发货下限守卫生效；任务头状态由剩余明细派生。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认未完成区域、部分安排、暂不安排和取消入口。
 
-- [ ] 5.14 超额兼容
-  - 依赖：5.2 任务模型；5.4 正常产能；5.5 多明细创建；5.7 核验；5.13 未完成提醒。
-  - Requirement/Scenario：`production-management` Requirement「超额预占只能形成预占和人工调整提醒」；Scenario「超额预占余额不足」「超额合格产生调整提醒」。
-  - 文件/API/表：实现独立超额预占 API（不得把 `OVERTIME` 加入生产任务类型）；使用 `overtime_preemptions`、生产提醒和计划调整历史；支持跨订单/产品明细逐条指向未来 `NORMAL` 任务明细；未来计划原数量只读。
-  - 事务/锁/幂等：按未来任务明细 id 升序锁定并锁定读有效预占；创建、核验、释放预占和生成调整提醒分事务边界明确；所有写命令带幂等键。
-  - 关键断言：只能当天创建，来源只能是未来待执行 NORMAL 明细；有效预占不超过未来原计划未预占余额；预占不改未来数量、不写生产/库存/订单履约事实；零合格自动释放并结束提醒；只有合格生成 `PLAN_ADJUSTMENT`，返工/报废不作为计划减少依据。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认超额来源、预占余额、未来计划原值和提醒附着位置。
+- [ ] 5.14 实现独立超额预占和未来调整提醒
+  - 依赖：5.2 任务明细；5.4 产能；5.5 创建；5.7 核验；5.13 提醒。
+  - 修改文件：`backend/src/main/resources/db/migration/V1__yumi_v2_schema.sql`；新增 `OvertimeTask.java`、`OvertimeTaskItem.java`、`OvertimePreemption.java`、`OvertimeTaskController.java`、`OvertimeTaskService.java`、`OvertimePreemptionRepository.java`；修改 `ProductionReminderService.java`。
+  - 表固定为 `overtime_tasks`、`overtime_task_items`、`overtime_preemptions`。预占记录保存超额明细、未来 `production_task_item_id`、数量、状态、释放数量、处理信息和审计；有效预占唯一键为超额明细与未来明细组合。不得向 `ProductionTaskType` 增加 `OVERTIME`。
+  - API 固定为 `POST /api/overtime-tasks`、`GET /api/overtime-tasks/{id}`、`POST /api/overtime-tasks/{id}/verify`；创建请求必须包含执行日期、明细和未来 NORMAL 任务明细引用；执行日期由服务端业务时钟读取，不能信任客户端“今天”。
+  - 创建锁定顺序：锁超额任务头→按未来任务明细 id 升序锁未来 NORMAL 明细→锁有效预占→重算未预占余额→写预占事实。来源未来日期必须大于服务器业务日期、状态为 PENDING、类型为 NORMAL。
+  - 规则：预占不修改未来计划数量、不产生普通生产流入、不写库存和订单履约事实；未完成或取消释放对应预占；只有超额合格按预占顺序生成 `PLAN_ADJUSTMENT` 提醒；返工、报废和未完成不自动减少未来计划。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/OvertimePreemptionApiTest.java`：`acceptsOnlyFutureNormalItems`、`rejectsTodayOrPastSource`、`doesNotChangeFuturePlanQuantity`、`qualifiedQuantityCreatesPlanAdjustmentReminder`、`reworkAndScrapDoNotCreateAdjustment`；`OvertimePreemptionConcurrencyTest.java`：`concurrentReservationsCannotExceedFutureBalance`、`duplicateReservationIsRejected`。
+  - 完成条件：未来任务原计划值不变；并发预占总量不超过可预占余额；超额不是生产任务类型；零合格释放预占；只有合格产生提醒；重复同键不重复预占。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认超额来源、预占余额、未来原计划和提醒附着位置。
 
-- [ ] 5.15 其他排班
-  - 依赖：5.2 任务头可扩展属性；阶段二员工在职校验；5.3 工时口径；与商品产能隔离。
-  - Requirement/Scenario：`production-management` Requirement「其他排班只记录工时，不产生商品数量」；Scenario「合法其他排班」「工时更正」。
-  - 文件/API/表：实现统一“新建排班”入口的 OTHER 分支，以及 `GET/POST /api/other-schedules`、核验、取消、更正 API；使用 `other_schedules`、`other_schedule_verifications`、`other_schedule_time_corrections`，不得写生产任务明细、库存或履约表。
-  - 事务/锁/幂等：创建/核验/取消/更正锁定排班头并按一次核验唯一键校验；更正追加事实；写命令使用 `Idempotency-Key`。
-  - 关键断言：分钟 0–59、总分钟>0；只允许一次工时核验；未核验不显示有效工时；更正保留原核验并派生最新有效工时；离职员工返回 `EMPLOYEE_NOT_ELIGIBLE`；商品、库存、订单履约数量和正常产能均不变。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认 OTHER 表单、工时核验和更正历史。
+- [ ] 5.15 实现 OTHER 其他排班、一次核验和工时更正
+  - 依赖：5.2 任务头属性；阶段二员工资格；5.3 工时口径；必须与产品产能和履约模块隔离。
+  - 修改文件：`backend/src/main/resources/db/migration/V1__yumi_v2_schema.sql`；新增 `OtherSchedule.java`、`OtherScheduleVerification.java`、`OtherScheduleTimeCorrection.java`、`OtherScheduleController.java`、`OtherScheduleService.java`、`OtherScheduleRepository.java`、`OtherScheduleViews.java`。
+  - 表固定为 `other_schedules`、`other_schedule_verifications`、`other_schedule_time_corrections`。排班头保存员工、日期、事项、小时、分钟、总分钟、备注、状态和审计；核验表对 `schedule_id` 建唯一键；更正表保存原有效分钟、新分钟、原因、操作人和时间。
+  - API 固定为：`GET /api/other-schedules`、`POST /api/other-schedules`、`POST /api/other-schedules/{id}/verify`、`POST /api/other-schedules/{id}/cancel`、`POST /api/other-schedules/{id}/corrections`。创建字段为 `employeeId`、`scheduleDate`、`subject`、`hours`、`minutes`、`note`；核验只接收备注；更正接收 `hours`、`minutes`、`reason`。
+  - 规则：`minutes` 必须 0–59，总分钟必须大于 0；员工必须在职；未核验不计有效工时；每个排班只允许一次核验；更正追加事实，不覆盖原核验；最新有效分钟由原核验和更正事实派生；OTHER 不写生产任务明细、订单、商品、库存、履约、正常产能和生产数量。
+  - 锁/幂等：创建锁员工资格；核验、取消、更正锁排班头并按 `schedule_id` 唯一核验键校验；所有写命令使用 `Idempotency-Key`；更正失败不得留下部分事实。
+  - 测试文件和方法：`backend/src/test/java/com/yumi/OtherScheduleApiTest.java`：`createsValidOtherSchedule`、`rejectsInvalidMinuteRange`、`rejectsZeroTotalMinutes`、`allowsOnlyOneVerification`、`cancellationRequiresPendingState`、`correctionAppendsNewFact`、`rejectsResignedEmployee`；`OtherScheduleIsolationTest.java`：`doesNotWriteProductInventoryOrderOrFulfillmentFacts`。
+  - 完成条件：合法排班、核验、取消和更正闭环完成；更正历史可追溯；未核验不进入有效工时；隔离测试中相关商品、库存、订单履约、正常产能和生产数量行数不变。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认 OTHER 表单、工时核验和更正历史。
 
-- [ ] 5.16 后端并发与幂等门禁
-  - 依赖：5.4 产能锁；5.6 暗线流入锁定读；5.7 批量核验；5.9/5.10 来源余额；5.14 预占；5.15 其他排班。
-  - Requirement/Scenario：`production-management` Requirement「写命令必须具备统一错误、幂等和并发门禁」；Scenario「同一批量核验重复提交」「并发来源安排」。
-  - 文件/API/表：新增生产域 HTTP、MySQL 和并发测试；覆盖任务创建、正常产能、下游可执行、批量核验、返工来源、REWORK、报废回转、未完成、超额预占和其他排班；检查 `idempotency_records`、审计、任务/事实/来源/提醒表。
-  - 事务/锁/幂等：明确每个命令的事务拥有者和稳定锁顺序；所有竞争校验必须锁定读；重复同键重放首次结果，同键异指纹返回 `CONFLICT_IDEMPOTENCY`；失败事务不得留下部分事实。
-  - 关键断言：来源余额、正常产能、可执行量、唯一核验、同一明细重复和超额预占在并发下均不超卖；批量核验恰好全成或全回滚；重复写请求业务事实一份、审计按既定策略可追溯；错误码和统一信封完整。
-  - 人工证据：不适用；若需查看并发结果页面，`humanVisualConclusion.status: pending-user-signoff`。
+- [ ] 5.16 建立生产域并发、幂等和整批回滚门禁
+  - 依赖：5.4、5.6、5.7、5.9、5.10、5.12、5.14、5.15 全部完成。
+  - 新增测试文件：`backend/src/test/java/com/yumi/ProductionConcurrencyTest.java`、`ProductionIdempotencyTest.java`、`ProductionRollbackTest.java`；必要的 MySQL 并发测试使用真实 Testcontainers MySQL，不用内存数据库替代锁验证。
+  - 固定测试场景：①两个线程创建同一产品/日期 NORMAL 计划；②两个线程消费同一返工来源；③两个线程分配同一回转余额；④两个线程核验竞争同一实际流入；⑤两个线程预占同一未来明细；⑥两个线程核验同一任务明细；⑦同一请求重复提交；⑧同键不同请求指纹；⑨批量核验第二条失败；⑩OTHER 核验与更正并发。
+  - 每个测试必须记录线程数、请求数、成功/失败 HTTP 状态、错误码、`requestId`、幂等记录数、审计记录数、任务/明细/核验/来源/回转/提醒行数和最终投影余额。
+  - 固定锁顺序检查：创建为员工资格→订单明细/履约余额→来源/回转→产品日期计划；批量核验为任务头→明细 id→订单投影→库存/来源；预占为超额头→未来明细→预占；OTHER 为员工→排班头。测试不得通过调整隔离级别或重试循环掩盖锁顺序错误。
+  - 完成条件：所有余额不超卖；同一明细最多一条核验；同一来源安排总量不超过余额；同一幂等键重放首次结果；同键异指纹返回 `CONFLICT_IDEMPOTENCY`；失败事务不留下任何部分事实；`./mvnw test` 全量退出码为 0。
+  - 人工证据：不适用；并发为机器证据。
 
-- [ ] 5.17 工作台/全页统一新建
-  - 依赖：5.2 任务模型；5.4 产能；5.9/5.10 来源；5.14 超额；5.15 其他排班；阶段一共享前端路由和 API 客户端。
-  - Requirement/Scenario：`production-management` Requirement「工作台必须以日期横向周历展示统一新建排班入口」；Scenario「统一新建排班入口」「日期横向周历与员工属性」。
-  - 文件/API/表：重做正式 `/production` 工作台和全页创建/编辑/核验入口；前端 `production.ts` API 类型覆盖任务头、明细、来源、提醒、其他排班和核验；后端沿用 5.5/5.7/5.9/5.14/5.15 API；不新增来源/额度主导航。
-  - 事务/锁/幂等：前端不计算权威数量；所有提交调用后端写事务并携带幂等键；页面取消、返回和刷新不产生写入。
-  - 关键断言：工作台日期横向展示周历；员工只作为任务属性和筛选；只有一个“新建排班”入口，类型在表单内选择；来源/额度为明细或追溯信息；查看与编辑/核验分离；无预置表单和伪造数量。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认日期横向周历、员工属性、统一入口和主导航结构。
+- [ ] 5.17 实现正式 `/production` 工作台和全页统一新建
+  - 依赖：5.2、5.4、5.5、5.9、5.10、5.14、5.15；阶段一共享路由和 API 客户端。
+  - 修改文件：`frontend/src/api/production.ts`；`frontend/src/pages/production/ProductionWorkbenchPage.tsx`、`ProductionTaskCreatePage.tsx`、`ProductionTaskCard.tsx`、`ProductionFilters.tsx`、`ProductionWeekCalendar.tsx`；`frontend/src/routes/index.tsx` 或当前正式路由文件；删除正式生产页中的占位组件和静态假数据。
+  - 正式路由固定为 `/production` 和 `/production/tasks/new`；不得新增 `/production-sources`、`/rework-sources`、`/overtime`、`/other-schedules` 等顶级生产入口。来源、额度、超额和 OTHER 都从统一新建入口或任务上下文进入。
+  - 工作台结构：日期横向周历；员工同行显示固定色 Badge，状态放员工信息第二行；筛选支持员工、工序、类型、状态和订单/产品；任务卡显示任务编号、订单、产品、工序、计划数量、实际流入、可执行量、员工、类型和提醒；今日产品行不重复显示员工色点。
+  - 统一新建：一个“新建排班”按钮，进入全页表单，表单内选择 `NORMAL`、`REWORK`、超额预占或 `OTHER`；NORMAL/REWORK 使用多明细编辑，来源和余额在明细上下文显示；OTHER 使用分钟字段；超额只能选择未来 NORMAL 明细；前端不计算权威数量。
+  - API 要求：`production.ts` 定义任务头、明细、来源、流入、提醒、OTHER、超额和核验类型；所有 POST/PATCH 请求由 API 客户端自动携带 `Idempotency-Key`；取消、返回、刷新和切换周历不得调用写 API。
+  - 测试文件和方法：`frontend/src/pages/production/ProductionWorkbenchPage.test.tsx`：`rendersHorizontalWeekCalendar`、`filtersEmployeeWithoutMakingEmployeeNavigation`、`showsOnlyOneCreateEntry`；`ProductionTaskCreatePage.test.tsx`：`selectsTypeInsideUnifiedForm`、`doesNotCalculateAuthoritativeQuantity`、`cancelAndRefreshDoNotWrite`；`production-api.test.ts`：`sendsIdempotencyKeyForWrites`。
+  - 完成条件：正式 `/production` 可进入；日期为横向周历；员工只是属性/筛选；页面没有来源/额度顶级导航；统一入口能到达四种类型；`npm run typecheck`、`npm test`、`npm run build` 均退出码 0。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认周历、员工属性、统一入口和主导航结构。
 
-- [ ] 5.18 多明细核验与追溯页
-  - 依赖：5.7 批量核验；5.8 流转；5.9–5.13 来源/报废/未完成；5.17 工作台。
-  - Requirement/Scenario：`production-management` Requirement「每条明细只能核验一次，批量核验必须原子提交」和「明线计划与暗线事实必须分离」；Scenario「多明细批量核验成功」「核验事实不覆盖原计划」。
-  - 文件/API/表：新增或改造正式任务详情/核验全页，不新增与任务头无关的顶级来源页；页面展示任务头、明细列表、计划值、实际流入、可执行、核验输入、合格分流、返工来源、报废事实、数量回转、未完成提醒、取消历史和审计追踪；API 支持批量读取和批量提交。
-  - 事务/锁/幂等：页面提交一次批量命令；后端沿用 5.7 的锁定顺序和幂等；追溯读取只读事务，按事实时间/id稳定排序。
-  - 关键断言：每条明细可独立核验状态；一条失败时页面展示整批失败且库内无部分事实；原计划数量、产品/订单快照和员工属性仍可见；事实时间线能追溯来源、父级核验、流转、报废、回转、取消和更正；三道工序数量不相加。
-  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；清单待用户确认多明细核验、事实时间线和来源追溯可读性。
+- [ ] 5.18 实现任务详情、批量核验页和事实追溯时间线
+  - 依赖：5.7、5.8、5.9–5.13、5.17。
+  - 修改文件：`frontend/src/pages/production/ProductionTaskDetailPage.tsx`、`ProductionTaskVerifyPage.tsx`；新增 `frontend/src/components/production/ProductionFactTimeline.tsx`、`ProductionItemFactTable.tsx`；补充 `frontend/src/api/production.ts` 的详情、批量读取和批量提交类型。
+  - 路由固定为 `/production/tasks/:id` 和 `/production/tasks/:id/verify`。详情页只读展示任务头、员工/工序/类型、明细计划、产品/订单快照、标准分钟、实际流入、可执行量、核验、返工来源、报废、回转、未完成提醒、取消历史和审计；查看页不得预置编辑表单。
+  - 核验页每条明细展示计划数量、实际流入、当前可执行上限，输入合格/返工/报废/备注；前端只展示等式，后端重新计算完成和未完成；一次点击提交整个任务的 `items[]`，不得逐条发送多个写请求；错误按明细和字段定位，整批失败明确显示“未产生任何事实”。
+  - 时间线固定按 `factTime ASC, factId ASC` 排序，事件类型覆盖计划、来源安排、库存接入、合格流转、返工事实、返工来源、报废、数量回转、未完成、取消、超额预占、提醒和工时更正；显示来源 id、父核验、操作人、原因和数量。
+  - 测试文件和方法：`ProductionTaskDetailPage.test.tsx`：`rendersReadOnlySnapshotsAndDerivedQuantities`、`doesNotRenderEditFormOnViewPage`；`ProductionTaskVerifyPage.test.tsx`：`submitsAllItemsOnce`、`rendersFieldErrorsByItem`、`showsAtomicRollbackError`、`blocksQuantityAboveExecutable`；`ProductionFactTimeline.test.tsx`：`sortsFactsByTimeAndId`、`rendersReworkScrapReturnAndCancelLinks`。
+  - 完成条件：查看和操作分离；批量核验只发一个写请求；失败时页面展示整批失败且不显示假成功；原计划和快照仍可见；事实时间线能追溯来源到最终流转；三道工序不相加；前端门禁全部通过。
+  - 人工证据：`humanVisualConclusion.status: pending-user-signoff`；待确认多明细核验、事实时间线和来源追溯可读性。
 
-- [ ] 5.19 浏览器验收
-  - 依赖：5.1–5.18 全部实现并通过自动化门禁；必须使用正式 `/production` 路由和真实后端 API，不使用预览路由或静态数据。
-  - Requirement/Scenario：`production-management` 全部相关 Requirement；重点 Scenario「创建多订单多产品任务」「下游计划可等待上游但不能核验」「多明细批量核验成功」「合法多轮返工」「工序内报废数量回转」「统一新建排班入口」。
-  - 文件/API/表：不新增业务实现文件；验收记录实际正式路由、浏览器网络请求、后端 API、任务/明细/核验/来源/提醒/工时事实表和必要的只读数据库核对。
-  - 事务/锁/幂等：验收必须覆盖重复提交和至少一个并发/幂等路径；记录实际请求携带的 `Idempotency-Key`、响应 requestId、错误码和事务回滚结果。
-  - 关键断言：浏览器完成多订单多产品任务创建；日期横向周历和统一“新建排班”可达；员工仅为任务属性；等待上游不能核验；逐明细一次核验和批量原子回滚可观察；正常流转、REWORK、多轮返工、报废回转、未完成/明细取消、超额提醒、其他排班和追溯页均与服务端事实一致；控制台无新增错误。
-  - 人工证据：必须记录 `humanVisualConclusion`，状态固定为 `pending-user-signoff`，包含正式路由、周历、入口、明细核验、追溯和错误回显清单；用户确认后才可改为 confirmed。
+- [ ] 5.19 使用正式路由完成浏览器端到端验收并留证
+  - 依赖：5.1–5.18 的实现、后端全量测试、前端 typecheck/test/build 全部通过。
+  - 验收入口：只能使用正式 `/production`、`/production/tasks/new`、`/production/tasks/:id`、`/production/tasks/:id/verify`；后端使用真实 Spring Boot API；不得使用预览路由、静态 JSON 或测试专用页面。
+  - 数据准备顺序：①创建两个已确认订单、至少三个订单明细和两个产品；②准备在职且具备工种资格的员工；③通过统一入口创建多订单多产品 NORMAL 任务；④创建下游等待上游任务并确认页面显示零可执行；⑤核验上游并观察下游实际流入增加；⑥批量核验多个明细并验证事实时间线；⑦产生返工事实、显式创建来源、完成两轮 REWORK；⑧产生报废并验证同工序回转；⑨用回转余额创建新的 NORMAL；⑩创建超额预占并核验合格提醒；⑪创建、核验、取消和更正 OTHER；⑫重复提交一个写请求；⑬执行一次并发/幂等路径并检查错误显示。
+  - 每一步记录：正式路由、点击动作、请求方法/路径、请求体摘要、`Idempotency-Key`、响应 `requestId`、HTTP 状态、错误码、数据库事实行数、投影前后值和控制台消息。数据库只读核对任务/明细/核验/来源/报废/回转/提醒/OTHER 表及订单履约、库存流水隔离。
+  - 关键验收：等待上游不能核验；批量一条失败整批回滚；NORMAL/REWORK、报废回转、超额提醒和 OTHER 结果与服务端事实一致；员工不成为主导航；日期横向周历和唯一新建入口可达；控制台无本阶段新增错误。
+  - 人工证据必须原样记录：`humanVisualConclusion.status: pending-user-signoff`，清单包含正式路由、周历、统一入口、明细核验、事实时间线、来源追溯和错误回显；用户未确认前不得改为 `confirmed`，不得勾选本项。
+  - 完成条件：验收报告记录所有请求和库内断言；机器证据和人工证据分开；签字前保持 `[ ]`。
 
-- [ ] 5.20 OpenSpec/文档门禁
-  - 依赖：5.1–5.19；所有代码、迁移、API、测试和页面证据必须已实际完成后执行。
-  - Requirement/Scenario：`production-management` 全部 Requirement/Scenario；`platform-foundation` 统一响应、认证、幂等和审计 Requirement；Scenario「成功与失败响应形状一致」「重复幂等请求不重复写入」。
-  - 文件/API/表：同步生产正式架构/数据库/数量模型/接口契约文档和 OpenSpec 追踪；逐项核对任务头/明细、NORMAL/REWORK、标准分钟/工时、产能、暗线流入、批量核验、流转、返工、报废回转、未完成/取消、超额、其他排班和工作台 API/表/路由。
-  - 事务/锁/幂等：文档必须列出每个写 API 的事务拥有者、锁定对象与顺序、幂等键和失败回滚边界；不得用“已完成”文字代替实际命令、退出码、测试断言或人工签字。
-  - 关键断言：`openspec validate build-yumi-v2-order-fulfillment --strict` 通过；每个 Requirement 至少有 Scenario；tasks 阶段五 5.1–5.20 均为真实未实施 `[ ]` 直到对应实现完成；文档中不存在 REMAKE 业务契约、旧的单任务头/单产品假设、返工占正常产能或下游按计划数量执行的矛盾描述；阶段五外的 tasks 原文未被改动。
-  - 人工证据：所有页面、工作台、全页核验和追溯判断保持 `humanVisualConclusion.status: pending-user-signoff`；未获用户确认不得勾选任何阶段五任务。
+- [ ] 5.20 执行 OpenSpec、文档一致性和阶段五追踪门禁
+  - 依赖：5.1–5.19；只有实现、测试和浏览器证据均真实存在后才能执行。
+  - 检查文件固定为：`openspec/changes/build-yumi-v2-order-fulfillment/tasks.md`、`design.md`、`proposal.md`、`specs/production-management/spec.md`、`specs/master-data-management/spec.md`、`docs/architecture/database-design.md`、`docs/architecture/domain-and-quantity-model.md`、`docs/architecture/production-module-design.md`。
+  - 执行命令固定为：`openspec validate build-yumi-v2-order-fulfillment --strict`、`git diff --check`、`./mvnw test`、`npm run typecheck`、`npm test`、`npm run build`；每条命令记录退出码和实际输出摘要，不得以文字“已完成”替代。
+  - 固定检查项：①5.1–5.19 的文件、类、API、表、测试和证据逐项可定位；②每个写 API 都有事务拥有者、锁定对象、锁定顺序、幂等键和回滚边界；③统一响应信封、错误码和 `fieldErrors` 一致；④任务头不保存数量汇总；⑤只存在 NORMAL/REWORK；⑥REWORK 不占正常产能；⑦下游只按实际流入核验；⑧报废只产生同工序回转；⑨超额不进入生产任务类型；⑩OTHER 不写商品/订单/库存/履约事实；⑪事实时间线和页面路由与实现一致。
+  - REMAKE 检查：使用仓库搜索确认 `REMAKE` 只能出现在拒绝测试、迁移历史或不做项说明；不得出现在可提交枚举、数据库 CHECK、Controller 成功路径、前端选择项、请求 DTO 或正式 API 契约。
+  - 完成条件：OpenSpec 严格校验退出码 0；所有门禁退出码 0；5.1–5.19 在未取得真实证据前保持 `[ ]`；人工页面证据仍为 `pending-user-signoff`；本次修改不得改变阶段五以外 tasks 原文。
+  - 人工证据：不适用机器门禁；页面相关结论继续保持 `humanVisualConclusion.status: pending-user-signoff`。
 
 阶段五执行顺序：5.1 → 5.2 → 5.3 → 5.4 → 5.5 → 5.6 → 5.7 → 5.8 → 5.9 → 5.10 → 5.11 → 5.12 → 5.13 → 5.14 → 5.15 → 5.16 → 5.17 → 5.18 → 5.19 → 5.20。
 ## 6. 阶段六：订单发货、物流与发货更正（依赖阶段四和五）
