@@ -1,46 +1,67 @@
 digraph YumiQuantityFlow {
-  graph [rankdir=TB, fontname="Arial", label="YUMI V2 target quantity flow", labelloc=t];
+  graph [rankdir=TB, fontname="Arial", nodesep=0.35, ranksep=0.6,
+    label="YUMI V2 数量主线（重构目标，未实施）\n依据：domain-and-quantity-model.md §4–12；分层图见 §15\n无开始任务；未核验计划均可取消，已核验不可取消\n取消不删实物；同兼容池真实流入按 taskDate/itemId 分配", labelloc=t];
   node [shape=box, style="rounded,filled", fillcolor="#F7F9FC", fontname="Arial"];
-  edge [fontname="Arial"];
+  edge [fontname="Arial", fontsize=10];
 
-  orderDemand [label="Current order-item demand\n(single shared quantity)"];
-  make [label="制作"];
-  bag [label="捏毛装袋"];
-  edgeWork [label="缝边剪袋"];
-  shippable [label="Order-item shippable quantity"];
-  shipment [label="Confirmed original-order shipment"];
-  customer [label="Original-order delivered quantity"];
+  demand [label="普通订单当前有效需求\n工序数量不相加"];
+  make [label="制作 NORMAL"];
+  bag [label="捏毛装袋 NORMAL"];
+  seam [label="缝边剪袋 NORMAL\n仅适用路线；核验禁止报废"];
+  terminal [label="全部适用工序合格\n或兼容成品库存接入"];
+  purpose [shape=diamond, label="份额所有者与用途"];
+  shippable [label="普通订单可发份额"];
+  shipment [label="管理员确认普通发货\n仅消费可发；不再扣库存"];
+  afterSales [label="对有效原发货受理售后\n部分发货后及关闭后均可\n不回写原单需求/已发/应收"];
+  repair [label="核验分配产生修补来源\n保存发生入口、目标、原路线及用途\n管理员另排目标 REWORK"];
+  onward [label="实际修补合格后的后续 NORMAL\n已处理段增重过额度\n未处理已有等待额度只补流入"];
+  scrap [label="合法加工核验报废：旧实物失效\n不是发生工序的合格流入"];
+  returnScrap [label="退回直接报废：保留分桶事实\n不自动减少补发承诺，不自动补做"];
+  obligation [shape=diamond, label="仍需履约/补发？"];
+  remake [label="新份额从制作 NORMAL 补做\n按量承接旧未处理等待额度\n不增加客户需求或重复覆盖"];
+  retired [label="无补发义务的售后库存用途等\n只留报废并失效未处理来源\n取消/未完成不复活"];
+  inventory [label="真实库存批次\n单一冻结路线/工艺，兼容校验"];
+  allocation [label="显式领用：原库存扣一次\n写领用头行/出库流水/接入份额\n普通跳过工序对应额度终止"];
+  receipt [label="库存用途在终点真实入库\n新批次 + 流水 + 互斥完成证据"];
+  gap [label="独立补发缺口\n逐路线减已发/预留/有效来源覆盖"];
+  reserve [label="售后补发终点预留\n来源覆盖到预留仅迁移一次"];
+  replacement [label="专用确认补发\n只增售后已补发；不再扣库存"];
 
-  inventory [label="Compatible inventory batch"];
-  inventoryAllocation [label="Inventory allocation\n(stock deducted once)"];
-  rework [label="Rework source"];
-  remake [label="Scrap-remake source"];
-
-  surplus [label="Surplus inventory\nremoved from order demand"];
-  afterSales [label="After-sales replacement demand\n(separate ledger)"];
-  replacement [label="Confirmed replacement shipment"];
-
-  orderDemand -> make [label="production gap"];
-  make -> bag [label="qualified"];
-  bag -> shippable [label="qualified, no edge service"];
-  bag -> edgeWork [label="qualified, edge-service portion"];
-  edgeWork -> shippable [label="qualified"];
-  shippable -> shipment [label="consume shippable"];
-  shipment -> customer [label="increase original delivery"];
-
-  inventory -> inventoryAllocation [label="allocate"];
-  inventoryAllocation -> bag [label="制作-qualified stock"];
-  inventoryAllocation -> edgeWork [label="捏毛装袋-qualified stock"];
-  inventoryAllocation -> shippable [label="final-stage stock"];
-
-  rework -> make [style=dashed, label="target 制作"];
-  rework -> bag [style=dashed, label="target 捏毛装袋"];
-  rework -> edgeWork [style=dashed, label="target 缝边剪袋"];
-  remake -> make [style=dashed, label="remake start"];
-  remake -> bag [style=dashed, label="allowed start"];
-  remake -> edgeWork [style=dashed, label="allowed start"];
-
-  shippable -> surplus [label="confirmed order reduction"];
-  customer -> afterSales [style=dotted, label="issue after closure; no rollback"];
-  afterSales -> replacement [label="consume after-sales shippable"];
+  demand -> make [label="合法生产缺口授权后安排"];
+  demand -> allocation [label="管理员选择库存"];
+  inventory -> allocation [label="真实兼容批次"];
+  allocation -> bag [label="制作合格库存"];
+  allocation -> seam [label="装袋合格且还需缝边"];
+  allocation -> terminal [label="全部适用路线已完成"];
+  make -> bag [label="合格实物"];
+  bag -> seam [label="需缝边份额合格"];
+  bag -> terminal [label="无需缝边份额合格"];
+  seam -> terminal [label="合格"];
+  terminal -> purpose [label="沿有效份额用途分流"];
+  purpose -> shippable [label="普通交付"];
+  purpose -> reserve [label="售后补发"];
+  purpose -> receipt [label="明确库存用途"];
+  receipt -> inventory [label="生成新批次，不恢复原领用"];
+  shippable -> shipment [label="锁内校验可发及需求两桶"];
+  shipment -> afterSales [style=dotted, label="独立受理入口，不必等关闭"];
+  afterSales -> gap [label="独立补发承诺"];
+  afterSales -> repair [label="退回核验：补发/库存用途及适用目标"];
+  afterSales -> returnScrap [label="实际退回剩余量直接报废"];
+  returnScrap -> gap [style=dotted, label="独立缺口保留，另行显式授权"];
+  gap -> make [label="显式正常缺口授权并安排"];
+  gap -> allocation [label="显式兼容库存领用"];
+  make -> repair [label="返工目标：制作"];
+  bag -> repair [label="返工目标：制作"];
+  seam -> repair [label="返工目标：制作或装袋"];
+  repair -> onward [label="目标修补合格且有后续工序"];
+  repair -> terminal [label="目标为路线终点且修补合格"];
+  onward -> terminal [label="后续全部适用工序合格"];
+  make -> scrap [label="核验报废"];
+  bag -> scrap [label="核验报废"];
+  repair -> scrap [label="本次实际修补非缝边时才允许"];
+  scrap -> obligation [label="按用途与剩余义务判断"];
+  obligation -> remake [label="需要"];
+  obligation -> retired [label="无需"];
+  remake -> make [label="唯一补做起点；不是 REWORK"];
+  reserve -> replacement [label="管理员确认；受预留和需求两桶限制"];
 }

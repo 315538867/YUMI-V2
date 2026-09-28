@@ -1,8 +1,10 @@
 # 生产模块施工文档（阶段五：生产任务、核验、返工与超额提醒）
 
+> 历史文档：2026-09-27 起由 `docs/architecture/scheduling-module-design.md` 取代，不再作为下一轮施工输入。下文保留当时的设计与实施记录；超额、返工目标、报废回转、工作量与售后口径均以新文档为准。旧完成表述不代表新模型已实施；工作台、详情/批量核验和浏览器移交项仍须在新路由重新验收及签字。
+
 日期：2026-09-25
 修改人：chen
-状态：**已按本文实施（阶段五 5.1–5.18）**。本文是阶段五的施工基线；实现证据见 `openspec/changes/build-yumi-v2-order-fulfillment/tasks.md` 的阶段五逐项证据与 `docs/delivery/manual-acceptance-report.md` §8.24。本文描述的行为口径与实现一致；实现期只行使了「类名、DTO 内部组织与页面视觉细节」的自由度。
+状态：**历史实施记录**。原阶段五证据见 `openspec/changes/archive/2026-09-27-build-yumi-v2-order-fulfillment/tasks.md` 与 `docs/delivery/manual-acceptance-report.md` §8.24。以下内容保持当时记录，不作为当前新模型的完成声明。
 上游依据：`docs/architecture/domain-and-quantity-model.md`、`docs/architecture/database-design.md`、`specs/production-management/spec.md`、`design.md`。如上游文档与本文冲突，以本文件列明的最终口径为阶段五实施输入，并在实施前同步评估受影响的上游契约。
 
 ---

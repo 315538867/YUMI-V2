@@ -893,7 +893,16 @@
   - 完成条件：所有余额不超卖；同一明细最多一条核验；同一来源安排总量不超过余额；同一幂等键重放首次结果；同键异指纹返回 `CONFLICT_IDEMPOTENCY`；失败事务不留下任何部分事实；`./mvnw test` 全量退出码为 0。
   - 人工证据：不适用；并发为机器证据。
   - 证据（机器）：`ProductionConcurrencyTest`（4 用例：并发创建不超产品日产能、并发消费同一返工来源不超余额、并发分配同一回转不超卖、并发核验同一明细只留一份事实与一份流转）、`ProductionIdempotencyTest`（3 用例：任务创建同键重放、同键异指纹 CONFLICT_IDEMPOTENCY、批量核验重放不重复事实）、整批回滚见 `ProductionVerificationApiTest.rollsBackAllItemsAndDerivedFactsWhenOneItemFails` 与 `ProductionTaskApiTest.doesNotPersistPartialTaskOnItemFailure`；真实 MySQL 上运行，未调整隔离级别或重试掩盖锁顺序。
-- [ ] 5.17 实现正式 `/production` 工作台和全页统一新建
+### 阶段五移交项（2026-09-27）
+
+原 5.17、5.18、5.19 三项**移交至 `restructure-scheduling-module`**。原因：排班模块决定全栈改名（`production` → `scheduling`，含路由 `/production` → `/scheduling`、前端目录与类型名）并重写返工池与超额模型，这三项的页面、路由和验收对象会被原样推翻，在旧名下继续对齐已无意义。
+
+- 移交前状态：三项代码均已写完并有浏览器实测证据，因与原型整页布局级差异（缺今日分组视图/四指标条/周历卡片员工色边框与问题态/当日高亮/每日添加/310px 右栏等）于 2026-09-26 撤回勾选；5.19 未取得用户签字。
+- 证据去向：原实现与浏览器证据见 `docs/delivery/manual-acceptance-report.md` §8.24 与本文件历史版本（git `ec8642a`）。
+- 承接位置：`openspec/changes/restructure-scheduling-module/tasks.md` 的排班工作台、任务详情与批量核验、浏览器端到端验收三项。
+- 归档口径：本 change 归档时这三项不计入未完成；本 change 剩余未完成项只有 9.5/9.6/9.7（运维侧，部署环境落地后勾选）。
+
+- **5.17 实现正式 `/production` 工作台和全页统一新建 —— 已移交至 `restructure-scheduling-module`**
   - 依赖：5.2、5.4、5.5、5.9、5.10、5.14、5.15；阶段一共享路由和 API 客户端。
   - 修改文件：`frontend/src/api/production.ts`；`frontend/src/pages/production/ProductionWorkbenchPage.tsx`、`ProductionTaskCreatePage.tsx`、`ProductionTaskCard.tsx`、`ProductionFilters.tsx`、`ProductionWeekCalendar.tsx`；`frontend/src/routes/index.tsx` 或当前正式路由文件；删除正式生产页中的占位组件和静态假数据。
   - 正式路由固定为 `/production` 和 `/production/tasks/new`；不得新增 `/production-sources`、`/rework-sources`、`/overtime`、`/other-schedules` 等顶级生产入口。来源、额度、超额和 OTHER 都从统一新建入口或任务上下文进入。
@@ -907,7 +916,7 @@
   - 状态更正（2026-09-26）：原型（`.superpowers/brainstorm/production-scheduling-prototype/content/index.html`）找回后对照发现本页与原型是**整页布局级差异**（缺今日分组视图/四指标条/周历卡片员工色边框与问题态/当日高亮/每日添加/310px 右栏等）。按「原型为大致布局基线、需求以规格为准」，本项在按原型对齐并重新截图复核前**不勾选**。
   - 对齐进展（2026-09-26）：代理已按原型完成双视图 + 7 列周历 + 员工分组今日列表，前端 typecheck/76 用例/build 均 0；与原型对比后仍缺 `全部记录` 视图、状态 chips + 自由文本搜索、今日四指标条与「+ 给此员工安排」入口；原型 `排班周历` 的视觉证据尚未取到（截图误停在今日排班），故仍不勾选。
 
-- [ ] 5.18 实现任务详情、批量核验页和事实追溯时间线
+- **5.18 实现任务详情、批量核验页和事实追溯时间线 —— 已移交至 `restructure-scheduling-module`**
   - 依赖：5.7、5.8、5.9–5.13、5.17。
   - 修改文件：`frontend/src/pages/production/ProductionTaskDetailPage.tsx`、`ProductionTaskVerifyPage.tsx`；新增 `frontend/src/components/production/ProductionFactTimeline.tsx`、`ProductionItemFactTable.tsx`；补充 `frontend/src/api/production.ts` 的详情、批量读取和批量提交类型。
   - 路由固定为 `/production/tasks/:id` 和 `/production/tasks/:id/verify`。详情页只读展示任务头、员工/工序/类型、明细计划、产品/订单快照、标准分钟、实际流入、可执行量、核验、返工来源、报废、回转、未完成提醒、取消历史和审计；查看页不得预置编辑表单。
@@ -920,7 +929,7 @@
   - 状态更正（2026-09-26）：原型（`.superpowers/brainstorm/production-scheduling-prototype/content/index.html`）找回后对照发现本页与原型是**整页布局级差异**（缺今日分组视图/四指标条/周历卡片员工色边框与问题态/当日高亮/每日添加/310px 右栏等）。按「原型为大致布局基线、需求以规格为准」，本项在按原型对齐并重新截图复核前**不勾选**。
   - 对齐进展（2026-09-26）：代理已按原型完成双视图 + 7 列周历 + 员工分组今日列表，前端 typecheck/76 用例/build 均 0；与原型对比后仍缺 `全部记录` 视图、状态 chips + 自由文本搜索、今日四指标条与「+ 给此员工安排」入口；原型 `排班周历` 的视觉证据尚未取到（截图误停在今日排班），故仍不勾选。
 
-- [ ] 5.19 使用正式路由完成浏览器端到端验收并留证
+- **5.19 使用正式路由完成浏览器端到端验收并留证 —— 已移交至 `restructure-scheduling-module`**
   - 依赖：5.1–5.18 的实现、后端全量测试、前端 typecheck/test/build 全部通过。
   - 验收入口：只能使用正式 `/production`、`/production/tasks/new`、`/production/tasks/:id`、`/production/tasks/:id/verify`；后端使用真实 Spring Boot API；不得使用预览路由、静态 JSON 或测试专用页面。
   - 数据准备顺序：①创建两个已确认订单、至少三个订单明细和两个产品；②准备在职且具备工种资格的员工；③通过统一入口创建多订单多产品 NORMAL 任务；④创建下游等待上游任务并确认页面显示零可执行；⑤核验上游并观察下游实际流入增加；⑥批量核验多个明细并验证事实时间线；⑦产生返工事实、显式创建来源、完成两轮 REWORK；⑧产生报废并验证同工序回转；⑨用回转余额创建新的 NORMAL；⑩创建超额预占并核验合格提醒；⑪创建、核验、取消和更正 OTHER；⑫重复提交一个写请求；⑬执行一次并发/幂等路径并检查错误显示。

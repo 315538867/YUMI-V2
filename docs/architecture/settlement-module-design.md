@@ -124,3 +124,62 @@ CHECK：`amount > 0`、`source_type IN ('ORDER_CHANGE','AFTER_SALES')`。索引�
 - 不做报表、导出与打印（阶段九）；
 - 不做分期/账期、发票与对账（不在首期）；
 - 不做自动结清（收款状态一律由事实派生，不提供手工状态）。
+
+## 11. 资金与关闭业务流程（2026-09-27 静态核对）
+
+本节按现有 [SettlementService](../../backend/src/main/java/com/yumi/orders/settlement/SettlementService.java) 的登记、退款、`totalsOf` 与 `close` 处理路径核对，**不是运行验收结果**。前文「阶段八接入后才校验售后来源」是阶段七历史范围：当前退款代码已经检查售后来源存在且属于本订单；不把该历史占位当现状，也不额外宣称来源已确认状态有守卫。全系统入口见 [总体架构 §1](system-architecture.md)。
+
+### 11.1 收款与两类退款分别改变什么
+
+```mermaid
+flowchart TB
+    confirmed["已确认订单：管理员登记实际收款"]
+    paid["累计收款增加：追加不可变收款事实"]
+    change["订单变更后当前有效应收<br/>可能产生待退款，不自动出款"]
+    refund["管理员登记实际退款<br/>正金额、原因与本订单来源<br/>累计全部退款不超过累计收款"]
+    kind{"退款来源类型"}
+    orderRefund["订单变更退款<br/>减少订单结清净额和实际净收"]
+    afterRefund["售后退款<br/>只减少实际净收，不减少结清净额"]
+    net["订单结清净额＝累计收款－变更退款"]
+    actual["实际净收＝结清净额－售后退款"]
+    pending["待退款＝max（结清净额－当前有效应收，0）"]
+    confirmed --> paid
+    paid --> net
+    change -.->|管理员按实际退款另行登记| refund
+    refund --> kind
+    kind -->|ORDER_CHANGE| orderRefund
+    kind -->|AFTER_SALES| afterRefund
+    orderRefund --> net
+    net --> actual
+    afterRefund --> actual
+    net --> pending
+    change -->|当前应收作为计算输入| pending
+```
+
+退款不是订单变更或售后受理的自动副作用；售后退款也可以独立于变更发生。退款要求来源归属与累计金额守卫，已关闭/取消订单仍允许符合条件的实际退款补录，不能新增原订单收款。收款与发货互不作为前置条件；售后退款不增加原单新待收、待退或未交付数量。这里只是管理员登记资金事实，不代表接入银行/支付网关自动收付。
+
+### 11.2 关闭：三个条件全部满足，不把售后当第四关
+
+```mermaid
+flowchart TB
+    request["管理员申请关闭订单"]
+    status{"订单仍为 CONFIRMED？"}
+    fulfillment{"逐明细累计有效发货<br/>达到当前有效需求？"}
+    settlement{"订单结清净额<br/>达到当前有效应收？"}
+    refund{"订单待退款为 0？"}
+    closed["同事务标 CLOSED<br/>记录关闭人和时间；不可重开"]
+    reject["拒绝关闭，给出未满足原因<br/>保持原状态，无部分关闭"]
+    later["关闭后合法独立动作<br/>物流、等量发货更正、有依据退款、售后"]
+    request --> status
+    status -->|是| fulfillment
+    status -->|否| reject
+    fulfillment -->|是| settlement
+    fulfillment -->|否| reject
+    settlement -->|是| refund
+    settlement -->|否| reject
+    refund -->|是| closed
+    refund -->|否| reject
+    closed -.->|不重开、不新增原交付或收款| later
+```
+
+关闭服务在本次事务重读履约和资金事实；生产完成、成品余量不能替代实际发货。图中关闭后的合法动作是业务边界，不等于所有入口守卫均已完整实现：现有普通发货确认缺少再次检查订单状态、份额传递仍待重构，见总体架构 §1.2；不能据此图声称已验证关闭后所有非法写入均被拦截。售后可在关闭前后独立处理，其退款单列，所以不应把「售后结束」画成关闭的必要条件。
