@@ -1,16 +1,22 @@
 # YUMI V2 HTTP/API 目标架构
 
+> 文档类别：架构基线
+>
+> 权威范围：HTTP 路由、鉴权、错误与接口演进规则
+>
+> 统一导航：`docs/00-文档总览.md`
+
 > 状态：HTTP/API 外部协议基线已确认
 >
-> 日期：2026-09-28
+> 日期：2026-09-29
 >
 > 修改人：chen
 >
 > 关联文档：
-> - `docs/architecture/making-centered-target-architecture.md`
-> - `docs/architecture/backend-architecture.md`
-> - `docs/architecture/data-facts-snapshots-projections.md`
-> - `docs/architecture/module-contracts-and-transaction-matrix.md`
+> - `docs/01-架构基线/01-制作核心目标架构.md`
+> - `docs/01-架构基线/02-后端目标架构.md`
+> - `docs/01-架构基线/04-数据事实快照与投影规范.md`
+> - `docs/01-架构基线/05-模块接口与事务矩阵.md`
 >
 > 本文确定 HTTP 外部适配层的资源边界、命令与查询协议、响应信封、错误、幂等、并发、分页、文件和版本策略。不包含前端实现、完整接口字段清单、认证供应商选型和代码实施计划。
 
@@ -107,10 +113,24 @@ GET /api/v1/orders/{orderId}
 GET /api/v1/orders
 GET /api/v1/production/workbench
 GET /api/v1/scheduling/tasks
+GET /api/v1/master-data/work-teams
+GET /api/v1/master-data/work-teams/{teamId}
+GET /api/v1/master-data/team-efficiency-standards
+GET /api/v1/master-data/team-efficiency-standards/{memberCount}
 GET /api/v1/reporting/costs
 ```
 
 查询返回当前投影、有效事实关系和必要冻结快照。查询接口不得返回一个可以直接作为正式命令输入的“授权结果”。预览、影响评估和试算结果只代表查询时点的观察结果。
+
+### 3.1.1 小组配置资源
+
+小组配置仅包含编号、名称、状态和成员标识集合，不包含组长、可承接商品、可承接工序、成员贡献比例或成员生效时间。成员集合按整体替换命令更新。
+
+修改、停用或替换成员时，服务端可以先调用 `scheduling.WorkTeamActivePlanReferenceQuery` 给出页面提示，但 HTTP 适配层的正式命令必须只调用 `workforce-coordination` 完整用例：协调器在同一事务内先调用 `scheduling.WorkTeamPlanReferenceGuardPort`，再调用 `master-data.WorkTeamMutationParticipantPort`。存在 `ARRANGED` 计划引用则返回稳定业务拒绝 `WORK_TEAM_ACTIVE_PLAN_REFERENCED`；计划取消或核验后可再次修改。小组创建及每次成功变更都由 `master-data` 同步物化快照，查询不得补建；历史成员通过 `WorkTeamSnapshotRef` 解析。
+
+小组全部成员必须在职可用，且至少一名成员具有 `MAKING` 资格；首期不跟踪内部流水步骤资格。
+
+全局小组效率配置固定服务于 `MAKING`，仅按人数维护 `collaborationEfficiencyFactor`。读取使用 `GET /api/v1/master-data/team-efficiency-standards` 和 `GET /api/v1/master-data/team-efficiency-standards/{memberCount}`，要求 `master-data.team-efficiency-standard.read`；创建或修改使用 `PUT /api/v1/master-data/team-efficiency-standards/{memberCount}`，要求 `master-data.team-efficiency-standard.update`，请求固定包含 `collaborationEfficiencyFactor`、`status` 和 `expectedVersion`（首次创建时 `expectedVersion` 为空）。启用因子必须大于 `1`，否则返回 `TEAM_EFFICIENCY_FACTOR_INVALID`；每次成功写入立即形成新快照。客户端不能在创建排班任务时覆盖效率因子；缺少对应人数 ACTIVE 标准时新任务创建失败并返回 `TEAM_EFFICIENCY_STANDARD_NOT_FOUND`。
 
 ### 3.2 正式命令接口
 
@@ -123,31 +143,56 @@ POST /api/v1/orders/{orderId}/shipments
 POST /api/v1/orders/{orderId}/receipt
 POST /api/v1/orders/{orderId}/complete
 POST /api/v1/scheduling/tasks
+POST /api/v1/scheduling/tasks/{taskId}/reassign
+POST /api/v1/scheduling/tasks/{taskId}/cancellation-confirmations
 POST /api/v1/scheduling/tasks/{taskId}/cancel
 POST /api/v1/scheduling/tasks/{taskId}/verify
 POST /api/v1/production/items/{itemId}/restore-packaging
+POST /api/v1/production/items/{itemId}/quality-dispositions
 POST /api/v1/after-sales
 POST /api/v1/after-sales/{caseId}/redelivery
 POST /api/v1/after-sales/{caseId}/replacement
+POST /api/v1/master-data/work-teams
+PUT /api/v1/master-data/team-efficiency-standards/{memberCount}
+POST /api/v1/workforce-coordination/work-teams/{teamId}/renames
+POST /api/v1/workforce-coordination/work-teams/{teamId}/member-changes
+POST /api/v1/workforce-coordination/work-teams/{teamId}/status-changes
 ```
 
-命令端点表达业务动作，不暴露参与模块的内部写入动作。例如普通发货由 `orders` 的命令端点负责协调 `production`，不提供让客户端直接调用 `production.consumeForShipment` 的 HTTP 端点。
+命令端点表达业务动作，不暴露参与模块的内部写入动作。例如普通发货由 `orders` 的命令端点负责协调 `production`，不提供让客户端直接调用 `ShipmentSourcePort.consume` 的 HTTP 端点。
+
+创建或调整排班时，外部请求只提交执行主体和计划意图：
+
+```json
+{
+  "assignmentSubject": {
+    "type": "EMPLOYEE | TEAM",
+    "businessId": "..."
+  },
+  "scheduledDate": "2026-09-28",
+  "lines": [
+    { "productBusinessId": "...", "processCode": "MAKING", "plannedQuantity": 10 }
+  ]
+}
+```
+
+客户端不得提交成员个人产量、贡献比例、标准分钟、可用分钟、剩余分钟、负载率、效率因子、成员子集或目标评估状态。HTTP 适配层只调用 `scheduling` 应用用例；由 `scheduling` 通过 `master-data` 公开接口取得员工/小组主体 `SnapshotRef` 和工作量评估。小组任务按完整配置成员形成共同产出，不展开倒胶、填色、画画等内部步骤。
+
+包装还原和质量处置的 HTTP 资源路径属于生产业务上下文，但如果动作会同时改变未核验排班任务，适配层必须调用 `fulfillment-coordination`，不能让客户端感知或直接调用协调器内部参与端口。普通排班取消使用专用取消命令；订单变更、包装还原和质量处置影响任务时，管理员确认由 `scheduling` 的确认命令保存，必须绑定 `scopeType + scopeBusinessId + taskBusinessId + expectedTaskVersion`。确认端点虽然位于排班资源下，但不是可跨业务复用的通用授权；orders、after-sales 和生产页面只传入自己的业务范围，不能保存第二份确认事实。
 
 资源的普通创建、替换和取消也必须经过业务命令语义；不默认提供通用 `PUT` 或 `PATCH` 让客户端直接编辑事实和投影。
 
-### 3.3 草稿与正式命令
+### 3.3 直接提交与正式命令
 
-草稿可以通过资源接口保存和修改，但草稿持久化不表示业务事实已经生效：
+首期不提供服务端持久化业务草稿。前端表单内容只保存在当前页面状态中，用户提交时必须发送完整命令；服务端在同一正式命令中重新读取并校验当前订单、余额、价格、资格、权限和预期版本，成功后直接产生正式业务记录、必要快照、追溯记录和投影。
 
 ```text
-POST   /api/v1/orders/drafts
-GET    /api/v1/orders/drafts/{draftId}
-PUT    /api/v1/orders/drafts/{draftId}
-DELETE /api/v1/orders/drafts/{draftId}
-POST   /api/v1/orders/drafts/{draftId}/confirm
+POST /api/v1/orders
+POST /api/v1/orders/{orderId}/changes:confirm
+POST /api/v1/orders/{orderId}/shipments:confirm
 ```
 
-草稿确认端点必须重新读取当前订单、余额、价格、资格和权限。不能使用草稿创建时缓存的状态直接提交。
+预览接口只返回计算或影响评估结果，不保存可继续编辑的服务端业务数据，也不能作为正式提交时的权威输入。
 
 ### 3.4 预览与影响评估
 
@@ -161,6 +206,12 @@ POST /api/v1/after-sales/preview
 
 预览可以返回差异、预计金额、可选来源和校验提示，但不得写入正式事实、投影、占用、幂等成功记录或审计结果。正式命令必须再次校验；预览响应中的余额、状态和授权结论不能作为提交依据。
 
+### 3.5 快照引用的 HTTP 边界
+
+客户端不能任意指定 `ownerModule`、`snapshotType`、`snapshotBusinessId` 或 `snapshotVersion` 来选择历史规则。正式命令中的快照引用由服务端根据当前权威状态创建或解析；只有明确的历史查询资源可以返回只读引用。客户端回传的引用仅可作为查询游标或受控资源标识，服务端仍必须校验引用类型、所有者和业务归属。
+
+HTTP 不提供通用 `/snapshots/{type}/{id}` CRUD。领域快照只能通过所属业务资源或模块专用查询读取。
+
 ## 4. 统一成功响应
 
 ### 4.1 响应信封
@@ -172,7 +223,7 @@ POST /api/v1/after-sales/preview
   "code": "OK",
   "message": "操作成功",
   "fieldErrors": {},
-  "requestId": "req_01J...",
+  "requestId": "0199f0e8-7abc-7def-8abc-0123456789ab",
   "data": {}
 }
 ```
@@ -207,7 +258,7 @@ POST /api/v1/after-sales/preview
 - 稳定业务标识；
 - 当前状态和必要投影；
 - 业务事实摘要；
-- 冻结快照摘要；
+- 业务上下文需要的快照摘要和服务端生成的强类型快照引用；
 - 版本和时间；
 - 后续操作所需的业务链接或能力标识。
 
@@ -237,7 +288,7 @@ POST /api/v1/after-sales/preview
   "fieldErrors": {
     "requestedQuantity": ["不得超过当前可交付数量"]
   },
-  "requestId": "req_01J...",
+  "requestId": "0199f0e8-7abc-7def-8abc-0123456789ab",
   "data": null
 }
 ```
@@ -362,7 +413,7 @@ Idempotency-Key: <opaque-key>
 
 ### 7.2 并发版本
 
-需要基于当前读取结果提交的命令必须携带预期版本：
+单一业务根命令可以携带单值预期版本：
 
 ```json
 {
@@ -370,7 +421,19 @@ Idempotency-Key: <opaque-key>
 }
 ```
 
-服务端在锁内重新读取当前版本。版本不一致返回：
+跨模块命令必须携带各权威资源的版本快照，不能用一个订单版本代表排班和生产版本：
+
+```json
+{
+  "expectedResourceVersions": {
+    "orders": 7,
+    "scheduling": 12,
+    "production": 31
+  }
+}
+```
+
+服务端在同一事务、各模块自己的锁内重新读取并比较对应版本；缺少必需资源版本时拒绝执行。版本不一致返回：
 
 ```text
 409 CONFLICT_EXPECTED_VERSION
@@ -378,7 +441,7 @@ Idempotency-Key: <opaque-key>
 
 响应可以返回当前版本和重新读取所需的资源摘要，但不能自动合并具有业务含义的数量、金额或状态变更。
 
-`expectedVersion` 是并发校验输入，不是调用方可以直接写入的目标版本。服务端决定新版本并在成功响应中返回。
+`expectedVersion` 和 `expectedResourceVersions` 都是并发校验输入，不是调用方可以直接写入的目标版本。服务端决定各资源的新版本并在成功响应中返回。命令即使没有携带版本，也必须在锁内重新读取和校验；是否允许无版本提交由具体命令契约明确，不能由 Controller 默认放行。
 
 ### 7.3 重试边界
 
@@ -423,7 +486,7 @@ GET /api/v1/orders?pageSize=50&cursor=...
 
 ```text
 sort=createdAt.desc
-filter=status:eq:IN_PROGRESS
+filter=status:eq:ARRANGED
 ```
 
 实际字段映射由查询模块维护。未知字段、未知操作符和超出范围的 `pageSize` 返回结构化输入错误。
@@ -464,7 +527,7 @@ DELETE /api/v1/files/temporary/{fileId}
 ```json
 {
   "attachments": [
-    {"temporaryFileId": "file_tmp_01J..."}
+    {"temporaryFileId": "0199f0e9-7abc-7def-8abc-0123456789ab"}
   ]
 }
 ```
@@ -526,7 +589,7 @@ HTTP 使用 ISO 8601 格式：
 → 认证和输入校验
 → 命令所有者开启事务
 → 跨模块同步参与
-→ 事实、快照、投影、幂等和审计写入
+→ 事实、快照、投影、幂等、审计和 `platform_action_tasks` 写入
 → 一次提交
 → 返回成功
 ```
@@ -542,7 +605,7 @@ HTTP 响应返回成功前，正式业务事实必须已经提交并可由查询
 - 可重建报表生成；
 - 外部 HTTP 调用。
 
-这些动作必须能安全重试，并记录可观察的处理状态。外部动作失败不能回滚已经提交的订单、生产、发货、收款或售后事实，也不能把未执行的外部动作伪装为已完成。
+这些动作必须在主事务中先登记 `platform_action_tasks`，提交后由受控 worker 执行；提交后监听只允许用于唤醒 worker。任务必须能安全重试，并记录可观察的处理状态。外部动作失败不能回滚已经提交的订单、生产、发货、收款或售后事实，也不能把未执行的外部动作伪装为已完成。
 
 ## 12. 可观测性与安全边界
 
@@ -646,22 +709,14 @@ Controller 不编排多个模块、不访问 Repository、不计算余额和金�
 外部协议版本与内部模块版本、数据库迁移版本分离
 ```
 
-## 16. 后续细化内容
+## 16. 具体设计归属
 
-本文已经冻结 HTTP/API 外部适配层的协议基线。平台能力职责边界已由以下文档冻结：
+公共协议之上的具体内容按唯一来源维护：
 
-```text
-docs/architecture/platform-capabilities-architecture.md
-```
+- 各模块端点、稳定业务错误和权限代码：对应 `docs/02-模块设计/01` 至 `12`；
+- 会话、权限、幂等、审计和文件：`docs/01-架构基线/07-平台公共能力架构.md`；
+- 平台表和业务表字段：`docs/01-架构基线/08-完整系统数据库设计.md`；
+- 前端请求、会话和冲突处理：`docs/01-架构基线/09-前端与管理端架构设计.md`；
+- 部署、密钥、日志、指标和恢复：`docs/01-架构基线/10-部署运维与数据迁移设计.md`。
 
-后续仍需独立落文档的内容是：
-
-1. 各业务模块完整端点目录和每个命令的请求、响应字段；
-2. 稳定错误码目录、字段错误字典和权限能力清单；
-3. 具体认证供应商、会话存储和凭证生命周期实现；
-4. 具体文件存储后端、病毒扫描和清理运维实现；
-5. 部署、配置、备份恢复和可观测性；
-6. 测试分层、契约测试和真实 MySQL 集成测试门禁；
-7. 最后确定前端技术、目录、路由、状态和交互架构。
-
-以上内容仍属于架构设计阶段，不进入代码实现、OpenSpec 或提交流程。
+G1 起通过 HTTP 契约测试和 E2E 持续验证。开发人员不得自行更换认证承载、错误信封、幂等范围或文件关联流程。
