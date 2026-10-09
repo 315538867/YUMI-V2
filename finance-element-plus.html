@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YUMI V2 · 财务结算</title>
+  <link rel="stylesheet" href="assets/vendor/element-plus-2.11.5/index.css" />
+  <script src="assets/vendor/vue-3.5.22/vue.global.prod.js"></script>
+  <script src="assets/vendor/element-plus-2.11.5/index.full.min.js"></script>
+  <script src="assets/vendor/icons-vue-2.3.2/index.iife.min.js"></script>
+  <script src="payment-vouchers.js"></script>
+  <script src="order-finance-store.js"></script>
+  <script src="customer-store.js"></script>
+  <link rel="stylesheet" href="assets/payment-vouchers.css">
+  <style>
+    :root{--ink:#20352d;--muted:#718078;--line:#e5ebe7;--canvas:#f5f7f5;--accent:#2f6f57;--accent-soft:#e7f1eb;--gold:#b67a35;--el-color-primary:#2f6f57;--el-color-success:#2f6f57;--el-color-warning:#b67a35;--el-color-danger:#a85b50;--el-color-info:#718078;--el-border-radius-base:5px}
+    *{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px}[v-cloak]{display:none}button{font-family:inherit}.app-shell{min-height:100vh}.rail{position:fixed;z-index:5;inset:0 auto 0 0;width:76px;background:#1d3028;display:flex;flex-direction:column;align-items:center;padding:18px 0}.brand{width:36px;height:36px;border-radius:10px;background:#b8d3c2;color:#1d3028;display:grid;place-items:center;font-weight:800;font-size:15px}.rail-nav{display:flex;flex-direction:column;gap:12px;margin-top:34px}.rail-btn{width:42px;height:42px;padding:0;border:0;background:transparent;color:#91a79b;border-radius:9px;cursor:pointer;display:grid;place-items:center;text-decoration:none}.rail-btn .el-icon{font-size:19px}.rail-btn.active,.rail-btn:hover{background:#2b493c;color:#fff}.rail-footer{margin-top:auto;color:#91a79b;font-size:11px}.workspace{margin-left:76px}.topbar{height:70px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 30px}.breadcrumb{color:var(--muted);font-size:12px}.breadcrumb strong{color:var(--ink);font-size:16px;margin-left:8px}.top-actions,.operator{display:flex;align-items:center;gap:16px}.operator{gap:8px;color:var(--muted);font-size:12px}.content{max-width:1600px;margin:0 auto;padding:24px 32px 48px}.page-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.heading-copy{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.page-heading h1{margin:0;font-size:23px;font-weight:650;letter-spacing:.5px}.divider{color:#c9d4cd;font-size:20px}.page-heading p{margin:0;color:var(--muted);font-size:12px}.module-tabs>.el-tabs__header{margin-bottom:20px}.el-tabs__nav-wrap:after{height:1px;background:#dce5df}.el-tabs__item{font-size:13px}.main-card,.detail-card{background:#fff;border:1px solid var(--line);border-radius:8px}.card-header{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px 20px;border-bottom:1px solid var(--line)}.card-header h2{margin:0;font-size:15px;font-weight:600}.card-header span,.hint{font-size:11px;color:var(--muted);line-height:1.8}.header-actions{display:flex;gap:8px;align-items:center}.header-actions .el-button+.el-button{margin-left:0}.filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:18px 20px}.keyword{width:235px}.filter-select{width:145px}.filters .el-date-editor{max-width:250px}.table-wrap{padding:0 20px 18px}.el-table{--el-table-header-bg-color:#f5f8f6;--el-table-header-text-color:#64776b;--el-table-text-color:#30483b;--el-table-border-color:#eaf0ec}.el-table th.el-table__cell{font-size:11px;height:43px;font-weight:500}.el-table td.el-table__cell{padding:15px 0}.el-table .cell{line-height:1.7}.cell-title{display:block;font-size:12px;font-weight:600}.cell-sub{display:block;color:var(--muted);font-size:11px;margin-top:3px}.link-button{color:var(--accent);font-size:12px;font-weight:600;border:0;background:none;cursor:pointer;padding:0;text-align:left}.money{font-variant-numeric:tabular-nums;white-space:nowrap}.positive{color:var(--accent)}.pending{color:var(--gold)}.muted{color:var(--muted)}.table-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:17px}.prototype-note{font-size:11px;color:var(--muted);line-height:1.9;margin:16px 0 0}.section-note{margin:0;padding:15px 20px;color:var(--muted);font-size:12px;line-height:1.9}.back-link{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--muted);padding:0;cursor:pointer;font-size:12px;margin-bottom:20px}.period-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.period-heading h2{margin:0;font-size:21px;font-weight:600}.period-heading p{font-size:12px;color:var(--muted);margin:9px 0 0}.period-info{display:flex;align-items:center;justify-content:space-between;gap:18px;background:#edf4ef;border:1px solid #dfeae2;border-radius:8px;padding:17px 20px;margin-bottom:18px;flex-wrap:wrap}.period-info strong{font-weight:600}.period-info .label{font-size:11px;color:var(--muted);margin-right:10px}.period-alert{margin-bottom:18px}.detail-tabs>.el-tabs__header{margin-bottom:18px}.empty-section{padding:16px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}.form-grid .wide{grid-column:1/-1}.el-form-item{margin-bottom:20px}.el-form-item__label{font-size:12px!important;color:#375441!important}.el-form-item__content{display:block}.el-select,.el-input-number{width:100%}.form-grid .el-date-editor.el-input{width:100%}.field-hint{display:block;font-size:11px;color:var(--muted);line-height:1.8;margin-top:7px}.allocation-header{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:17px;margin-bottom:15px}.allocation-header strong{font-size:13px}.allocation-row{display:grid;grid-template-columns:minmax(0,1fr) 135px 28px;gap:10px;align-items:start;margin-bottom:14px}.allocation-row .el-button{padding:0;width:28px;margin-top:4px}.allocation-row .el-select{min-width:0}.allocation-label{font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:6px}.allocation-total{display:flex;justify-content:space-between;background:#f4f8f5;border:1px solid #e3ebe6;border-radius:6px;padding:12px 14px;font-size:12px;margin-top:16px}.dialog-actions{display:flex;justify-content:flex-end;gap:10px}.dialog-actions .el-button+.el-button{margin-left:0}.confirm-info,.info-grid{display:grid;grid-template-columns:95px minmax(0,1fr);gap:12px 14px;font-size:12px;line-height:1.9}.confirm-info{margin-bottom:18px}.confirm-info .label,.info-grid dt{color:var(--muted)}.info-grid dd{margin:0;overflow-wrap:anywhere}.confirm-tip{background:#f1f6f2;border:1px solid #e1ebe3;border-radius:6px;color:#597364;padding:13px 15px;font-size:12px;line-height:1.9;margin-top:18px}.drawer-header{display:flex;align-items:center;justify-content:space-between;gap:14px}.drawer-header h2{font-size:16px;margin:0}.drawer-section{padding:18px 0;border-bottom:1px solid var(--line)}.drawer-section:first-child{padding-top:0}.drawer-section h3{font-size:13px;margin:0 0 14px}.drawer-note{font-size:12px;color:var(--muted);line-height:1.9;margin:12px 0 0}.source-card{background:#f7faf8;border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:12px}.source-card-header{display:flex;justify-content:space-between;align-items:center;gap:10px}.source-card p{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.9}.blocking-list{padding-left:18px;margin:8px 0;font-size:12px;line-height:2}.toolbar-note{margin-left:auto;font-size:11px;color:var(--muted)}.flow-direction{display:inline-flex;align-items:center;gap:5px;font-size:11px}.flow-direction .el-icon{font-size:13px}.el-drawer{max-width:100vw}.el-dialog{max-width:calc(100vw - 32px)}
+    .filters > .keyword{width:235px;flex:0 0 235px;min-width:0;max-width:100%}.filters > .filter-select{width:145px;flex:0 0 145px;min-width:0;max-width:100%}.filters > .el-button{flex-shrink:0}
+    @media(max-width:1100px){.content{padding:22px}.heading-copy .divider{display:none}.heading-copy p{width:100%}.filters > .keyword{width:205px;flex-basis:205px}.filters > .filter-select{width:130px;flex-basis:130px}.toolbar-note{display:none}}
+    @media(max-width:820px){.rail{width:58px}.workspace{margin-left:58px}.brand{width:32px;height:32px}.topbar{padding:0 18px}.content{padding:20px 16px}.operator{display:none}.page-heading h1{font-size:21px}.card-header{padding:15px 16px;align-items:flex-start;flex-wrap:wrap}.filters{padding:16px}.filters .el-date-editor{max-width:100%}.table-wrap{padding:0 14px 16px}.table-footer{align-items:flex-start;flex-direction:column}.period-heading{align-items:flex-start;flex-wrap:wrap}.period-info{padding:15px 16px}.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.allocation-row{grid-template-columns:minmax(0,1fr) 100px 26px}.confirm-info,.info-grid{grid-template-columns:75px minmax(0,1fr);gap:10px}.header-actions{flex-wrap:wrap}.card-header>span{max-width:100%}}
+    @media(max-width:520px){.filters > .keyword{width:100%;flex-basis:100%}}
+    .payroll-layout{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:20px;align-items:start}.payroll-body{padding:20px}.reference-total{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:12px}.reference-total span{font-size:12px;color:var(--muted)}.reference-total strong{font-size:21px;font-weight:600}.reference-warning{margin:12px 0}.payroll-manual .el-form-item{margin-bottom:22px}.payroll-confirm{width:100%;margin-top:18px}.payroll-note{white-space:pre-wrap;overflow-wrap:anywhere}.payroll-manual .info-grid{grid-template-columns:100px minmax(0,1fr)}
+    @media(max-width:1200px){.payroll-layout{grid-template-columns:minmax(0,1fr)}}
+    .monthly-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}.monthly-toolbar h2{font-size:18px;margin:0 0 6px}.monthly-toolbar p{font-size:12px;color:var(--muted);margin:0;line-height:1.8}.month-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.month-controls .el-date-editor{width:155px}.month-controls .el-button+.el-button{margin-left:0}.monthly-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:18px}.monthly-metric{background:white;border:1px solid var(--line);border-radius:8px;padding:20px;min-width:0}.monthly-metric>span{display:block;font-size:12px;color:var(--muted);margin-bottom:12px}.monthly-metric strong{font-size:25px;font-weight:600;overflow-wrap:anywhere}.monthly-metric p{font-size:11px;line-height:1.8;color:var(--muted);margin:10px 0 0}.monthly-metric.net{background:#edf4ef}.monthly-panels{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}.monthly-panels .main-card{min-width:0}.monthly-panels .table-wrap{padding-top:12px}.monthly-total{padding:16px 20px;background:#f7faf8;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px}.monthly-total .link-button{font-size:19px}.monthly-footnote{padding:0 20px 18px;font-size:11px;line-height:1.9;color:var(--muted);margin:0}.monthly-pending{margin-bottom:18px}.monthly-basis{padding:16px 20px;border:1px solid var(--line);border-radius:8px;background:#f7faf8;font-size:12px;line-height:1.9;color:var(--muted);margin-top:18px}.monthly-detail-note{font-size:12px;color:var(--muted);line-height:1.9;margin:0 0 18px}
+    @media(max-width:1200px){.monthly-panels{grid-template-columns:minmax(0,1fr)}}
+    @media(max-width:620px){.monthly-metrics{grid-template-columns:minmax(0,1fr);gap:10px}.monthly-metric{padding:16px}.monthly-metric strong{font-size:22px}.month-controls{width:100%}.monthly-total{align-items:flex-start;flex-wrap:wrap}}
+    .daily-cost-choice .el-checkbox{height:auto;align-items:flex-start}.daily-cost-choice .el-checkbox__input{margin-top:4px}.daily-cost-choice .el-checkbox__label{white-space:normal;line-height:1.8}.daily-purpose{white-space:pre-wrap;overflow-wrap:anywhere}
+  </style>
+</head>
+<body>
+<div id="app" class="app-shell" v-cloak>
+  <aside class="rail"><div class="brand">YU</div><nav class="rail-nav" aria-label="模块导航">
+    <a class="rail-btn" href="production-element-plus.html" title="生产作业"><el-icon><Operation></Operation></el-icon></a>
+    <a class="rail-btn" href="product-element-plus.html" title="商品"><el-icon><Goods></Goods></el-icon></a>
+    <a class="rail-btn" href="workforce-element-plus.html" title="人员与小组"><el-icon><UserFilled></UserFilled></el-icon></a>
+    <a class="rail-btn" href="customers-element-plus.html" @click.prevent="goCustomers()" title="客户"><el-icon><User></User></el-icon></a>
+    <a class="rail-btn" href="orders-element-plus.html" @click.prevent="goOrder()" title="订单"><el-icon><Tickets></Tickets></el-icon></a>
+    <button class="rail-btn active" title="财务结算" @click="backToOverview"><el-icon><DataAnalysis></DataAnalysis></el-icon></button>
+  </nav><div class="rail-footer">一期</div></aside>
+  <main class="workspace">
+    <header class="topbar"><div class="breadcrumb"><span>工作台 / </span><strong>财务结算</strong></div><div class="top-actions"><el-tag type="success" effect="plain">结算 · 财务</el-tag><div class="operator"><el-avatar :size="26">管</el-avatar>管理员</div></div></header>
+    <section class="content">
+      <div class="page-heading"><div class="heading-copy"><h1>财务结算</h1><span class="divider">/</span><p>按月看实际收支与成本；工资逐人核定，付款单独登记</p></div></div>
+      <el-tabs v-model="activeTab" class="module-tabs" @tab-change="onTabChange">
+        <el-tab-pane label="月度汇总" name="monthly">
+          <div class="monthly-toolbar"><div><h2>每月收支与成本</h2><p>订单收入按实际收到的款项统计，不采用订单应收金额。</p></div><div class="month-controls"><el-button @click="shiftSummaryMonth(-1)">上月</el-button><el-date-picker v-model="summaryMonth" type="month" value-format="YYYY-MM" format="YYYY 年 MM 月" :clearable="false" :editable="false" :disabled-date="disableFutureDate" aria-label="选择统计月份" @change="onSummaryMonthChange"></el-date-picker><el-button :disabled="summaryMonth>=today().slice(0,7)" @click="shiftSummaryMonth(1)">下月</el-button><el-button text @click="resetSummaryMonth">本月</el-button></div></div>
+          <div class="monthly-metrics">
+            <div class="monthly-metric"><span>当月总流入</span><strong class="money positive">{{money(monthlyCashTotals.incomeCents)}}</strong><p>订单实际收款、其他收入及支出冲销流入</p></div>
+            <div class="monthly-metric"><span>当月总流出</span><strong class="money">{{money(monthlyCashTotals.expenseCents)}}</strong><p>实际付款、订单退款及收入冲销流出</p></div>
+            <div class="monthly-metric net"><span>当月{{monthlyCashTotals.netCents<0?'净流出':'净流入'}}</span><strong class="money">{{money(Math.abs(monthlyCashTotals.netCents))}}</strong><p>总流入 − 总流出，不代表利润</p></div>
+          </div>
+          <el-alert v-if="monthlyPendingPayroll" class="monthly-pending" :title="'本月所属核算期间还有 '+monthlyPendingPayroll+' 条员工工资待核定；系统参考金额未计入人工成本。'" type="warning" :closable="false" show-icon></el-alert>
+          <div class="monthly-panels">
+            <section class="main-card"><div class="card-header"><h2>实际资金收支</h2><span class="hint">按实际收付业务日期统计</span></div><div class="table-wrap"><el-table :data="monthlyCashGroups" row-key="key"><el-table-column label="分类" min-width="155"><template #default="scope">{{scope.row.label}}<span class="cell-sub">{{scope.row.note}}</span></template></el-table-column><el-table-column label="方向" width="70"><template #default="scope"><el-tag size="small" effect="plain" :type="scope.row.direction==='IN'?'success':'info'">{{scope.row.direction==='IN'?'流入':'流出'}}</el-tag></template></el-table-column><el-table-column label="笔数" width="60" align="right" prop="count"></el-table-column><el-table-column label="金额" min-width="125" align="right"><template #default="scope"><button class="link-button money" @click="openMonthlyDetails('cash',scope.row.key)">{{money(scope.row.amountCents)}}</button></template></el-table-column></el-table><div class="table-footer"><span class="hint">{{monthlyCashFacts.length}} 条有效流水，点击金额查看明细</span><el-button link type="primary" @click="openMonthlyDetails('cash','ALL')">全部收付明细</el-button></div></div><p class="monthly-footnote">冲销保留原流水，反向流水按自身业务日期单列。跨月冲销不回写原月份；当月净收支包含其抵消效果。</p></section>
+            <section class="main-card"><div class="card-header"><h2>当月发生的成本</h2><span class="hint">不等于当月付款</span></div><div class="monthly-total"><span>当月成本合计</span><button class="link-button money" @click="openMonthlyDetails('cost','ALL')">{{costMoney(monthlyCostTotal)}}</button></div><div class="table-wrap"><el-table :data="monthlyCostGroups" row-key="key"><el-table-column label="成本分类" min-width="155"><template #default="scope">{{scope.row.label}}<span class="cell-sub">{{scope.row.note}}</span></template></el-table-column><el-table-column label="笔数" width="60" align="right" prop="count"></el-table-column><el-table-column label="金额" min-width="140" align="right"><template #default="scope"><button class="link-button money" @click="openMonthlyDetails('cost',scope.row.key)">{{costMoney(scope.row.amountUnits)}}</button></template></el-table-column></el-table></div><p class="monthly-footnote">仅汇总有效成本，按成本发生日期归属月份。人工取逐人核定金额；材料取实际耗用成本，保留四位小数精度。</p></section>
+          </div>
+          <div class="monthly-basis"><strong>收支与成本分开看，不重复扣减。</strong>工资核定形成成本，实际支付形成现金流出；采购材料付款不等于本月材料耗用。订单退款只影响收支，不直接推算售后成本。应收、待收和待付不是实际收支，也不将「净收支 − 成本」当作利润。</div>
+          <p class="prototype-note">暂无有效记录的分类显示零，不生成估算收付。日常经营收支可在「资金收付」登记，按所选登记日期计入对应月份，不再单独选择费用月份；材料采购及售后收付登记入口尚未接入，本页按已有记录展示汇总与追溯。</p>
+        </el-tab-pane>
+        <el-tab-pane label="工资结算" name="payroll">
+          <template v-if="pageMode==='list'">
+            <section class="main-card"><div class="card-header"><h2>员工工资核算</h2><el-button type="primary" @click="createPeriod"><el-icon><Plus></Plus></el-icon>&nbsp;新增核算期间</el-button></div>
+              <div class="filters"><el-input v-model="payrollFilters.keyword" class="keyword" clearable placeholder="员工姓名 / 编号" aria-label="搜索员工"><template #prefix><el-icon><Search></Search></el-icon></template></el-input><el-select v-model="payrollFilters.periodId" class="filter-select" aria-label="核算期间"><el-option label="全部期间" value="ALL"></el-option><el-option v-for="period in payrollPeriods" :key="period.id" :label="period.code" :value="period.id"></el-option></el-select><el-select v-model="payrollFilters.status" class="filter-select" aria-label="核定状态"><el-option label="全部状态" value="ALL"></el-option><el-option v-for="option in payrollStatuses" :key="option.value" :label="option.label" :value="option.value"></el-option></el-select><el-button text @click="resetPayrollFilters">重置</el-button></div>
+              <div class="table-wrap"><el-table :data="filteredPayroll" row-key="id" empty-text="暂无符合条件的员工工资记录">
+                <el-table-column label="员工" min-width="125"><template #default="scope"><button class="link-button" @click="openPayroll(scope.row)">{{scope.row.employeeName}}</button><span class="cell-sub">{{scope.row.employeeId}}</span></template></el-table-column>
+                <el-table-column label="核算期间" min-width="155"><template #default="scope">{{scope.row.periodCode}}<span class="cell-sub">{{scope.row.startDate}} 至 {{scope.row.endDate}}</span></template></el-table-column>
+                <el-table-column label="系统参考金额" min-width="130" align="right"><template #default="scope"><span class="money muted">{{money(scope.row.referenceCents)}}</span><span v-if="scope.row.referenceWarnings.length" class="cell-sub pending">参考不完整，需人工核实</span><span v-else class="cell-sub">仅供核算参考</span></template></el-table-column>
+                <el-table-column label="实际核定金额" min-width="130" align="right"><template #default="scope"><strong class="money">{{money(scope.row.actualCents)}}</strong><span v-if="scope.row.status==='PENDING'" class="cell-sub">待人工填写</span></template></el-table-column>
+                <el-table-column label="已付 / 待付" min-width="145" align="right"><template #default="scope"><span v-if="scope.row.status==='CONFIRMED'" class="money">{{money(paidCents(scope.row.id))}} / {{money(remainingPayable(scope.row))}}</span><span v-else class="muted">—</span></template></el-table-column>
+                <el-table-column label="状态" width="105"><template #default="scope"><el-tag :type="scope.row.status==='CONFIRMED'?'success':'info'" effect="plain" size="small">{{scope.row.status==='CONFIRMED'?'已核定':'待核定'}}</el-tag><span v-if="scope.row.status==='CONFIRMED'" class="cell-sub">{{billStatus(scope.row)}}</span></template></el-table-column>
+                <el-table-column label="操作" width="115" fixed="right"><template #default="scope"><el-button link type="primary" @click="openPayroll(scope.row)">{{scope.row.status==='PENDING'?'核算':'详情'}}</el-button><el-button v-if="scope.row.status==='CONFIRMED'&&remainingPayable(scope.row)>0" link type="primary" @click="openCash('PAYROLL_PAYMENT',scope.row)">付款</el-button></template></el-table-column>
+              </el-table><div class="table-footer"><span class="hint">共 {{filteredPayroll.length}} 条员工工资记录 · 系统参考不等于应付，每位员工需单独核定。</span></div></div>
+            </section><p class="prototype-note">核算期间只用于筛选。系统按任务历史快照提供参考，不自动确定工资；实际金额与说明由人工填写，逐人确认后才形成应付。确认工资不等于已经付款。</p>
+          </template>
+          <template v-else-if="selectedPayroll">
+            <button class="back-link" @click="backToOverview"><el-icon><ArrowLeft></ArrowLeft></el-icon>返回员工工资列表</button>
+            <div class="period-heading"><div><h2>{{selectedPayroll.employeeName}} <span class="muted">· {{selectedPayroll.employeeId}}</span></h2><p>{{selectedPayroll.periodCode}} · {{selectedPayroll.startDate}} 至 {{selectedPayroll.endDate}}</p></div><el-tag :type="selectedPayroll.status==='CONFIRMED'?'success':'info'" effect="plain">{{selectedPayroll.status==='CONFIRMED'?'已核定':'待人工核定'}}</el-tag></div>
+            <div class="payroll-layout">
+              <section class="detail-card"><div class="card-header"><h2>系统参考</h2><el-button v-if="selectedPayroll.status==='PENDING'" link type="primary" @click="refreshReference(selectedPayroll)">刷新参考</el-button><span v-else>核定时的参考快照</span></div>
+                <div class="payroll-body"><div class="reference-total"><span>系统参考金额<span v-if="selectedPayroll.referenceWarnings.length">（已知部分）</span></span><strong class="money">{{money(selectedPayroll.referenceCents)}}</strong></div><p class="hint">参考值不等于应付金额，也不会自动填入核定金额。小组任务按冻结成员均分，仅表示参考分配，不代表个人产量。</p><el-alert v-for="warning in selectedPayroll.referenceWarnings" :key="warning" :title="warning" type="warning" :closable="false" class="reference-warning"></el-alert>
+                  <el-empty v-if="!selectedPayroll.contributions.length" description="本期无任务参考，可按实际情况人工核定" :image-size="70"></el-empty>
+                  <section v-for="line in selectedPayroll.contributions" :key="line.sourceId" class="source-card"><div class="source-card-header"><strong>{{line.taskNo}} · {{line.process}}</strong><span class="money">{{line.amountCents===null?'参考待确认':money(line.amountCents)}}</span></div><p>{{line.productName||'未关联商品'}} · {{line.subjectName}} · {{line.source.businessDate}}<br />{{line.subjectType==='TEAM'?'小组冻结成员：'+line.memberNames:'个人任务'}} · {{taskTypeLabel(line.source.taskType)}}</p><el-table :data="line.source.lines" size="small"><el-table-column label="完成数量" min-width="95" align="right"><template #default="scope">{{scope.row.qualified+scope.row.repair+scope.row.scrapped+scope.row.transferred}}</template></el-table-column><el-table-column prop="unfinished" label="未完成（不计）" min-width="115" align="right"></el-table-column><el-table-column label="历史人工单价" min-width="130" align="right"><template #default="scope">{{costMoney(scope.row.unitCostUnits)}}</template></el-table-column></el-table><p class="hint">来源 {{line.sourceId}} · 单价为任务历史标准，按明细四舍五入到分；不是实际工资。</p></section>
+                  <p class="hint">责任与激励规则未明确时只提示核实，不自动加减工资。实际调整依据写入右侧核定说明。</p>
+                </div>
+              </section>
+              <section class="detail-card payroll-manual"><div class="card-header"><h2>人工核定</h2><span>每位员工单独确认</span></div><div class="payroll-body">
+                <el-form v-if="selectedPayroll.status==='PENDING'" label-position="top" @submit.prevent="requestPayrollConfirm"><el-form-item label="实际核定金额（元）" required><el-input v-model="payrollDraft.amount" inputmode="decimal" maxlength="9" placeholder="请人工填写，不自动采用参考值"><template #prefix>¥</template></el-input><small class="field-hint">可以与参考不同；零元也需说明核定依据。</small></el-form-item><el-form-item label="核定说明" required><el-input v-model="payrollDraft.note" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="填写实际工资依据及调整说明"></el-input></el-form-item><div class="confirm-tip">确认仅针对当前员工。未确认前没有应付金额；确认后记录核定金额与参考快照，不生成现金付款。</div><el-button type="primary" class="payroll-confirm" @click="requestPayrollConfirm">核对并确认该员工</el-button></el-form>
+                <template v-else><dl class="info-grid"><dt>实际核定金额</dt><dd><strong class="money">{{money(selectedPayroll.actualCents)}}</strong></dd><dt>核定说明</dt><dd class="payroll-note">{{selectedPayroll.note}}</dd><dt>核定时间</dt><dd>{{selectedPayroll.confirmedAt}}</dd><dt>已付金额</dt><dd class="money">{{money(paidCents(selectedPayroll.id))}}</dd><dt>待付金额</dt><dd class="money">{{money(remainingPayable(selectedPayroll))}}</dd><dt>付款状态</dt><dd>{{billStatus(selectedPayroll)}}</dd></dl><div class="confirm-tip">人工核定结果已确认，不随任务参考变化而改写。付款单独登记，避免将核定误当成已付款。</div><el-button v-if="remainingPayable(selectedPayroll)>0" type="primary" class="payroll-confirm" @click="openCash('PAYROLL_PAYMENT',selectedPayroll)">登记该员工付款</el-button></template>
+              </div></section>
+            </div>
+          </template>
+        </el-tab-pane>
+        <el-tab-pane label="成本台账" name="costs"><section class="main-card"><div class="card-header"><h2>实际成本记录</h2><span>成本金额保留 4 位小数 · 不等于现金支出</span></div>
+          <div class="filters"><el-input v-model="costFilters.keyword" class="keyword" clearable placeholder="成本编号 / 来源 / 订单 / 商品" aria-label="搜索成本"></el-input><el-select v-model="costFilters.category" class="filter-select" aria-label="成本分类"><el-option label="全部分类" value="ALL"></el-option><el-option v-for="category in costCategories" :key="category.value" :label="category.label" :value="category.value"></el-option></el-select><el-select v-model="costFilters.status" class="filter-select" aria-label="成本有效性"><el-option label="全部记录" value="ALL"></el-option><el-option label="有效记录" value="VALID"></el-option><el-option label="已失效" value="INVALID"></el-option></el-select><el-button text @click="resetCostFilters">重置</el-button></div>
+          <div class="table-wrap"><el-table :data="filteredCosts" row-key="id" empty-text="暂无匹配成本记录"><el-table-column label="记录 / 来源" min-width="185"><template #default="scope"><button class="link-button" @click="showCost(scope.row)">{{scope.row.no}}</button><span class="cell-sub">{{scope.row.sourceNo}}</span></template></el-table-column><el-table-column label="分类" width="120"><template #default="scope">{{costCategoryLabel(scope.row.category)}}</template></el-table-column><el-table-column label="归集对象" min-width="170"><template #default="scope"><span>{{scope.row.orderNo||scope.row.periodCode||'工作室经营'}}</span><span class="cell-sub">{{scope.row.productName||scope.row.description}}</span></template></el-table-column><el-table-column label="业务日期" width="115" prop="businessDate"></el-table-column><el-table-column label="计价依据" min-width="155"><template #default="scope">{{scope.row.basis}}</template></el-table-column><el-table-column label="实际成本" min-width="135" align="right"><template #default="scope"><span class="money">{{costMoney(scope.row.amountUnits)}}</span></template></el-table-column><el-table-column label="状态" width="95"><template #default="scope"><el-tag effect="plain" size="small" :type="scope.row.valid?'success':'info'">{{scope.row.valid?'有效':'已失效'}}</el-tag></template></el-table-column><el-table-column label="操作" width="70" fixed="right"><template #default="scope"><el-button link type="primary" @click="showCost(scope.row)">详情</el-button></template></el-table-column></el-table><div class="table-footer"><span class="hint">{{filteredCosts.length}} 条记录 · 仅有效记录进入合计，历史更正记录保留。</span><span class="hint">当前筛选有效成本 <strong class="money">{{costMoney(filteredCosts.filter(entry=>entry.valid).reduce((total,entry)=>total+entry.amountUnits,0))}}</strong></span></div></div>
+        </section><p class="prototype-note">生产材料使用历史快照中的工作室承担价；人工只在员工人工核定时登记，按员工及期间归集，不按系统参考自动分摊至订单。商品预算中的房租、杂费等预计分摊，不自动转为实际成本。本版先确认查询与追溯，归集重试、分摊和更正操作后续补充。</p></el-tab-pane>
+        <el-tab-pane label="资金收付" name="cash"><section class="main-card"><div class="card-header"><h2>现金流水</h2><div class="header-actions"><a class="link-button" href="orders-element-plus.html" @click.prevent="goOrder()">前往订单登记收退款</a><el-button @click="openCash('PAYROLL_PAYMENT')">登记工资付款</el-button><el-button type="primary" @click="openDaily">登记日常收支</el-button></div></div>
+          <div class="filters"><el-input v-model="cashFilters.keyword" class="keyword" clearable placeholder="流水编号 / 分类 / 用途" aria-label="搜索现金流水"></el-input><el-select v-model="cashFilters.type" class="filter-select" aria-label="收付类型"><el-option label="全部类型" value="ALL"></el-option><el-option v-for="type in cashTypes" :key="type.value" :label="type.label" :value="type.value"></el-option><el-option label="冲销事实" value="REVERSAL"></el-option></el-select><el-button text @click="resetCashFilters">重置</el-button></div>
+            <div class="table-wrap"><el-table :data="filteredCash" row-key="id" empty-text="暂无匹配现金流水"><el-table-column label="流水编号" min-width="180"><template #default="scope"><button class="link-button" @click="showCash(scope.row)">{{scope.row.no}}</button></template></el-table-column><el-table-column label="业务类型" min-width="125"><template #default="scope">{{scope.row.reversesId?'冲销事实':cashTypeLabel(scope.row.type)}}<span v-if="scope.row.reversesId" class="cell-sub">{{cashTypeLabel(scope.row.type)}}</span></template></el-table-column><el-table-column label="业务来源" min-width="200"><template #default="scope"><button v-if="scope.row.orderId" class="link-button" @click="goOrder(scope.row.orderId)">{{sourceName(scope.row.allocations[0].sourceId)}}</button><span v-else v-for="line in scope.row.allocations" :key="line.sourceId" class="cell-sub">{{sourceName(line.sourceId)}}</span></template></el-table-column><el-table-column label="业务日期" prop="businessDate" width="115"></el-table-column><el-table-column label="金额" min-width="125" align="right"><template #default="scope"><span class="money" :class="scope.row.direction==='IN'?'positive':''">{{scope.row.direction==='IN'?'+':'−'}}{{money(scope.row.amountCents)}}</span></template></el-table-column><el-table-column label="记录状态" width="110"><template #default="scope"><el-tag effect="plain" size="small" :type="cashStatus(scope.row)==='有效'?'success':'info'">{{cashStatus(scope.row)}}</el-tag></template></el-table-column><el-table-column label="操作" min-width="130" fixed="right"><template #default="scope"><el-button link type="primary" @click="showCash(scope.row)">详情</el-button><el-tooltip :content="reverseReason(scope.row)||'追加反向现金事实'" placement="top"><span><el-button link type="primary" :disabled="!!reverseReason(scope.row)" @click="requestReverse(scope.row)">冲销</el-button></span></el-tooltip></template></el-table-column></el-table><div class="table-footer"><span class="hint">{{filteredCash.length}} 条现金事实 · 原记录不直接编辑，冲销新增反向事实。</span></div></div>
+        </section><p class="prototype-note">订单收款和退款均从订单详情登记，财务只查询同一条关联流水，不重复录入。工资支付仅针对已人工核定金额。日常经营收支在此登记，日常收支按所选登记日期归属月份，需要计入经营费用的支出也归属同一个月份，无需重复录入。材料采购及售后收付登记后续补充。</p></el-tab-pane>
+      </el-tabs>
+      <p class="prototype-note">原型示例，不写真实账务。订单及其收退款由浏览器保存，并通过订单 / 财务模块入口切换联动；工资、日常收支与成本仍为本页示例，刷新恢复初始数据。</p>
+    </section>
+  </main>
+
+  <el-dialog v-model="periodFormVisible" title="新增核算期间" width="470px" :close-on-click-modal="false"><el-form label-position="top" @submit.prevent="savePeriod"><el-form-item label="期间名称" required><el-input v-model="periodDraft.code" maxlength="30" placeholder="例如：2026 年 10 月下旬"></el-input></el-form-item><el-form-item label="起止日期" required><el-date-picker v-model="periodDraft.dates" type="daterange" value-format="YYYY-MM-DD" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" style="width:100%"></el-date-picker><small class="field-hint">期间不允许重叠；新建只建立待核定员工记录，不形成应付或成本。</small></el-form-item></el-form><template #footer><div class="dialog-actions"><el-button @click="periodFormVisible=false">取消</el-button><el-button type="primary" @click="savePeriod">创建期间</el-button></div></template></el-dialog>
+  <el-dialog v-model="payrollPreviewVisible" title="确认该员工核定工资" width="530px" :close-on-click-modal="false"><template v-if="selectedPayroll"><div class="confirm-info"><span class="label">员工</span><strong>{{selectedPayroll.employeeName}} · {{selectedPayroll.employeeId}}</strong><span class="label">核算期间</span><span>{{selectedPayroll.periodCode}}</span><span class="label">系统参考（非应付）</span><span class="money">{{money(selectedPayroll.referenceCents)}}</span><span class="label">实际核定金额</span><strong class="money">{{money(parseMoney(payrollDraft.amount))}}</strong><span class="label">核定说明</span><span class="payroll-note">{{payrollDraft.note}}</span></div><div class="confirm-tip">只确认此员工的人工核定金额，不确认其他员工。核定金额与参考可以不同；确认会记录应付与人工成本，不代表付款。</div></template><template #footer><div class="dialog-actions"><el-button @click="payrollPreviewVisible=false">返回修改</el-button><el-button type="primary" @click="confirmPayroll">确认该员工</el-button></div></template></el-dialog>
+
+  <el-dialog v-model="dailyFormVisible" title="登记日常实际收支" width="600px" :close-on-click-modal="false"><el-form label-position="top" @submit.prevent="requestDailyConfirm"><div class="form-grid">
+    <el-form-item label="收支方向" required><el-select v-model="dailyDraft.direction" @change="changeDailyDirection"><el-option label="日常支出" value="OUT"></el-option><el-option label="日常收入" value="IN"></el-option></el-select></el-form-item>
+    <el-form-item label="收支分类" required><el-select v-model="dailyDraft.category" placeholder="选择日常分类"><el-option v-for="category in dailyCategoryOptions" :key="category.value" :label="category.label" :value="category.value"></el-option></el-select></el-form-item>
+    <el-form-item label="登记日期" required><el-date-picker v-model="dailyDraft.businessDate" type="date" value-format="YYYY-MM-DD" :disabled-date="disableFutureDate"></el-date-picker><small class="field-hint">按所选日期计入对应月份，经营费用也使用同一日期。</small></el-form-item>
+    <el-form-item label="实际金额（元）" required><el-input v-model="dailyDraft.amount" inputmode="decimal" maxlength="9" placeholder="填写实际收到或付出的金额"><template #prefix>¥</template></el-input></el-form-item>
+    <el-form-item label="用途说明" required class="wide"><el-input v-model="dailyDraft.note" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="例如：支付 10 月工作室房租"></el-input></el-form-item><el-form-item label="收支凭证" class="wide"><payment-vouchers v-model="dailyDraft.vouchers" :disabled="!dailyFormVisible||dailyPreviewVisible" @busy-change="dailyVoucherBusy=$event"></payment-vouchers></el-form-item>
+    <el-form-item v-if="dailyDraft.direction==='OUT'" class="wide daily-cost-choice"><el-checkbox v-model="dailyDraft.countAsCost">同时计入经营费用</el-checkbox><small class="field-hint">仅在费用尚未归集时勾选，费用与本条收支记录按所选登记日期计入同一个月份，无需再录入。已在其他业务中记录的成本不要重复登记；不勾选仅记录实际支出。</small></el-form-item>
+  </div><div class="confirm-tip">只记录非订单、非工资的日常实际收支。订单收款仍从订单详情发起；工资、材料采购和售后收付请从原业务登记，不在此重复记录。</div></el-form><template #footer><div class="dialog-actions"><el-button @click="dailyFormVisible=false">取消</el-button><el-button type="primary" :disabled="dailyVoucherBusy" @click="requestDailyConfirm">核对日常收支</el-button></div></template></el-dialog>
+  <el-dialog v-model="dailyPreviewVisible" title="确认日常收支" width="550px" :close-on-click-modal="false"><div class="confirm-info"><span class="label">收支方向</span><strong>{{dailyDraft.direction==='IN'?'日常收入':'日常支出'}}</strong><span class="label">收支分类</span><span>{{dailyCategoryLabel(dailyDraft.category)}}</span><span class="label">登记日期</span><span>{{dailyDraft.businessDate}}</span><span class="label">实际金额</span><strong class="money">{{money(parseMoney(dailyDraft.amount))}}</strong><span class="label">用途说明</span><span class="daily-purpose">{{dailyDraft.note}}</span><span class="label">经营费用</span><span>{{dailyDraft.countAsCost?'同时登记一笔关联经营费用':'不新增成本记录'}}</span></div><h3>本次凭证</h3><payment-vouchers :model-value="dailyDraft.vouchers" readonly></payment-vouchers><div class="confirm-tip">确认后保存这条日常收支记录，按所选登记日期计入对应月份。{{dailyDraft.countAsCost?'经营费用也计入同一个月份，无需重复录入；冲销时保留原记录并追加更正。':'本次不计入经营费用或其他成本。'}}不改变订单应收与工资核定结果。</div><template #footer><div class="dialog-actions"><el-button @click="dailyPreviewVisible=false;dailyFormVisible=true">返回修改</el-button><el-button @click="dailyPreviewVisible=false">取消</el-button><el-button type="primary" @click="confirmDaily">确认登记</el-button></div></template></el-dialog>
+
+  <el-dialog v-model="cashFormVisible" title="登记工资付款" width="650px" :close-on-click-modal="false"><el-form label-position="top" @submit.prevent="requestCashConfirm"><div class="form-grid">
+    <el-form-item label="业务类型" required><el-input model-value="工资付款" readonly></el-input></el-form-item>
+    <el-form-item label="业务日期" required><el-date-picker v-model="cashDraft.businessDate" type="date" value-format="YYYY-MM-DD" :disabled-date="disableFutureDate"></el-date-picker></el-form-item>
+    <el-form-item label="现金金额（元）" required><el-input v-model="cashDraft.amount" inputmode="decimal" maxlength="9" placeholder="0.00" @change="syncSingleAllocation"><template #prefix>¥</template></el-input></el-form-item>
+    <el-form-item label="备注" class="wide"><el-input v-model="cashDraft.note" type="textarea" :rows="2" maxlength="200" placeholder="记录本次付款说明"></el-input></el-form-item><el-form-item label="付款凭证" class="wide"><payment-vouchers v-model="cashDraft.vouchers" :disabled="!cashFormVisible||cashPreviewVisible" @busy-change="cashVoucherBusy=$event"></payment-vouchers></el-form-item>
+  </div><div class="allocation-header"><strong>分配到业务来源</strong><el-button link type="primary" :disabled="cashDraft.allocations.length>=10" @click="addAllocation">添加来源</el-button></div>
+  <div v-for="line in cashDraft.allocations" :key="line.key" class="allocation-row"><div><p class="allocation-label">已核定员工应付</p><el-select v-model="line.sourceId" filterable placeholder="选择来源"><el-option v-for="source in sourceOptions" :key="source.id" :label="source.label" :value="source.id" :disabled="remainingEligibility(source.id)<=0"></el-option></el-select><small v-if="line.sourceId" class="field-hint">剩余允许额度 {{money(remainingEligibility(line.sourceId))}}</small></div><div><p class="allocation-label">分配金额（元）</p><el-input v-model="line.amount" inputmode="decimal" maxlength="9" placeholder="0.00"></el-input></div><el-button link type="danger" :disabled="cashDraft.allocations.length===1" aria-label="移除分配来源" @click="removeAllocation(line.key)"><el-icon><Close></Close></el-icon></el-button></div>
+  <div v-if="!eligibleSources.length" class="field-hint pending">暂无可付款的员工；请先逐人核定工资，且员工仍有待付金额。</div>
+  <div class="allocation-total"><span>分配合计 <strong class="money">{{money(allocationTotal)}}</strong></span><span>现金金额 <strong class="money">{{money(parseMoney(cashDraft.amount))}}</strong></span></div><small class="field-hint">分配合计必须与现金金额一致。工资可分配给多个已核定员工，不超过各员工的剩余待付金额。</small></el-form><template #footer><div class="dialog-actions"><el-button @click="cashFormVisible=false">取消</el-button><el-button type="primary" :disabled="cashVoucherBusy" @click="requestCashConfirm">核对付款</el-button></div></template></el-dialog>
+  <el-dialog v-model="cashPreviewVisible" title="确认工资付款" width="570px" :close-on-click-modal="false"><div class="confirm-info"><span class="label">业务类型</span><strong>{{cashTypeLabel(cashDraft.type)}}</strong><span class="label">业务日期</span><span>{{cashDraft.businessDate}}</span><span class="label">现金方向</span><span>{{cashDirection(cashDraft.type)==='IN'?'流入':'流出'}} · <strong class="money">{{money(parseMoney(cashDraft.amount))}}</strong></span></div><el-table :data="cashDraft.allocations" row-key="key"><el-table-column label="分配来源" min-width="200"><template #default="scope">{{sourceName(scope.row.sourceId)}}</template></el-table-column><el-table-column label="分配金额" width="130" align="right"><template #default="scope">{{money(parseMoney(scope.row.amount))}}</template></el-table-column></el-table><h3>本次凭证</h3><payment-vouchers :model-value="cashDraft.vouchers" readonly></payment-vouchers><div class="confirm-tip">确认后新增一笔示例付款流水及分配，更新来源已付金额。工资付款不修改人工核定结果，也不重复登记人工成本。</div><template #footer><div class="dialog-actions"><el-button @click="cashPreviewVisible=false;cashFormVisible=true">返回修改</el-button><el-button type="primary" @click="confirmCash">确认登记</el-button></div></template></el-dialog>
+  <el-dialog v-model="reverseVisible" title="确认冲销现金流水" width="490px" :close-on-click-modal="false"><template v-if="reverseTarget"><div class="confirm-info"><span class="label">原流水</span><strong>{{reverseTarget.no}}</strong><span class="label">金额</span><span class="money">{{money(reverseTarget.amountCents)}}</span></div><el-input v-model="reverseNote" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="请填写冲销原因"></el-input><div class="confirm-tip">新增同金额、反方向的现金事实，保留原流水及分配。工资应付的支付状态同步恢复，人工核定结果与人工成本不被重开。<span v-if="reverseTarget.dailyId&&linkedDailyCost(reverseTarget)">这笔日常支出同时追加一条负数经营费用更正，按冲销日期归属月份，保留原成本记录。</span></div></template><template #footer><div class="dialog-actions"><el-button @click="reverseVisible=false">取消</el-button><el-button type="primary" @click="submitReverse">确认冲销</el-button></div></template></el-dialog>
+
+  <el-drawer v-model="monthlyDetailsVisible" size="700px"><template #header><div class="drawer-header"><h2>{{summaryMonth}} · {{monthlyDetails.label}}</h2><el-tag size="small" type="info" effect="plain">月度明细</el-tag></div></template>
+    <p class="monthly-detail-note">{{monthlyDetails.kind==='cash'?'仅列当月有效收付流水，冲销按反向事实业务日期归属。':'仅列当月有效成本，已失效或被更正的历史记录不计入合计。'}}点击记录编号可查看原始详情。</p>
+    <el-table :data="monthlyDetailsRows" row-key="id" empty-text="本月此分类暂无有效记录">
+      <el-table-column label="记录编号" min-width="175"><template #default="scope"><button class="link-button" @click="showMonthlyRecord(scope.row)">{{scope.row.no}}</button></template></el-table-column>
+      <el-table-column label="发生日期" prop="businessDate" width="110"></el-table-column>
+      <el-table-column label="来源 / 说明" min-width="175"><template #default="scope"><template v-if="monthlyDetails.kind==='cash'"><span v-if="scope.row.reversesId" class="cell-sub">冲销 {{scope.row.reversesId}}</span><span v-for="line in scope.row.allocations" :key="line.sourceId" class="cell-sub">{{sourceName(line.sourceId)}}</span>{{scope.row.note}}</template><template v-else>{{scope.row.employeeName||scope.row.orderNo||scope.row.periodCode||scope.row.sourceNo}}<span class="cell-sub">{{scope.row.description}}</span></template></template></el-table-column>
+      <el-table-column label="金额" min-width="135" align="right"><template #default="scope"><span class="money">{{monthlyDetails.kind==='cash'?(scope.row.direction==='IN'?'+':'−')+money(scope.row.amountCents):costMoney(scope.row.amountUnits)}}</span></template></el-table-column>
+    </el-table><p class="monthly-detail-note">共 {{monthlyDetailsRows.length}} 条记录。汇总只查询已有事实，不在这里新增收款、付款或成本。</p>
+  </el-drawer>
+
+  <el-drawer v-model="drawerVisible" size="530px"><template #header><div class="drawer-header"><h2>{{drawerKind==='bill'?'工资来源明细':drawerKind==='cost'?'成本记录详情':'现金事实详情'}}</h2><el-tag size="small" type="info" effect="plain">追溯记录</el-tag></div></template>
+    <template v-if="drawerKind==='bill'&&drawerRecord"><div class="drawer-section"><h3>{{drawerRecord.employeeName}} · {{drawerRecord.employeeId}}</h3><dl class="info-grid"><dt>系统参考金额</dt><dd class="money">{{money(drawerRecord.referenceCents)}}</dd><dt>实际核定金额</dt><dd class="money">{{money(drawerRecord.actualCents)}}</dd><dt>分配方式</dt><dd>个人任务计入本人；小组任务参考按任务冻结成员均分。</dd></dl></div><div class="drawer-section"><h3>来源与到人参考</h3><section v-for="line in drawerRecord.contributions" :key="line.sourceId" class="source-card"><div class="source-card-header"><strong>{{line.taskNo}}</strong><strong class="money">{{money(line.amountCents)}}</strong></div><p>{{line.subjectName}} · {{line.process}} · {{line.productName||'未关联商品'}}<br />{{line.subjectType==='TEAM'?'小组完整成员：'+line.memberNames:'个人执行'}}<br />来源 {{line.sourceId}} · 工资规则 PAYROLL_BASE_V1 / HALF_UP_CENT_V1</p></section></div><p class="drawer-note">到人金额仅为系统参考分配，不表示小组成员的个人产量；不使用效率因子加权。</p></template>
+    <template v-else-if="drawerKind==='cost'&&drawerRecord"><div class="drawer-section"><h3>{{drawerRecord.no}}</h3><dl class="info-grid"><dt>来源事实</dt><dd>{{drawerRecord.sourceNo}} · 来源 V{{drawerRecord.sourceVersion}}</dd><dt>成本分类</dt><dd>{{costCategoryLabel(drawerRecord.category)}}</dd><dt>发生日期</dt><dd>{{drawerRecord.businessDate}}</dd><dt>记录日期</dt><dd>{{drawerRecord.recordedDate}}</dd><dt>计价依据</dt><dd>{{drawerRecord.basis}}</dd><dt>承担方</dt><dd>工作室</dd><dt>实际成本</dt><dd class="money">{{costMoney(drawerRecord.amountUnits)}}</dd><template v-if="drawerRecord.cashId"><dt>关联收付流水</dt><dd><button class="link-button" @click="showDailyCash(drawerRecord)">{{drawerRecord.cashId}}</button></dd></template><template v-if="drawerRecord.reversesId"><dt>更正原成本</dt><dd>{{drawerRecord.reversesId}}</dd></template><dt>归集对象</dt><dd>{{drawerRecord.orderNo||drawerRecord.periodCode||'工作室经营'}} · {{drawerRecord.productName||drawerRecord.description}}</dd><dt>记录状态</dt><dd>{{drawerRecord.valid?'有效':'已失效'}}{{drawerRecord.correctionNote?' · '+drawerRecord.correctionNote:''}}</dd></dl></div><div class="drawer-section"><h3>计价明细</h3><el-table :data="drawerRecord.lines"><el-table-column prop="description" label="项目" min-width="155"></el-table-column><el-table-column prop="quantity" label="数量" width="70" align="right"></el-table-column><el-table-column label="金额" width="135" align="right"><template #default="scope">{{costMoney(scope.row.amountUnits)}}</template></el-table-column></el-table></div><p class="drawer-note">工资人工以员工人工核定结果登记，生产材料取历史工序的非人工承担价，不重复计入商品的预计人工或经营分摊。</p></template>
+    <template v-else-if="drawerKind==='cash'&&drawerRecord"><div class="drawer-section"><h3>{{drawerRecord.no}}</h3><dl class="info-grid"><dt>业务类型</dt><dd>{{cashTypeLabel(drawerRecord.type)}}{{drawerRecord.reversesId?' · 冲销事实':''}}</dd><template v-if="drawerRecord.dailyId"><dt>日常收支分类</dt><dd>{{dailyCategoryLabel(dailyEntryFor(drawerRecord)?.category)}}</dd><dt>日常记录</dt><dd>{{drawerRecord.dailyId}}</dd><dt>关联经营费用</dt><dd><button v-if="linkedDailyCost(drawerRecord)" class="link-button" @click="showDailyCost(drawerRecord)">{{drawerRecord.costId}}</button><span v-else>本次不新增成本</span></dd></template><dt v-if="drawerRecord.orderId">关联订单</dt><dd v-if="drawerRecord.orderId"><button class="link-button" @click="goOrder(drawerRecord.orderId)">{{drawerRecord.orderId}}</button></dd><dt>业务日期</dt><dd>{{drawerRecord.businessDate}}</dd><dt>记录时间</dt><dd>{{drawerRecord.recordedAt}}</dd><dt>现金方向</dt><dd>{{drawerRecord.direction==='IN'?'流入':'流出'}}</dd><dt>金额 / 币种</dt><dd class="money">{{money(drawerRecord.amountCents)}} · CNY</dd><dt>记录状态</dt><dd>{{cashStatus(drawerRecord)}}</dd><dt v-if="drawerRecord.reversesId">冲销原事实</dt><dd v-if="drawerRecord.reversesId">{{drawerRecord.reversesId}}</dd><dt>收付备注</dt><dd>{{drawerRecord.note||'未填写'}}</dd></dl></div><div class="drawer-section"><h3>{{drawerRecord.reversesId?'原记录收付凭证':'本条收付凭证'}}</h3><payment-vouchers :model-value="cashVouchers(drawerRecord)" readonly></payment-vouchers></div><div class="drawer-section"><h3>业务分配</h3><el-table :data="drawerRecord.allocations" row-key="sourceId"><el-table-column label="业务来源" min-width="205"><template #default="scope">{{sourceName(scope.row.sourceId)}}</template></el-table-column><el-table-column label="分配金额" width="135" align="right"><template #default="scope">{{money(scope.row.amountCents)}}</template></el-table-column></el-table></div><p class="drawer-note">原现金事实不可编辑。冲销通过反向事实抵消原收付，恢复来源可收 / 可付金额，不删除历史。日常支出若关联经营费用，冲销同时追加负数成本更正，不重复抵消。</p></template>
+  </el-drawer>
+</div>
+<script>
+const {createApp,ref,reactive,computed}=Vue;
+const app=createApp({setup(){
+  const activeTab=ref('monthly');
+  const summaryMonth=ref(today().slice(0,7));
+  const monthlyDetailsVisible=ref(false);
+  const monthlyDetails=reactive({kind:'cash',key:'ALL',label:'全部收付明细'});
+  const pageMode=ref('list');
+  const selectedPayroll=ref(null);
+  const payrollDraft=reactive({amount:'',note:''});
+  const payrollPreviewVisible=ref(false);
+  const payrollFingerprint=ref('');
+  const periodFormVisible=ref(false);
+  const cashFormVisible=ref(false);
+  const cashPreviewVisible=ref(false);
+  const dailyFormVisible=ref(false);
+  const dailyPreviewVisible=ref(false);
+  const dailyFingerprint=ref('');
+  const dailyDraft=reactive({direction:'OUT',category:'',businessDate:today(),amount:'',note:'',countAsCost:false,vouchers:[]});
+  const dailyVoucherBusy=ref(false);
+  const cashVoucherBusy=ref(false);
+  const dailyEntries=reactive([]);
+  const dailyCategories=[
+    {value:'RENT',label:'房租 / 场地',direction:'OUT'},
+    {value:'UTILITIES',label:'水电 / 网络',direction:'OUT'},
+    {value:'FREIGHT',label:'日常运费',direction:'OUT'},
+    {value:'OFFICE',label:'办公 / 日常用品',direction:'OUT'},
+    {value:'OTHER_EXPENSE',label:'其他日常支出',direction:'OUT'},
+    {value:'RECYCLE',label:'废旧物品处理收入',direction:'IN'},
+    {value:'SUBSIDY',label:'补贴收入',direction:'IN'},
+    {value:'OTHER_INCOME',label:'其他日常收入',direction:'IN'}
+  ];
+  const dailyCategoryOptions=computed(()=>dailyCategories.filter(category=>category.direction===dailyDraft.direction));
+  const reverseVisible=ref(false);
+  const reverseTarget=ref(null);
+  const reverseNote=ref('');
+  const drawerVisible=ref(false);
+  const drawerKind=ref('bill');
+  const drawerRecord=ref(null);
+  const payrollFilters=reactive({keyword:'',periodId:'PP-OCT',status:'ALL'});
+  const costFilters=reactive({keyword:'',category:'ALL',status:'ALL'});
+  const cashFilters=reactive({keyword:'',type:'ALL'});
+  const periodDraft=reactive({code:'',dates:[]});
+  const payrollStatuses=[{value:'PENDING',label:'待核定'},{value:'CONFIRMED',label:'已核定'}];
+  const costCategories=[{value:'DIRECT_MATERIAL',label:'生产材料'},{value:'DIRECT_LABOR',label:'生产人工'},{value:'AFTER_SALES',label:'售后成本'},{value:'OPERATING_EXPENSE',label:'经营费用'},{value:'ADJUSTMENT',label:'成本调整'}];
+  const orderStore=window.YumiOrderStore;
+  const paymentTypes=[{value:'PAYROLL_PAYMENT',label:'工资付款'}];
+  const cashTypes=[{value:'ORDER_RECEIPT',label:'订单收款'},{value:'ORDER_REFUND',label:'订单退款'},{value:'PAYROLL_PAYMENT',label:'工资付款'},{value:'MATERIAL_PAYMENT',label:'材料采购付款'},{value:'AFTER_SALES_PAYMENT',label:'售后相关付款'},{value:'OPERATING_PAYMENT',label:'日常经营支出'},{value:'OTHER_INCOME',label:'其他收入'},{value:'OTHER_PAYMENT',label:'其他支出'}];
+  function clone(value){return JSON.parse(JSON.stringify(value))}
+  function today(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
+  function recordedAt(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date())}
+  function parseMoney(value){if(value===null||value===undefined)return null;const text=String(value).trim();if(!/^\d{1,6}(?:\.\d{1,2})?$/.test(text))return null;const [whole,fraction='']=text.split('.');return Number(whole)*100+Number(fraction.padEnd(2,'0'))}
+  function money(cents){return cents===null||!Number.isFinite(cents)?'—':new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',minimumFractionDigits:2,maximumFractionDigits:2}).format(cents/100)}
+  function costMoney(units){return new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',minimumFractionDigits:4,maximumFractionDigits:4}).format(units/10000)}
+  function validDate(value){if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const date=new Date(`${value}T00:00:00Z`);return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value}
+  function disableFutureDate(date){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(date)>today()}
+  const employees=[{id:'E-0001',name:'林小满'},{id:'E-0002',name:'周禾'},{id:'E-0003',name:'陈一'},{id:'E-0004',name:'许宁'},{id:'E-0005',name:'宋晴'}];
+  function laborRecord(id,taskNo,date,kind,quantity){
+    const isTeam=kind==='TEAM';
+    const isOther=kind==='OTHER';
+    const orderMonth=date.slice(0,7).replace('-','');
+    return{id,taskNo,businessDate:date,valid:true,sourceVersion:1,taskType:isOther?'OTHER_TASK':'NORMAL_PRODUCTION',linkedProduct:true,productName:isTeam?'花束兔':isOther?'小云朵':'花束兔',orderNo:isOther?`OD-${orderMonth}05-02`:`OD-${orderMonth}01-08`,process:isTeam?'捏毛装袋':isOther?'其他任务':'制作',subjectType:isTeam?'TEAM':'EMPLOYEE',subjectName:isTeam?'二组':isOther?'陈一':'林小满',members:clone(isTeam?[employees[1],employees[3],employees[4]]:isOther?[employees[2]]:[employees[0]]),lines:[{qualified:quantity,repair:0,scrapped:0,transferred:0,unfinished:10,unitCostUnits:isTeam?32000:isOther?12500:45000}]};
+  }
+  const laborSources=reactive([
+    laborRecord('LS-SEP-01','T-0901','2026-09-30','PERSON',100),laborRecord('LS-SEP-02','T-0902','2026-09-30','TEAM',150),laborRecord('LS-SEP-03','T-0903','2026-09-30','OTHER',40),
+    laborRecord('LS-OCT-01','T-0104','2026-10-07','PERSON',50),laborRecord('LS-OCT-02','T-0106','2026-10-07','TEAM',75),laborRecord('LS-OCT-03','T-0108','2026-10-07','OTHER',10),
+    {id:'LS-EXTRA-01',taskNo:'T-0110',businessDate:'2026-10-08',valid:true,sourceVersion:1,taskType:'EXTRA_PRODUCTION',linkedProduct:true,productName:'花束兔',orderNo:'OD-20261001-08',process:'制作',subjectType:'EMPLOYEE',subjectName:'林小满',members:[clone(employees[0])],lines:[{qualified:10,repair:0,scrapped:0,transferred:0,unfinished:0,unitCostUnits:45000}]}
+  ]);
+  const responsibilitySources=reactive([
+    {id:'RS-TEAM-01',no:'RS-20261008-01',businessDate:'2026-10-08',valid:true,bearer:'TEAM',employeeIds:['E-0002','E-0004','E-0005'],subjectName:'二组（任务成员快照）',description:'制作质量问题，责任事实已登记，扣款规则尚未确认'},
+    {id:'RS-STUDIO-01',no:'RS-20261008-02',businessDate:'2026-10-08',valid:true,bearer:'STUDIO',employeeIds:[],subjectName:'工作室',description:'工作室承担材料问题，不直接形成员工扣款'},
+    {id:'RS-WAIVED-01',no:'RS-20261008-03',businessDate:'2026-10-08',valid:true,bearer:'WAIVED',employeeIds:[],subjectName:'免追责',description:'保留已确认免追责事实，不在接收阶段丢弃'}
+  ]);
+  const payrollPeriods=reactive([
+    {id:'PP-PENDING',code:'10 月第 2 周',startDate:'2026-10-08',endDate:'2026-10-15'},
+    {id:'PP-OCT',code:'10 月第 1 周',startDate:'2026-10-01',endDate:'2026-10-07'},
+    {id:'PP-SEP',code:'2026 年 9 月',startDate:'2026-09-01',endDate:'2026-09-30'}
+  ]);
+  function periodLaborSources(period){const seen=new Set();return laborSources.filter(source=>{if(!source.valid||source.businessDate<period.startDate||source.businessDate>period.endDate||seen.has(source.id))return false;seen.add(source.id);return true})}
+  function periodResponsibilitySources(period){return responsibilitySources.filter(source=>source.valid&&source.businessDate>=period.startDate&&source.businessDate<=period.endDate)}
+  function finishedQuantity(source){return source.lines.reduce((total,line)=>total+line.qualified+line.repair+line.scrapped+line.transferred,0)}
+  function unfinishedQuantity(source){return source.lines.reduce((total,line)=>total+(line.unfinished||0),0)}
+  function sourceReferenceCents(source){
+    if(source.taskType==='EXTRA_PRODUCTION')return null;
+    if(source.taskType==='OTHER_TASK'&&!source.linkedProduct)return 0;
+    return source.lines.reduce((total,line)=>total+Math.floor(((line.qualified+line.repair+line.scrapped+line.transferred)*line.unitCostUnits+50)/100),0);
+  }
+  function splitCents(amountCents,members){if(!members.length)return[];const sorted=[...members].sort((first,second)=>first.id.localeCompare(second.id));const base=Math.floor(amountCents/sorted.length);const remainder=amountCents%sorted.length;return sorted.map((member,index)=>({employeeId:member.id,employeeName:member.name,amountCents:base+(index<remainder?1:0)}))}
+  function employeeSources(record){return periodLaborSources(record).filter(source=>source.members.some(member=>member.id===record.employeeId))}
+  function employeeResponsibilities(record){return periodResponsibilitySources(record).filter(source=>(source.employeeIds||[]).includes(record.employeeId))}
+  function referenceFingerprint(record){return JSON.stringify({employeeId:record.employeeId,startDate:record.startDate,endDate:record.endDate,labor:employeeSources(record),responsibility:employeeResponsibilities(record)})}
+  function calculateEmployeeReference(record){
+    const contributions=employeeSources(record).map(source=>{
+      const amount=sourceReferenceCents(source);
+      const share=amount===null?null:splitCents(amount,source.members).find(member=>member.employeeId===record.employeeId).amountCents;
+      return{sourceId:source.id,taskNo:source.taskNo,amountCents:share,source:clone(source),subjectType:source.subjectType,subjectName:source.subjectName,process:source.process,productName:source.productName,memberNames:source.members.map(member=>member.name).join('、')};
+    });
+    const referenceWarnings=contributions.filter(line=>line.amountCents===null).map(line=>line.taskNo+'：激励规则尚未明确，未纳入参考合计，请人工核实');
+    employeeResponsibilities(record).forEach(source=>referenceWarnings.push(source.no+'：'+source.description+'，不自动扣款'));
+    if(record.endDate>today())referenceWarnings.push('核算期间尚未结束，请核实本次实际工资依据');
+    return{referenceCents:contributions.reduce((total,line)=>total+(line.amountCents||0),0),contributions,referenceWarnings,referenceFingerprint:referenceFingerprint(record)};
+  }
+  function newPayrollRecord(period,employee){const record={id:period.id+'-'+employee.id,periodId:period.id,periodCode:period.code,startDate:period.startDate,endDate:period.endDate,employeeId:employee.id,employeeName:employee.name,status:'PENDING',actualCents:null,note:'',confirmedAt:'',referenceSnapshot:null};return Object.assign(record,calculateEmployeeReference(record))}
+  const payrollRecords=reactive(payrollPeriods.flatMap(period=>employees.map(employee=>newPayrollRecord(period,employee))));
+  const septemberApprovals=[{employeeId:'E-0001',actualCents:50000,note:'已人工核实本期工资，包含另行约定的工作报酬'},{employeeId:'E-0002',actualCents:16000,note:'已人工核实本期工作和约定工资'},{employeeId:'E-0003',actualCents:6000,note:'其他工作报酬已人工核实，不直接采用计件参考'},{employeeId:'E-0004',actualCents:16000,note:'本期工资已逐人人工核实'},{employeeId:'E-0005',actualCents:16000,note:'本期工资已逐人人工核实'}];
+  function referenceSnapshot(record){return clone({referenceCents:record.referenceCents,contributions:record.contributions,referenceWarnings:record.referenceWarnings,responsibility:employeeResponsibilities(record),fingerprint:record.referenceFingerprint})}
+  septemberApprovals.forEach(approval=>{const record=payrollRecords.find(row=>row.periodId==='PP-SEP'&&row.employeeId===approval.employeeId);Object.assign(record,approval,{status:'CONFIRMED',confirmedAt:'2026-10-01 09:00:00',referenceSnapshot:referenceSnapshot(record)})});
+  function refreshReference(record){if(!record||record.status!=='PENDING'||!payrollRecords.includes(record))return false;Object.assign(record,calculateEmployeeReference(record));payrollPreviewVisible.value=false;payrollFingerprint.value='';return true}
+  function openPayroll(record){if(!payrollRecords.includes(record))return false;selectedPayroll.value=record;refreshReference(record);Object.assign(payrollDraft,{amount:'',note:''});payrollPreviewVisible.value=false;payrollFingerprint.value='';activeTab.value='payroll';pageMode.value='employee';window.scrollTo({top:0,behavior:'instant'});return true}
+  function validatePayroll(){
+    const record=selectedPayroll.value;
+    if(!record||!payrollRecords.includes(record)||record.status!=='PENDING')return'请选择待核定的员工记录，已确认结果不能重复核定';
+    if(parseMoney(payrollDraft.amount)===null)return'请人工填写核定金额，最多两位小数且不超过 999999.99 元';
+    if(!payrollDraft.note.trim()||payrollDraft.note.length>200)return'请填写核定说明，最多 200 个字符';
+    return'';
+  }
+  function payrollPreviewFingerprint(){return JSON.stringify({id:selectedPayroll.value?.id,amount:payrollDraft.amount,note:payrollDraft.note,reference:selectedPayroll.value?.referenceFingerprint})}
+  function ensureCurrentReference(){const record=selectedPayroll.value;if(record.referenceFingerprint===referenceFingerprint(record))return true;refreshReference(record);ElementPlus.ElMessage.warning('参考来源已变化，已刷新，请核对后重新确认');return false}
+  function requestPayrollConfirm(){const error=validatePayroll();if(error){ElementPlus.ElMessage.error(error);return false}if(!ensureCurrentReference())return false;payrollFingerprint.value=payrollPreviewFingerprint();payrollPreviewVisible.value=true;return true}
+  function payrollCostEntry(record){const amountUnits=record.actualCents*100;return{id:'CL-'+record.id,no:'CL-'+record.id,sourceNo:record.id,sourceVersion:1,category:'DIRECT_LABOR',businessDate:record.endDate<record.confirmedAt.slice(0,10)?record.endDate:record.confirmedAt.slice(0,10),recordedDate:record.confirmedAt.slice(0,10),amountUnits,basis:'员工人工核定工资',periodCode:record.periodCode,employeeName:record.employeeName,valid:true,description:record.employeeName+' · 人工核定工资',lines:[{description:'人工核定金额：'+record.note,quantity:1,amountUnits}]}}
+  function confirmPayroll(){
+    if(!payrollPreviewVisible.value)return false;
+    const error=validatePayroll();if(error){ElementPlus.ElMessage.error(error);payrollPreviewVisible.value=false;return false}
+    if(!ensureCurrentReference())return false;
+    if(payrollFingerprint.value!==payrollPreviewFingerprint()){payrollPreviewVisible.value=false;ElementPlus.ElMessage.warning('核定内容已变化，请重新核对');return false}
+    const record=selectedPayroll.value;
+    if(costEntries.some(entry=>entry.sourceNo===record.id)){ElementPlus.ElMessage.error('该员工已登记人工成本，不能重复确认');return false}
+    const approved={...clone(record),actualCents:parseMoney(payrollDraft.amount),note:payrollDraft.note.trim(),status:'CONFIRMED',confirmedAt:recordedAt(),referenceSnapshot:referenceSnapshot(record)};
+    const cost=approved.actualCents>0?payrollCostEntry(approved):null;
+    if(!saveFinanceSnapshot({payrollRecords:payrollRecords.map(current=>current===record?approved:current),costEntries:cost?[...costEntries,cost]:costEntries}))return false;
+    Object.assign(record,approved);
+    if(cost)costEntries.push(cost);
+    payrollPreviewVisible.value=false;payrollFingerprint.value='';ElementPlus.ElMessage.success('已确认该员工人工核定工资，未产生现金付款');return true;
+  }
+  const costEntries=reactive([
+    ...payrollRecords.filter(record=>record.status==='CONFIRMED'&&record.actualCents>0).map(payrollCostEntry),
+    {id:'CL-MATERIAL-01',no:'CL-20261007-001',sourceNo:'T-0104 · MATERIAL-V1',sourceVersion:1,category:'DIRECT_MATERIAL',businessDate:'2026-10-07',recordedDate:'2026-10-08',amountUnits:7390000,basis:'历史标准录入价',orderNo:'OD-20261001-08',productName:'花束兔',valid:true,description:'制作工序材料',lines:[{description:'工作室承担的制作非人工材料，单件 14.7800 元',quantity:50,amountUnits:7390000}]},
+    {id:'CL-MATERIAL-OLD',no:'CL-20261006-002',sourceNo:'T-0106 · MATERIAL-V1',sourceVersion:1,category:'DIRECT_MATERIAL',businessDate:'2026-10-06',recordedDate:'2026-10-07',amountUnits:1440000,basis:'历史标准录入价',orderNo:'OD-20261001-08',productName:'花束兔',valid:false,correctionNote:'原数量已更正，由 V2 替代',description:'包装非人工材料',lines:[{description:'包装材料原记录',quantity:72,amountUnits:1440000}]},
+    {id:'CL-MATERIAL-02',no:'CL-20261007-003',sourceNo:'T-0106 · MATERIAL-V2',sourceVersion:2,category:'DIRECT_MATERIAL',businessDate:'2026-10-07',recordedDate:'2026-10-08',amountUnits:1500000,basis:'历史标准录入价',orderNo:'OD-20261001-08',productName:'花束兔',valid:true,description:'包装非人工材料',lines:[{description:'包装袋与装饰材料，单件 2.0000 元',quantity:75,amountUnits:1500000}]},
+    {id:'CL-RENT-01',no:'CL-20261001-004',sourceNo:'EXP-20261001-01',sourceVersion:1,category:'OPERATING_EXPENSE',businessDate:'2026-10-01',recordedDate:'2026-10-01',amountUnits:8000000,basis:'正式经营费用事实',valid:true,description:'10 月工作室场地费用',lines:[{description:'场地费用（示例已确认凭据）',quantity:1,amountUnits:8000000}]}
+  ]);
+  const orderQualifications=reactive(orderStore.qualifications());
+  const cashFacts=reactive([
+    ...orderStore.facts(),
+    {id:'CF-20261003-002',no:'CF-20261003-002',type:'PAYROLL_PAYMENT',direction:'OUT',businessDate:'2026-10-03',recordedAt:'2026-10-03 15:30:00',amountCents:25000,valid:true,note:'9 月工资部分付款',allocations:[{sourceId:'PP-SEP-E-0001',amountCents:20000},{sourceId:'PP-SEP-E-0003',amountCents:5000}]},
+    {id:'CF-20261001-004',no:'CF-20261001-004',type:'OPERATING_PAYMENT',direction:'OUT',businessDate:'2026-10-01',recordedAt:'2026-10-01 09:00:00',amountCents:80000,valid:true,note:'场地费用示例，已关联正式费用成本',allocations:[{sourceId:'EXP-20261001-01',amountCents:80000}]}
+  ]);
+  const financeStorageKey='yumi-v2-finance-prototype-v1';
+  function financeSnapshot(overrides={}){const data={version:1,payrollPeriods,payrollRecords,costEntries,cashFacts,dailyEntries,...overrides};return clone({...data,cashFacts:data.cashFacts.filter(fact=>!fact.orderId)})}
+  function saveFinanceSnapshot(overrides={}){
+    const snapshot=financeSnapshot(overrides);
+    const error=window.YumiPaymentVouchers.capacity(snapshot.cashFacts);if(error){ElementPlus.ElMessage.error(error);return false}
+    try{window.localStorage.setItem(financeStorageKey,JSON.stringify(snapshot));return true}catch{
+      if(snapshot.cashFacts.some(fact=>fact.vouchers?.length)){ElementPlus.ElMessage.error('无法保存本地凭证，请检查浏览器存储空间后重试；本次记录尚未登记');return false}
+      return true;
+    }
+  }
+  function restoreFinanceSnapshot(){
+    try{
+      const text=window.localStorage.getItem(financeStorageKey);if(!text||text.length>3*1024*1024)return;
+      const snapshot=JSON.parse(text);
+      if(snapshot.version!==1||!['payrollPeriods','payrollRecords','costEntries','cashFacts','dailyEntries'].every(key=>Array.isArray(snapshot[key])))return;
+      if(!snapshot.payrollPeriods.every(period=>typeof period.id==='string'&&typeof period.code==='string'&&validDate(period.startDate)&&validDate(period.endDate)))return;
+      if(!snapshot.payrollRecords.every(record=>record.id===record.periodId+'-'+record.employeeId&&employees.some(employee=>employee.id===record.employeeId)&&snapshot.payrollPeriods.some(period=>period.id===record.periodId)&&validDate(record.startDate)&&validDate(record.endDate)&&Array.isArray(record.contributions)&&Array.isArray(record.referenceWarnings)&&typeof record.referenceFingerprint==='string'&&['PENDING','CONFIRMED'].includes(record.status)&&typeof record.note==='string'&&(record.status==='PENDING'||Number.isSafeInteger(record.actualCents)&&record.actualCents>=0)))return;
+      if(!snapshot.costEntries.every(entry=>typeof entry.id==='string'&&entry.no&&validDate(entry.businessDate)&&Number.isSafeInteger(entry.amountUnits)&&Array.isArray(entry.lines)&&costCategories.some(category=>category.value===entry.category)))return;
+      if(!snapshot.cashFacts.every(fact=>typeof fact.id==='string'&&fact.no===fact.id&&!fact.orderId&&cashTypes.some(type=>type.value===fact.type&&!type.value.startsWith('ORDER_'))&&['IN','OUT'].includes(fact.direction)&&validDate(fact.businessDate)&&Number.isSafeInteger(fact.amountCents)&&fact.amountCents>0&&typeof fact.note==='string'&&Array.isArray(fact.allocations)&&fact.allocations.every(line=>typeof line.sourceId==='string'&&Number.isSafeInteger(line.amountCents)&&line.amountCents>0)&&fact.allocations.reduce((total,line)=>total+line.amountCents,0)===fact.amountCents))return;
+      if(!snapshot.dailyEntries.every(entry=>typeof entry.id==='string'&&dailyCategories.some(category=>category.value===entry.category&&category.direction===entry.direction)&&validDate(entry.businessDate)&&typeof entry.note==='string'&&snapshot.cashFacts.some(fact=>fact.id===entry.cashId&&fact.dailyId===entry.id)))return;
+      if(['payrollPeriods','payrollRecords','costEntries','cashFacts','dailyEntries'].some(key=>new Set(snapshot[key].map(record=>record.id)).size!==snapshot[key].length)||window.YumiPaymentVouchers.capacity(snapshot.cashFacts))return;
+      for(const [key,target] of Object.entries({payrollPeriods,payrollRecords,costEntries,dailyEntries}))target.splice(0,target.length,...snapshot[key]);
+      cashFacts.splice(0,cashFacts.length,...orderStore.facts(),...snapshot.cashFacts);
+    }catch{}
+  }
+  restoreFinanceSnapshot();
+  function cashVouchers(fact){const original=fact?.reversesId?cashFacts.find(record=>record.id===fact.reversesId):fact;return original?.vouchers||[]}
+  function syncSharedOrderFacts(){orderQualifications.splice(0,orderQualifications.length,...orderStore.qualifications());for(const fact of orderStore.facts()){if(!cashFacts.some(current=>current.id===fact.id))cashFacts.push(fact)}}
+  const monthlyCashDefinitions=[
+    {key:'ORDER_RECEIPT',label:'订单实际收款',direction:'IN',note:'以订单关联收款流水为准'},
+    {key:'OTHER_INCOME',label:'日常其他收入',direction:'IN',note:'非订单的实际收入'},
+    {key:'PAYROLL_PAYMENT',label:'实际工资付款',direction:'OUT',note:'只统计已经付出的核定工资'},
+    {key:'MATERIAL_PAYMENT',label:'材料采购付款',direction:'OUT',note:'与材料耗用成本分别统计'},
+    {key:'AFTER_SALES_PAYMENT',label:'售后相关付款',direction:'OUT',note:'售后业务关联的实际付款'},
+    {key:'ORDER_REFUND',label:'订单退款',direction:'OUT',note:'订单义务关联的实际退款'},
+    {key:'OPERATING_PAYMENT',label:'日常经营支出',direction:'OUT',note:'房租、水电等实际付款'},
+    {key:'OTHER_PAYMENT',label:'日常其他支出',direction:'OUT',note:'其他类别实际付款'},
+    {key:'REVERSAL_IN',label:'支出冲销流入',direction:'IN',note:'反向事实，非新增订单收入'},
+    {key:'REVERSAL_OUT',label:'收入冲销流出',direction:'OUT',note:'反向事实，非新增成本'}
+  ];
+  const monthlyCostDefinitions=[
+    {key:'DIRECT_LABOR',label:'人工成本',note:'逐人核定实际工资，不取参考金额'},
+    {key:'DIRECT_MATERIAL',label:'材料成本',note:'实际耗用材料，不取采购付款'},
+    {key:'AFTER_SALES',label:'售后成本',note:'售后归集的材料、人工、运费等'},
+    {key:'OPERATING_EXPENSE',label:'日常经营费用',note:'已确认的房租、水电等费用'},
+    {key:'ADJUSTMENT',label:'成本调整',note:'已确认的成本调整记录'},
+    {key:'OTHER_COST',label:'其他成本',note:'其他有效成本记录'}
+  ];
+  function validSummaryMonth(value){return typeof value==='string'&&/^\d{4}-\d{2}$/.test(value)&&validDate(value+'-01')&&value<=today().slice(0,7)}
+  function belongsToSummaryMonth(date){return validSummaryMonth(summaryMonth.value)&&validDate(date)&&date.slice(0,7)===summaryMonth.value}
+  function monthlyCashKey(fact){if(fact.reversesId)return fact.direction==='IN'?'REVERSAL_IN':'REVERSAL_OUT';const category=monthlyCashDefinitions.find(row=>row.key===fact.type&&row.direction===fact.direction);return category?category.key:fact.direction==='IN'?'OTHER_INCOME':'OTHER_PAYMENT'}
+  function monthlyCostKey(entry){return monthlyCostDefinitions.some(row=>row.key===entry.category)?entry.category:'OTHER_COST'}
+  const monthlyCashFacts=computed(()=>cashFacts.filter(fact=>fact.valid&&belongsToSummaryMonth(fact.businessDate)).sort((first,second)=>second.businessDate.localeCompare(first.businessDate)||second.no.localeCompare(first.no)));
+  const monthlyCostEntries=computed(()=>costEntries.filter(entry=>entry.valid&&belongsToSummaryMonth(entry.businessDate)).sort((first,second)=>second.businessDate.localeCompare(first.businessDate)||second.no.localeCompare(first.no)));
+  const monthlyCashTotals=computed(()=>{const incomeCents=monthlyCashFacts.value.filter(fact=>fact.direction==='IN').reduce((total,fact)=>total+fact.amountCents,0);const expenseCents=monthlyCashFacts.value.filter(fact=>fact.direction==='OUT').reduce((total,fact)=>total+fact.amountCents,0);return{incomeCents,expenseCents,netCents:incomeCents-expenseCents}});
+  const monthlyCostTotal=computed(()=>monthlyCostEntries.value.reduce((total,entry)=>total+entry.amountUnits,0));
+  const monthlyCashGroups=computed(()=>monthlyCashDefinitions.map(category=>{const facts=monthlyCashFacts.value.filter(fact=>monthlyCashKey(fact)===category.key);return{...category,count:facts.length,amountCents:facts.reduce((total,fact)=>total+fact.amountCents,0)}}));
+  const monthlyCostGroups=computed(()=>monthlyCostDefinitions.map(category=>{const entries=monthlyCostEntries.value.filter(entry=>monthlyCostKey(entry)===category.key);return{...category,count:entries.length,amountUnits:entries.reduce((total,entry)=>total+entry.amountUnits,0)}}));
+  const monthlyPendingPayroll=computed(()=>validSummaryMonth(summaryMonth.value)?payrollRecords.filter(record=>record.status==='PENDING'&&record.startDate.slice(0,7)<=summaryMonth.value&&record.endDate.slice(0,7)>=summaryMonth.value).length:0);
+  const monthlyDetailsRows=computed(()=>monthlyDetails.kind==='cash'?monthlyCashFacts.value.filter(fact=>monthlyDetails.key==='ALL'||monthlyCashKey(fact)===monthlyDetails.key):monthlyCostEntries.value.filter(entry=>monthlyDetails.key==='ALL'||monthlyCostKey(entry)===monthlyDetails.key));
+  function onSummaryMonthChange(){monthlyDetailsVisible.value=false;if(validSummaryMonth(summaryMonth.value))return true;summaryMonth.value=today().slice(0,7);ElementPlus.ElMessage.warning('请选择有效月份，不能晚于本月');return false}
+  function shiftSummaryMonth(offset){if(![-1,1].includes(offset)||!validSummaryMonth(summaryMonth.value))return false;const [year,month]=summaryMonth.value.split('-').map(Number);const date=new Date(Date.UTC(year,month-1+offset,1));const next=date.toISOString().slice(0,7);if(!validSummaryMonth(next))return false;summaryMonth.value=next;onSummaryMonthChange();return true}
+  function resetSummaryMonth(){summaryMonth.value=today().slice(0,7);onSummaryMonthChange()}
+  function openMonthlyDetails(kind,key){if(!['cash','cost'].includes(kind))return false;const definitions=kind==='cash'?monthlyCashDefinitions:monthlyCostDefinitions;const category=definitions.find(row=>row.key===key);if(key!=='ALL'&&!category)return false;Object.assign(monthlyDetails,{kind,key,label:category?.label||(kind==='cash'?'全部收付明细':'全部成本明细')});monthlyDetailsVisible.value=true;return true}
+  function showMonthlyRecord(record){if(!monthlyDetailsRows.value.includes(record))return false;monthlyDetailsVisible.value=false;if(monthlyDetails.kind==='cash')showCash(record);else showCost(record);return true}
+  orderStore.subscribe(syncSharedOrderFacts);syncSharedOrderFacts();
+  function goOrder(orderId){window.location.href=window.YumiCustomerStore.navigationUrl(orderStore.navigationUrl('orders-element-plus.html',orderId?{orderId}:{}))}
+  function goCustomers(){window.location.href=window.YumiCustomerStore.navigationUrl(orderStore.navigationUrl('customers-element-plus.html'))}
+  function paidCents(sourceId){return cashFacts.filter(fact=>fact.valid).reduce((total,fact)=>total+fact.allocations.filter(line=>line.sourceId===sourceId).reduce((subtotal,line)=>subtotal+line.amountCents*(fact.reversesId?-1:1),0),0)}
+  function remainingPayable(record){return record.status==='CONFIRMED'?Math.max(0,record.actualCents-paidCents(record.id)):0}
+  function billStatus(record){return record.status!=='CONFIRMED'?'待核定':record.actualCents===0?'无需付款':remainingPayable(record)===0?'已付清':paidCents(record.id)>0?'部分支付':'待支付'}
+  function createPeriod(){Object.assign(periodDraft,{code:'',dates:[]});periodFormVisible.value=true}
+  let periodSequence=1;
+  function savePeriod(){
+    const code=periodDraft.code.trim();const dates=periodDraft.dates;
+    if(!code||code.length>30){ElementPlus.ElMessage.error('请填写期间名称，最多 30 个字符');return false}
+    if(!dates||dates.length!==2||!dates.every(validDate)||dates[0]>dates[1]){ElementPlus.ElMessage.error('请填写有效的起止日期');return false}
+    if(payrollPeriods.some(period=>period.code===code||dates[0]<=period.endDate&&dates[1]>=period.startDate)){ElementPlus.ElMessage.error('期间名称不能重复，日期不能与已有期间重叠');return false}
+    do{periodSequence+=1}while(payrollPeriods.some(period=>period.id===`PP-NEW-${periodSequence}`));const period={id:`PP-NEW-${periodSequence}`,code,startDate:dates[0],endDate:dates[1]};const records=employees.map(employee=>newPayrollRecord(period,employee));if(!saveFinanceSnapshot({payrollPeriods:[period,...payrollPeriods],payrollRecords:[...payrollRecords,...records]}))return false;payrollPeriods.unshift(period);payrollRecords.push(...records);Object.assign(payrollFilters,{keyword:'',periodId:period.id,status:'ALL'});periodFormVisible.value=false;backToOverview();ElementPlus.ElMessage.success('已创建期间及待核定员工记录，未形成应付');return true;
+  }
+  function businessSources(type){if(type!=='PAYROLL_PAYMENT')return [];return payrollRecords.filter(record=>record.status==='CONFIRMED'&&record.actualCents>0).map(record=>({id:record.id,type:'PAYROLL_PAYMENT',periodId:record.periodId,label:record.employeeName+' · '+record.periodCode+' · 已人工核定',limitCents:record.actualCents,availableDate:record.confirmedAt.slice(0,10),reversalAllowed:true}))}
+  function findSource(id){return orderQualifications.find(source=>source.id===id)||businessSources('PAYROLL_PAYMENT').find(source=>source.id===id)}
+  function remainingEligibility(id){const source=findSource(id);return source?Math.max(0,source.limitCents-paidCents(id)):0}
+  function sourceName(id){const daily=dailyEntries.find(entry=>entry.id===id);return findSource(id)?.label||(daily?daily.no+' · '+dailyCategoryLabel(daily.category):id==='EXP-20261001-01'?'EXP-20261001-01 · 场地费用':id)}
+  function cashDirection(type){return type==='ORDER_RECEIPT'?'IN':'OUT'}
+  let allocationSequence=0;
+  function emptyAllocation(){allocationSequence+=1;return{key:`allocation-${allocationSequence}`,sourceId:'',amount:''}}
+  const cashDraft=reactive({type:'PAYROLL_PAYMENT',businessDate:today(),amount:'',note:'',vouchers:[],allocations:[]});
+  const cashFingerprint=ref('');
+  const sourceOptions=computed(()=>businessSources(cashDraft.type));
+  const eligibleSources=computed(()=>sourceOptions.value.filter(source=>remainingEligibility(source.id)>0));
+  const allocationTotal=computed(()=>cashDraft.allocations.reduce((total,line)=>total+(parseMoney(line.amount)||0),0));
+  function openCash(type,bill){if(!paymentTypes.some(option=>option.value===type)){ElementPlus.ElMessage.warning('订单收款和退款请从订单详情登记');return false}orderStore.refresh();if(bill&&(type!=='PAYROLL_PAYMENT'||!payrollRecords.includes(bill)||bill.status!=='CONFIRMED'||remainingPayable(bill)<=0)){ElementPlus.ElMessage.warning('该员工尚未核定或没有待付金额');return false}Object.assign(cashDraft,{type,businessDate:today(),amount:'',note:'',vouchers:[],allocations:[emptyAllocation()]});if(bill){cashDraft.allocations[0].sourceId=bill.id;cashDraft.amount=(remainingPayable(bill)/100).toFixed(2);cashDraft.allocations[0].amount=cashDraft.amount}cashFingerprint.value='';cashPreviewVisible.value=false;cashFormVisible.value=true;return true}
+  function changeCashType(){cashDraft.allocations=[emptyAllocation()];cashDraft.amount=''}
+  function syncSingleAllocation(){if(cashDraft.allocations.length===1)cashDraft.allocations[0].amount=cashDraft.amount}
+  function addAllocation(){if(cashDraft.allocations.length<10)cashDraft.allocations.push(emptyAllocation())}
+  function removeAllocation(key){if(cashDraft.allocations.length>1){const index=cashDraft.allocations.findIndex(line=>line.key===key);if(index>=0)cashDraft.allocations.splice(index,1)}}
+  function validateCash(){
+    if(cashVoucherBusy.value)return'凭证正在读取，请稍后核对';
+    const voucherError=window.YumiPaymentVouchers.validate(cashDraft.vouchers);if(voucherError)return voucherError;
+    orderStore.refresh();
+    if(!paymentTypes.some(type=>type.value===cashDraft.type))return'订单收款和退款请从订单详情登记，财务不可独立创建';
+    if(!validDate(cashDraft.businessDate)||cashDraft.businessDate>today())return'请填写有效业务日期，不能晚于今天';
+    const amount=parseMoney(cashDraft.amount);
+    if(amount===null||amount<=0)return'现金金额必须大于零，最多两位小数且不超过 999999.99 元';
+    if(cashDraft.note.length>200)return'备注最多 200 个字符';
+    if(!cashDraft.allocations.length||cashDraft.allocations.length>10)return'请填写 1 至 10 项业务分配';
+    const seen=new Set();
+    for(const line of cashDraft.allocations){
+      const source=businessSources(cashDraft.type).find(record=>record.id===line.sourceId);
+      if(!source)return'请选择当前业务类型的有效来源；工资需先逐人核定';
+      if(seen.has(line.sourceId))return'同一流水不能重复分配到相同来源';seen.add(line.sourceId);
+      const assigned=parseMoney(line.amount);
+      if(assigned===null||assigned<=0)return'每项分配金额必须大于零且最多两位小数';
+      if(assigned>remainingEligibility(line.sourceId))return'分配金额超过来源当前允许额度，请重新核对';
+      if(cashDraft.businessDate<source.availableDate)return'业务日期不能早于该来源可登记日期';
+    }
+    if(allocationTotal.value!==amount)return'分配合计必须严格等于现金金额';
+    return'';
+  }
+  function requestCashConfirm(){const error=validateCash();if(error){ElementPlus.ElMessage.error(error);return false}cashFingerprint.value=JSON.stringify(cashDraft);cashFormVisible.value=false;cashPreviewVisible.value=true;return true}
+  let cashSequence=10;
+  function nextCashNo(){let no;do{cashSequence+=1;no=`CF-${today().replaceAll('-','')}-${String(cashSequence).padStart(3,'0')}`}while(cashFacts.some(fact=>fact.id===no));return no}
+  function dailyCategoryLabel(category){return dailyCategories.find(option=>option.value===category)?.label||category||'—'}
+  function dailyEntryFor(fact){return dailyEntries.find(entry=>entry.id===fact?.dailyId)||null}
+  function linkedDailyCost(fact){return fact?.costId?costEntries.find(entry=>entry.id===fact.costId)||null:null}
+  function openDaily(){Object.assign(dailyDraft,{direction:'OUT',category:'',businessDate:today(),amount:'',note:'',countAsCost:false,vouchers:[]});dailyFingerprint.value='';dailyPreviewVisible.value=false;dailyFormVisible.value=true}
+  function changeDailyDirection(){dailyDraft.category='';dailyDraft.countAsCost=false}
+  function validateDaily(){
+    if(dailyVoucherBusy.value)return'凭证正在读取，请稍后核对';
+    const voucherError=window.YumiPaymentVouchers.validate(dailyDraft.vouchers);if(voucherError)return voucherError;
+    if(!['IN','OUT'].includes(dailyDraft.direction))return'请选择日常收入或日常支出';
+    if(!dailyCategories.some(category=>category.value===dailyDraft.category&&category.direction===dailyDraft.direction))return'请选择对应收支方向的日常分类；订单、工资、材料及售后业务请从原业务登记';
+    if(!validDate(dailyDraft.businessDate)||dailyDraft.businessDate>today())return'请选择有效登记日期，不能晚于今天';
+    const amount=parseMoney(dailyDraft.amount);
+    if(amount===null||amount<=0)return'实际金额必须大于零，最多两位小数且不超过 999999.99 元';
+    if(typeof dailyDraft.note!=='string'||!dailyDraft.note.trim()||dailyDraft.note.length>200)return'请填写用途说明，最多 200 个字符';
+    if(typeof dailyDraft.countAsCost!=='boolean'||dailyDraft.direction==='IN'&&dailyDraft.countAsCost)return'仅日常支出可选择同时登记经营费用';
+    return'';
+  }
+  function requestDailyConfirm(){const error=validateDaily();if(error){ElementPlus.ElMessage.error(error);return false}dailyFingerprint.value=JSON.stringify(dailyDraft);dailyFormVisible.value=false;dailyPreviewVisible.value=true;return true}
+  function confirmDaily(){
+    if(!dailyPreviewVisible.value||!dailyFingerprint.value)return false;
+    const error=validateDaily();
+    if(error||dailyFingerprint.value!==JSON.stringify(dailyDraft)){dailyPreviewVisible.value=false;dailyFormVisible.value=true;dailyFingerprint.value='';ElementPlus.ElMessage.warning(error||'日常收支内容已变化，请重新核对');return false}
+    const no=nextCashNo();
+    const id='DY-'+no.slice(3);
+    const amountCents=parseMoney(dailyDraft.amount);
+    const entry={id,no:id,direction:dailyDraft.direction,category:dailyDraft.category,businessDate:dailyDraft.businessDate,amountCents,note:dailyDraft.note.trim(),countAsCost:dailyDraft.countAsCost,cashId:no,costId:dailyDraft.countAsCost?'CL-'+id:''};
+    const fact={id:no,no,dailyId:id,costId:entry.costId,type:entry.direction==='IN'?'OTHER_INCOME':entry.countAsCost?'OPERATING_PAYMENT':'OTHER_PAYMENT',direction:entry.direction,businessDate:entry.businessDate,recordedAt:recordedAt(),amountCents,valid:true,note:entry.note,vouchers:window.YumiPaymentVouchers.copy(dailyDraft.vouchers),allocations:[{sourceId:id,amountCents}]};
+    const cost=entry.countAsCost?{id:entry.costId,no:entry.costId,dailyId:id,cashId:no,sourceNo:id,sourceVersion:1,category:'OPERATING_EXPENSE',businessDate:entry.businessDate,recordedDate:today(),amountUnits:amountCents*100,basis:'日常支出联动经营费用',valid:true,description:dailyCategoryLabel(entry.category)+' · '+entry.note,lines:[{description:entry.note,quantity:1,amountUnits:amountCents*100}]}:null;
+    if(!saveFinanceSnapshot({dailyEntries:[...dailyEntries,entry],cashFacts:[...cashFacts,fact],costEntries:cost?[...costEntries,cost]:costEntries}))return false;
+    dailyEntries.push(entry);cashFacts.push(fact);if(cost)costEntries.push(cost);
+    dailyPreviewVisible.value=false;dailyFormVisible.value=false;dailyFingerprint.value='';ElementPlus.ElMessage.success(cost?'已登记日常支出及经营费用，均计入所选日期对应月份':'已登记日常收支，计入所选日期对应月份');return true;
+  }
+  function showDailyCost(fact){const cost=linkedDailyCost(fact);if(!cost)return false;showCost(cost);return true}
+  function showDailyCash(entry){const fact=cashFacts.find(record=>record.id===entry?.cashId);if(!fact)return false;showCash(fact);return true}
+  function confirmCash(){
+    if(!cashPreviewVisible.value||!cashFingerprint.value)return false;
+    const error=validateCash();
+    if(error||cashFingerprint.value!==JSON.stringify(cashDraft)){cashPreviewVisible.value=false;cashFormVisible.value=true;cashFingerprint.value='';ElementPlus.ElMessage.warning(error||'收付内容已变化，请重新核对');return false}
+    const no=nextCashNo();
+    const fact={id:no,no,type:cashDraft.type,direction:cashDirection(cashDraft.type),businessDate:cashDraft.businessDate,recordedAt:recordedAt(),amountCents:parseMoney(cashDraft.amount),valid:true,note:cashDraft.note.trim(),vouchers:window.YumiPaymentVouchers.copy(cashDraft.vouchers),allocations:cashDraft.allocations.map(line=>({sourceId:line.sourceId,amountCents:parseMoney(line.amount)}))};
+    if(!saveFinanceSnapshot({cashFacts:[...cashFacts,fact]}))return false;
+    cashFacts.push(fact);
+    cashPreviewVisible.value=false;cashFormVisible.value=false;cashFingerprint.value='';ElementPlus.ElMessage.success('示例现金流水及业务分配已登记');return true;
+  }
+  function reverseReason(fact){if(fact.orderId)return orderStore.reversalReason(fact);if(!fact.valid)return'原事实无效，不能冲销';if(fact.reversesId)return'不能再次冲销冲销事实';if(cashFacts.some(record=>record.reversesId===fact.id))return'该流水已冲销';if(fact.dailyId){const daily=dailyEntryFor(fact);if(!daily||daily.cashId!==fact.id||daily.costId!==fact.costId)return'日常收支关联记录不一致，请先核对';if(daily.countAsCost){const cost=linkedDailyCost(fact);if(!cost||!cost.valid||cost.cashId!==fact.id||cost.dailyId!==daily.id||cost.category!=='OPERATING_EXPENSE'||cost.amountUnits!==fact.amountCents*100||costEntries.some(entry=>entry.reversesId===cost.id))return'关联经营费用不完整或已更正，不能单独冲销付款'}}else if(fact.type==='OPERATING_PAYMENT')return'经营费用需联动成本更正，本轮暂不提供';if(fact.allocations.some(line=>findSource(line.sourceId)?.reversalAllowed===false))return'业务来源不允许此次冲销';return''}
+  function reverseCash(fact,reason){
+    if(!fact||!cashFacts.some(record=>record===fact)||reverseReason(fact)){ElementPlus.ElMessage.warning('该流水当前不能冲销');return false}
+    if(typeof reason!=='string'||!reason.trim()||reason.trim().length>200){ElementPlus.ElMessage.error('请填写冲销原因，最多 200 个字符');return false}
+    if(fact.orderId){try{orderStore.reverse(fact.id,reason);ElementPlus.ElMessage.success('已追加订单流水冲销，订单收款同步更新');return true}catch(error){ElementPlus.ElMessage.error(error.message);return false}}
+    const no=nextCashNo();const originalCost=linkedDailyCost(fact);const costId=originalCost?'CL-'+no:'';
+    const reversal={id:no,no,type:fact.type,direction:fact.direction==='IN'?'OUT':'IN',businessDate:today(),recordedAt:recordedAt(),amountCents:fact.amountCents,valid:true,note:reason.trim(),reversesId:fact.id,allocations:clone(fact.allocations),...(fact.dailyId?{dailyId:fact.dailyId,costId}:{})};
+    const correction=originalCost?{...clone(originalCost),id:costId,no:costId,cashId:no,sourceNo:no,sourceVersion:1,businessDate:today(),recordedDate:today(),amountUnits:-originalCost.amountUnits,basis:'日常收支冲销联动成本更正',description:dailyCategoryLabel(dailyEntryFor(fact).category)+' · 冲销更正',reversesId:originalCost.id,correctionNote:reason.trim(),lines:[{description:'冲销 '+originalCost.no+'：'+reason.trim(),quantity:1,amountUnits:-originalCost.amountUnits}]}:null;
+    if(!saveFinanceSnapshot({cashFacts:[...cashFacts,reversal],costEntries:correction?[...costEntries,correction]:costEntries}))return false;
+    cashFacts.push(reversal);if(correction)costEntries.push(correction);ElementPlus.ElMessage.success(correction?'已追加反向流水与经营费用更正，原始记录保留':'已新增示例反向事实，原流水保持不变');return true;
+  }
+  function requestReverse(fact){reverseTarget.value=fact;reverseNote.value='';reverseVisible.value=true}
+  function submitReverse(){if(reverseCash(reverseTarget.value,reverseNote.value))reverseVisible.value=false}
+  function cashStatus(fact){return fact.reversesId?'冲销事实':cashFacts.some(record=>record.reversesId===fact.id)?'已冲销':fact.valid?'有效':'已失效'}
+  function costCategoryLabel(category){return costCategories.find(option=>option.value===category)?.label||category}
+  function cashTypeLabel(type){return cashTypes.find(option=>option.value===type)?.label||(type==='OPERATING_PAYMENT'?'经营费用付款':type)}
+  function taskTypeLabel(type){return{NORMAL_PRODUCTION:'正常生产',EXTRA_PRODUCTION:'超额制作',REPAIR:'修复任务',OTHER_TASK:'其他任务'}[type]||type}
+  function responsibilityLabel(type){return{EMPLOYEE:'员工',TEAM:'小组',STUDIO:'工作室',CUSTOMER:'客户',WAIVED:'免追责'}[type]||type}
+  const filteredPayroll=computed(()=>payrollRecords.filter(record=>{const keyword=payrollFilters.keyword.trim().toLowerCase();return(!keyword||[record.employeeId,record.employeeName].some(value=>value.toLowerCase().includes(keyword)))&&(payrollFilters.periodId==='ALL'||record.periodId===payrollFilters.periodId)&&(payrollFilters.status==='ALL'||record.status===payrollFilters.status)}).sort((first,second)=>second.startDate.localeCompare(first.startDate)||first.employeeId.localeCompare(second.employeeId)));
+  const filteredCosts=computed(()=>costEntries.filter(entry=>{const keyword=costFilters.keyword.trim().toLowerCase();return(!keyword||[entry.no,entry.sourceNo,entry.orderNo,entry.periodCode,entry.productName,entry.description].some(value=>String(value||'').toLowerCase().includes(keyword)))&&(costFilters.category==='ALL'||entry.category===costFilters.category)&&(costFilters.status==='ALL'||(costFilters.status==='VALID'?entry.valid:!entry.valid))}).sort((first,second)=>second.businessDate.localeCompare(first.businessDate)||second.no.localeCompare(first.no)));
+  const filteredCash=computed(()=>cashFacts.filter(fact=>{const keyword=cashFilters.keyword.trim().toLowerCase();return(!keyword||[fact.no,fact.note||'',...fact.allocations.map(line=>sourceName(line.sourceId))].some(value=>value.toLowerCase().includes(keyword)))&&(cashFilters.type==='ALL'||(cashFilters.type==='REVERSAL'?!!fact.reversesId:fact.type===cashFilters.type&&!fact.reversesId))}).sort((first,second)=>second.businessDate.localeCompare(first.businessDate)||second.no.localeCompare(first.no)));
+  function resetPayrollFilters(){Object.assign(payrollFilters,{keyword:'',periodId:'PP-OCT',status:'ALL'})}
+  function resetCostFilters(){Object.assign(costFilters,{keyword:'',category:'ALL',status:'ALL'})}
+  function resetCashFilters(){Object.assign(cashFilters,{keyword:'',type:'ALL'})}
+  function backToOverview(){pageMode.value='list';window.scrollTo({top:0,behavior:'instant'})}
+  function onTabChange(){pageMode.value='list';drawerVisible.value=false;monthlyDetailsVisible.value=false}
+  function showBill(bill){drawerKind.value='bill';drawerRecord.value=bill;drawerVisible.value=true}
+  function showCost(entry){drawerKind.value='cost';drawerRecord.value=entry;drawerVisible.value=true}
+  function showCash(fact){drawerKind.value='cash';drawerRecord.value=fact;drawerVisible.value=true}
+  if(orderStore.navigation.get('view')==='cash'){activeTab.value='cash';const incomingFact=cashFacts.find(fact=>fact.id===orderStore.navigation.get('cashId'));if(incomingFact)showCash(incomingFact)}
+  return{goCustomers,dailyVoucherBusy,cashVoucherBusy,cashVouchers,dailyFormVisible,dailyPreviewVisible,dailyDraft,dailyEntries,dailyCategoryOptions,dailyCategoryLabel,dailyEntryFor,linkedDailyCost,openDaily,changeDailyDirection,validateDaily,requestDailyConfirm,confirmDaily,showDailyCost,showDailyCash,summaryMonth,monthlyDetailsVisible,monthlyDetails,monthlyCashFacts,monthlyCostEntries,monthlyCashTotals,monthlyCostTotal,monthlyCashGroups,monthlyCostGroups,monthlyPendingPayroll,monthlyDetailsRows,onSummaryMonthChange,shiftSummaryMonth,resetSummaryMonth,openMonthlyDetails,showMonthlyRecord,goOrder,activeTab,pageMode,selectedPayroll,payrollDraft,payrollPreviewVisible,periodFormVisible,cashFormVisible,cashPreviewVisible,reverseVisible,reverseTarget,reverseNote,drawerVisible,drawerKind,drawerRecord,payrollFilters,costFilters,cashFilters,periodDraft,payrollStatuses,costCategories,cashTypes,paymentTypes,payrollPeriods,payrollRecords,laborSources,responsibilitySources,costEntries,orderQualifications,cashFacts,today,parseMoney,money,costMoney,disableFutureDate,finishedQuantity,unfinishedQuantity,sourceReferenceCents,splitCents,paidCents,remainingPayable,billStatus,openPayroll,refreshReference,validatePayroll,requestPayrollConfirm,confirmPayroll,createPeriod,savePeriod,remainingEligibility,sourceName,cashDirection,cashDraft,sourceOptions,eligibleSources,allocationTotal,openCash,changeCashType,syncSingleAllocation,addAllocation,removeAllocation,validateCash,requestCashConfirm,confirmCash,reverseReason,reverseCash,requestReverse,submitReverse,cashStatus,costCategoryLabel,cashTypeLabel,taskTypeLabel,responsibilityLabel,filteredPayroll,filteredCosts,filteredCash,resetPayrollFilters,resetCostFilters,resetCashFilters,backToOverview,onTabChange,showBill,showCost,showCash};
+}});
+Object.entries(ElementPlusIconsVue).forEach(([name,component])=>app.component(name,component));
+app.component('PaymentVouchers',window.YumiPaymentVouchers.component);
+app.use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>
