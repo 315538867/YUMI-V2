@@ -1,0 +1,35 @@
+schema: spec-driven
+context: |
+  项目为 YUMIV2；使用中文文档和中文 Conventional Commits。
+  当前仓库是六个 HTML 交互原型及方案文档，不是已经实现的正式系统。
+  一期权威方案位于 docs/一期/，变更必须记录所依据的 Git 提交。
+  后端基线：Java 21、Spring Boot 3.5、Spring Modulith、JdbcClient、MySQL、Flyway。
+  顶层只有 platform、calculation、customer、product、workforce、production、orders、finance、reporting 九个模块。
+  售后属于 orders；工资、成本台账、现金分别属于 finance 内部子域。
+  禁止跨模块 Repository/SQL/数据库外键；只能通过公开接口和独立来源 Feed 协作。
+  一期无资金账户、员工账号绑定、材料库存采购、线下库存销售管理或服务端业务草稿。
+  线上报废与实物去向分开；移交线下不可取回或更正；返工无责任扣款。
+  工资核算逐项提供成本和胶水减免参考，负责人填写处理金额和最终工资，不自动扣减。
+  所有收付款凭证可选，归本条现金记录；订单收退款在订单页面操作。
+  创建和验证提案不代表获得实施、提交后续文件或推送授权。
+rules:
+  proposal:
+    - 记录人类可读提案名、change id、源方案路径及提交、日期、创建者、计划状态。
+    - 明确全量范围、非目标及对现有原型的兼容性，不把原型演示宣称为已实现能力。
+  specs:
+    - 使用可观察的中文行为要求，保留 SHALL、Requirement、Scenario 和 WHEN/THEN 标记。
+    - 每条要求至少有一个可验证场景；并发、更正和失败回滚必须有对应验收。
+  design:
+    - 区分已确认业务基线与本提案建议的工程选型，记录替代方案及迁移风险。
+    - 保持九模块依赖方向、事实所有权、固定锁序、历史快照和金额精度规则。
+  tasks:
+    - 仅使用未勾选的编号任务；逐项写明目标路径或符号、依赖、完成条件和验证方式。
+    - 新功能先写失败测试，再实现；真实 MySQL 并发验证不得以内存数据库替代。
+operations:
+  apply:
+    guidance:
+      - 必须先获得用户明确实施授权，再创建工程或修改业务代码；原型文件不可被静默覆盖。
+      - 来源方案漂移时先同步提案，不允许用通过静态校验代替业务测试。
+  archive:
+    guidance:
+      - 只在实施和全部验证完成且获授权后归档，回写方案与验收证据。
