@@ -1,0 +1,7 @@
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration,classpath:db/testmigration
+    # 测试探针迁移 V900 先于后续业务增量被应用，新增的较低版本需按序补跑
+    out-of-order: true
+    clean-disabled: false

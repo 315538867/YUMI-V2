@@ -163,3 +163,42 @@
 - AS-04、UI-02、design D5 和交付清单 A01 一致规定：orders 拥有 `disposeReturnedProduct` 网页命令，production 通过处置 Participant 在同一事务写生产事实。N02 不再承接售后池初次处置；已有责任独立更正仍保留。
 - 任务 9.7—9.8 覆盖 orders 处置记录与 production 处置/责任/退出/移交原子性；13.7—13.8 校验正式 HTTP 归属及拒绝绕行；14.13—14.14 验证页面单一命令；15.2 核对跨模块事实引用。
 - 计划校验增加该命令在交付矩阵中的唯一归属检查，不再仅校验 owner 是合法模块名；不以该静态守卫代替真实业务测试。
+
+## 2. 实施与验证记录
+
+- 记录日期：2026-10-21；记录人：chen。
+- 范围：一期全部业务模块、管理端页面、来源 Feed 与 HTTP 适配；未部署、未归档、未提交。
+- 结论：`tasks.md` 154 项全部完成；本表要求在实现侧均有公开 Query/命令、页面或测试证据。以下差异按实际实现记录，不以月汇总或报表投影替代业务事实。
+
+### 2.1 全量门禁（新鲜证据）
+
+| 门禁 | 命令 | 实际结果 |
+|---|---|---|
+| 后端全量 | `cd backend && ./mvnw verify` | 268 个真实 MySQL 集成测试、121 个单元/架构测试，0 失败 |
+| 前端单元 | `pnpm --dir frontend test:unit` | 38 通过 |
+| 前端类型与构建 | `pnpm --dir frontend typecheck`、`pnpm --dir frontend build` | 通过 |
+| 页面闭环 | `pnpm --dir frontend exec playwright test` | 27 通过（含 `phase-one.spec.ts` 与可选凭证、窄屏筛选） |
+| 计划校验 | `openspec validate implement-phase-one-business-system --strict` | valid |
+| 计划结构 | `python3 openspec/changes/implement-phase-one-business-system/verify-plan.py` | 154 任务、78 要求、132 场景、23 交付行；结构通过 |
+| 备份恢复/接管 | 见 `docs/operations/phase-one-runbook.md` | 9/9 订单、9/9 需求、10/10 现金、现金合计 540.00 一致；接管后订单与需求各 +1，现金不变 |
+
+### 2.2 验收证据映射
+
+| 验收域 | 证据 |
+|---|---|
+| 标准订单闭环 | `PhaseOneBusinessFlowIT`：订单→排班核验→交付→现金收款→完成；订单、生产、现金三方数量/金额一致 |
+| 售后闭环 | `AfterSalesFinanceFlowIT`：10 件退回按 3 修复 + 7 报废转线下；补发只覆盖修复缺口；售后赔付独立现金；双端故障全回滚 |
+| 工资人工决定 | `PayrollManualDecisionFlowIT`：同月两期间、空/零处理项不改变 1000 元核定、只读复核不改应付、跨月部分退回后人工调整不产生现金 |
+| 并发与回滚 | `ConcurrencyAndRollbackIT`、`AfterSalesReturnDispositionIT`、`PayrollConfirmationIT`：并发付款/退回/冲销只有一方成功，无负数、超付或半笔现金；处置双端回滚 |
+| 报表与重建 | `ReportingReconciliationIT`、`ReportingRebuildIT`：重复归集、失败恢复、影子重建、应收/成本/现金对账 |
+| 管理恢复入口 | `business-ui` 页面与 E2E：审计只读检索、提交后任务重试/放弃、成本归集失败重试、成本更正/分摊、报表对账/重建 |
+| 页面与权限 | `phase-one.spec.ts`、`navigation.spec.ts` 及各模块 spec：统一导航、登录过期、越权拒绝、空态、版本冲突、可选凭证、窄屏筛选 |
+
+### 2.3 已知实现差异
+
+- 生产任务独立“取消”已提供公开命令、HTTP 路由与页面入口（释放来源预留、负载、新制产能与日槽位，保留取消事实）；独立“调整”（改期/改主体/改工序）仍通过订单变更或内部参与能力完成，页面不伪造该动作。
+- 售后费用查询与生产转线下独立列表没有公开 Query；A02/N03 页面按案例/明细标识读取现有公开 Query，订单追溯事实已包含转线下记录。售后案例列表/搜索已提供 `GET /api/after-sales/cases`。
+- 现金凭证为可选附件：订单收付款、日常收支与售后赔付请求可携带正式文件引用，随现金命令同事务引用；上传组件在订单收款与日常收支页面复用。
+- 普通任务验收报废责任现在同步发布 APPLY 修订，工资责任 Feed 可消费；`PayrollManualDecisionFlowIT` 已覆盖迟到责任复核且原核定/应付不变。
+- 平台命令与现金命令已整体使用死锁重试模板；并发付款、退回与冲销专项测试通过。
+- 一期不计算超额制作激励；不提供动态公式编辑；报表不把工资参考、处理金额或现金净额合并成利润。
