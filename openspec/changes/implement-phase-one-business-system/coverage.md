@@ -2,13 +2,15 @@
 
 - 版本：1.3；2026-10-19；创建者：Codex。
 - 源方案版本：`a714ede433b37d9d987e7229d2fdead52d723ac1`；全部 `docs/一期/` 文档在该提交冻结。
-- 状态：本表只证明计划映射，不证明实现或测试通过。所有实施任务仍未开始；本次审查补充了 HTTP 适配层、平台账号角色维护、工资付款/人工调整和其他小组任务计算边界。
+- 状态：155 项实施任务于 2026-10-21 全部完成，验证记录见第 2 节；第 1 节保留计划映射与依赖审查原文。
 
 修订记录：2026-10-20，Codex 将提案更新为 1.1；修复工资付款归属及任务依赖，补齐其他任务来源和核验例外。基线提交不变，业务实施未开始。
 
 修订记录：2026-10-20，Codex 将提案更新为 1.2；统一修复契约与真实集成的阶段依赖，补齐用户页面、管理恢复入口和来源生产者门禁；新增交付清单和可重复的计划校验。业务基线不变，尚未实施。
 
 修订记录：2026-10-20，Codex 将提案更新为 1.3；售后池初次处置统一由 orders 编排，production 仅在同一事务参与；同步双端回滚、页面单一命令及归属校验，业务基线不变，未实施。
+
+修订记录：2026-10-21，chen 在版本 1.3 下追加实施与验证记录、已知实现差异，回写全量门禁与手工演练证据。生产任务独立“调整”在本 change 内按 §7.2 补齐公开命令、HTTP、页面与测试。
 
 ## 源文档覆盖
 
@@ -168,18 +170,18 @@
 
 - 记录日期：2026-10-21；记录人：chen。
 - 范围：一期全部业务模块、管理端页面、来源 Feed 与 HTTP 适配；未部署、未归档、未提交。
-- 结论：`tasks.md` 154 项全部完成；本表要求在实现侧均有公开 Query/命令、页面或测试证据。以下差异按实际实现记录，不以月汇总或报表投影替代业务事实。
+- 结论：`tasks.md` 155 项全部完成；本表要求在实现侧均有公开 Query/命令、页面或测试证据。以下差异按实际实现记录，不以月汇总或报表投影替代业务事实。
 
 ### 2.1 全量门禁（新鲜证据）
 
 | 门禁 | 命令 | 实际结果 |
 |---|---|---|
-| 后端全量 | `cd backend && ./mvnw verify` | 268 个真实 MySQL 集成测试、121 个单元/架构测试，0 失败 |
-| 前端单元 | `pnpm --dir frontend test:unit` | 38 通过 |
+| 后端全量 | `cd backend && ./mvnw clean verify` | 275 个真实 MySQL 集成测试、121 个单元/架构测试，0 失败 |
+| 前端单元 | `pnpm --dir frontend test:unit` | 39 通过 |
 | 前端类型与构建 | `pnpm --dir frontend typecheck`、`pnpm --dir frontend build` | 通过 |
-| 页面闭环 | `pnpm --dir frontend exec playwright test` | 27 通过（含 `phase-one.spec.ts` 与可选凭证、窄屏筛选） |
+| 页面闭环 | `pnpm --dir frontend exec playwright test` | 28 通过（含 `phase-one.spec.ts`、任务调整、可选凭证与窄屏筛选） |
 | 计划校验 | `openspec validate implement-phase-one-business-system --strict` | valid |
-| 计划结构 | `python3 openspec/changes/implement-phase-one-business-system/verify-plan.py` | 154 任务、78 要求、132 场景、23 交付行；结构通过 |
+| 计划结构 | `python3 openspec/changes/implement-phase-one-business-system/verify-plan.py` | 155 任务、78 要求、132 场景、23 交付行；结构通过 |
 | 备份恢复/接管 | 见 `docs/operations/phase-one-runbook.md` | 9/9 订单、9/9 需求、10/10 现金、现金合计 540.00 一致；接管后订单与需求各 +1，现金不变 |
 
 ### 2.2 验收证据映射
@@ -191,14 +193,16 @@
 | 工资人工决定 | `PayrollManualDecisionFlowIT`：同月两期间、空/零处理项不改变 1000 元核定、只读复核不改应付、跨月部分退回后人工调整不产生现金 |
 | 并发与回滚 | `ConcurrencyAndRollbackIT`、`AfterSalesReturnDispositionIT`、`PayrollConfirmationIT`：并发付款/退回/冲销只有一方成功，无负数、超付或半笔现金；处置双端回滚 |
 | 报表与重建 | `ReportingReconciliationIT`、`ReportingRebuildIT`：重复归集、失败恢复、影子重建、应收/成本/现金对账 |
+| 生产任务调整 | `TaskAdjustmentIT`、`BusinessHttpCoverageIT`、`production.spec.ts`：改期/换主体/改工序/改明细、部分核验后锁定工序并保留原负载、依赖任务阻断、失败整笔回滚；HTTP 幂等重放与页面调整链路 |
 | 管理恢复入口 | `business-ui` 页面与 E2E：审计只读检索、提交后任务重试/放弃、成本归集失败重试、成本更正/分摊、报表对账/重建 |
 | 页面与权限 | `phase-one.spec.ts`、`navigation.spec.ts` 及各模块 spec：统一导航、登录过期、越权拒绝、空态、版本冲突、可选凭证、窄屏筛选 |
 
 ### 2.3 已知实现差异
 
-- 生产任务独立“取消”已提供公开命令、HTTP 路由与页面入口（释放来源预留、负载、新制产能与日槽位，保留取消事实）；独立“调整”（改期/改主体/改工序）仍通过订单变更或内部参与能力完成，页面不伪造该动作。
-- 售后费用查询与生产转线下独立列表没有公开 Query；A02/N03 页面按案例/明细标识读取现有公开 Query，订单追溯事实已包含转线下记录。售后案例列表/搜索已提供 `GET /api/after-sales/cases`。
+- 生产任务独立“取消”与“调整”均已提供公开命令、HTTP 路由与页面入口。调整支持改期、换主体、改工序与增删改未核验明细；按员工/日期、产能和来源新旧键并集稳定锁序重算负载、产能、来源、槽位与活动预留，已核验事实保留原日期、主体和标准版本，存在核验事实时锁定工序。`TaskAdjustmentIT` 覆盖成功调整、部分核验后改期、工序锁定、依赖任务阻断和失败回滚；`production.spec.ts` 覆盖页面调整链路。
+- 售后费用查询、生产转线下记录与售后案例列表/搜索均已提供公开 Query/HTTP：`GET /api/after-sales/costs`、`GET /api/production/offline-transfers`、`GET /api/after-sales/cases`；页面已接入费用与转线下记录展示。
 - 现金凭证为可选附件：订单收付款、日常收支与售后赔付请求可携带正式文件引用，随现金命令同事务引用；上传组件在订单收款与日常收支页面复用。
+- 部分核验按明细基准秒数分摊任务总负载，只移走被核验明细应占份额；调整与取消忽略已取消明细，避免多明细或调整后任务重复占用/错误保留。
 - 普通任务验收报废责任现在同步发布 APPLY 修订，工资责任 Feed 可消费；`PayrollManualDecisionFlowIT` 已覆盖迟到责任复核且原核定/应付不变。
 - 平台命令与现金命令已整体使用死锁重试模板；并发付款、退回与冲销专项测试通过。
 - 一期不计算超额制作激励；不提供动态公式编辑；报表不把工资参考、处理金额或现金净额合并成利润。

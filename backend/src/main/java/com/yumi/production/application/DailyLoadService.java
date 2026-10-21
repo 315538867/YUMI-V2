@@ -29,6 +29,11 @@ public class DailyLoadService {
         this.repository = repository;
     }
 
+    /** 幂等建行并锁定单个员工的日期负载；调整时由调用方按稳定顺序锁定新旧键并集。 */
+    public DayLoad lockDay(String employeeBusinessId, LocalDate workDate) {
+        return toDayLoad(repository.lockDayLoad(employeeBusinessId, workDate));
+    }
+
     /** 幂等建行并按稳定标识顺序锁定全部参与成员的日期负载。 */
     public Map<String, DayLoad> lockDays(Collection<String> employeeBusinessIds, LocalDate workDate) {
         Map<String, DayLoad> loads = new LinkedHashMap<>();

@@ -12,6 +12,8 @@ public interface OtherTaskRepository {
 
     void insert(OtherTaskRecord record);
 
+    void update(OtherTaskRecord record);
+
     Optional<OtherTaskRecord> find(String taskBusinessId);
 
     /** 其他任务详情记录。 */

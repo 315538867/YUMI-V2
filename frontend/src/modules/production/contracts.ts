@@ -152,3 +152,13 @@ export interface OrderProductionTrace {
     delayReasons: string[]
   }>
 }
+
+export interface OfflineTransferView {
+  factKind: string
+  factBusinessId: string
+  productionSourceBusinessId: string
+  quantity: number
+  occurredAt: string
+  detail: string | null
+  destination: string
+}

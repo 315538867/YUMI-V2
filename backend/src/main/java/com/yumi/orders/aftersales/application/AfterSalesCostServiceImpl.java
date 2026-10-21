@@ -1,7 +1,9 @@
 package com.yumi.orders.aftersales.application;
 
 import com.yumi.orders.aftersales.api.AfterSalesCostRef;
+import com.yumi.orders.aftersales.api.AfterSalesCostQuery;
 import com.yumi.orders.aftersales.api.AfterSalesCostService;
+import com.yumi.orders.aftersales.api.AfterSalesCostView;
 import com.yumi.orders.aftersales.api.ConfirmAfterSalesCostCommand;
 import com.yumi.orders.aftersales.api.CorrectAfterSalesCostCommand;
 import com.yumi.orders.aftersales.api.OrderAfterSalesCostSourceFeed;
@@ -31,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>成本来源不可变；更正发布旧版本 REVERSE 与新版本 ACCRUE。订单模块不调用财务写接口。
  */
 public class AfterSalesCostServiceImpl
-        implements AfterSalesCostService, OrderAfterSalesCostSourceFeed {
+        implements AfterSalesCostService, AfterSalesCostQuery, OrderAfterSalesCostSourceFeed {
 
     private static final String CONFIRM_SCOPE = "orders.aftersales.confirm_cost";
     private static final String CORRECT_SCOPE = "orders.aftersales.correct_cost";
@@ -144,6 +146,22 @@ public class AfterSalesCostServiceImpl
                 command.businessDate(), "ACCRUE", latest.sourceBusinessId(),
                 command.reasonText().strip(), now));
         return command.sourceBusinessId();
+    }
+
+    @Override
+    public List<AfterSalesCostView> listByCase(String caseBusinessId) {
+        authorization.require(PermissionCodes.AFTER_SALES_READ, ResourceScope.GLOBAL);
+        if (caseBusinessId == null || caseBusinessId.isBlank()) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_CASE", "售后案例不能为空");
+        }
+        return cases.findCostSourcesByCase(caseBusinessId).stream()
+                .map(record -> new AfterSalesCostView(
+                        record.sourceBusinessId(), record.caseBusinessId(),
+                        record.orderBusinessId(), record.costCategory(),
+                        SettlementMoney.of(record.amount(), CurrencyCode.CNY),
+                        record.businessDate(), record.operationType(),
+                        record.reasonText(), record.occurredAt()))
+                .toList();
     }
 
     private AfterSalesCostRef latestRef(String sourceBusinessId) {

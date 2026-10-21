@@ -6,11 +6,14 @@ import com.yumi.platform.api.idempotency.CommandOutcome;
 import com.yumi.platform.api.idempotency.CommandRequest;
 import com.yumi.platform.api.http.RequestContextResolver;
 import com.yumi.platform.api.idempotency.CommandExecutionFacade;
+import com.yumi.production.api.AdjustTaskCommand;
 import com.yumi.production.api.ArrangeTaskCommand;
 import com.yumi.production.api.CancelTaskCommand;
 import com.yumi.production.api.ProductionProjectionRow;
 import com.yumi.production.api.ProductionQuantityLedger;
 import com.yumi.production.api.ProductionQuery;
+import com.yumi.production.api.SubjectRef;
+import com.yumi.production.api.TargetProcess;
 import com.yumi.production.api.TaskApplicationService;
 import com.yumi.production.api.TaskRef;
 import com.yumi.production.api.TaskView;
@@ -19,6 +22,7 @@ import com.yumi.production.api.VerificationView;
 import com.yumi.production.api.VerifyOtherTaskCommand;
 import com.yumi.production.api.VerifyTaskCommand;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -35,8 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 生产任务 HTTP 适配器（交付清单 N01）。
  *
- * <p>只调用生产公开命令与查询，承载任务安排、一次最终核验、任务详情及需求缺口投影；
- * 任务列表、调整与取消目前没有公开 API 方法，不在此伪造。
+ * <p>只调用生产公开命令与查询，承载任务安排、调整、取消、一次最终核验、任务详情及需求缺口投影。
  */
 @RestController
 @RequestMapping("/api/production/tasks")
@@ -71,6 +74,44 @@ public class ProductionTaskController {
 
     /** 任务取消请求体。 */
     public record CancelTaskRequest(String reasonText) {
+    }
+
+    /** 任务调整请求体；任务标识由路径给出。 */
+    public record AdjustTaskRequest(
+            SubjectRef subject,
+            LocalDate workDate,
+            TargetProcess processCode,
+            List<AdjustTaskCommand.ItemRequest> items,
+            Integer enteredStandardMinutes,
+            ArrangeTaskCommand.OtherTaskRequest otherTask,
+            String overrideReason) {
+
+        AdjustTaskCommand toCommand(String taskBusinessId) {
+            return new AdjustTaskCommand(
+                    taskBusinessId, subject, workDate, processCode, items,
+                    enteredStandardMinutes, otherTask, overrideReason);
+        }
+    }
+
+    @PostMapping("/{taskBusinessId}/adjustment")
+    public ResponseEntity<TaskView> adjust(
+            @PathVariable String taskBusinessId,
+            @RequestBody AdjustTaskRequest request,
+            HttpServletRequest servletRequest) {
+        RequestContext context = contextResolver.resolveCommand(servletRequest);
+        AdjustTaskCommand command = request.toCommand(taskBusinessId);
+        AtomicReference<TaskView> result = new AtomicReference<>();
+        var execution = commands.execute(
+                new CommandRequest(
+                        "production.task.adjust",
+                        context.idempotencyKey(),
+                        CommandExecutionFacade.fingerprint(objectMapper, command)),
+                () -> {
+                    TaskView adjusted = tasks.adjust(command);
+                    result.set(adjusted);
+                    return new CommandOutcome("TASK", adjusted.taskBusinessId());
+                });
+        return commandResult(result.get(), execution.replayed(), HttpStatus.OK);
     }
 
     @PostMapping("/{taskBusinessId}/cancellation")

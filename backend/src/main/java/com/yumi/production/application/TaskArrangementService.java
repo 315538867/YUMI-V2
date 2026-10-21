@@ -13,9 +13,11 @@ import com.yumi.platform.api.identity.CurrentActorProvider;
 import com.yumi.platform.api.numbering.BusinessNumberService;
 import com.yumi.product.api.ProductSnapshotRef;
 import com.yumi.product.api.ProductSnapshotService;
+import com.yumi.production.api.AdjustTaskCommand;
 import com.yumi.production.api.ArrangeTaskCommand;
 import com.yumi.production.api.CancelTaskCommand;
 import com.yumi.production.api.DemandType;
+import com.yumi.production.api.SubjectRef;
 import com.yumi.production.api.SubjectType;
 import com.yumi.production.api.SubjectTaskSlot;
 import com.yumi.production.api.TargetProcess;
@@ -42,21 +44,24 @@ import com.yumi.workforce.api.AssignmentSubjectSnapshotService;
 import com.yumi.workforce.api.AssignmentSubjectSnapshotBundle.StandardSnapshotRef;
 import com.yumi.workforce.api.AssignmentSubjectSnapshotView;
 import com.yumi.workforce.api.AssignmentSubjectType;
+import com.yumi.workforce.api.ChangeWorkforceActivityCommand;
 import com.yumi.workforce.api.PreparedActivityReservation;
+import com.yumi.workforce.api.PreparedActivityReservationChange;
 import com.yumi.workforce.api.ReserveWorkforceActivityCommand;
 import com.yumi.workforce.api.ReleaseWorkforceActivityCommand;
 import com.yumi.workforce.api.WorkforceActivityReservationParticipant;
-import com.yumi.workforce.api.WorkforceActivitySourceRef;
 import com.yumi.workforce.api.WorkforceActivitySourceRef;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -155,6 +160,256 @@ public class TaskArrangementService implements TaskApplicationService {
     }
 
     @Override
+    public TaskView adjust(AdjustTaskCommand command) {
+        authorization.require(PermissionCodes.PRODUCTION_SCHEDULE, ResourceScope.GLOBAL);
+        if (command == null) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_ADJUSTMENT", "任务调整命令不能为空");
+        }
+        return transactionTemplate.execute(status -> doAdjust(command));
+    }
+
+    private TaskView doAdjust(AdjustTaskCommand command) {
+        Instant now = clock.instant();
+        String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
+        TaskRecord task = tasks.lockTask(command.taskBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCTION_TASK_NOT_FOUND", "任务不存在"));
+        if (task.status() == TaskStatus.CANCELLED || task.status() == TaskStatus.VERIFIED) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_TASK_NOT_ADJUSTABLE",
+                    "任务已取消或已全部核验，不能调整");
+        }
+        List<TaskItemRecord> items = tasks.findTaskItems(task.taskBusinessId());
+        if (task.taskType() == TaskType.OTHER_TASK) {
+            return adjustOtherTask(task, command, now, operatorId);
+        }
+        return adjustBoundTask(task, items, command, now, operatorId);
+    }
+
+    private TaskView adjustBoundTask(
+            TaskRecord task, List<TaskItemRecord> allItems, AdjustTaskCommand command,
+            Instant now, String operatorId) {
+        validateBoundAdjustCommand(task.taskType(), command);
+        List<TaskItemRecord> pending = allItems.stream()
+                .filter(item -> "PENDING".equals(item.verificationStatus()))
+                .toList();
+        if (pending.isEmpty()) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_TASK_NOT_ADJUSTABLE",
+                    "任务没有可调整的未核验明细");
+        }
+        boolean hasVerified = allItems.stream()
+                .anyMatch(item -> "VERIFIED".equals(item.verificationStatus()));
+        if (hasVerified && task.processCode() != command.processCode()) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_PROCESS_LOCKED_AFTER_VERIFICATION",
+                    "任务已有核验事实，不能修改工序");
+        }
+
+        long newVersion = task.activeAssignmentVersion() + 1;
+        List<PlannedItem> planned = planAdjustedItems(
+                task, allItems, pending, command);
+        Set<String> keptItemIds = planned.stream()
+                .map(PlannedItem::taskItemBusinessId)
+                .filter(id -> pending.stream().anyMatch(item -> item.taskItemBusinessId().equals(id)))
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        List<TaskItemRecord> removed = pending.stream()
+                .filter(item -> !keptItemIds.contains(item.taskItemBusinessId()))
+                .toList();
+
+        Set<String> oldParticipants = new LinkedHashSet<>(
+                tasks.findParticipantEmployeeIds(task.taskBusinessId()));
+        boolean moved = !task.workDate().equals(command.workDate())
+                || !task.subject().equals(command.subject())
+                || (task.processCode() == TargetProcess.MAKING
+                        && command.processCode() != TargetProcess.MAKING);
+        if (task.taskType() == TaskType.NORMAL_PRODUCTION && moved) {
+            requireNoDependentTasks(task, oldParticipants);
+        }
+
+        PreparedActivityReservationChange change = workforce.prepareChange(
+                new ChangeWorkforceActivityCommand(
+                        new WorkforceActivitySourceRef(SOURCE_MODULE, SOURCE_TYPE, task.taskBusinessId()),
+                        assignmentSubject(command.subject()),
+                        command.processCode().name(), command.workDate(), List.of()));
+        AssignmentSubjectSnapshotBundle bundle = change.prepared().bundle();
+        Set<String> newParticipants = participantsOf(command.subject(), bundle);
+
+        Map<String, DailyLoadService.DayLoad> newLoads = lockAdjustmentDays(
+                oldParticipants, task.workDate(), newParticipants, command.workDate());
+        validateSlotsFor(
+                task.taskType(), newParticipants, command.workDate(), task.taskBusinessId());
+
+        Map<CapacityKey, Integer> oldMaking = makingOfPending(
+                pending, task.workDate(), task.processCode(), task.taskType());
+        Map<CapacityKey, Integer> newMaking = makingOfPlanned(
+                planned, command.workDate(), command.processCode(), task.taskType());
+        Map<CapacityKey, NewProductCapacityService.CapacityLock> capacityLocks =
+                lockAdjustmentCapacity(oldMaking, newMaking);
+
+        Map<String, Integer> oldBySource = pending.stream().collect(
+                java.util.stream.Collectors.groupingBy(
+                        TaskItemRecord::productionSourceBusinessId,
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.summingInt(TaskItemRecord::plannedQuantity)));
+        Map<String, Integer> newBySource = planned.stream().collect(
+                java.util.stream.Collectors.groupingBy(
+                        PlannedItem::productionSourceBusinessId,
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.summingInt(PlannedItem::quantity)));
+        Map<String, PlannedItem> firstNewBySource = new LinkedHashMap<>();
+        planned.forEach(item -> firstNewBySource.putIfAbsent(
+                item.productionSourceBusinessId(), item));
+        lockAndValidateSources(
+                oldBySource, newBySource, firstNewBySource, command.processCode());
+
+        long releasedSeconds = pending.stream()
+                .mapToLong(item -> (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L)
+                .sum();
+        for (String employeeId : oldParticipants) {
+            dailyLoadService.releasePlan(employeeId, task.workDate(), releasedSeconds);
+        }
+        newLoads = currentLoads(newParticipants, command.workDate());
+        WorkloadAssessor.AssignableResult assessed = assess(
+                task.taskType(), command.subject(), null, planned, bundle, newLoads);
+        requirePermitted(task.taskType(), assessed.comparison(), command.overrideReason());
+
+        applyCapacityAdjustment(capacityLocks, oldMaking, newMaking);
+        applySourceReservationChanges(oldBySource, newBySource, pending);
+
+        for (TaskItemRecord item : removed) {
+            tasks.cancelTaskItem(
+                    item.taskItemBusinessId(), item.plannedQuantity(), newVersion);
+            tasks.insertItemAssignmentFact(item, newVersion, "REMOVE", now, operatorId);
+        }
+        for (PlannedItem item : planned) {
+            TaskItemRecord record = item.toRecord(task.taskBusinessId(), newVersion);
+            String operation = keptItemIds.contains(item.taskItemBusinessId()) ? "ADJUST" : "ADD";
+            if ("ADJUST".equals(operation)) {
+                tasks.updateTaskItemPlan(record);
+            } else {
+                tasks.insertTaskItem(record);
+            }
+            tasks.insertItemAssignmentFact(record, newVersion, operation, now, operatorId);
+            sourceReservations.upsertActiveHold(new SourceReservationRepository.SourceHold(
+                    task.taskBusinessId(), record.taskItemBusinessId(),
+                    record.productionSourceBusinessId(), record.plannedQuantity(), "ACTIVE"));
+        }
+
+        int verifiedQuantity = allItems.stream()
+                .filter(item -> "VERIFIED".equals(item.verificationStatus()))
+                .mapToInt(TaskItemRecord::plannedQuantity)
+                .sum();
+        long oldBaseSeconds = allItems.stream()
+                .mapToLong(item -> (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L)
+                .sum();
+        long verifiedBaseSeconds = allItems.stream()
+                .filter(item -> "VERIFIED".equals(item.verificationStatus()))
+                .mapToLong(item -> (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L)
+                .sum();
+        long verifiedLoad = oldBaseSeconds == 0
+                ? 0L
+                : Math.round((double) task.taskStandardSeconds()
+                        * verifiedBaseSeconds / oldBaseSeconds);
+        int totalQuantity = verifiedQuantity + planned.stream().mapToInt(PlannedItem::quantity).sum();
+        long totalSeconds = verifiedLoad + assessed.requiredSeconds();
+        String assessmentBusinessId = "ASMT-" + UUID.randomUUID();
+        saveAssessment(assessmentBusinessId, task.taskBusinessId(), newVersion, planned, assessed,
+                bundle, newParticipants, command.overrideReason());
+
+        TaskRecord updated = new TaskRecord(
+                task.id(), task.taskBusinessId(), task.taskNo(), task.taskType(),
+                command.workDate(), command.processCode(), totalQuantity, null, totalSeconds,
+                command.subject(), bundle.subjectSnapshot().snapshotBusinessId(),
+                assessmentBusinessId,
+                bundle.dailyWorkTimeSnapshot().snapshotBusinessId(),
+                bundle.efficiencyStandardSnapshot() == null
+                        ? null : bundle.efficiencyStandardSnapshot().snapshotBusinessId(),
+                hasVerified ? TaskStatus.PARTIALLY_VERIFIED : TaskStatus.ARRANGED,
+                newVersion, task.rowVersion() + 1, task.createdAt(), task.createdBy(), now);
+        tasks.updateTaskPlan(updated);
+        tasks.insertAssignmentFact(
+                task.taskBusinessId(), newVersion, "ADJUST", task.subjectSnapshotRef(),
+                bundle.subjectSnapshot().snapshotBusinessId(), task.workDate(), command.workDate(),
+                task.processCode() == null ? null : task.processCode().name(),
+                command.processCode().name(), task.plannedWorkQuantity(), totalQuantity,
+                now, operatorId);
+
+        dailyLoadService.reservePlan(newLoads, assessed.membersAddedSeconds());
+        applyActiveReferences(task.taskBusinessId(), oldParticipants, newParticipants,
+                command.subject(), command.workDate(), assessed.membersAddedSeconds());
+        applySlotChanges(
+                task, command.workDate(), oldParticipants, newParticipants, hasVerified);
+        workforce.commitChange(change);
+        return viewOf(tasks.findTask(task.taskBusinessId()).orElseThrow());
+    }
+
+    private TaskView adjustOtherTask(
+            TaskRecord task, AdjustTaskCommand command, Instant now, String operatorId) {
+        validateOtherTaskAdjustCommand(command);
+        if (task.status() != TaskStatus.ARRANGED) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_TASK_NOT_ADJUSTABLE",
+                    "其他任务已核验或取消，不能调整");
+        }
+        long newVersion = task.activeAssignmentVersion() + 1;
+        PreparedActivityReservationChange change = workforce.prepareChange(
+                new ChangeWorkforceActivityCommand(
+                        new WorkforceActivitySourceRef(SOURCE_MODULE, SOURCE_TYPE, task.taskBusinessId()),
+                        assignmentSubject(command.subject()), null, command.workDate(), List.of()));
+        AssignmentSubjectSnapshotBundle bundle = change.prepared().bundle();
+        Set<String> oldParticipants = new LinkedHashSet<>(
+                tasks.findParticipantEmployeeIds(task.taskBusinessId()));
+        Set<String> newParticipants = participantsOf(command.subject(), bundle);
+
+        Map<String, DailyLoadService.DayLoad> newLoads = lockAdjustmentDays(
+                oldParticipants, task.workDate(), newParticipants, command.workDate());
+        validateSlotsFor(
+                TaskType.OTHER_TASK, newParticipants, command.workDate(), task.taskBusinessId());
+
+        for (String employeeId : oldParticipants) {
+            dailyLoadService.releasePlan(
+                    employeeId, task.workDate(), task.taskStandardSeconds());
+        }
+        newLoads = currentLoads(newParticipants, command.workDate());
+        WorkloadAssessor.AssignableResult assessed = assess(
+                TaskType.OTHER_TASK, command.subject(), command.enteredStandardMinutes(),
+                List.of(), bundle, newLoads);
+        requirePermitted(TaskType.OTHER_TASK, assessed.comparison(), command.overrideReason());
+
+        otherTasks.update(otherTaskRecord(command.otherTask(), task.taskBusinessId()));
+        String assessmentBusinessId = "ASMT-" + UUID.randomUUID();
+        saveAssessment(assessmentBusinessId, task.taskBusinessId(), newVersion, List.of(), assessed,
+                bundle, newParticipants, command.overrideReason());
+        int totalQuantity = command.otherTask().plannedQuantity() == null
+                ? 0 : command.otherTask().plannedQuantity();
+
+        TaskRecord updated = new TaskRecord(
+                task.id(), task.taskBusinessId(), task.taskNo(), task.taskType(),
+                command.workDate(), null, totalQuantity, command.enteredStandardMinutes(),
+                assessed.requiredSeconds(), command.subject(),
+                bundle.subjectSnapshot().snapshotBusinessId(), assessmentBusinessId,
+                bundle.dailyWorkTimeSnapshot().snapshotBusinessId(),
+                bundle.efficiencyStandardSnapshot() == null
+                        ? null : bundle.efficiencyStandardSnapshot().snapshotBusinessId(),
+                TaskStatus.ARRANGED, newVersion, task.rowVersion() + 1,
+                task.createdAt(), task.createdBy(), now);
+        tasks.updateTaskPlan(updated);
+        tasks.insertAssignmentFact(
+                task.taskBusinessId(), newVersion, "ADJUST", task.subjectSnapshotRef(),
+                bundle.subjectSnapshot().snapshotBusinessId(), task.workDate(), command.workDate(),
+                null, null, task.plannedWorkQuantity(), totalQuantity, now, operatorId);
+
+        dailyLoadService.reservePlan(newLoads, assessed.membersAddedSeconds());
+        applyActiveReferences(task.taskBusinessId(), oldParticipants, newParticipants,
+                command.subject(), command.workDate(), assessed.membersAddedSeconds());
+        applySlotChanges(
+                task, command.workDate(), oldParticipants, newParticipants, false);
+        workforce.commitChange(change);
+        return viewOf(tasks.findTask(task.taskBusinessId()).orElseThrow());
+    }
+
+    @Override
     public TaskView getTask(String taskBusinessId) {
         authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
         TaskRecord task = tasks.findTask(taskBusinessId)
@@ -193,7 +448,7 @@ public class TaskArrangementService implements TaskApplicationService {
                     "任务没有可取消的未核验明细");
         }
         boolean hasVerified = items.stream()
-                .anyMatch(item -> !"PENDING".equals(item.verificationStatus()));
+                .anyMatch(item -> "VERIFIED".equals(item.verificationStatus()));
         List<String> participants = tasks.findParticipantEmployeeIds(task.taskBusinessId());
 
         var preparedRelease = workforce.prepareRelease(
@@ -248,10 +503,10 @@ public class TaskArrangementService implements TaskApplicationService {
                 ? SubjectTaskSlot.REPAIR.name() : task.taskType().name();
         if (hasVerified) {
             int remainingPlanned = items.stream()
-                    .filter(item -> !"PENDING".equals(item.verificationStatus()))
+                    .filter(item -> "VERIFIED".equals(item.verificationStatus()))
                     .mapToInt(TaskItemRecord::plannedQuantity).sum();
             long remainingSeconds = items.stream()
-                    .filter(item -> !"PENDING".equals(item.verificationStatus()))
+                    .filter(item -> "VERIFIED".equals(item.verificationStatus()))
                     .mapToLong(item -> (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L)
                     .sum();
             reductions.updateTaskTotals(
@@ -311,6 +566,338 @@ public class TaskArrangementService implements TaskApplicationService {
                         otherTask.resultNote()));
     }
 
+    private void validateBoundAdjustCommand(TaskType taskType, AdjustTaskCommand command) {
+        if (command.items().isEmpty() || command.processCode() == null) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID",
+                    "生产/返工任务调整必须给出工序与至少一条明细");
+        }
+        if (command.enteredStandardMinutes() != null || command.otherTask() != null) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID",
+                    "生产/返工任务不使用其他任务字段");
+        }
+        if (taskType == TaskType.EXTRA_PRODUCTION && command.processCode() != TargetProcess.MAKING) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID",
+                    "超额任务工序固定为 MAKING");
+        }
+        if (taskType == TaskType.REPAIR && command.items().size() != 1) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID",
+                    "返工任务只允许关联一个返工来源");
+        }
+    }
+
+    private void validateOtherTaskAdjustCommand(AdjustTaskCommand command) {
+        if (command.processCode() != null || !command.items().isEmpty()
+                || command.enteredStandardMinutes() == null
+                || command.enteredStandardMinutes() <= 0 || command.otherTask() == null) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID",
+                    "其他任务调整必须给出工作内容与整体标准分钟，且不关联来源与工序");
+        }
+    }
+
+    private List<PlannedItem> planAdjustedItems(
+            TaskRecord task, List<TaskItemRecord> allItems, List<TaskItemRecord> pending,
+            AdjustTaskCommand command) {
+        Map<String, TaskItemRecord> pendingById = new LinkedHashMap<>();
+        pending.forEach(item -> pendingById.put(item.taskItemBusinessId(), item));
+        Map<String, TaskItemRecord> allById = new LinkedHashMap<>();
+        allItems.forEach(item -> allById.put(item.taskItemBusinessId(), item));
+
+        Set<String> seenIds = new LinkedHashSet<>();
+        Set<String> seenSources = new LinkedHashSet<>();
+        int nextOrder = allItems.stream()
+                .mapToInt(TaskItemRecord::itemOrder).max().orElse(0) + 1;
+        List<PlannedItem> planned = new ArrayList<>();
+        for (AdjustTaskCommand.ItemRequest request : command.items()) {
+            TaskItemRecord existing = null;
+            if (request.existing()) {
+                existing = pendingById.get(request.taskItemBusinessId());
+                if (existing == null) {
+                    TaskItemRecord other = allById.get(request.taskItemBusinessId());
+                    if (other != null && "VERIFIED".equals(other.verificationStatus())) {
+                        throw new ApiException(
+                                ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_ITEM_ALREADY_VERIFIED",
+                                "已核验明细不能调整：" + request.taskItemBusinessId());
+                    }
+                    throw new ApiException(
+                            ApiErrorType.NOT_FOUND, "PRODUCTION_TASK_ITEM_NOT_FOUND",
+                            "任务明细不存在或不属于当前任务：" + request.taskItemBusinessId());
+                }
+                if (!seenIds.add(existing.taskItemBusinessId())) {
+                    throw new ApiException(
+                            ApiErrorType.VALIDATION, "PRODUCTION_TASK_ITEM_DUPLICATED",
+                            "同一明细不能重复提交");
+                }
+            }
+            SourceRecord source = production.findSource(request.productionSourceBusinessId())
+                    .orElseThrow(() -> new ApiException(
+                            ApiErrorType.NOT_FOUND, "PRODUCTION_SOURCE_NOT_FOUND",
+                            "生产来源不存在：" + request.productionSourceBusinessId()));
+            DemandRecord demand = production.findDemand(source.demandBusinessId())
+                    .orElseThrow(() -> new ApiException(
+                            ApiErrorType.NOT_FOUND, "PRODUCTION_DEMAND_NOT_FOUND", "生产需求不存在"));
+            requireTaskTypeConsistency(task.taskType(), command.processCode(), demand.demandType());
+            requireTargetReachable(source.targetProcess(), command.processCode());
+            if (!seenSources.add(source.productionSourceBusinessId())) {
+                throw new ApiException(
+                        ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID", "同一任务不能重复同一来源明细");
+            }
+            planned.add(new PlannedItem(
+                    existing == null ? "TI-" + UUID.randomUUID() : existing.taskItemBusinessId(),
+                    existing == null ? nextOrder++ : existing.itemOrder(),
+                    demand.demandBusinessId(), demand.demandType(),
+                    source.productionSourceBusinessId(), source.physicalRootSourceBusinessId(),
+                    existing == null ? null : existing.repairSourceBusinessId(),
+                    demand.orderBusinessId(), demand.orderItemBusinessId(),
+                    demand.productBusinessId(), demand.productSnapshotRef(),
+                    demand.schemeBusinessId(), demand.schemeSnapshotRef(),
+                    source.targetProcess(), command.processCode(), request.plannedQuantity(),
+                    standardMinutesOf(demand, command.processCode())));
+        }
+        return planned;
+    }
+
+    private void requireNoDependentTasks(TaskRecord task, Set<String> participants) {
+        for (String employeeId : participants) {
+            for (TaskRecord other : tasks.findOtherActiveTasksOfParticipant(
+                    employeeId, task.workDate(), task.taskBusinessId())) {
+                if (other.taskType() == TaskType.EXTRA_PRODUCTION
+                        || other.taskType() == TaskType.REPAIR) {
+                    throw new ApiException(
+                            ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_DEPENDENT_TASK_EXISTS",
+                            "正常任务存在依赖的超额或返工任务，请先取消或调整：" + other.taskNo());
+                }
+            }
+        }
+    }
+
+    private Map<CapacityKey, Integer> makingOfPending(
+            List<TaskItemRecord> pending, LocalDate workDate,
+            TargetProcess processCode, TaskType taskType) {
+        Map<CapacityKey, Integer> making = new LinkedHashMap<>();
+        if (processCode != TargetProcess.MAKING
+                || (taskType != TaskType.NORMAL_PRODUCTION
+                        && taskType != TaskType.EXTRA_PRODUCTION)) {
+            return making;
+        }
+        pending.stream()
+                .filter(item -> item.demandType() == DemandType.NEW_PRODUCT)
+                .forEach(item -> making.merge(
+                        new CapacityKey(item.productBusinessId(), workDate),
+                        item.plannedQuantity(), Integer::sum));
+        return making;
+    }
+
+    private Map<CapacityKey, Integer> makingOfPlanned(
+            List<PlannedItem> planned, LocalDate workDate,
+            TargetProcess processCode, TaskType taskType) {
+        Map<CapacityKey, Integer> making = new LinkedHashMap<>();
+        if (processCode != TargetProcess.MAKING
+                || (taskType != TaskType.NORMAL_PRODUCTION
+                        && taskType != TaskType.EXTRA_PRODUCTION)) {
+            return making;
+        }
+        planned.stream()
+                .filter(item -> item.demandType() == DemandType.NEW_PRODUCT)
+                .forEach(item -> making.merge(
+                        new CapacityKey(item.productBusinessId(), workDate),
+                        item.quantity(), Integer::sum));
+        return making;
+    }
+
+    private Map<CapacityKey, NewProductCapacityService.CapacityLock> lockAdjustmentCapacity(
+            Map<CapacityKey, Integer> oldMaking, Map<CapacityKey, Integer> newMaking) {
+        TreeSet<CapacityKey> keys = new TreeSet<>(
+                Comparator.comparing(CapacityKey::productBusinessId)
+                        .thenComparing(CapacityKey::workDate));
+        keys.addAll(oldMaking.keySet());
+        keys.addAll(newMaking.keySet());
+        Map<CapacityKey, NewProductCapacityService.CapacityLock> locks = new LinkedHashMap<>();
+        for (CapacityKey key : keys) {
+            if (newMaking.containsKey(key)) {
+                ProductSnapshotRef snapshot =
+                        productSnapshots.acquireProductSnapshot(key.productBusinessId());
+                int limit = productSnapshots.resolveProduct(snapshot).dailyCapacity();
+                locks.put(key, capacityService.lockOne(
+                        key.productBusinessId(), key.workDate(), limit,
+                        snapshot.sourceContentVersion()));
+            } else {
+                locks.put(key, capacityService.lockKeepingLimit(
+                        key.productBusinessId(), key.workDate()));
+            }
+        }
+        return locks;
+    }
+
+    private void applyCapacityAdjustment(
+            Map<CapacityKey, NewProductCapacityService.CapacityLock> locks,
+            Map<CapacityKey, Integer> oldMaking, Map<CapacityKey, Integer> newMaking) {
+        for (var entry : locks.entrySet()) {
+            int oldQuantity = oldMaking.getOrDefault(entry.getKey(), 0);
+            int newQuantity = newMaking.getOrDefault(entry.getKey(), 0);
+            if (oldQuantity > 0 && newQuantity > 0) {
+                capacityService.adjustPlan(entry.getValue(), oldQuantity, newQuantity);
+            } else if (oldQuantity > 0) {
+                capacityService.releasePlan(entry.getValue(), oldQuantity);
+            } else if (newQuantity > 0) {
+                capacityService.reservePlan(entry.getValue(), newQuantity);
+            }
+        }
+    }
+
+    private void lockAndValidateSources(
+            Map<String, Integer> oldBySource, Map<String, Integer> newBySource,
+            Map<String, PlannedItem> firstNewBySource, TargetProcess processCode) {
+        Set<String> sources = new TreeSet<>();
+        sources.addAll(oldBySource.keySet());
+        sources.addAll(newBySource.keySet());
+        for (String sourceId : sources) {
+            SourceRecord source = production.lockSource(sourceId);
+            int reserved = sourceReservations.lockReservedQuantity(sourceId);
+            int newQuantity = newBySource.getOrDefault(sourceId, 0);
+            if (newQuantity <= 0) {
+                continue;
+            }
+            if (OPENING_PENDING.equals(source.openingStatus())) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_SOURCE_NOT_OPENED",
+                        "来源尚未完成期初初始化，不能安排任务");
+            }
+            int effectiveReserved = reserved - oldBySource.getOrDefault(sourceId, 0);
+            if (effectiveReserved < 0) {
+                throw new ApiException(
+                        ApiErrorType.SYSTEM_FAILURE, "PRODUCTION_SOURCE_RESERVATION_INCONSISTENT",
+                        "来源预留不守恒：" + sourceId);
+            }
+            PlannedItem reference = firstNewBySource.get(sourceId);
+            int available = availableQuantity(reference, processCode) - effectiveReserved;
+            if (available < newQuantity) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_SOURCE_INSUFFICIENT",
+                        "来源当前可安排数量不足：需要 " + newQuantity + "，可用 " + available);
+            }
+        }
+    }
+
+    private void applySourceReservationChanges(
+            Map<String, Integer> oldBySource, Map<String, Integer> newBySource,
+            List<TaskItemRecord> pending) {
+        for (TaskItemRecord item : pending) {
+            sourceReservations.releaseHold(item.taskItemBusinessId());
+        }
+        for (var entry : oldBySource.entrySet()) {
+            if (entry.getValue() > 0) {
+                sourceReservations.release(entry.getKey(), entry.getValue());
+            }
+        }
+        for (var entry : newBySource.entrySet()) {
+            if (entry.getValue() > 0) {
+                sourceReservations.reserve(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    private Map<String, DailyLoadService.DayLoad> lockAdjustmentDays(
+            Set<String> oldParticipants, LocalDate oldWorkDate,
+            Set<String> newParticipants, LocalDate newWorkDate) {
+        TreeSet<DayKey> keys = new TreeSet<>(
+                Comparator.comparing(DayKey::employeeBusinessId)
+                        .thenComparing(DayKey::workDate));
+        oldParticipants.forEach(employeeId ->
+                keys.add(new DayKey(employeeId, oldWorkDate)));
+        newParticipants.forEach(employeeId ->
+                keys.add(new DayKey(employeeId, newWorkDate)));
+        Map<String, DailyLoadService.DayLoad> newLoads = new LinkedHashMap<>();
+        for (DayKey key : keys) {
+            DailyLoadService.DayLoad load =
+                    dailyLoadService.lockDay(key.employeeBusinessId(), key.workDate());
+            if (key.workDate().equals(newWorkDate)
+                    && newParticipants.contains(key.employeeBusinessId())) {
+                newLoads.put(key.employeeBusinessId(), load);
+            }
+        }
+        return newLoads;
+    }
+
+    private Map<String, DailyLoadService.DayLoad> currentLoads(
+            Set<String> participants, LocalDate workDate) {
+        Map<String, DailyLoadService.DayLoad> loads = new LinkedHashMap<>();
+        participants.stream().sorted().forEach(employeeId ->
+                loads.put(employeeId, dailyLoadService.load(employeeId, workDate)));
+        return loads;
+    }
+
+    private void applyActiveReferences(
+            String taskBusinessId, Set<String> oldParticipants, Set<String> newParticipants,
+            SubjectRef subject, LocalDate workDate, long occupiedSeconds) {
+        for (String employeeId : oldParticipants) {
+            if (!newParticipants.contains(employeeId)) {
+                dailyLoads.releaseActiveParticipant(taskBusinessId, employeeId);
+            }
+        }
+        for (String employeeId : newParticipants) {
+            dailyLoads.insertActiveParticipant(
+                    taskBusinessId, employeeId, subject.subjectType().name(),
+                    subject.subjectBusinessId(), workDate, occupiedSeconds);
+        }
+        dailyLoads.insertActiveSubject(
+                taskBusinessId, subject.subjectType().name(), subject.subjectBusinessId(), workDate);
+    }
+
+    private void applySlotChanges(
+            TaskRecord task, LocalDate newWorkDate, Set<String> oldParticipants,
+            Set<String> newParticipants, boolean hasVerified) {
+        String slotType = slotTypeOf(task.taskType());
+        boolean sameDate = task.workDate().equals(newWorkDate);
+        for (String employeeId : oldParticipants) {
+            if (sameDate && newParticipants.contains(employeeId)) {
+                continue;
+            }
+            dailyLoads.updateSlotStatusForTask(
+                    employeeId, task.workDate(), slotType, task.taskBusinessId(),
+                    hasVerified ? "RETAINED" : SLOT_RELEASED);
+            if (!hasVerified) {
+                releaseModeIfUnused(employeeId, task.workDate());
+            }
+        }
+        for (String employeeId : newParticipants) {
+            if (sameDate && oldParticipants.contains(employeeId)) {
+                continue;
+            }
+            String mode = task.taskType() == TaskType.OTHER_TASK
+                    ? WORK_MODE_OTHER : WORK_MODE_PRODUCTION;
+            if (!mode.equals(dailyLoads.findWorkMode(employeeId, newWorkDate).orElse(null))) {
+                dailyLoads.upsertWorkMode(employeeId, newWorkDate, mode);
+            }
+            dailyLoads.upsertSlot(
+                    employeeId, newWorkDate, slotType, task.taskBusinessId(), SLOT_ACTIVE);
+        }
+    }
+
+    private void releaseModeIfUnused(String employeeId, LocalDate workDate) {
+        boolean retained = dailyLoads.findSlots(employeeId, workDate).stream()
+                .anyMatch(slot -> !SLOT_RELEASED.equals(slot.status()));
+        if (!retained) {
+            dailyLoads.releaseWorkMode(employeeId, workDate);
+        }
+    }
+
+    private static String slotTypeOf(TaskType taskType) {
+        return taskType == TaskType.REPAIR
+                ? SubjectTaskSlot.REPAIR.name() : taskType.name();
+    }
+
+    private static AssignmentSubjectRef assignmentSubject(SubjectRef subject) {
+        return new AssignmentSubjectRef(
+                subject.subjectType() == SubjectType.TEAM
+                        ? AssignmentSubjectType.TEAM : AssignmentSubjectType.EMPLOYEE,
+                subject.subjectBusinessId());
+    }
+
     private TaskRef doArrange(ArrangeTaskCommand command) {
         Instant now = clock.instant();
         String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
@@ -335,7 +922,7 @@ public class TaskArrangementService implements TaskApplicationService {
         prepared = prepared.withSource(
                 new WorkforceActivitySourceRef(SOURCE_MODULE, SOURCE_TYPE, taskBusinessId));
         AssignmentSubjectSnapshotBundle bundle = prepared.bundle();
-        Set<String> participants = participantsOf(command, bundle);
+        Set<String> participants = participantsOf(command.subject(), bundle);
 
         applySlotsAndModes(command, participants);
         Map<String, DailyLoadService.DayLoad> loads =
@@ -352,7 +939,9 @@ public class TaskArrangementService implements TaskApplicationService {
             requireSourceAvailable(item);
         }
 
-        WorkloadAssessor.AssignableResult assessed = assess(command, planned, bundle, loads);
+        WorkloadAssessor.AssignableResult assessed = assess(
+                command.taskType(), command.subject(), command.enteredStandardMinutes(),
+                planned, bundle, loads);
         requirePermitted(command.taskType(), assessed.comparison(), command.overrideReason());
 
         TaskRecord task = new TaskRecord(
@@ -374,7 +963,7 @@ public class TaskArrangementService implements TaskApplicationService {
         }
 
         for (PlannedItem item : planned) {
-            TaskItemRecord record = item.toRecord(taskBusinessId);
+            TaskItemRecord record = item.toRecord(taskBusinessId, 1L);
             tasks.insertTaskItem(record);
             tasks.insertItemAssignmentFact(record, 1L, "CREATE", now, operatorId);
             sourceReservations.reserve(item.productionSourceBusinessId(), item.quantity());
@@ -383,11 +972,13 @@ public class TaskArrangementService implements TaskApplicationService {
                     item.quantity(), "ACTIVE"));
         }
         tasks.insertAssignmentFact(
-                taskBusinessId, 1L, "CREATE", bundle.subjectSnapshot().snapshotBusinessId(),
-                command.workDate(), command.processCode() == null ? null : command.processCode().name(),
-                task.plannedWorkQuantity(), now, operatorId);
+                taskBusinessId, 1L, "CREATE", null,
+                bundle.subjectSnapshot().snapshotBusinessId(), null,
+                command.workDate(), null,
+                command.processCode() == null ? null : command.processCode().name(),
+                null, task.plannedWorkQuantity(), now, operatorId);
 
-        saveAssessment(assessmentBusinessId, taskBusinessId, planned, assessed, bundle,
+        saveAssessment(assessmentBusinessId, taskBusinessId, 1L, planned, assessed, bundle,
                 participants, command.overrideReason());
 
         workforce.commitReserve(prepared);
@@ -411,7 +1002,11 @@ public class TaskArrangementService implements TaskApplicationService {
 
     private OtherTaskRepository.OtherTaskRecord planOtherTask(
             ArrangeTaskCommand command, String taskBusinessId) {
-        ArrangeTaskCommand.OtherTaskRequest request = command.otherTask();
+        return otherTaskRecord(command.otherTask(), taskBusinessId);
+    }
+
+    private OtherTaskRepository.OtherTaskRecord otherTaskRecord(
+            ArrangeTaskCommand.OtherTaskRequest request, String taskBusinessId) {
         String relatedProduct = request.relatedProductBusinessId();
         com.yumi.platform.api.value.CostAmount unitLabor = null;
         String productSnapshotRef = null;
@@ -543,26 +1138,27 @@ public class TaskArrangementService implements TaskApplicationService {
     }
 
     private WorkloadAssessor.AssignableResult assess(
-            ArrangeTaskCommand command, List<PlannedItem> planned,
-            AssignmentSubjectSnapshotBundle bundle, Map<String, DailyLoadService.DayLoad> loads) {
+            TaskType taskType, SubjectRef subject, Integer enteredStandardMinutes,
+            List<PlannedItem> planned, AssignmentSubjectSnapshotBundle bundle,
+            Map<String, DailyLoadService.DayLoad> loads) {
         int dailyMinutes = bundle.dailyEffectiveMinutes();
         List<WorkloadAssessor.DetailStandard> standards = planned.stream()
                 .map(item -> new WorkloadAssessor.DetailStandard(item.quantity(), item.standardMinutes()))
                 .toList();
 
-        if (command.subject().subjectType() == SubjectType.TEAM) {
+        if (subject.subjectType() == SubjectType.TEAM) {
             List<Long> memberOccupied = new ArrayList<>();
             for (var member : bundle.subjectView().members()) {
                 memberOccupied.add(occupiedOf(loads.get(member.employeeBusinessId())));
             }
             long occupiedBefore = memberOccupied.stream().mapToLong(Long::longValue).min().orElse(0L);
             return WorkloadAssessor.normalise(workloadAssessor.assessTeam(
-                    command.taskType(), standards, command.enteredStandardMinutes(), dailyMinutes,
+                    taskType, standards, enteredStandardMinutes, dailyMinutes,
                     occupiedBefore, bundle.subjectView().efficiencyFactor(), memberOccupied));
         }
-        String employeeId = command.subject().subjectBusinessId();
+        String employeeId = subject.subjectBusinessId();
         return WorkloadAssessor.normalise(workloadAssessor.assessIndividual(
-                command.taskType(), standards, command.enteredStandardMinutes(), dailyMinutes,
+                taskType, standards, enteredStandardMinutes, dailyMinutes,
                 occupiedOf(loads.get(employeeId))));
     }
 
@@ -584,14 +1180,21 @@ public class TaskArrangementService implements TaskApplicationService {
     }
 
     private void applySlotsAndModes(ArrangeTaskCommand command, Set<String> participants) {
-        boolean otherTask = command.taskType() == TaskType.OTHER_TASK;
-        String slotType = command.taskType() == TaskType.REPAIR
-                ? SubjectTaskSlot.REPAIR.name() : command.taskType().name();
+        validateSlotsFor(command.taskType(), participants, command.workDate(), null);
+    }
+
+    private void validateSlotsFor(
+            TaskType taskType, Set<String> participants, LocalDate workDate, String ignoredTaskId) {
+        boolean otherTask = taskType == TaskType.OTHER_TASK;
+        String slotType = slotTypeOf(taskType);
 
         for (String employeeId : participants) {
             List<DailyLoadRepository.SlotRecord> existing =
-                    dailyLoads.findSlots(employeeId, command.workDate());
-            String mode = dailyLoads.findWorkMode(employeeId, command.workDate()).orElse(null);
+                    dailyLoads.findSlots(employeeId, workDate).stream()
+                            .filter(slot -> ignoredTaskId == null
+                                    || !ignoredTaskId.equals(slot.taskBusinessId()))
+                            .toList();
+            String mode = dailyLoads.findWorkMode(employeeId, workDate).orElse(null);
 
             if (otherTask) {
                 boolean productionSlots = existing.stream().anyMatch(slot ->
@@ -610,12 +1213,12 @@ public class TaskArrangementService implements TaskApplicationService {
 
             boolean slotOccupied = existing.stream()
                     .anyMatch(slot -> slot.slotType().equals(slotType) && !SLOT_RELEASED.equals(slot.status()));
-            if (command.taskType().occupiesUniqueSlot() && slotOccupied) {
+            if (taskType.occupiesUniqueSlot() && slotOccupied) {
                 throw new ApiException(
                         ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_SLOT_CONFLICT",
                         "员工当日该类型任务槽位已被占用：" + slotType);
             }
-            if (command.taskType().requiresNormalProduction()) {
+            if (taskType.requiresNormalProduction()) {
                 boolean hasNormal = existing.stream().anyMatch(slot ->
                         SubjectTaskSlot.NORMAL_PRODUCTION.name().equals(slot.slotType())
                                 && !SLOT_RELEASED.equals(slot.status()));
@@ -660,23 +1263,24 @@ public class TaskArrangementService implements TaskApplicationService {
         return result;
     }
 
-    private Set<String> participantsOf(ArrangeTaskCommand command, AssignmentSubjectSnapshotBundle bundle) {
+    private Set<String> participantsOf(SubjectRef subject, AssignmentSubjectSnapshotBundle bundle) {
         Set<String> participants = new LinkedHashSet<>();
         for (AssignmentSubjectSnapshotView.MemberSnapshot member : bundle.subjectView().members()) {
             participants.add(member.employeeBusinessId());
         }
-        if (participants.isEmpty() && command.subject().subjectType() == SubjectType.EMPLOYEE) {
-            participants.add(command.subject().subjectBusinessId());
+        if (participants.isEmpty() && subject.subjectType() == SubjectType.EMPLOYEE) {
+            participants.add(subject.subjectBusinessId());
         }
         return participants;
     }
 
     private void saveAssessment(
-            String assessmentBusinessId, String taskBusinessId, List<PlannedItem> planned,
+            String assessmentBusinessId, String taskBusinessId, long assignmentVersion,
+            List<PlannedItem> planned,
             WorkloadAssessor.AssignableResult assessed, AssignmentSubjectSnapshotBundle bundle,
             Set<String> participants, String overrideReason) {
         assessments.insertAssessment(new AssessmentRepository.AssessmentRecord(
-                assessmentBusinessId, taskBusinessId, 1L, assessed.requiredSeconds(),
+                assessmentBusinessId, taskBusinessId, assignmentVersion, assessed.requiredSeconds(),
                 assessed.availableSeconds(), assessed.assessmentResult(),
                 bundle.subjectSnapshot().snapshotBusinessId(),
                 bundle.dailyWorkTimeSnapshot().snapshotBusinessId(),
@@ -707,13 +1311,21 @@ public class TaskArrangementService implements TaskApplicationService {
             String schemeSnapshotRef, TargetProcess targetProcess, TargetProcess processCode,
             int quantity, int standardMinutes) {
 
-        TaskItemRecord toRecord(String taskBusinessId) {
+        TaskItemRecord toRecord(String taskBusinessId, long assignmentVersion) {
             return new TaskItemRecord(
                     taskItemBusinessId, taskBusinessId, itemOrder, demandBusinessId, demandType,
                     productionSourceBusinessId, physicalRootSourceBusinessId, repairSourceBusinessId,
                     orderBusinessId, orderItemBusinessId, productBusinessId, productSnapshotRef,
                     schemeBusinessId, schemeSnapshotRef, targetProcess, quantity, standardMinutes,
-                    "PENDING", 1L, 1L);
+                    "PENDING", assignmentVersion, 1L);
         }
+    }
+
+    /** 调整时同时锁定的新旧产能键。 */
+    private record CapacityKey(String productBusinessId, LocalDate workDate) {
+    }
+
+    /** 调整时同时锁定的新旧员工日期负载键。 */
+    private record DayKey(String employeeBusinessId, LocalDate workDate) {
     }
 }

@@ -32,7 +32,7 @@ test('六模块、售后、设置与报表真实页面链路可操作', async ({
   await page.locator('.el-dialog .business-file-upload input[type="file"]').setInputFiles({
     name: 'voucher.pdf',
     mimeType: 'application/pdf',
-    buffer: Buffer.from('phase-one-voucher'),
+    buffer: Buffer.from(`phase-one-voucher-${Date.now()}`),
   })
   await expect(page.getByText('附件已上传')).toBeVisible()
   await page.locator('.el-dialog').getByRole('button', { name: '确认' }).click()

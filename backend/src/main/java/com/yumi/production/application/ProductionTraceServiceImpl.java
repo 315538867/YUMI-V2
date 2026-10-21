@@ -102,6 +102,26 @@ public class ProductionTraceServiceImpl implements ProductionQuery, ProductionRe
         return new ProductionProjectionPage(page, last.updatedAt(), last.demandBusinessId());
     }
 
+    @Override
+    public List<com.yumi.production.api.OfflineTransferView> offlineTransfersOfSource(
+            String productionSourceBusinessId) {
+        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
+        if (productionSourceBusinessId == null || productionSourceBusinessId.isBlank()) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_SOURCE", "生产来源不能为空");
+        }
+        return traces.findFactsOfSource(productionSourceBusinessId).stream()
+                .filter(fact -> "OFFLINE_TRANSFER".equals(fact.factKind())
+                        || ("TERMINAL_EXIT".equals(fact.factKind())
+                                && "TRANSFERRED_OFFLINE_INVENTORY".equals(fact.detail())))
+                .map(fact -> new com.yumi.production.api.OfflineTransferView(
+                        fact.factKind(), fact.factBusinessId(),
+                        fact.productionSourceBusinessId(), fact.quantity(), fact.occurredAt(),
+                        fact.detail(),
+                        "OFFLINE_TRANSFER".equals(fact.factKind())
+                                ? "TRANSFERRED_OFFLINE_INVENTORY" : fact.detail()))
+                .toList();
+    }
+
     private OrderProductionTrace.DemandTrace traceOfDemand(DemandRecord demand) {
         List<SourceRecord> sources = production.findSourcesOfDemand(demand.demandBusinessId());
         SourceRecord source = sources.isEmpty() ? null : sources.getFirst();

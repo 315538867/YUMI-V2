@@ -6,6 +6,7 @@ import { productionService } from '@/modules/production/services/productionServi
 
 const orderItemId = ref('')
 const trace = ref<OrderProductionTrace | null>(null)
+const offline = ref<Array<{ factKind: string; factBusinessId: string; productionSourceBusinessId: string; quantity: number; occurredAt: string; detail: string | null; destination: string }>>([])
 const loading = ref(false)
 const errorText = ref('')
 
@@ -18,6 +19,12 @@ async function load(): Promise<void> {
   errorText.value = ''
   try {
     trace.value = await productionService.orderTrace(orderItemId.value.trim())
+    const batches = await Promise.all(
+      trace.value.demands.map((demand) =>
+        productionService.offlineTransfers(demand.productionSourceBusinessId),
+      ),
+    )
+    offline.value = batches.flat()
   } catch (error) {
     trace.value = null
     errorText.value = userMessageOf(error, '生产追溯加载失败')
@@ -74,6 +81,14 @@ async function load(): Promise<void> {
           <el-table-column prop="occurredAt" label="发生时间" width="220" />
           <el-table-column prop="detail" label="说明" min-width="160" />
         </el-table>
+        <h3>转线下记录</h3>
+        <el-table :data="offline.filter((row) => row.productionSourceBusinessId === demand.productionSourceBusinessId)" border size="small">
+          <el-table-column prop="factKind" label="类型" width="160" />
+          <el-table-column prop="quantity" label="数量" width="80" />
+          <el-table-column prop="destination" label="去向" width="190" />
+          <el-table-column prop="detail" label="原因" min-width="150" />
+          <el-table-column prop="occurredAt" label="时间" width="220" />
+        </el-table>
       </el-card>
     </template>
   </section>
@@ -106,6 +121,8 @@ h1 {
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
+
+h3 { margin: 14px 0 8px; font-size: 14px; }
 
 .demand {
   margin-bottom: 12px;

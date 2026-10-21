@@ -36,13 +36,20 @@ public interface DailyLoadRepository {
     void upsertSlot(String employeeBusinessId, LocalDate workDate, String slotType,
             String taskBusinessId, String status);
 
+    /** 只调整该任务持有的槽位，避免误改同日其他任务。 */
+    void updateSlotStatusForTask(String employeeBusinessId, LocalDate workDate, String slotType,
+            String taskBusinessId, String status);
+
     List<SlotRecord> findSlots(String employeeBusinessId, LocalDate workDate);
 
-    /** 记录活动主体与参与人引用。 */
+    /** 记录活动主体与参与人引用；调整时同一任务原地更新到新主体、日期与秒数。 */
     void insertActiveSubject(String taskBusinessId, String subjectType, String subjectBusinessId, LocalDate workDate);
 
     void insertActiveParticipant(String taskBusinessId, String employeeBusinessId, String subjectType,
             String subjectBusinessId, LocalDate workDate, long occupiedStandardSeconds);
+
+    /** 调整后不再参与的成员保留引用历史，只置为已释放。 */
+    void releaseActiveParticipant(String taskBusinessId, String employeeBusinessId);
 
     /** 员工日期负载行。 */
     record LoadRecord(

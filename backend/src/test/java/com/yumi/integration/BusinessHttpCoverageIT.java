@@ -211,9 +211,22 @@ class BusinessHttpCoverageIT extends AbstractOrderFixtureTest {
         String itemId = json(task).get("items").get(0).get("taskItemBusinessId").asText();
 
         command("/api/production/tasks/verification", new VerifyTaskCommand(List.of(
-                new TaskItemResultRequest(itemId, 0, 2, 0, 0, List.of(), null))))
+                new TaskItemResultRequest(itemId, 0, 1, 0, 1,
+                        List.of(new com.yumi.production.api.DefectGroupRequest(
+                                "OTHER", "接口报废", 1, 0,
+                                List.of(new com.yumi.production.api.DefectGroupRequest.ScrapPartRequest(
+                                        1, com.yumi.production.api.PhysicalDestination
+                                                .TRANSFERRED_OFFLINE_INVENTORY,
+                                        com.yumi.production.api.ResponsibilityType.STUDIO,
+                                        "STUDIO", null)))),
+                        null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.taskBusinessId").value(taskId));
+        getAsAdmin("/api/production/offline-transfers",
+                "productionSourceBusinessId", sourceId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].quantity").value(1))
+                .andExpect(jsonPath("$[0].destination").value("TRANSFERRED_OFFLINE_INVENTORY"));
 
         getAsAdmin("/api/production/tasks/demands", "productBusinessId",
                 defaultProduct.productBusinessId())
@@ -251,6 +264,45 @@ class BusinessHttpCoverageIT extends AbstractOrderFixtureTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"))
                 .andExpect(jsonPath("$.plannedWorkQuantity").value(0));
+
+        EmployeeRef adjustWorker = hireEmployee(
+                "接口调整工人-" + java.util.UUID.randomUUID());
+        var adjustArrangeBody = new java.util.HashMap<String, Object>();
+        adjustArrangeBody.put("taskType", "OTHER_TASK");
+        adjustArrangeBody.put("subject", Map.of(
+                "subjectType", "EMPLOYEE",
+                "subjectBusinessId", adjustWorker.employeeBusinessId()));
+        adjustArrangeBody.put("workDate", "2026-10-08");
+        adjustArrangeBody.put("processCode", null);
+        adjustArrangeBody.put("items", List.of());
+        adjustArrangeBody.put("enteredStandardMinutes", 30);
+        adjustArrangeBody.put("otherTask", Map.of("workContent", "接口调整前任务"));
+        adjustArrangeBody.put("overrideReason", null);
+        MvcResult adjustableTask = command(
+                "/api/production/tasks/arrangements", adjustArrangeBody)
+                .andExpect(status().isCreated())
+                .andReturn();
+        String adjustableTaskId = json(adjustableTask).get("taskBusinessId").asText();
+
+        var adjustBody = new java.util.HashMap<String, Object>();
+        adjustBody.put("subject", Map.of(
+                "subjectType", "EMPLOYEE",
+                "subjectBusinessId", adjustWorker.employeeBusinessId()));
+        adjustBody.put("workDate", "2026-10-09");
+        adjustBody.put("processCode", null);
+        adjustBody.put("items", List.of());
+        adjustBody.put("enteredStandardMinutes", 45);
+        adjustBody.put("otherTask", Map.of("workContent", "接口调整后任务"));
+        adjustBody.put("overrideReason", null);
+        String adjustKey = "HTTP-ADJUST-" + java.util.UUID.randomUUID();
+        String adjustPath = "/api/production/tasks/" + adjustableTaskId + "/adjustment";
+        command(adjustPath, adjustKey, adjustBody)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workDate").value("2026-10-09"))
+                .andExpect(jsonPath("$.taskStandardSeconds").value(2700))
+                .andExpect(jsonPath("$.otherTask.workContent").value("接口调整后任务"));
+        command(adjustPath, adjustKey, adjustBody)
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -330,6 +382,9 @@ class BusinessHttpCoverageIT extends AbstractOrderFixtureTest {
                         "reasonText", "接口确认费用"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.sourceBusinessId").isNotEmpty());
+        getAsAdmin("/api/after-sales/costs", "caseBusinessId", caseId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sourceBusinessId").isNotEmpty());
     }
 
     @Test

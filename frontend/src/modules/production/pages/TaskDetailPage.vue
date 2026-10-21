@@ -2,14 +2,17 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAuthStore } from '@/platform/stores/auth'
 import type { TaskView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const task = ref<TaskView | null>(null)
 const loading = ref(true)
 const errorText = ref('')
+const canSchedule = auth.hasPermission('production.schedule')
 
 async function load(): Promise<void> {
   loading.value = true
@@ -34,7 +37,15 @@ onMounted(load)
           <h1>{{ task.taskNo }}</h1>
           <span class="meta">{{ task.taskType }} · {{ task.status }} · {{ task.workDate }}</span>
         </div>
-        <el-button @click="router.push(`/production/verify?task=${task.taskBusinessId}`)">核验</el-button>
+        <el-space>
+          <el-button
+            v-if="canSchedule && (task.status === 'ARRANGED' || task.status === 'PARTIALLY_VERIFIED')"
+            @click="router.push(`/production/tasks/${task.taskBusinessId}/adjust`)"
+          >
+            调整
+          </el-button>
+          <el-button @click="router.push(`/production/verify?task=${task.taskBusinessId}`)">核验</el-button>
+        </el-space>
       </header>
       <el-descriptions :column="3" border>
         <el-descriptions-item label="执行主体">

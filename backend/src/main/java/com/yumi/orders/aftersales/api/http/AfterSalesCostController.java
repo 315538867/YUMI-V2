@@ -1,6 +1,7 @@
 package com.yumi.orders.aftersales.api.http;
 
 import com.yumi.orders.aftersales.api.AfterSalesCostRef;
+import com.yumi.orders.aftersales.api.AfterSalesCostQuery;
 import com.yumi.orders.aftersales.api.AfterSalesCostService;
 import com.yumi.orders.aftersales.api.ConfirmAfterSalesCostCommand;
 import com.yumi.orders.aftersales.api.CorrectAfterSalesCostCommand;
@@ -9,6 +10,7 @@ import com.yumi.platform.api.value.SettlementMoney;
 import java.time.LocalDate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -26,9 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AfterSalesCostController {
 
     private final AfterSalesCostService costs;
+    private final AfterSalesCostQuery queries;
 
-    public AfterSalesCostController(AfterSalesCostService costs) {
+    public AfterSalesCostController(
+            AfterSalesCostService costs, AfterSalesCostQuery queries) {
         this.costs = costs;
+        this.queries = queries;
     }
 
     /** 售后成本确认请求体。 */
@@ -47,6 +52,12 @@ public class AfterSalesCostController {
             SettlementMoney amount,
             LocalDate businessDate,
             String reasonText) {
+    }
+
+    @GetMapping
+    public java.util.List<com.yumi.orders.aftersales.api.AfterSalesCostView> list(
+            @org.springframework.web.bind.annotation.RequestParam String caseBusinessId) {
+        return queries.listByCase(caseBusinessId);
     }
 
     @PostMapping("/confirmations")

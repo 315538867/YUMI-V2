@@ -35,6 +35,36 @@ describe('生产 service', () => {
     expect('subjectType' in body).toBe(false)
   })
 
+  it('任务调整提交未核验明细与现有明细标识', async () => {
+    command.mockResolvedValue({ taskBusinessId: 'TASK-1' })
+    await productionService.adjustTask('TASK-1', {
+      subject: { subjectType: 'EMPLOYEE', subjectBusinessId: 'EMP-2' },
+      workDate: '2026-10-21',
+      processCode: 'MAKING',
+      items: [
+        {
+          taskItemBusinessId: 'TI-1',
+          productionSourceBusinessId: 'SRC-1',
+          plannedQuantity: 2,
+        },
+        {
+          taskItemBusinessId: null,
+          productionSourceBusinessId: 'SRC-2',
+          plannedQuantity: 1,
+        },
+      ],
+      enteredStandardMinutes: null,
+      otherTask: null,
+      overrideReason: null,
+    })
+    const [path, options] = command.mock.calls[0] as [string, Record<string, unknown>]
+    expect(path).toBe('/api/production/tasks/TASK-1/adjustment')
+    const body = options.body as {
+      items: Array<{ taskItemBusinessId: string | null }>
+    }
+    expect(body.items.map((item) => item.taskItemBusinessId)).toEqual(['TI-1', null])
+  })
+
   it('报废数量只出现一次并携带独立去向', async () => {
     command.mockResolvedValue({ taskBusinessId: 'TASK-1' })
     await productionService.verify([

@@ -119,6 +119,40 @@ public class NewProductCapacityService {
                 lock.capacityLimit(), lock.productContentVersion());
     }
 
+    /**
+     * 调整：在同一产能行内先释放旧预留再登记新预留。
+     *
+     * <p>只有净增占用才受上限约束；商品上限被下调到低于既有已用时，等量或减量调整仍可完成。
+     */
+    public void adjustPlan(CapacityLock lock, int releasedQuantity, int reservedQuantity) {
+        if (releasedQuantity < 0 || reservedQuantity < 0) {
+            throw new IllegalArgumentException("产能释放与预留不能为负");
+        }
+        if (releasedQuantity > lock.reservedQuantity()) {
+            throw new ApiException(
+                    ApiErrorType.SYSTEM_FAILURE, "PRODUCTION_CAPACITY_INCONSISTENT",
+                    "释放预留超过当前预留：" + lock.productBusinessId());
+        }
+        int nextReserved = lock.reservedQuantity() - releasedQuantity + reservedQuantity;
+        int usedBefore = lock.committedQuantity() + lock.reservedQuantity();
+        int usedAfter = lock.committedQuantity() + nextReserved;
+        if (reservedQuantity > releasedQuantity && usedAfter > lock.capacityLimit()) {
+            if (usedBefore > lock.capacityLimit()) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_CAPACITY_CONFIG_CONFLICT",
+                        "商品单日产能上限 " + lock.capacityLimit() + " 已低于既有已用 " + usedBefore
+                                + "，不能扩大安排，请先调整商品产能配置");
+            }
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_CAPACITY_EXCEEDED",
+                    "超出商品单日产能：已用 " + usedBefore + "，调整后 " + usedAfter + "，上限 "
+                            + lock.capacityLimit());
+        }
+        repository.updateCapacity(
+                lock.productBusinessId(), lock.workDate(), lock.committedQuantity(), nextReserved,
+                lock.capacityLimit(), lock.productContentVersion());
+    }
+
     /** 取消或调整：只释放未核验预留。 */
     public void releasePlan(CapacityLock lock, int quantity) {
         if (quantity > lock.reservedQuantity()) {

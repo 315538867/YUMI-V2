@@ -148,6 +148,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { requiresAuth: true, title: '生产排班', permission: 'production.read' },
           },
           {
+            path: 'tasks/:taskBusinessId/adjust',
+            name: 'production-task-adjust',
+            component: () => import('@/modules/production/pages/TaskAdjustPage.vue'),
+            meta: { requiresAuth: true, title: '任务调整', permission: 'production.schedule' },
+          },
+          {
             path: 'tasks/:taskBusinessId',
             name: 'production-task-detail',
             component: () => import('@/modules/production/pages/TaskDetailPage.vue'),

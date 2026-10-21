@@ -74,6 +74,9 @@ public interface AfterSalesRepository {
 
     List<CostSourceRecord> listCostSourcesAfter(long afterSequence, int limit);
 
+    /** 某案例全部费用来源，按发布顺序。 */
+    List<CostSourceRecord> findCostSourcesByCase(String caseBusinessId);
+
     Optional<CostSourceRecord> findLatestCostSource(String sourceBusinessId);
 
     List<CaseRecord> findCasesChangedAfter(

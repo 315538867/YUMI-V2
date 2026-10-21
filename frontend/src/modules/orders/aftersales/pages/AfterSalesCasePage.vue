@@ -22,6 +22,7 @@ const errorText = ref('')
 const keyword = ref('')
 const statusFilter = ref('')
 const cases = ref<AfterSalesCaseView[]>([])
+const costs = ref<Array<{ sourceBusinessId: string; costCategory: string; amount: { amount: string }; businessDate: string; operationType: string; reasonText: string | null }>>([])
 const successText = ref('')
 const dialogVisible = ref(false)
 const action = ref('open')
@@ -87,6 +88,7 @@ async function load(): Promise<void> {
   errorText.value = ''
   try {
     current.value = await afterSalesService.getCase(caseId.value.trim())
+    costs.value = await afterSalesService.listCosts(caseId.value.trim())
   } catch (error) {
     current.value = null
     errorText.value = userMessageOf(error, '售后案例加载失败')
@@ -233,6 +235,7 @@ async function submit(): Promise<void> {
       })
       form.costSourceId = cost.sourceBusinessId
       successText.value = '售后费用已确认（不产生现金）'
+      await load()
     } else if (action.value === 'cost-correct') {
       await afterSalesService.correctCost({
         caseBusinessId: caseId.value,
@@ -242,6 +245,7 @@ async function submit(): Promise<void> {
         reasonText: form.reason,
       })
       successText.value = '售后费用已更正'
+      await load()
     } else if (action.value === 'complete') {
       await afterSalesService.complete(caseId.value)
       successText.value = '售后案例已结案'
@@ -315,6 +319,18 @@ async function submit(): Promise<void> {
             <el-button link type="danger" @click="openAction('cancel', row.obligationBusinessId)">取消</el-button>
           </template>
         </el-table-column>
+      </el-table>
+
+      <h2>售后费用（不属于现金）</h2>
+      <el-table :data="costs" empty-text="暂无售后费用" border size="small" class="case-list">
+        <el-table-column prop="sourceBusinessId" label="费用来源" min-width="200" />
+        <el-table-column prop="costCategory" label="分类" width="150" />
+        <el-table-column label="金额" width="130">
+          <template #default="{ row }">{{ row.amount.amount }}</template>
+        </el-table-column>
+        <el-table-column prop="businessDate" label="业务日期" width="120" />
+        <el-table-column prop="operationType" label="操作" width="110" />
+        <el-table-column prop="reasonText" label="原因" min-width="160" />
       </el-table>
 
       <h2>本次已接收退回</h2>

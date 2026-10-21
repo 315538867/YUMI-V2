@@ -121,7 +121,7 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
 
         List<TaskItemResultRequest> results = command.items();
         String taskBusinessId = resolveTaskBusinessId(results.getFirst());
-        TaskRecord task = tasks.findTask(taskBusinessId)
+        TaskRecord task = tasks.lockTask(taskBusinessId)
                 .orElseThrow(() -> new ApiException(
                         ApiErrorType.NOT_FOUND, "PRODUCTION_TASK_NOT_FOUND", "任务不存在"));
         if (task.taskType() == TaskType.OTHER_TASK) {
@@ -145,6 +145,13 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
         Map<String, int[]> demandDeltas = new LinkedHashMap<>();
         long plannedSecondsTotal = 0L;
         long completedSecondsTotal = 0L;
+        long totalPlannedSeconds = items.stream()
+                .mapToLong(item -> (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L)
+                .sum();
+        long previouslyVerifiedSeconds = items.stream()
+                .filter(item -> VERIFIED.equals(item.verificationStatus()))
+                .mapToLong(item -> (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L)
+                .sum();
         Set<String> participants = new LinkedHashSet<>();
 
         for (TaskItemResultRequest request : results) {
@@ -162,6 +169,11 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
                 throw new ApiException(
                         ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_ITEM_ALREADY_VERIFIED",
                         "该明细已提交过最终核验，不能再核验");
+            }
+            if ("CANCELLED".equals(item.verificationStatus())) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_TASK_ITEM_CANCELLED",
+                        "该明细已在任务调整中取消，不能再核验");
             }
             requireQuantityEquation(item, request);
             requireDefects(item, request);
@@ -192,9 +204,11 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
         }
 
         applyLoadAndCapacity(task, makingPlannedByProduct, makingCompletedByProduct,
-                plannedSecondsTotal, completedSecondsTotal);
+                plannedSecondsTotal, completedSecondsTotal,
+                totalPlannedSeconds, previouslyVerifiedSeconds);
 
         boolean allVerified = tasks.findTaskItems(taskBusinessId).stream()
+                .filter(item -> !"CANCELLED".equals(item.verificationStatus()))
                 .allMatch(item -> VERIFIED.equals(item.verificationStatus()));
         TaskStatus nextStatus = allVerified ? TaskStatus.VERIFIED : TaskStatus.PARTIALLY_VERIFIED;
         verifications.updateTaskStatus(taskBusinessId, nextStatus, task.rowVersion());
@@ -205,7 +219,7 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
     private VerificationView doVerifyOtherTask(VerifyOtherTaskCommand command) {
         Instant now = clock.instant();
         String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
-        TaskRecord task = tasks.findTask(command.taskBusinessId())
+        TaskRecord task = tasks.lockTask(command.taskBusinessId())
                 .orElseThrow(() -> new ApiException(
                         ApiErrorType.NOT_FOUND, "PRODUCTION_TASK_NOT_FOUND", "任务不存在"));
         if (task.taskType() != TaskType.OTHER_TASK) {
@@ -553,10 +567,20 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
     private void applyLoadAndCapacity(
             TaskRecord task, Map<String, Integer> makingPlannedByProduct,
             Map<String, Integer> makingCompletedByProduct, long plannedBaseSeconds,
-            long completedBaseSeconds) {
-        long plannedLoad = task.taskStandardSeconds();
-        long completedLoad = plannedBaseSeconds == 0
-                ? 0L : Math.round((double) plannedLoad * completedBaseSeconds / plannedBaseSeconds);
+            long completedBaseSeconds, long totalPlannedBaseSeconds,
+            long previouslyVerifiedBaseSeconds) {
+        // 任务总负载按明细基准秒数分摊；本次只移走被核验明细应占的份额
+        long plannedLoad = totalPlannedBaseSeconds == 0
+                ? 0L
+                : Math.round((double) task.taskStandardSeconds()
+                        * (previouslyVerifiedBaseSeconds + plannedBaseSeconds)
+                        / totalPlannedBaseSeconds)
+                        - Math.round((double) task.taskStandardSeconds()
+                                * previouslyVerifiedBaseSeconds / totalPlannedBaseSeconds);
+        long completedLoad = totalPlannedBaseSeconds == 0
+                ? 0L
+                : Math.round((double) task.taskStandardSeconds()
+                        * completedBaseSeconds / totalPlannedBaseSeconds);
         for (String employeeId : participantsOf(task)) {
             dailyLoads.movePlanToCommitted(employeeId, task.workDate(), plannedLoad, completedLoad);
         }

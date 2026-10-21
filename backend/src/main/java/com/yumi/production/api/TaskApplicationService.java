@@ -16,6 +16,9 @@ public interface TaskApplicationService {
 
     TaskRef arrange(ArrangeTaskCommand command);
 
+    /** 调整任务计划；已核验部分保留在原日期、主体与标准版本下。 */
+    TaskView adjust(AdjustTaskCommand command);
+
     TaskView getTask(String taskBusinessId);
 
     /** 取消未核验的任务安排，释放计划占用并保留历史事实。 */

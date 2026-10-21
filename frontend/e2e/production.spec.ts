@@ -59,6 +59,48 @@ test('无生产来源的其他任务可安排并核验', async ({ page, request 
   await expect(cancelRow.getByText('CANCELLED')).toBeVisible()
 })
 
+test('独立调整其他任务的工作内容与标准分钟', async ({ page, request }) => {
+  const token = await loginViaApi(request)
+  const worker = `调整任务员工-${Date.now()}`
+  const hired = await request.post('/api/workforce/employees', {
+    headers: authHeaders(token, `e2e-adjust-hire-${Date.now()}`),
+    data: { name: worker, phone: '13500000003', effectiveDate: '2026-10-01' },
+  })
+  expect(hired.status()).toBe(201)
+  const employeeId = ((await hired.json()) as { employeeBusinessId: string }).employeeBusinessId
+  const arranged = await request.post('/api/production/tasks/arrangements', {
+    headers: authHeaders(token, `e2e-adjust-arrange-${Date.now()}`),
+    data: {
+      taskType: 'OTHER_TASK',
+      subject: { subjectType: 'EMPLOYEE', subjectBusinessId: employeeId },
+      workDate: '2026-10-11',
+      processCode: null,
+      items: [],
+      enteredStandardMinutes: 30,
+      otherTask: { workContent: '待调整其他任务' },
+      overrideReason: null,
+    },
+  })
+  expect(arranged.status()).toBe(201)
+  const taskId = ((await arranged.json()) as { taskBusinessId: string }).taskBusinessId
+
+  await login(page)
+  await page.goto(`/production/tasks/${taskId}/adjust`)
+  await expect(page.getByRole('heading', { name: /调整任务/ })).toBeVisible()
+  await page
+    .locator('.el-form-item')
+    .filter({ hasText: '工作内容' })
+    .locator('textarea')
+    .fill('调整后的其他任务')
+  await formInput(page, '整体标准分钟').fill('75')
+  await page.getByRole('button', { name: '保存调整' }).click()
+
+  await expect(page.getByText('任务已调整')).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/production/tasks/${taskId}$`))
+  await expect(page.getByText('4500')).toBeVisible()
+  await expect(page.getByText('调整后的其他任务')).toBeVisible()
+})
+
 test('缺陷原因维护与需求缺口分列展示', async ({ page }) => {
   await login(page)
   await page.goto('/production/defect-reasons')

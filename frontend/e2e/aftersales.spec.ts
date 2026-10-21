@@ -34,13 +34,14 @@ async function prepareCompletedOrder(
   request: APIRequestContext,
   token: string,
 ): Promise<PreparedOrder> {
-  const customers = await api<Array<{ customerBusinessId: string; contactName: string; phone: string; defaultAddress: string }>>(
+  const customers = await api<Array<{ customerBusinessId: string; contactName: string; phone: string; defaultAddress: string; status: string }>>(
     request, token, 'get', '/api/customers?page=1&size=10',
   )
   const products = await api<Array<{ productBusinessId: string }>>(request, token, 'get', '/api/products?page=1&size=10')
-  expect(customers.length).toBeGreaterThan(0)
+  const activeCustomers = customers.filter((item) => item.status === 'ACTIVE')
+  expect(activeCustomers.length).toBeGreaterThan(0)
   expect(products.length).toBeGreaterThan(0)
-  const customer = customers[0]!
+  const customer = activeCustomers[0]!
   const product = products[0]!
   const schemes = await api<Array<{ schemeBusinessId: string; targetProcess: string; salePrice: { amount: string } }>>(
     request, token, 'get', `/api/products/${product.productBusinessId}/schemes`,
@@ -167,6 +168,8 @@ test('售后受理、费用确认、退款与结案使用正式命令', async ({
   await page.locator('.el-dialog .el-form-item').filter({ hasText: '原因' }).locator('textarea').fill('售后费用')
   await page.locator('.el-dialog').getByRole('button', { name: '确认' }).click()
   await expect(page.getByText(/售后费用已确认/).first()).toBeVisible()
+  await expect(page.getByText('售后费用（不属于现金）')).toBeVisible()
+  await expect(page.locator('.aftersales-page .case-list').last().locator('tbody tr').first()).toBeVisible()
 
   await page.getByRole('button', { name: '赔付/退款' }).first().click()
   await dialogInput(page, '金额').fill('20.00')

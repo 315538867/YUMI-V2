@@ -55,3 +55,15 @@ export interface ReceivedReturn {
   quantity: number
   conditionCode: string
 }
+
+export interface AfterSalesCostView {
+  sourceBusinessId: string
+  caseBusinessId: string
+  orderBusinessId: string
+  costCategory: string
+  amount: MoneyWire
+  businessDate: string
+  operationType: string
+  reasonText: string | null
+  occurredAt: string
+}

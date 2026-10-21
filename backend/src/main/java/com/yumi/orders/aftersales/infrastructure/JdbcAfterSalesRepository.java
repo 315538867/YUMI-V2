@@ -751,6 +751,21 @@ public class JdbcAfterSalesRepository implements AfterSalesRepository {
     }
 
     @Override
+    public List<CostSourceRecord> findCostSourcesByCase(String caseBusinessId) {
+        return jdbc.sql("""
+                        SELECT feed_sequence, source_business_id, source_version, case_business_id,
+                               order_business_id, cost_category, amount, business_date,
+                               operation_type, basis_ref, reason_text, occurred_at
+                        FROM after_sales_cost_source_items
+                        WHERE case_business_id = :caseId
+                        ORDER BY feed_sequence
+                        """)
+                .param("caseId", caseBusinessId)
+                .query(JdbcAfterSalesRepository::mapCostSource)
+                .list();
+    }
+
+    @Override
     public Optional<CostSourceRecord> findLatestCostSource(String sourceBusinessId) {
         return jdbc.sql("""
                         SELECT feed_sequence, source_business_id, source_version, case_business_id,

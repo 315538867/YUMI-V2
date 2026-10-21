@@ -60,6 +60,40 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
+    public void updateTaskPlan(TaskRecord record) {
+        jdbc.sql("""
+                        UPDATE production_tasks
+                        SET work_date = :workDate, process_code = :processCode,
+                            planned_work_quantity = :plannedQuantity,
+                            entered_standard_minutes = :enteredMinutes,
+                            task_standard_seconds = :standardSeconds,
+                            subject_type = :subjectType, subject_business_id = :subjectId,
+                            subject_snapshot_ref = :subjectSnapshotRef,
+                            assessment_business_id = :assessmentId,
+                            work_time_standard_snapshot_ref = :workTimeSnapshotRef,
+                            efficiency_snapshot_ref = :efficiencySnapshotRef,
+                            status = :status, active_assignment_version = :assignmentVersion,
+                            row_version = row_version + 1, updated_at = UTC_TIMESTAMP(6)
+                        WHERE task_business_id = :taskId
+                        """)
+                .param("workDate", Date.valueOf(record.workDate()))
+                .param("processCode", record.processCode() == null ? null : record.processCode().name())
+                .param("plannedQuantity", record.plannedWorkQuantity())
+                .param("enteredMinutes", record.enteredStandardMinutes())
+                .param("standardSeconds", record.taskStandardSeconds())
+                .param("subjectType", record.subject().subjectType().name())
+                .param("subjectId", record.subject().subjectBusinessId())
+                .param("subjectSnapshotRef", record.subjectSnapshotRef())
+                .param("assessmentId", record.assessmentBusinessId())
+                .param("workTimeSnapshotRef", record.workTimeStandardSnapshotRef())
+                .param("efficiencySnapshotRef", record.efficiencySnapshotRef())
+                .param("status", record.status().name())
+                .param("assignmentVersion", record.activeAssignmentVersion())
+                .param("taskId", record.taskBusinessId())
+                .update();
+    }
+
+    @Override
     public List<TaskRecord> findTasksByWorkDate(LocalDate workDate) {
         return jdbc.sql(TASK_SELECT + " WHERE work_date = :workDate ORDER BY task_no")
                 .param("workDate", workDate)
@@ -125,6 +159,26 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
+    public List<TaskRecord> findOtherActiveTasksOfParticipant(
+            String employeeBusinessId, LocalDate workDate, String excludedTaskBusinessId) {
+        return jdbc.sql("""
+                         SELECT t.* FROM production_tasks t
+                         JOIN production_active_participant_references p
+                           ON p.task_business_id = t.task_business_id
+                          AND p.employee_business_id = :employeeId AND p.status = 'ACTIVE'
+                         WHERE t.work_date = :workDate
+                           AND t.status <> 'CANCELLED'
+                           AND t.task_business_id <> :excludedTaskId
+                         ORDER BY t.id
+                        """)
+                .param("employeeId", employeeBusinessId)
+                .param("workDate", Date.valueOf(workDate))
+                .param("excludedTaskId", excludedTaskBusinessId)
+                .query(JdbcTaskRepository::mapTask)
+                .list();
+    }
+
+    @Override
     public void insertTask(TaskRecord record) {
         jdbc.sql("""
                         INSERT INTO production_tasks (
@@ -173,7 +227,8 @@ public class JdbcTaskRepository implements TaskRepository {
                         VALUES (:itemId, :taskId, :itemOrder, :demandId, :demandType, :sourceId,
                                 :physicalRoot, :repairSourceId, :orderId, :orderItemId, :productId,
                                 :productSnapshotRef, :schemeId, :schemeSnapshotRef, :targetProcess,
-                                :plannedQuantity, :standardMinutes, :verificationStatus, 1, 1)
+                                :plannedQuantity, :standardMinutes, :verificationStatus,
+                                :assignmentVersion, 1)
                         """)
                 .param("itemId", record.taskItemBusinessId())
                 .param("taskId", record.taskBusinessId())
@@ -193,13 +248,68 @@ public class JdbcTaskRepository implements TaskRepository {
                 .param("plannedQuantity", record.plannedQuantity())
                 .param("standardMinutes", record.itemStandardMinutes())
                 .param("verificationStatus", record.verificationStatus())
+                .param("assignmentVersion", record.assignmentVersion())
+                .update();
+    }
+
+    @Override
+    public void updateTaskItemPlan(TaskItemRecord record) {
+        jdbc.sql("""
+                        UPDATE production_task_items
+                        SET item_order = :itemOrder, demand_business_id = :demandId,
+                            demand_type = :demandType, production_source_business_id = :sourceId,
+                            physical_root_source_business_id = :physicalRoot,
+                            repair_source_business_id = :repairSourceId,
+                            order_business_id = :orderId, order_item_business_id = :orderItemId,
+                            product_business_id = :productId, product_snapshot_ref = :productSnapshotRef,
+                            scheme_business_id = :schemeId, scheme_snapshot_ref = :schemeSnapshotRef,
+                            target_process = :targetProcess, planned_quantity = :plannedQuantity,
+                            item_standard_minutes = :standardMinutes,
+                            assignment_version = :assignmentVersion,
+                            row_version = row_version + 1
+                        WHERE task_item_business_id = :itemId
+                        """)
+                .param("itemOrder", record.itemOrder())
+                .param("demandId", record.demandBusinessId())
+                .param("demandType", record.demandType().name())
+                .param("sourceId", record.productionSourceBusinessId())
+                .param("physicalRoot", record.physicalRootSourceBusinessId())
+                .param("repairSourceId", record.repairSourceBusinessId())
+                .param("orderId", record.orderBusinessId())
+                .param("orderItemId", record.orderItemBusinessId())
+                .param("productId", record.productBusinessId())
+                .param("productSnapshotRef", record.productSnapshotRef())
+                .param("schemeId", record.schemeBusinessId())
+                .param("schemeSnapshotRef", record.schemeSnapshotRef())
+                .param("targetProcess", record.targetProcess().name())
+                .param("plannedQuantity", record.plannedQuantity())
+                .param("standardMinutes", record.itemStandardMinutes())
+                .param("assignmentVersion", record.assignmentVersion())
+                .param("itemId", record.taskItemBusinessId())
+                .update();
+    }
+
+    @Override
+    public void cancelTaskItem(
+            String taskItemBusinessId, int cancelledQuantity, long assignmentVersion) {
+        jdbc.sql("""
+                        UPDATE production_task_items
+                        SET planned_quantity = 0, cancelled_quantity = :cancelledQuantity,
+                            verification_status = 'CANCELLED', assignment_version = :assignmentVersion,
+                            row_version = row_version + 1
+                        WHERE task_item_business_id = :itemId AND verification_status = 'PENDING'
+                        """)
+                .param("cancelledQuantity", cancelledQuantity)
+                .param("assignmentVersion", assignmentVersion)
+                .param("itemId", taskItemBusinessId)
                 .update();
     }
 
     @Override
     public void insertAssignmentFact(
             String taskBusinessId, long assignmentVersion, String operationType,
-            String newSubjectRef, LocalDate newWorkDate, String newProcessCode, Integer newQuantity,
+            String oldSubjectRef, String newSubjectRef, LocalDate oldWorkDate, LocalDate newWorkDate,
+            String oldProcessCode, String newProcessCode, Integer oldQuantity, Integer newQuantity,
             Instant now, String operatorId) {
         jdbc.sql("""
                         INSERT INTO production_task_assignment_facts (
@@ -207,17 +317,22 @@ public class JdbcTaskRepository implements TaskRepository {
                             old_subject_ref, new_subject_ref, old_work_date, new_work_date,
                             old_process_code, new_process_code, old_quantity, new_quantity,
                             occurred_at, operator_id, is_valid)
-                        VALUES (:factId, :taskId, :version, :operationType, NULL, :subjectRef,
-                                NULL, :workDate, NULL, :processCode, NULL, :quantity, :now, :operatorId, 1)
+                        VALUES (:factId, :taskId, :version, :operationType, :oldSubjectRef,
+                                :newSubjectRef, :oldWorkDate, :newWorkDate, :oldProcessCode,
+                                :newProcessCode, :oldQuantity, :newQuantity, :now, :operatorId, 1)
                         """)
                 .param("factId", "TAF-" + java.util.UUID.randomUUID())
                 .param("taskId", taskBusinessId)
                 .param("version", assignmentVersion)
                 .param("operationType", operationType)
-                .param("subjectRef", newSubjectRef)
-                .param("workDate", Date.valueOf(newWorkDate))
-                .param("processCode", newProcessCode)
-                .param("quantity", newQuantity)
+                .param("oldSubjectRef", oldSubjectRef)
+                .param("newSubjectRef", newSubjectRef)
+                .param("oldWorkDate", oldWorkDate == null ? null : Date.valueOf(oldWorkDate))
+                .param("newWorkDate", newWorkDate == null ? null : Date.valueOf(newWorkDate))
+                .param("oldProcessCode", oldProcessCode)
+                .param("newProcessCode", newProcessCode)
+                .param("oldQuantity", oldQuantity)
+                .param("newQuantity", newQuantity)
                 .param("now", JdbcTimes.toUtc(now))
                 .param("operatorId", operatorId)
                 .update();

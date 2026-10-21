@@ -18,4 +18,7 @@ public interface ProductionQuery {
 
     /** 某产品的需求列表（含数量账摘要）。 */
     List<ProductionProjectionRow> projectionsOfProduct(String productBusinessId, int limit);
+
+    /** 某生产来源的转线下记录（报废转线下与业务移交分别标记）。 */
+    java.util.List<OfflineTransferView> offlineTransfersOfSource(String productionSourceBusinessId);
 }

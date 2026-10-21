@@ -42,6 +42,12 @@ export const afterSalesService = {
     return api.query<AfterSalesCaseView[]>(`/api/after-sales/cases?${search.toString()}`)
   },
 
+  listCosts(caseBusinessId: string): Promise<import('@/modules/orders/aftersales/contracts').AfterSalesCostView[]> {
+    return api.query(
+      `/api/after-sales/costs?caseBusinessId=${encodeURIComponent(caseBusinessId)}`,
+    )
+  },
+
   getCase(caseBusinessId: string): Promise<AfterSalesCaseView> {
     return api.query<AfterSalesCaseView>(
       `/api/after-sales/cases/${encodeURIComponent(caseBusinessId)}`,

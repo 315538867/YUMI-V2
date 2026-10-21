@@ -242,6 +242,24 @@ public class JdbcDailyLoadRepository implements DailyLoadRepository {
     }
 
     @Override
+    public void updateSlotStatusForTask(
+            String employeeBusinessId, LocalDate workDate, String slotType,
+            String taskBusinessId, String status) {
+        jdbc.sql("""
+                        UPDATE production_employee_daily_task_slots
+                        SET status = :status, row_version = row_version + 1
+                        WHERE employee_business_id = :employeeId AND work_date = :workDate
+                          AND slot_type = :slotType AND task_business_id = :taskId
+                        """)
+                .param("status", status)
+                .param("employeeId", employeeBusinessId)
+                .param("workDate", Date.valueOf(workDate))
+                .param("slotType", slotType)
+                .param("taskId", taskBusinessId)
+                .update();
+    }
+
+    @Override
     public List<SlotRecord> findSlots(String employeeBusinessId, LocalDate workDate) {
         return jdbc.sql("""
                         SELECT employee_business_id, work_date, slot_type, task_business_id, status, row_version
@@ -267,6 +285,9 @@ public class JdbcDailyLoadRepository implements DailyLoadRepository {
                         INSERT INTO production_active_subject_references (
                             task_business_id, subject_type, subject_business_id, work_date, status)
                         VALUES (:taskId, :subjectType, :subjectId, :workDate, 'ACTIVE')
+                        ON DUPLICATE KEY UPDATE
+                            subject_type = :subjectType, subject_business_id = :subjectId,
+                            work_date = :workDate, status = 'ACTIVE'
                         """)
                 .param("taskId", taskBusinessId)
                 .param("subjectType", subjectType)
@@ -284,6 +305,10 @@ public class JdbcDailyLoadRepository implements DailyLoadRepository {
                             task_business_id, employee_business_id, subject_type, subject_business_id,
                             work_date, occupied_standard_seconds, status)
                         VALUES (:taskId, :employeeId, :subjectType, :subjectId, :workDate, :seconds, 'ACTIVE')
+                        ON DUPLICATE KEY UPDATE
+                            subject_type = :subjectType, subject_business_id = :subjectId,
+                            work_date = :workDate, occupied_standard_seconds = :seconds,
+                            status = 'ACTIVE'
                         """)
                 .param("taskId", taskBusinessId)
                 .param("employeeId", employeeBusinessId)
@@ -291,6 +316,17 @@ public class JdbcDailyLoadRepository implements DailyLoadRepository {
                 .param("subjectId", subjectBusinessId)
                 .param("workDate", Date.valueOf(workDate))
                 .param("seconds", occupiedStandardSeconds)
+                .update();
+    }
+
+    @Override
+    public void releaseActiveParticipant(String taskBusinessId, String employeeBusinessId) {
+        jdbc.sql("""
+                        UPDATE production_active_participant_references SET status = 'RELEASED'
+                        WHERE task_business_id = :taskId AND employee_business_id = :employeeId
+                        """)
+                .param("taskId", taskBusinessId)
+                .param("employeeId", employeeBusinessId)
                 .update();
     }
 }

@@ -12,10 +12,13 @@ public interface TaskRepository {
 
     Optional<TaskRecord> findTask(String taskBusinessId);
 
-    /** 行锁读取任务，供取消与调整串行化。 */
+    /** 行锁读取任务，供调整、核验与取消串行化。 */
     Optional<TaskRecord> lockTask(String taskBusinessId);
 
     void updateTaskStatus(String taskBusinessId, TaskStatus status);
+
+    /** 调整后覆盖任务头计划；调用方已持有任务行锁。 */
+    void updateTaskPlan(TaskRecord record);
 
     /** 按工作日期读取任务（排班页只读）。 */
     List<TaskRecord> findTasksByWorkDate(LocalDate workDate);
@@ -35,13 +38,28 @@ public interface TaskRepository {
     /** 同一员工同一工作日期所有未取消任务（用于模式与槽位校验）。 */
     List<TaskRecord> findActiveTasksOfEmployee(String employeeBusinessId, LocalDate workDate);
 
+    /**
+     * 通过活动参与人引用查找同日其他未取消任务。
+     *
+     * <p>小组任务的成员不在 {@code subject_business_id} 上，依赖校验必须走参与人引用。
+     */
+    List<TaskRecord> findOtherActiveTasksOfParticipant(
+            String employeeBusinessId, LocalDate workDate, String excludedTaskBusinessId);
+
     void insertTask(TaskRecord record);
 
     void insertTaskItem(TaskItemRecord record);
 
+    /** 调整后覆盖未核验明细的来源、数量与标准；调用方已持有任务行锁。 */
+    void updateTaskItemPlan(TaskItemRecord record);
+
+    /** 删除未核验明细：计划归零、标记取消并追加减量。 */
+    void cancelTaskItem(String taskItemBusinessId, int cancelledQuantity, long assignmentVersion);
+
     void insertAssignmentFact(
             String taskBusinessId, long assignmentVersion, String operationType,
-            String newSubjectRef, LocalDate newWorkDate, String newProcessCode, Integer newQuantity,
+            String oldSubjectRef, String newSubjectRef, LocalDate oldWorkDate, LocalDate newWorkDate,
+            String oldProcessCode, String newProcessCode, Integer oldQuantity, Integer newQuantity,
             java.time.Instant now, String operatorId);
 
     void insertItemAssignmentFact(TaskItemRecord item, long assignmentVersion, String operationType,

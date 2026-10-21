@@ -54,6 +54,12 @@ public class ProductionTraceController {
         return production.traceOfOrderItem(orderItemBusinessId);
     }
 
+    @GetMapping("/offline-transfers")
+    public java.util.List<com.yumi.production.api.OfflineTransferView> offlineTransfers(
+            @RequestParam String productionSourceBusinessId) {
+        return production.offlineTransfersOfSource(productionSourceBusinessId);
+    }
+
     @GetMapping("/corrections")
     public List<ProductionCorrectionFeedItem> corrections(
             @RequestParam(required = false) String correctionCommandBusinessId,

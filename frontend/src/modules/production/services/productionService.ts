@@ -25,6 +25,20 @@ export interface ArrangeInput {
   overrideReason: string | null
 }
 
+export interface AdjustTaskInput {
+  subject: { subjectType: 'EMPLOYEE' | 'TEAM'; subjectBusinessId: string }
+  workDate: string
+  processCode: TargetProcess | null
+  items: Array<{
+    taskItemBusinessId: string | null
+    productionSourceBusinessId: string
+    plannedQuantity: number
+  }>
+  enteredStandardMinutes: number | null
+  otherTask: { workContent: string; relatedProductBusinessId: string | null; plannedQuantity: number | null } | null
+  overrideReason: string | null
+}
+
 export interface VerifyItemInput {
   taskItemBusinessId: string
   unfinishedQuantity: number
@@ -65,6 +79,13 @@ export const productionService = {
     )
   },
 
+  adjustTask(taskBusinessId: string, input: AdjustTaskInput): Promise<TaskView> {
+    return api.command<TaskView, AdjustTaskInput>(
+      `/api/production/tasks/${encodeURIComponent(taskBusinessId)}/adjustment`,
+      { idempotencyKey: newIdempotencyKey('task-adjust'), body: input },
+    )
+  },
+
   verify(items: VerifyItemInput[]): Promise<{ taskBusinessId: string }> {
     return api.command<{ taskBusinessId: string }, { items: VerifyItemInput[] }>(
       '/api/production/tasks/verification',
@@ -97,6 +118,14 @@ export const productionService = {
   demands(productBusinessId: string): Promise<ProductionProjectionRow[]> {
     return api.query<ProductionProjectionRow[]>(
       `/api/production/tasks/demands?productBusinessId=${encodeURIComponent(productBusinessId)}`,
+    )
+  },
+
+  offlineTransfers(
+    productionSourceBusinessId: string,
+  ): Promise<import('@/modules/production/contracts').OfflineTransferView[]> {
+    return api.query(
+      `/api/production/offline-transfers?productionSourceBusinessId=${encodeURIComponent(productionSourceBusinessId)}`,
     )
   },
 

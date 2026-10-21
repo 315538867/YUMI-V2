@@ -37,6 +37,29 @@ public class JdbcOtherTaskRepository implements OtherTaskRepository {
     }
 
     @Override
+    public void update(OtherTaskRecord record) {
+        jdbc.sql("""
+                        UPDATE production_other_task_details
+                        SET work_content = :workContent,
+                            related_product_business_id = :relatedProduct,
+                            product_snapshot_ref = :productSnapshotRef,
+                            planned_quantity = :plannedQuantity,
+                            frozen_unit_labor_amount = :unitLabor,
+                            result_note = :resultNote, row_version = row_version + 1
+                        WHERE task_business_id = :taskId
+                        """)
+                .param("taskId", record.taskBusinessId())
+                .param("workContent", record.workContent())
+                .param("relatedProduct", record.relatedProductBusinessId())
+                .param("productSnapshotRef", record.productSnapshotRef())
+                .param("plannedQuantity", record.plannedQuantity())
+                .param("unitLabor", record.frozenUnitLaborAmount() == null
+                        ? null : record.frozenUnitLaborAmount().value())
+                .param("resultNote", record.resultNote())
+                .update();
+    }
+
+    @Override
     public Optional<OtherTaskRecord> find(String taskBusinessId) {
         return jdbc.sql("""
                         SELECT task_business_id, work_content, related_product_business_id,
