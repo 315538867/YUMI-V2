@@ -1,0 +1,100 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-backend-environment: &backend-environment
+  YUMI_DB_URL: "jdbc:mysql://mysql:3306/${YUMI_DB_NAME:-yumi_v2}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false"
+  YUMI_DB_USERNAME: "${YUMI_DB_USER:-yumi}"
+  YUMI_DB_PASSWORD: "${YUMI_DB_PASSWORD:?请在 .env 中设置 YUMI_DB_PASSWORD}"
+  YUMI_FILE_ROOT: "/var/lib/yumi/files"
+  TZ: "Asia/Shanghai"
+
+services:
+  mysql:
+    image: mysql:8.4.11
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --innodb-buffer-pool-size=512M
+    environment:
+      MYSQL_DATABASE: "${YUMI_DB_NAME:-yumi_v2}"
+      MYSQL_USER: "${YUMI_DB_USER:-yumi}"
+      MYSQL_PASSWORD: "${YUMI_DB_PASSWORD:?请在 .env 中设置 YUMI_DB_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}"
+      TZ: "Asia/Shanghai"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ./backend
+    image: "yumi-backend:${YUMI_VERSION:-latest}"
+    environment:
+      <<: *backend-environment
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx1g"
+    volumes:
+      - ./data/files:/var/lib/yumi/files
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *default-logging
+
+  frontend:
+    build:
+      context: ./frontend
+    image: "yumi-frontend:${YUMI_VERSION:-latest}"
+    environment:
+      TZ: "Asia/Shanghai"
+    ports:
+      - "${YUMI_HTTP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    logging: *default-logging
+
+  admin-bootstrap:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+    image: "yumi-backend:${YUMI_VERSION:-latest}"
+    entrypoint:
+      - java
+      - -Dloader.main=com.yumi.platform.identity.bootstrap.InitialAdministratorCommand
+      - -cp
+      - /app/app.jar
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    environment:
+      <<: *backend-environment
+      YUMI_INITIAL_ADMIN_LOGIN: "${YUMI_INITIAL_ADMIN_LOGIN:-admin}"
+      YUMI_INITIAL_ADMIN_PASSWORD: "${YUMI_INITIAL_ADMIN_PASSWORD:-}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    logging: *default-logging

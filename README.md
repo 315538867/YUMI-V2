@@ -13,6 +13,7 @@
 YUMIV2/
 ├─ backend/          Java 21 + Spring Boot 3.5 模块化单体（本文件 §3）
 ├─ frontend/         Vue 3 + TypeScript + Vite 管理端（本文件 §4）
+├─ compose.yaml      Docker Compose 部署入口（见 docs/operations/phase-one-docker-deployment.md）
 ├─ docs/一期/        业务基线方案（只回写工程决策，不改业务口径）
 ├─ openspec/        提案、规范、任务与交付清单
 └─ *.html, *.js      历史交互原型（保留只读参考，不是数据源）
@@ -122,7 +123,7 @@ pnpm exec playwright test # 页面测试（自动启动 Vite，结束清理）
 | 1.9 HTTP 契约红测试 | 完成 | `HttpContractBoundaryTest`、`HttpWireContractTest` |
 | 1.10 平台 HTTP 上下文与前端 apiClient | 完成 | `PlatformHttpWireTest`、`apiClient.test.ts` |
 
-第 1 组（工程与边界基线）已全部完成并通过验证。后续组（2—15）尚未实施。
+第 1 组为骨架阶段的验证记录。后续 2—15 组已实施完成，完整任务与证据见 `openspec/changes/implement-phase-one-business-system/coverage.md`。
 
 ## 7. 已执行验证与结果
 
@@ -164,13 +165,8 @@ $ git diff a714ede -- docs/一期/
 `package-info.java` 尚未实现时，先以“程序包不存在 / 缺少 package-info / 未实现”失败，
 实现后才转绿；此前未把编译失败当作业务断言红。
 
-## 8. 与业务基线的边界
+## 8. 发布状态
 
-本仓库当前只完成工程骨架与纯契约。以下内容**尚未实现**，不得对外宣称可用：
-
-- 任何业务命令、Query、HTTP 路由与页面；
-- 登录、权限、幂等、审计、文件与提交后任务的真实行为；
-- 计算中心的预算、工作量、成本与胶水公式；
-- 数据库业务表与 Flyway 业务迁移（`db/migration` 目前为空）。
+一期业务系统已实现；后端全量集成测试与前端类型检查、单元测试、生产构建已通过，历史验收证据见 `openspec/changes/implement-phase-one-business-system/coverage.md`。生产部署使用仓库根目录的 `compose.yaml`，步骤见 [一期 Docker Compose 部署手册](docs/operations/phase-one-docker-deployment.md)。
 
 业务口径仍以 `docs/一期/` 与 `openspec/` 中的规范为准；本文件只记录工程事实。
