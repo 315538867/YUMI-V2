@@ -93,6 +93,7 @@ openssl rand -base64 24
 
 - `YUMI_DB_PASSWORD`：应用连接业务库的口令
 - `MYSQL_ROOT_PASSWORD`：MySQL root 口令，只用于运维
+- `YUMI_MYSQL_TAG`：MySQL 镜像标签，默认 `8.4.11`；无法拉取固定小版本时可改为已缓存的 `8.4`
 - `YUMI_HTTP_PORT`：默认 80；被占用时改掉
 - `YUMI_VERSION`：本次发布标记，例如 `20261026`
 
@@ -297,3 +298,14 @@ docker compose logs -f --tail=200 mysql
 - 一期是单实例部署：会话在数据库中，重启不掉线，但不支持多实例横向扩容。
 - 附件默认上限 10 MB；Nginx 已放宽到 12 MB。修改上限时要同时改后端配置和 Nginx 配置。
 - 生产备份、保留周期和异地副本由发布负责人确认；本手册只提供可执行步骤。
+
+## 12. 本次部署记录
+
+- 日期：2026-10-27
+- 主机：`192.168.2.42`（`chw-server`，x86_64，4 核 / 7.5 GiB）
+- 访问地址：`http://192.168.2.42`
+- 发布版本：`20261027-4ddd8f9`（后端）、前端同标签
+- MySQL：复用服务器已缓存的 `mysql:8.4`（实际 8.4.13）；镜像加速器无法拉取 `mysql:8.4.11`，因此 `YUMI_MYSQL_TAG=8.4`
+- 首个管理员凭据：保存在服务器 `/root/yumi-admin-credentials.txt`（权限 600）
+- 已验证：45 个迁移、管理员登录、业务接口鉴权、附件上传/删除、`restart` 与 `down/up` 后会话和附件保持、停机无 `eventPublicationRegistry` 报错、备份脚本生成数据库与附件包
+- 服务器上另有独立 `mysql` 容器占用 3306；本系统使用 Compose 内部 MySQL，不发布 3306，两者互不影响
