@@ -190,8 +190,11 @@ docker compose start frontend backend
 建议每天定时执行，并把 `backups/` 同步到 NAS 或其他机器（不要只留在同一块盘）。定时任务放到 root 的 crontab（`sudo crontab -e`），避免非交互环境无法输入 sudo 口令：
 
 ```cron
-0 2 * * * cd /srv/yumi/app && ./deploy/backup.sh >> backups/backup.log 2>&1
+# .42 的系统时区是 UTC；18:00 UTC 等于次日 02:00 北京时间
+0 18 * * * cd /srv/yumi/app && ./deploy/backup.sh >> backups/backup.log 2>&1
 ```
+
+备份文件名按 `Asia/Shanghai` 生成，与业务日期一致。
 
 ### 9.2 恢复
 
@@ -307,5 +310,6 @@ docker compose logs -f --tail=200 mysql
 - 发布版本：`20261027-4ddd8f9`（后端）、前端同标签
 - MySQL：复用服务器已缓存的 `mysql:8.4`（实际 8.4.13）；镜像加速器无法拉取 `mysql:8.4.11`，因此 `YUMI_MYSQL_TAG=8.4`
 - 首个管理员凭据：保存在服务器 `/root/yumi-admin-credentials.txt`（权限 600）
+- 服务器系统时区：UTC；容器内为 `Asia/Shanghai`，业务日期按北京时间
 - 已验证：45 个迁移、管理员登录、业务接口鉴权、附件上传/删除、`restart` 与 `down/up` 后会话和附件保持、停机无 `eventPublicationRegistry` 报错、备份脚本生成数据库与附件包
 - 服务器上另有独立 `mysql` 容器占用 3306；本系统使用 Compose 内部 MySQL，不发布 3306，两者互不影响

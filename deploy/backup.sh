@@ -13,7 +13,7 @@ set -a
 source .env
 set +a
 
-stamp=$(date +%Y%m%d-%H%M%S)
+stamp=$(TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)
 mkdir -p backups
 
 docker compose exec -T -e MYSQL_PWD="$YUMI_DB_PASSWORD" mysql \
