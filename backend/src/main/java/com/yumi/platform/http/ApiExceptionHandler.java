@@ -12,8 +12,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * 平台统一错误映射。
@@ -78,10 +80,31 @@ public class ApiExceptionHandler {
                 List.of()));
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParameter(
+            MissingServletRequestParameterException exception, HttpServletRequest request) {
+        return response(new ApiError(
+                ApiErrorType.VALIDATION,
+                "MISSING_PARAMETER",
+                "缺少必需请求参数：" + exception.getParameterName(),
+                contextResolver.resolveRequestId(request),
+                List.of()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+        return response(new ApiError(
+                ApiErrorType.VALIDATION,
+                "INVALID_PARAMETER",
+                "请求参数格式不合法：" + exception.getName(),
+                contextResolver.resolveRequestId(request),
+                List.of()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> handleIllegalArgument(
-            IllegalArgumentException exception, HttpServletRequest request) {
-        return response(new ApiError(
+            IllegalArgumentException exception, HttpServletRequest request) {        return response(new ApiError(
                 ApiErrorType.VALIDATION,
                 "VALIDATION_FAILED",
                 exception.getMessage() == null ? "请求参数不合法" : exception.getMessage(),

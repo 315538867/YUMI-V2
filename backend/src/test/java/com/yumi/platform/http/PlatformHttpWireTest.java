@@ -116,6 +116,24 @@ class PlatformHttpWireTest {
     }
 
     @Test
+    @DisplayName("缺少必需查询参数返回 VALIDATION 而不是 SYSTEM_FAILURE")
+    void missingRequestParameterIsValidation() throws Exception {
+        mockMvc.perform(get("/probe/requires-param"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("VALIDATION"))
+                .andExpect(jsonPath("$.code").value("MISSING_PARAMETER"));
+    }
+
+    @Test
+    @DisplayName("查询参数类型不匹配返回 VALIDATION 而不是 SYSTEM_FAILURE")
+    void malformedRequestParameterIsValidation() throws Exception {
+        mockMvc.perform(get("/probe/requires-date").param("workDate", "not-a-date"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("VALIDATION"))
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+    }
+
+    @Test
     @DisplayName("未预期异常返回 SYSTEM_FAILURE 且不泄露堆栈与内部类名")
     void unexpectedExceptionHidesInternals() throws Exception {
         String body = mockMvc.perform(get("/probe/boom"))
@@ -172,6 +190,15 @@ class PlatformHttpWireTest {
         @GetMapping("/boom")
         public void boom() {
             throw new IllegalStateException("internal detail must not leak");
+        }
+
+        @GetMapping("/requires-param")
+        public void requiresParam(@org.springframework.web.bind.annotation.RequestParam String workDate) {
+        }
+
+        @GetMapping("/requires-date")
+        public void requiresDate(
+                @org.springframework.web.bind.annotation.RequestParam java.time.LocalDate workDate) {
         }
     }
 }
