@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
+import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import type { CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -25,6 +26,9 @@ const form = reactive({
   phone: '',
   defaultAddress: '',
 })
+const initialSnapshot = ref(JSON.stringify(form))
+const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value)
+const { allowLeave } = useUnsavedGuard(() => isDirty.value)
 
 function previewStatus(): string {
   return editing ? (customer.value?.status ?? 'ACTIVE') : 'ACTIVE'
@@ -45,6 +49,7 @@ async function load(): Promise<void> {
       phone: current.phone,
       defaultAddress: current.defaultAddress,
     })
+    initialSnapshot.value = JSON.stringify(form)
   } catch (error) {
     errorText.value = userMessageOf(error, '客户资料加载失败')
   } finally {
@@ -71,10 +76,12 @@ async function save(): Promise<void> {
         expectedRowVersion: customer.value.rowVersion,
       })
       ElMessage.success('客户资料已保存')
+      allowLeave()
       await router.push(`/customers/${customerId}`)
     } else {
       const created = await customerService.create({ ...form })
       ElMessage.success('客户已创建')
+      allowLeave()
       await router.push(`/customers/${created.customerBusinessId}`)
     }
   } catch (error) {

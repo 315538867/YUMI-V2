@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type {
   MaterialSource,
@@ -30,6 +31,11 @@ const budgetPreview = ref<SchemeBudgetView | null>(null)
 const previewLoading = ref(false)
 const previewError = ref('')
 let previewTimer: ReturnType<typeof setTimeout> | null = null
+const initialSnapshot = ref('')
+const isDirty = computed(
+  () => loading.value === false && JSON.stringify(form) !== initialSnapshot.value,
+)
+const { allowLeave } = useUnsavedGuard(() => isDirty.value)
 
 const form = reactive({
   name: '',
@@ -76,6 +82,7 @@ async function load(): Promise<void> {
     } else {
       form.name = '自定义方案'
     }
+    initialSnapshot.value = JSON.stringify(form)
   } catch (error) {
     errorText.value = userMessageOf(error, '方案加载失败')
   } finally {
@@ -148,6 +155,7 @@ async function save(): Promise<void> {
       await productService.createScheme(productId, input(), product.value.contentVersion)
     }
     ElMessage.success('方案已保存，预算由服务端重新计算')
+    allowLeave()
     await router.replace(`/products/${productId}`)
   } catch (error) {
     errorText.value = userMessageOf(error, '方案保存失败')

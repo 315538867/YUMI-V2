@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type { CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
@@ -41,6 +42,14 @@ const errorText = ref('')
 const previewVisible = ref(false)
 const recipient = reactive({ name: '', phone: '', address: '' })
 const note = ref('')
+const initialSnapshot = ref('')
+const isDirty = computed(
+  () =>
+    loading.value === false &&
+    JSON.stringify({ form, recipient, note: note.value, items: items.value }) !==
+      initialSnapshot.value,
+)
+const { allowLeave } = useUnsavedGuard(() => isDirty.value)
 const form = reactive({
   customerBusinessId: '',
   orderDate: new Date().toISOString().slice(0, 10),
@@ -94,6 +103,12 @@ async function load(): Promise<void> {
     } else {
       items.value = [emptyItem()]
     }
+    initialSnapshot.value = JSON.stringify({
+      form,
+      recipient,
+      note: note.value,
+      items: items.value,
+    })
   } catch (error) {
     errorText.value = userMessageOf(error, '录入数据加载失败')
   } finally {
@@ -234,6 +249,7 @@ async function confirmCreate(): Promise<void> {
     const created = await orderService.create(input)
     ElMessage.success('订单已确认')
     previewVisible.value = false
+    allowLeave()
     await router.replace(`/orders/${created.orderBusinessId}`)
   } catch (error) {
     errorText.value = userMessageOf(error, '订单保存失败')

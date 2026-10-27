@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
+import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -24,6 +25,9 @@ const form = reactive({
   phone: '',
   effectiveDate: new Date().toISOString().slice(0, 10),
 })
+const initialSnapshot = ref(JSON.stringify(form))
+const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value)
+const { allowLeave } = useUnsavedGuard(() => isDirty.value)
 
 function previewStatus(): string {
   return editing ? (employee.value?.employmentStatus ?? 'EMPLOYED') : 'EMPLOYED'
@@ -41,6 +45,7 @@ async function load(): Promise<void> {
     form.name = current.name
     form.phone = current.phone
     form.effectiveDate = current.latestEffectiveDate
+    initialSnapshot.value = JSON.stringify(form)
   } catch (error) {
     errorText.value = userMessageOf(error, '员工资料加载失败')
   } finally {
@@ -63,10 +68,12 @@ async function save(): Promise<void> {
         expectedRowVersion: employee.value.rowVersion,
       })
       ElMessage.success('员工资料已保存')
+      allowLeave()
       await router.push(`/workforce/employees/${employeeId}`)
     } else {
       const created = await workforceService.hire({ ...form })
       ElMessage.success('员工已入职')
+      allowLeave()
       await router.push(`/workforce/employees/${created.employeeBusinessId}`)
     }
   } catch (error) {

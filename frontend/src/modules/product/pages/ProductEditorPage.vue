@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type {
   EntryConfiguration,
@@ -78,6 +79,11 @@ const budgetPreview = ref<SchemeBudgetView | null>(null)
 const previewLoading = ref(false)
 const previewError = ref('')
 let previewTimer: ReturnType<typeof setTimeout> | null = null
+const initialSnapshot = ref('')
+const isDirty = computed(
+  () => loading.value === false && JSON.stringify(form) !== initialSnapshot.value,
+)
+const { allowLeave } = useUnsavedGuard(() => isDirty.value)
 
 const form = reactive<EditorForm>({
   name: '',
@@ -176,6 +182,7 @@ async function load(): Promise<void> {
         extraOtherCost: product.extraCosts.otherCost.amount,
       })
     }
+    initialSnapshot.value = JSON.stringify(form)
   } catch (error) {
     errorText.value = userMessageOf(error, '商品录入数据加载失败')
   } finally {
@@ -258,6 +265,7 @@ async function save(): Promise<void> {
         ? await productService.update(productId, definition(), original.value.rowVersion)
         : await productService.create(definition())
     ElMessage.success('商品已保存')
+    allowLeave()
     await router.replace(`/products/${saved.productBusinessId}`)
   } catch (error) {
     errorText.value = userMessageOf(error, '商品保存失败')

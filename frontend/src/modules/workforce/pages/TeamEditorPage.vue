@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
+import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -23,6 +24,9 @@ const form = reactive({
   name: '',
   memberEmployeeBusinessIds: [] as string[],
 })
+const initialSnapshot = ref(JSON.stringify(form))
+const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value)
+const { allowLeave } = useUnsavedGuard(() => isDirty.value)
 
 const memberNames = computed(() =>
   form.memberEmployeeBusinessIds
@@ -46,6 +50,7 @@ async function load(): Promise<void> {
       form.name = current.name
       form.memberEmployeeBusinessIds = current.members.map((member) => member.employeeBusinessId)
     }
+    initialSnapshot.value = JSON.stringify(form)
   } catch (error) {
     errorText.value = userMessageOf(error, '小组资料加载失败')
   } finally {
@@ -72,10 +77,12 @@ async function save(): Promise<void> {
         expectedRowVersion: team.value.rowVersion,
       })
       ElMessage.success('小组已保存')
+      allowLeave()
       await router.push(`/workforce/teams/${teamId}`)
     } else {
       const created = await workforceService.createTeam({ ...form })
       ElMessage.success('小组已创建')
+      allowLeave()
       await router.push(`/workforce/teams/${created.teamBusinessId}`)
     }
   } catch (error) {

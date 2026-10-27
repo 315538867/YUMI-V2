@@ -35,6 +35,7 @@ test('客户列表、编辑、启停与历史引用使用真实接口', async ({
 
   await login(page)
   await page.goto('/customers')
+  await expect(page.getByText(/启用客户 \d+/)).toBeVisible()
   await page.getByPlaceholder('名称、编号、联系人或电话').fill(name)
   await page.getByRole('button', { name: '查询' }).click()
 
@@ -109,4 +110,25 @@ test('客户新建使用整页表单并展示资料预览', async ({ page }) => 
   await page.getByRole('button', { name: '保存' }).click()
   await expect(page).toHaveURL(/\/customers\/CUS-/)
   await expect(page.getByRole('heading', { name })).toBeVisible()
+})
+
+test('编辑页未保存离开需要确认', async ({ page, request }) => {
+  const token = await loginViaApi(request)
+  const name = `离开确认客户-${Date.now()}`
+  const customer = await createCustomer(request, token, name)
+
+  await login(page)
+  await page.goto(`/customers/${customer.customerBusinessId}/edit`)
+  await expect(page.getByLabel('客户名称')).toHaveValue(name)
+  await page.getByLabel('客户名称').fill(`${name}-未保存`)
+  await page.getByRole('button', { name: '取消' }).click()
+
+  const box = page.locator('.el-message-box')
+  await expect(box.getByText('离开页面')).toBeVisible()
+  await box.getByRole('button', { name: '继续编辑' }).click()
+  await expect(page).toHaveURL(new RegExp(`/customers/${customer.customerBusinessId}/edit$`))
+
+  await page.getByRole('button', { name: '取消' }).click()
+  await box.getByRole('button', { name: '离开' }).click()
+  await expect(page).toHaveURL(new RegExp(`/customers/${customer.customerBusinessId}$`))
 })
