@@ -17,4 +17,7 @@ public interface ProductApplicationService {
     ProductRef update(UpdateProductCommand command);
 
     ProductRef changeStatus(ChangeProductStatusCommand command);
+
+    /** 按当前表单只读试算系统标准方案预算；不写库。 */
+    SchemeView.SchemeBudgetView previewBudget(CreateProductCommand command);
 }

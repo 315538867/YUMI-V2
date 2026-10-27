@@ -67,6 +67,11 @@ function templateOf(content: string): string {
   return match?.[1] ?? ''
 }
 
+function styleOf(content: string): string {
+  const match = content.match(/<style[^>]*>([\s\S]*)<\/style>/)
+  return match?.[1] ?? ''
+}
+
 describe('前端展示编码门禁', () => {
   it('模板不直接渲染领域编码字段', () => {
     const offenders: string[] = []
@@ -81,6 +86,17 @@ describe('前端展示编码门禁', () => {
         if (expressionPattern.test(template)) {
           offenders.push(`${file}: 模板表达式 .${field}`)
         }
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([])
+  })
+
+  it('页面样式只使用设计令牌，不写死色值', () => {
+    const offenders: string[] = []
+    for (const file of walk(SRC).filter((path) => path.endsWith('.vue'))) {
+      const style = styleOf(readFileSync(file, 'utf8'))
+      if (/#[0-9a-fA-F]{3,8}\b/.test(style)) {
+        offenders.push(file)
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([])

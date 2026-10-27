@@ -64,6 +64,12 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'customers/new',
+        name: 'customer-create',
+        component: () => import('@/modules/customer/pages/CustomerEditorPage.vue'),
+        meta: { requiresAuth: true, title: '新建客户', permission: 'customer.manage' },
+      },
+      {
         path: 'customers/:customerBusinessId',
         name: 'customer-detail',
         component: () => import('@/modules/customer/pages/CustomerDetailPage.vue'),
@@ -138,6 +144,16 @@ export const routes: RouteRecordRaw[] = [
             meta: { requiresAuth: true, title: '员工与资格', permission: 'workforce.read' },
           },
           {
+            path: 'employees/new',
+            name: 'workforce-employee-create',
+            component: () => import('@/modules/workforce/pages/EmployeeEditorPage.vue'),
+            meta: {
+              requiresAuth: true,
+              title: '新增员工',
+              permission: 'workforce.employee.manage',
+            },
+          },
+          {
             path: 'employees/:employeeBusinessId',
             name: 'workforce-employee-detail',
             component: () => import('@/modules/workforce/pages/EmployeeDetailPage.vue'),
@@ -158,6 +174,16 @@ export const routes: RouteRecordRaw[] = [
             name: 'workforce-teams',
             component: () => import('@/modules/workforce/pages/TeamPage.vue'),
             meta: { requiresAuth: true, title: '小组', permission: 'workforce.read' },
+          },
+          {
+            path: 'teams/new',
+            name: 'workforce-team-create',
+            component: () => import('@/modules/workforce/pages/TeamEditorPage.vue'),
+            meta: {
+              requiresAuth: true,
+              title: '新增小组',
+              permission: 'workforce.team.manage',
+            },
           },
           {
             path: 'teams/:teamBusinessId',

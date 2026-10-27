@@ -5,20 +5,34 @@ import { ElMessage } from 'element-plus'
 import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 
 const route = useRoute()
 const router = useRouter()
-const employeeId = String(route.params.employeeBusinessId ?? '')
+const employeeId =
+  typeof route.params.employeeBusinessId === 'string' ? route.params.employeeBusinessId : ''
+const editing = employeeId !== ''
 const employee = ref<EmployeeView | null>(null)
-const loading = ref(true)
+const loading = ref(editing)
 const saving = ref(false)
 const errorText = ref('')
 const formError = ref('')
 
-const form = reactive({ name: '', phone: '' })
+const form = reactive({
+  name: '',
+  phone: '',
+  effectiveDate: new Date().toISOString().slice(0, 10),
+})
+
+function previewStatus(): string {
+  return editing ? (employee.value?.employmentStatus ?? 'EMPLOYED') : 'EMPLOYED'
+}
 
 async function load(): Promise<void> {
+  if (!editing) {
+    return
+  }
   loading.value = true
   errorText.value = ''
   try {
@@ -26,6 +40,7 @@ async function load(): Promise<void> {
     employee.value = current
     form.name = current.name
     form.phone = current.phone
+    form.effectiveDate = current.latestEffectiveDate
   } catch (error) {
     errorText.value = userMessageOf(error, '员工资料加载失败')
   } finally {
@@ -34,9 +49,6 @@ async function load(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (employee.value === null) {
-    return
-  }
   if (form.name.trim() === '' || form.phone.trim() === '') {
     formError.value = '请填写姓名和电话'
     return
@@ -44,13 +56,19 @@ async function save(): Promise<void> {
   saving.value = true
   formError.value = ''
   try {
-    await workforceService.updateEmployee(employeeId, {
-      name: form.name,
-      phone: form.phone,
-      expectedRowVersion: employee.value.rowVersion,
-    })
-    ElMessage.success('员工资料已保存')
-    await router.push(`/workforce/employees/${employeeId}`)
+    if (editing && employee.value !== null) {
+      await workforceService.updateEmployee(employeeId, {
+        name: form.name,
+        phone: form.phone,
+        expectedRowVersion: employee.value.rowVersion,
+      })
+      ElMessage.success('员工资料已保存')
+      await router.push(`/workforce/employees/${employeeId}`)
+    } else {
+      const created = await workforceService.hire({ ...form })
+      ElMessage.success('员工已入职')
+      await router.push(`/workforce/employees/${created.employeeBusinessId}`)
+    }
   } catch (error) {
     formError.value = isErrorType(error, 'CONCURRENT_CONFLICT')
       ? '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖'
@@ -61,7 +79,7 @@ async function save(): Promise<void> {
 }
 
 function cancel(): void {
-  void router.push(`/workforce/employees/${employeeId}`)
+  void router.push(editing ? `/workforce/employees/${employeeId}` : '/workforce/employees')
 }
 
 onMounted(load)
@@ -69,46 +87,124 @@ onMounted(load)
 
 <template>
   <section class="employee-editor">
-    <h1>编辑员工</h1>
+    <header class="head">
+      <h1>{{ editing ? '编辑员工' : '新增员工' }}</h1>
+      <div>
+        <el-button @click="cancel">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      </div>
+    </header>
     <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-form v-if="!loading" label-width="96px" class="form" @submit.prevent>
-        <el-alert
-          v-if="formError"
-          type="error"
-          :closable="false"
-          :title="formError"
-          class="alert"
-        />
-        <el-form-item label="姓名" required>
-          <el-input v-model="form.name" aria-label="姓名" />
-        </el-form-item>
-        <el-form-item label="电话" required>
-          <el-input v-model="form.phone" aria-label="电话" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="saving" @click="save">保存</el-button>
-          <el-button @click="cancel">取消</el-button>
-        </el-form-item>
-      </el-form>
+      <div class="editor-grid">
+        <el-form v-if="!loading" label-width="96px" class="form" @submit.prevent>
+          <el-alert
+            v-if="formError"
+            type="error"
+            :closable="false"
+            :title="formError"
+            class="alert"
+          />
+          <el-form-item label="姓名" required>
+            <el-input v-model="form.name" aria-label="姓名" />
+          </el-form-item>
+          <el-form-item label="电话" required>
+            <el-input v-model="form.phone" aria-label="电话" />
+          </el-form-item>
+          <el-form-item label="生效日期">
+            <el-date-picker
+              v-model="form.effectiveDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              :disabled="editing"
+              aria-label="生效日期"
+            />
+          </el-form-item>
+        </el-form>
+
+        <aside class="preview">
+          <h2>员工资料预览</h2>
+          <dl>
+            <dt>姓名</dt>
+            <dd>{{ form.name || '未填写' }}</dd>
+            <dt>电话</dt>
+            <dd>{{ form.phone || '未填写' }}</dd>
+            <dt>生效日期</dt>
+            <dd>{{ form.effectiveDate || '未填写' }}</dd>
+            <dt>在职状态</dt>
+            <dd><CodeTag category="workforce.employmentStatus" :code="previewStatus()" /></dd>
+          </dl>
+          <p class="hint">编号由服务端生成；预览只用于核对。</p>
+        </aside>
+      </div>
     </PageState>
   </section>
 </template>
 
 <style scoped>
 .employee-editor {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 16px;
 }
 
-.employee-editor h1 {
-  margin: 0 0 12px;
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+h1 {
+  margin: 0;
   font-size: 18px;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
 }
 
 .form {
   max-width: 720px;
+}
+
+.preview {
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  padding: 12px 16px;
+  background: var(--el-fill-color-lighter);
+  align-self: start;
+}
+
+.preview dl {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.preview dt {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.preview dd {
+  margin: 0;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.hint {
+  margin: 12px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .alert {

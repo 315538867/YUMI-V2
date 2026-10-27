@@ -139,6 +139,24 @@ class ProductAggregateIT extends AbstractMySqlIntegrationTest {
     }
 
     @Test
+    @DisplayName("预算预览与保存后的内置方案预算一致")
+    void previewBudgetMatchesSavedStandardScheme() {
+        CreateProductCommand command = definition("预览商品");
+        var preview = products.previewBudget(command);
+        ProductRef created = products.create(command);
+        var standard = schemes.listSchemes(created.productBusinessId()).stream()
+                .filter(scheme -> scheme.schemeType() == SchemeType.SYSTEM_STANDARD)
+                .findFirst()
+                .orElseThrow();
+        var saved = standard.latestBudget().orElseThrow();
+        assertThat(preview.fullResourceUnitCost().value())
+                .isEqualByComparingTo(saved.fullResourceUnitCost().value());
+        assertThat(preview.studioBorneUnitCost().value())
+                .isEqualByComparingTo(saved.studioBorneUnitCost().value());
+        assertThat(preview.lines()).hasSameSizeAs(saved.lines());
+    }
+
+    @Test
     @DisplayName("商品命令不接受目标工序：类型上没有该字段，库中也没有该列")
     void productDoesNotAcceptTargetProcess() {
         assertThat(List.of(CreateProductCommand.class.getRecordComponents()))

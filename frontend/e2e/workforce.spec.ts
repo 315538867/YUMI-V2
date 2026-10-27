@@ -88,21 +88,15 @@ test('小组详情、整页编辑与人员标准', async ({ page, request }) => 
   await login(page)
   await page.goto('/workforce/teams')
   await page.getByRole('button', { name: '新增小组' }).click()
-  await formInput(page, '小组名称').fill(teamName)
-  await page
-    .locator('.el-dialog .el-form-item')
-    .filter({ hasText: '成员' })
-    .locator('.el-select')
-    .click()
+  await expect(page).toHaveURL(/\/workforce\/teams\/new$/)
+  await expect(page.getByRole('heading', { name: '新增小组' })).toBeVisible()
+  await page.getByLabel('小组名称').fill(teamName)
+  await page.locator('.el-form-item').filter({ hasText: '成员' }).locator('.el-select').click()
   await page.getByRole('option', { name: new RegExp(name) }).click()
   await page.getByRole('option', { name: new RegExp(secondName) }).click()
   await page.keyboard.press('Escape')
-  await page.locator('.el-dialog').getByRole('button', { name: '保存' }).click()
-  const row = page.locator('.el-table__row').filter({ hasText: teamName })
-  await expect(row).toBeVisible()
-
-  await row.getByRole('button', { name: '查看' }).click()
-  await expect(page).toHaveURL(/\/workforce\/teams\/[^/]+$/)
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page).toHaveURL(/\/workforce\/teams\/TEAM-/)
   await expect(page.getByRole('heading', { name: teamName })).toBeVisible()
   await expect(page.locator('.el-table__row').filter({ hasText: name })).toBeVisible()
 
@@ -124,4 +118,18 @@ test('小组详情、整页编辑与人员标准', async ({ page, request }) => 
 
   await expect(page.getByText('绑定账号')).toHaveCount(0)
   await expect(page.getByPlaceholder('登录名')).toHaveCount(0)
+})
+
+test('员工新增使用整页表单并展示资料预览', async ({ page }) => {
+  await login(page)
+  await page.goto('/workforce/employees/new')
+  await expect(page.getByRole('heading', { name: '新增员工' })).toBeVisible()
+  const name = `整页员工-${Date.now()}`
+  await page.getByLabel('姓名').fill(name)
+  await page.getByLabel('电话').fill('13600000009')
+  await expect(page.getByText('员工资料预览')).toBeVisible()
+  await expect(page.locator('.preview').getByText(name)).toBeVisible()
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page).toHaveURL(/\/workforce\/employees\/EMP-/)
+  await expect(page.getByRole('heading', { name })).toBeVisible()
 })

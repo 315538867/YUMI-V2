@@ -94,3 +94,19 @@ test('版本冲突保留输入并提示刷新，不静默覆盖', async ({ page,
   await expect(page.getByText(/资料已被其他人修改/)).toBeVisible()
   await expect(nameInput).toHaveValue(`${name}-页面`)
 })
+
+test('客户新建使用整页表单并展示资料预览', async ({ page }) => {
+  await login(page)
+  await page.goto('/customers/new')
+  await expect(page.getByRole('heading', { name: '新建客户' })).toBeVisible()
+  const name = `整页客户-${Date.now()}`
+  await page.getByLabel('客户名称').fill(name)
+  await page.getByLabel('联系人').fill('整页联系人')
+  await page.getByLabel('电话').fill('13900000002')
+  await page.getByLabel('默认地址').fill('上海市整页路 1 号')
+  await expect(page.getByText('客户资料预览')).toBeVisible()
+  await expect(page.locator('.preview').getByText(name)).toBeVisible()
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page).toHaveURL(/\/customers\/CUS-/)
+  await expect(page.getByRole('heading', { name })).toBeVisible()
+})

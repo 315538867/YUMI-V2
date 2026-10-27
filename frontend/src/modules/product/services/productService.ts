@@ -2,6 +2,7 @@ import { api } from '@/platform/services/api'
 import { newIdempotencyKey } from '@/platform/services/idempotency'
 import type {
   EntryConfiguration,
+  SchemeBudgetView,
   ProductDefinition,
   ProductStatus,
   ProductView,
@@ -27,6 +28,13 @@ export const productService = {
 
   get(productBusinessId: string): Promise<ProductView> {
     return api.query<ProductView>(`/api/products/${encodeURIComponent(productBusinessId)}`)
+  },
+
+  previewBudget(definition: ProductDefinition): Promise<SchemeBudgetView> {
+    return api.command<SchemeBudgetView, ProductDefinition>('/api/products/budget-preview', {
+      idempotencyKey: newIdempotencyKey('product-budget-preview'),
+      body: definition,
+    })
   },
 
   create(definition: ProductDefinition): Promise<ProductView> {
@@ -81,6 +89,16 @@ export const productService = {
 
   schemes(productBusinessId: string): Promise<SchemeView[]> {
     return api.query<SchemeView[]>(`/api/products/${encodeURIComponent(productBusinessId)}/schemes`)
+  },
+
+  previewSchemeBudget(productBusinessId: string, input: SchemeInput): Promise<SchemeBudgetView> {
+    return api.command<SchemeBudgetView, SchemeInput>(
+      `/api/products/${encodeURIComponent(productBusinessId)}/schemes/budget-preview`,
+      {
+        idempotencyKey: newIdempotencyKey('scheme-budget-preview'),
+        body: input,
+      },
+    )
   },
 
   createScheme(

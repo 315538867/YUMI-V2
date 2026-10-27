@@ -143,6 +143,12 @@ public class ProductController {
                 .body(view);
     }
 
+    @PostMapping("/budget-preview")
+    public SchemeView.SchemeBudgetView previewBudget(
+            @RequestBody CreateProductCommand request) {
+        return products.previewBudget(request);
+    }
+
     @PutMapping("/{productBusinessId}")
     public ProductView update(
             @PathVariable String productBusinessId,
@@ -206,6 +212,28 @@ public class ProductController {
     public com.yumi.product.api.ProductSnapshotService.SchemeSnapshotRefAndView orderEntry(
             @PathVariable String schemeBusinessId) {
         return orderEntries.getSchemeEntry(schemeBusinessId);
+    }
+
+    @PostMapping("/{productBusinessId}/schemes/budget-preview")
+    public SchemeView.SchemeBudgetView previewSchemeBudget(
+            @PathVariable String productBusinessId,
+            @RequestBody CreateSchemeRequest request) {
+        return schemes.previewBudget(productBusinessId, new CreateCustomSchemeCommand(
+                productBusinessId,
+                request.name(),
+                request.targetProcess(),
+                request.salePrice(),
+                request.glueSource(),
+                request.colorPasteSource(),
+                request.makingOtherMaterialCost(),
+                request.baggingBagUnitCost(),
+                request.baggingBagSource(),
+                request.baggingDecorationUnitPrice(),
+                request.baggingDecorationSource(),
+                request.baggingOtherCost(),
+                request.seamCombinedMaterialCost(),
+                request.seamOtherCost(),
+                0L));
     }
 
     @PostMapping("/{productBusinessId}/schemes")

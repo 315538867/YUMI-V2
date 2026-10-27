@@ -21,6 +21,7 @@ import com.yumi.product.api.ProductApplicationService;
 import com.yumi.product.api.ProductQuery;
 import com.yumi.product.api.ProductRef;
 import com.yumi.product.api.ProductStatus;
+import com.yumi.product.api.SchemeView;
 import com.yumi.product.api.ProductView;
 import com.yumi.product.api.SchemeType;
 import com.yumi.product.api.UpdateProductCommand;
@@ -170,6 +171,19 @@ public class ProductCommandService implements ProductApplicationService, Product
                             String.valueOf(reloaded.contentVersion())));
             return toRef(reloaded);
         });
+    }
+
+    @Override
+    public SchemeView.SchemeBudgetView previewBudget(CreateProductCommand command) {
+        authorization.require(PermissionCodes.PRODUCT_READ, ResourceScope.GLOBAL);
+        ValidatedDefinition definition = validate(command);
+        Instant now = clock.instant();
+        ProductRecord product = definition.toRecord(
+                "PREVIEW", "PREVIEW", 0, ProductStatus.ACTIVE, now, "preview");
+        SchemeRecord scheme = buildSystemScheme(product, now);
+        var result = budgetMapper.calculateBudget(product, scheme);
+        return ProductBudgetMapper.toView(budgetMapper.toRecord(
+                "BUDGET-PREVIEW", 0, 0, result, "SCHEME-PREVIEW"));
     }
 
     @Override

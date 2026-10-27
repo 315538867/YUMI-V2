@@ -130,6 +130,42 @@ public class ProductSchemeCommandService implements ProductSchemeApplicationServ
     }
 
     @Override
+    public SchemeView.SchemeBudgetView previewBudget(
+            String productBusinessId, CreateCustomSchemeCommand command) {
+        authorization.require(PermissionCodes.PRODUCT_SCHEME_MANAGE, ResourceScope.GLOBAL);
+        if (command == null) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_SCHEME", "方案定义不能为空");
+        }
+        requireTargetProcess(command.targetProcess());
+        ProductRecord product = products.requireProduct(
+                ProductCommandService.requireText(productBusinessId, "商品标识", 64));
+        products.requireActiveProduct(product);
+        Instant now = clock.instant();
+        SchemeRecord scheme = new SchemeRecord(
+                0L,
+                "SCHEME-PREVIEW",
+                product.productBusinessId(),
+                SchemeType.CUSTOM,
+                command.name() == null || command.name().isBlank()
+                        ? "预览方案" : command.name().strip(),
+                product.standardWeightGrams(),
+                command.targetProcess().name(),
+                command.salePrice().value(),
+                requireSource(command.glueSource()).name(),
+                requireSource(command.colorPasteSource()).name(),
+                ProductStatus.ACTIVE,
+                product.contentVersion(),
+                1,
+                1,
+                now,
+                now,
+                mergeCosts(product, null, command));
+        var result = budgetMapper.calculateBudget(product, scheme);
+        return ProductBudgetMapper.toView(budgetMapper.toRecord(
+                "BUDGET-PREVIEW", product.contentVersion(), 1, result, "SCHEME-PREVIEW"));
+    }
+
+    @Override
     public SchemeRef updateCustomScheme(UpdateCustomSchemeCommand command) {
         authorization.require(PermissionCodes.PRODUCT_SCHEME_MANAGE, ResourceScope.GLOBAL);
         if (command == null) {

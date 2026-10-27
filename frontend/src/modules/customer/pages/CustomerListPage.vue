@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import type { CustomerStatus, CustomerView } from '@/modules/customer/contracts'
@@ -19,10 +18,6 @@ const { filters, page, size, sizes, search, reset, goPage, changeSize } = useLis
   { keyword: '', status: '' as CustomerStatus | '' },
   { onSearch: () => void load() },
 )
-const createVisible = ref(false)
-const creating = ref(false)
-const createError = ref('')
-const form = reactive({ name: '', contactName: '', phone: '', defaultAddress: '' })
 
 async function load(): Promise<void> {
   loading.value = true
@@ -36,35 +31,6 @@ async function load(): Promise<void> {
   }
 }
 
-function openCreate(): void {
-  createError.value = ''
-  Object.assign(form, { name: '', contactName: '', phone: '', defaultAddress: '' })
-  createVisible.value = true
-}
-
-async function create(): Promise<void> {
-  if (
-    form.name.trim() === '' ||
-    form.contactName.trim() === '' ||
-    form.phone.trim() === '' ||
-    form.defaultAddress.trim() === ''
-  ) {
-    createError.value = '请填写客户名称、联系人、电话和默认收货地址'
-    return
-  }
-  creating.value = true
-  createError.value = ''
-  try {
-    const created = await customerService.create({ ...form })
-    createVisible.value = false
-    ElMessage.success('客户已创建')
-    await router.push(`/customers/${created.customerBusinessId}`)
-  } catch (error) {
-    createError.value = userMessageOf(error, '客户创建失败')
-  } finally {
-    creating.value = false
-  }
-}
 void load()
 </script>
 
@@ -91,7 +57,7 @@ void load()
       </el-select>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
-      <PermissionButton permission="customer.manage" @click="openCreate">
+      <PermissionButton permission="customer.manage" @click="router.push('/customers/new')">
         新增客户
       </PermissionButton>
     </div>
@@ -134,34 +100,6 @@ void load()
         @update:size="changeSize"
       />
     </PageState>
-
-    <el-dialog v-model="createVisible" title="新增客户" width="480px">
-      <el-alert
-        v-if="createError"
-        type="error"
-        :closable="false"
-        :title="createError"
-        class="alert"
-      />
-      <el-form label-width="92px">
-        <el-form-item label="客户名称" required>
-          <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item label="联系人" required>
-          <el-input v-model="form.contactName" />
-        </el-form-item>
-        <el-form-item label="电话" required>
-          <el-input v-model="form.phone" />
-        </el-form-item>
-        <el-form-item label="默认地址" required>
-          <el-input v-model="form.defaultAddress" type="textarea" :rows="2" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="create">创建</el-button>
-      </template>
-    </el-dialog>
   </section>
 </template>
 
@@ -172,7 +110,7 @@ void load()
 }
 
 .customer-list {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 16px;

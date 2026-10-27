@@ -7,25 +7,14 @@ test('六模块、售后、设置与报表真实页面链路可操作', async ({
 
   await page.goto('/customers')
   await page.getByRole('button', { name: '新增客户' }).click()
+  await expect(page).toHaveURL(/\/customers\/new$/)
   const customerName = `闭环客户-${Date.now()}`
-  const dialog = page.locator('.el-dialog')
-  await dialog
-    .locator('.el-form-item')
-    .filter({ hasText: '客户名称' })
-    .locator('input')
-    .fill(customerName)
-  await dialog.locator('.el-form-item').filter({ hasText: '联系人' }).locator('input').fill('闭环')
-  await dialog
-    .locator('.el-form-item')
-    .filter({ hasText: '电话' })
-    .locator('input')
-    .fill('13900000003')
-  await dialog
-    .locator('.el-form-item')
-    .filter({ hasText: '默认地址' })
-    .locator('textarea')
-    .fill('闭环路 1 号')
-  await dialog.getByRole('button', { name: '创建' }).click()
+  await page.getByLabel('客户名称').fill(customerName)
+  await page.getByLabel('联系人').fill('闭环')
+  await page.getByLabel('电话').fill('13900000003')
+  await page.getByLabel('默认地址').fill('闭环路 1 号')
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page).toHaveURL(/\/customers\/CUS-/)
   await expect(page.getByRole('heading', { name: customerName })).toBeVisible()
 
   await page.goto('/products')

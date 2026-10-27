@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { money } from '@/platform/services/money'
 import type {
   EntryConfiguration,
+  SchemeBudgetView,
   ProductDefinition,
   ProductView,
 } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
+import MoneyText from '@/shared/components/MoneyText.vue'
 
 type MoneyKey =
   | 'standardSalePrice'
@@ -72,6 +74,10 @@ const saving = ref(false)
 const errorText = ref('')
 const configuration = ref<EntryConfiguration | null>(null)
 const original = ref<ProductView | null>(null)
+const budgetPreview = ref<SchemeBudgetView | null>(null)
+const previewLoading = ref(false)
+const previewError = ref('')
+let previewTimer: ReturnType<typeof setTimeout> | null = null
 
 const form = reactive<EditorForm>({
   name: '',
@@ -210,6 +216,35 @@ function definition(): ProductDefinition {
   }
 }
 
+function schedulePreview(): void {
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer)
+  }
+  if (form.name.trim() === '' || form.makingStarCode === '') {
+    budgetPreview.value = null
+    return
+  }
+  previewTimer = setTimeout(async () => {
+    previewLoading.value = true
+    previewError.value = ''
+    try {
+      budgetPreview.value = await productService.previewBudget(definition())
+    } catch (error) {
+      previewError.value = userMessageOf(error, '预算预览计算失败')
+    } finally {
+      previewLoading.value = false
+    }
+  }, 400)
+}
+
+watch(form, schedulePreview, { deep: true })
+
+onBeforeUnmount(() => {
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer)
+  }
+})
+
 async function save(): Promise<void> {
   if (form.name.trim() === '') {
     errorText.value = '请填写商品名称'
@@ -245,81 +280,145 @@ onMounted(load)
     </header>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
 
-    <el-form v-if="!loading" label-width="128px" class="form">
-      <h2>1. 基本信息</h2>
-      <el-form-item label="商品名称" required>
-        <el-input v-model="form.name" />
-      </el-form-item>
-      <el-form-item label="描述">
-        <el-input v-model="form.description" type="textarea" :rows="2" />
-      </el-form-item>
-      <el-form-item label="标准重量（克）">
-        <el-input v-model="form.standardWeightGrams" />
-      </el-form-item>
-      <el-form-item label="制作星级">
-        <el-select v-model="form.makingStarCode">
-          <el-option
-            v-for="star in configuration?.makingStars ?? []"
-            :key="star.starCode"
-            :label="`${star.name} / ${star.standardMinutes} 分钟`"
-            :value="star.starCode"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="制作标准分钟">
-        <el-input v-model.number="form.makingStandardMinutes" type="number" />
-      </el-form-item>
-      <el-form-item label="标准售价">
-        <el-input v-model="form.standardSalePrice" />
-      </el-form-item>
-      <el-form-item label="胶水损耗率">
-        <el-input v-model="form.glueLossRate" />
-      </el-form-item>
-      <el-form-item label="胶水单价/克">
-        <el-input v-model="form.glueUnitPrice" />
-      </el-form-item>
-      <el-form-item label="色浆单价/克">
-        <el-input v-model="form.colorPasteUnitPrice" />
-      </el-form-item>
-      <el-form-item label="模具数量">
-        <el-input v-model.number="form.mouldCount" type="number" />
-      </el-form-item>
-      <el-form-item label="每日批次">
-        <el-input v-model.number="form.mouldDailyBatches" type="number" />
-      </el-form-item>
+    <div class="editor-grid">
+      <el-form v-if="!loading" label-width="128px" class="form">
+        <h2>1. 基本信息</h2>
+        <el-form-item label="商品名称" required>
+          <el-input v-model="form.name" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="form.description" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="标准重量（克）">
+          <el-input v-model="form.standardWeightGrams" />
+        </el-form-item>
+        <el-form-item label="制作星级">
+          <el-select v-model="form.makingStarCode">
+            <el-option
+              v-for="star in configuration?.makingStars ?? []"
+              :key="star.starCode"
+              :label="`${star.name} / ${star.standardMinutes} 分钟`"
+              :value="star.starCode"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="制作标准分钟">
+          <el-input v-model.number="form.makingStandardMinutes" type="number" />
+        </el-form-item>
+        <el-form-item label="标准售价">
+          <el-input v-model="form.standardSalePrice" />
+        </el-form-item>
+        <el-form-item label="胶水损耗率">
+          <el-input v-model="form.glueLossRate" />
+        </el-form-item>
+        <el-form-item label="胶水单价/克">
+          <el-input v-model="form.glueUnitPrice" />
+        </el-form-item>
+        <el-form-item label="色浆单价/克">
+          <el-input v-model="form.colorPasteUnitPrice" />
+        </el-form-item>
+        <el-form-item label="模具数量">
+          <el-input v-model.number="form.mouldCount" type="number" />
+        </el-form-item>
+        <el-form-item label="每日批次">
+          <el-input v-model.number="form.mouldDailyBatches" type="number" />
+        </el-form-item>
 
-      <h2>2. 制作</h2>
-      <el-form-item v-for="field in makingFields" :key="field.key" :label="field.label">
-        <el-input v-model="form[field.key]" />
-      </el-form-item>
+        <h2>2. 制作</h2>
+        <el-form-item v-for="field in makingFields" :key="field.key" :label="field.label">
+          <el-input v-model="form[field.key]" />
+        </el-form-item>
 
-      <h2>3. 捏毛装袋</h2>
-      <el-form-item label="标准分钟">
-        <el-input v-model.number="form.baggingStandardMinutes" type="number" />
-      </el-form-item>
-      <el-form-item v-for="field in baggingFields" :key="field.key" :label="field.label">
-        <el-input v-model="form[field.key]" />
-      </el-form-item>
+        <h2>3. 捏毛装袋</h2>
+        <el-form-item label="标准分钟">
+          <el-input v-model.number="form.baggingStandardMinutes" type="number" />
+        </el-form-item>
+        <el-form-item v-for="field in baggingFields" :key="field.key" :label="field.label">
+          <el-input v-model="form[field.key]" />
+        </el-form-item>
 
-      <h2>4. 缝边剪袋</h2>
-      <el-form-item label="标准分钟">
-        <el-input v-model.number="form.seamStandardMinutes" type="number" />
-      </el-form-item>
-      <el-form-item v-for="field in seamFields" :key="field.key" :label="field.label">
-        <el-input v-model="form[field.key]" />
-      </el-form-item>
+        <h2>4. 缝边剪袋</h2>
+        <el-form-item label="标准分钟">
+          <el-input v-model.number="form.seamStandardMinutes" type="number" />
+        </el-form-item>
+        <el-form-item v-for="field in seamFields" :key="field.key" :label="field.label">
+          <el-input v-model="form[field.key]" />
+        </el-form-item>
 
-      <h2>5. 额外单件费用</h2>
-      <el-form-item v-for="field in extraFields" :key="field.key" :label="field.label">
-        <el-input v-model="form[field.key]" />
-      </el-form-item>
-    </el-form>
+        <h2>5. 额外单件费用</h2>
+        <el-form-item v-for="field in extraFields" :key="field.key" :label="field.label">
+          <el-input v-model="form[field.key]" />
+        </el-form-item>
+      </el-form>
+      <aside class="budget-preview">
+        <h2>预算预览</h2>
+        <p v-if="previewLoading" class="hint">正在计算…</p>
+        <el-alert v-else-if="previewError" type="error" :closable="false" :title="previewError" />
+        <template v-else-if="budgetPreview">
+          <dl>
+            <dt>全资源成本</dt>
+            <dd><MoneyText :value="budgetPreview.fullResourceUnitCost" /></dd>
+            <dt>工作室成本</dt>
+            <dd><MoneyText :value="budgetPreview.studioBorneUnitCost" /></dd>
+            <dt>预计利润</dt>
+            <dd><MoneyText :value="budgetPreview.expectedUnitProfit" /></dd>
+            <dt>利润率</dt>
+            <dd>
+              {{
+                budgetPreview.expectedProfitRate === null
+                  ? '—'
+                  : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
+              }}
+            </dd>
+          </dl>
+          <p class="hint">只读预览，保存后以服务端预算结果为准。</p>
+        </template>
+        <p v-else class="hint">填写商品名称和制作星级后显示预算预览。</p>
+      </aside>
+    </div>
   </section>
 </template>
 
 <style scoped>
+.editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+.budget-preview {
+  position: sticky;
+  top: 12px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  padding: 12px 16px;
+  background: var(--el-fill-color-lighter);
+}
+
+.budget-preview h2 {
+  margin-top: 0;
+}
+
+.budget-preview dl {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.budget-preview dt {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.budget-preview dd {
+  margin: 0;
+  font-size: 13px;
+}
+
 .product-editor {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 20px;

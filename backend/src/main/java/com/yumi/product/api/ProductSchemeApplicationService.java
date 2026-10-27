@@ -21,4 +21,8 @@ public interface ProductSchemeApplicationService {
     void deactivateCustomScheme(String schemeBusinessId, long expectedRowVersion);
 
     List<SchemeView> listSchemes(String productBusinessId);
+
+    /** 按当前表单只读试算自定义方案预算；不写库。 */
+    SchemeView.SchemeBudgetView previewBudget(
+            String productBusinessId, CreateCustomSchemeCommand command);
 }

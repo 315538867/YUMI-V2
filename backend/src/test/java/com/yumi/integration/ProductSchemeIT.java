@@ -246,6 +246,28 @@ class ProductSchemeIT extends AbstractMySqlIntegrationTest {
         assertThat(all.get(1).targetProcess()).isEqualTo(SchemeView.ProcessCode.BAGGING);
     }
 
+    @Test
+    @DisplayName("自定义方案预算预览与保存结果一致")
+    void previewBudgetMatchesSavedCustomScheme() {
+        ProductRef product = createProduct();
+        CreateCustomSchemeCommand command = new CreateCustomSchemeCommand(
+                product.productBusinessId(), "预览方案", SchemeView.ProcessCode.SEAM_CUTTING,
+                SettlementMoney.of(new BigDecimal("55"), CurrencyCode.CNY),
+                MaterialSource.STUDIO, MaterialSource.STUDIO,
+                cost("0.20"), cost("0.25"), MaterialSource.STUDIO, cost("0.05"),
+                MaterialSource.STUDIO, cost("0.02"), cost("0.03"), cost("0.01"), 1L);
+
+        var preview = schemes.previewBudget(product.productBusinessId(), command);
+        var saved = createCustomScheme(product, SchemeView.ProcessCode.SEAM_CUTTING).latestBudget()
+                .orElseThrow();
+
+        assertThat(preview.fullResourceUnitCost().value())
+                .isEqualByComparingTo(saved.fullResourceUnitCost().value());
+        assertThat(preview.studioBorneUnitCost().value())
+                .isEqualByComparingTo(saved.studioBorneUnitCost().value());
+        assertThat(preview.lines()).hasSameSizeAs(saved.lines());
+    }
+
     private SchemeView createCustomScheme(ProductRef product, SchemeView.ProcessCode targetProcess) {
         var ref = schemes.createCustomScheme(new CreateCustomSchemeCommand(
                 product.productBusinessId(), "自定义方案", targetProcess,

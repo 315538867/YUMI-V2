@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
@@ -8,10 +8,12 @@ import type {
   MaterialSource,
   ProcessCode,
   ProductView,
+  SchemeBudgetView,
   SchemeInput,
   SchemeView,
 } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
+import MoneyText from '@/shared/components/MoneyText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +26,10 @@ const scheme = ref<SchemeView | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 const errorText = ref('')
+const budgetPreview = ref<SchemeBudgetView | null>(null)
+const previewLoading = ref(false)
+const previewError = ref('')
+let previewTimer: ReturnType<typeof setTimeout> | null = null
 
 const form = reactive({
   name: '',
@@ -95,6 +101,35 @@ function input(): SchemeInput {
   }
 }
 
+function schedulePreview(): void {
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer)
+  }
+  if (form.salePrice.trim() === '') {
+    budgetPreview.value = null
+    return
+  }
+  previewTimer = setTimeout(async () => {
+    previewLoading.value = true
+    previewError.value = ''
+    try {
+      budgetPreview.value = await productService.previewSchemeBudget(productId, input())
+    } catch (error) {
+      previewError.value = userMessageOf(error, '预算预览计算失败')
+    } finally {
+      previewLoading.value = false
+    }
+  }, 400)
+}
+
+watch(form, schedulePreview, { deep: true })
+
+onBeforeUnmount(() => {
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer)
+  }
+})
+
 async function save(): Promise<void> {
   if (product.value === null) {
     return
@@ -140,69 +175,133 @@ onMounted(load)
       title="人工、工时、提成与额外单件费用继承商品，本页不能覆盖；保存后由后端返回预算。"
       class="alert"
     />
-    <el-form label-width="150px" class="form">
-      <el-form-item label="方案名称" required>
-        <el-input v-model="form.name" />
-      </el-form-item>
-      <el-form-item label="目标工序">
-        <el-select v-model="form.targetProcess">
-          <el-option label="制作" value="MAKING" />
-          <el-option label="捏毛装袋" value="BAGGING" />
-          <el-option label="缝边剪袋" value="SEAM_CUTTING" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="销售价">
-        <el-input v-model="form.salePrice" />
-      </el-form-item>
-      <el-form-item label="胶水供料方">
-        <el-select v-model="form.glueSource">
-          <el-option label="工作室" value="STUDIO" />
-          <el-option label="客户" value="CUSTOMER" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="色浆供料方">
-        <el-select v-model="form.colorPasteSource">
-          <el-option label="工作室" value="STUDIO" />
-          <el-option label="客户" value="CUSTOMER" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="制作其他材料">
-        <el-input v-model="form.makingOtherMaterialCost" />
-      </el-form-item>
-      <el-form-item label="单件袋子成本">
-        <el-input v-model="form.baggingBagUnitCost" />
-      </el-form-item>
-      <el-form-item label="袋子供料方">
-        <el-select v-model="form.baggingBagSource">
-          <el-option label="工作室" value="STUDIO" />
-          <el-option label="客户" value="CUSTOMER" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="单件装饰品">
-        <el-input v-model="form.baggingDecorationUnitPrice" />
-      </el-form-item>
-      <el-form-item label="装饰品供料方">
-        <el-select v-model="form.baggingDecorationSource">
-          <el-option label="工作室" value="STUDIO" />
-          <el-option label="客户" value="CUSTOMER" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="捏毛装袋其他费用">
-        <el-input v-model="form.baggingOtherCost" />
-      </el-form-item>
-      <el-form-item label="综合材料成本">
-        <el-input v-model="form.seamCombinedMaterialCost" />
-      </el-form-item>
-      <el-form-item label="缝边剪袋其他费用">
-        <el-input v-model="form.seamOtherCost" />
-      </el-form-item>
-    </el-form>
+    <div class="editor-grid">
+      <el-form label-width="150px" class="form">
+        <el-form-item label="方案名称" required>
+          <el-input v-model="form.name" />
+        </el-form-item>
+        <el-form-item label="目标工序">
+          <el-select v-model="form.targetProcess">
+            <el-option label="制作" value="MAKING" />
+            <el-option label="捏毛装袋" value="BAGGING" />
+            <el-option label="缝边剪袋" value="SEAM_CUTTING" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="销售价">
+          <el-input v-model="form.salePrice" />
+        </el-form-item>
+        <el-form-item label="胶水供料方">
+          <el-select v-model="form.glueSource">
+            <el-option label="工作室" value="STUDIO" />
+            <el-option label="客户" value="CUSTOMER" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="色浆供料方">
+          <el-select v-model="form.colorPasteSource">
+            <el-option label="工作室" value="STUDIO" />
+            <el-option label="客户" value="CUSTOMER" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="制作其他材料">
+          <el-input v-model="form.makingOtherMaterialCost" />
+        </el-form-item>
+        <el-form-item label="单件袋子成本">
+          <el-input v-model="form.baggingBagUnitCost" />
+        </el-form-item>
+        <el-form-item label="袋子供料方">
+          <el-select v-model="form.baggingBagSource">
+            <el-option label="工作室" value="STUDIO" />
+            <el-option label="客户" value="CUSTOMER" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="单件装饰品">
+          <el-input v-model="form.baggingDecorationUnitPrice" />
+        </el-form-item>
+        <el-form-item label="装饰品供料方">
+          <el-select v-model="form.baggingDecorationSource">
+            <el-option label="工作室" value="STUDIO" />
+            <el-option label="客户" value="CUSTOMER" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="捏毛装袋其他费用">
+          <el-input v-model="form.baggingOtherCost" />
+        </el-form-item>
+        <el-form-item label="综合材料成本">
+          <el-input v-model="form.seamCombinedMaterialCost" />
+        </el-form-item>
+        <el-form-item label="缝边剪袋其他费用">
+          <el-input v-model="form.seamOtherCost" />
+        </el-form-item>
+      </el-form>
+      <aside class="budget-preview">
+        <h2>预算预览</h2>
+        <p v-if="previewLoading" class="hint">正在计算…</p>
+        <el-alert v-else-if="previewError" type="error" :closable="false" :title="previewError" />
+        <template v-else-if="budgetPreview">
+          <dl>
+            <dt>全资源成本</dt>
+            <dd><MoneyText :value="budgetPreview.fullResourceUnitCost" /></dd>
+            <dt>工作室成本</dt>
+            <dd><MoneyText :value="budgetPreview.studioBorneUnitCost" /></dd>
+            <dt>预计利润</dt>
+            <dd><MoneyText :value="budgetPreview.expectedUnitProfit" /></dd>
+            <dt>利润率</dt>
+            <dd>
+              {{
+                budgetPreview.expectedProfitRate === null
+                  ? '—'
+                  : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
+              }}
+            </dd>
+          </dl>
+          <p class="hint">只读预览，保存后以服务端预算结果为准。</p>
+        </template>
+        <p v-else class="hint">填写目标工序和销售价后显示预算预览。</p>
+      </aside>
+    </div>
   </section>
 </template>
 
 <style scoped>
+.editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+.budget-preview {
+  position: sticky;
+  top: 12px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  padding: 12px 16px;
+  background: var(--el-fill-color-lighter);
+}
+
+.budget-preview h2 {
+  margin-top: 0;
+}
+
+.budget-preview dl {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.budget-preview dt {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.budget-preview dd {
+  margin: 0;
+  font-size: 13px;
+}
+
 .scheme-editor {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 20px;
