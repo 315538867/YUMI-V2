@@ -9,6 +9,9 @@ public interface CustomerQuery {
 
     List<CustomerView> search(String keyword, CustomerStatus status, int page, int size);
 
+    /** 启用客户数量，用于列表页概览。 */
+    long countActive();
+
     /** 客户资料变化历史，按发生时间升序。 */
     List<CustomerChangeView> history(String customerBusinessId);
 }

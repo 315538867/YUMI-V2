@@ -59,6 +59,31 @@ public class JdbcWorkforceRepository implements WorkforceRepository {
     }
 
     @Override
+    public List<EmployeeRecord> searchEmployees(
+            String keyword, EmploymentStatus status, String workTypeCode, int offset, int limit) {
+        return jdbc.sql(SELECT_EMPLOYEE + """
+                        WHERE (:keyword = '' OR name LIKE CONCAT('%', :keyword, '%')
+                               OR employee_no LIKE CONCAT('%', :keyword, '%')
+                               OR phone LIKE CONCAT('%', :keyword, '%'))
+                          AND (:status = '' OR employment_status = :status)
+                          AND (:workType = '' OR EXISTS (
+                              SELECT 1 FROM workforce_qualifications q
+                              WHERE q.employee_business_id = workforce_employees.employee_business_id
+                                AND q.work_type_code = :workType
+                                AND q.status = 'ACTIVE'))
+                        ORDER BY employee_no
+                        LIMIT :limit OFFSET :offset
+                        """)
+                .param("keyword", keyword == null ? "" : keyword.strip())
+                .param("status", status == null ? "" : status.name())
+                .param("workType", workTypeCode == null ? "" : workTypeCode)
+                .param("limit", limit)
+                .param("offset", offset)
+                .query(JdbcWorkforceRepository::mapEmployee)
+                .list();
+    }
+
+    @Override
     public void insertEmployee(EmployeeRecord record, String operatorId) {
         jdbc.sql("""
                         INSERT INTO workforce_employees (
@@ -238,6 +263,23 @@ public class JdbcWorkforceRepository implements WorkforceRepository {
     @Override
     public List<TeamRecord> listTeams() {
         return jdbc.sql(SELECT_TEAM + " ORDER BY team_no").query(JdbcWorkforceRepository::mapTeam).list();
+    }
+
+    @Override
+    public List<TeamRecord> searchTeams(String keyword, TeamStatus status, int offset, int limit) {
+        return jdbc.sql(SELECT_TEAM + """
+                        WHERE (:keyword = '' OR name LIKE CONCAT('%', :keyword, '%')
+                               OR team_no LIKE CONCAT('%', :keyword, '%'))
+                          AND (:status = '' OR status = :status)
+                        ORDER BY team_no
+                        LIMIT :limit OFFSET :offset
+                        """)
+                .param("keyword", keyword == null ? "" : keyword.strip())
+                .param("status", status == null ? "" : status.name())
+                .param("limit", limit)
+                .param("offset", offset)
+                .query(JdbcWorkforceRepository::mapTeam)
+                .list();
     }
 
     @Override

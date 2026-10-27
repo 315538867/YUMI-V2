@@ -34,10 +34,12 @@ test('新订单确认、收款与刷新恢复使用真实接口', async ({ page 
   await expect(page.locator('.order-detail h1')).toHaveText(orderNo)
 
   await page.goto('/orders')
-  await page.getByPlaceholder('订单号或客户').fill(orderNo)
+  await page.getByPlaceholder('订单号、客户或商品').fill(orderNo)
   await page.getByRole('button', { name: '查询' }).click()
   await expect(page.getByRole('cell', { name: orderNo })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: '净收款' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '客户' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '商品' })).toBeVisible()
 })
 
 test('新建订单支持多明细并在详情五页签展示', async ({ page }) => {
@@ -77,7 +79,7 @@ test('列表筛选与每页条数写入 URL 并在刷新后恢复', async ({ pag
   await login(page)
   await page.goto('/orders?keyword=不存在的订单&status=COMPLETED')
 
-  const keyword = page.getByPlaceholder('订单号或客户')
+  const keyword = page.getByPlaceholder('订单号、客户或商品')
   await expect(keyword).toHaveValue('不存在的订单')
   await expect(page.getByText('没有匹配的订单')).toBeVisible()
 

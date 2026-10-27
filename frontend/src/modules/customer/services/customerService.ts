@@ -24,6 +24,10 @@ export const customerService = {
     return api.query<CustomerView[]>(`/api/customers${query({ keyword, status, page, size })}`)
   },
 
+  activeCount(): Promise<number> {
+    return api.query<number>('/api/customers/active-count')
+  },
+
   get(customerBusinessId: string): Promise<CustomerView> {
     return api.query<CustomerView>(`/api/customers/${encodeURIComponent(customerBusinessId)}`)
   },

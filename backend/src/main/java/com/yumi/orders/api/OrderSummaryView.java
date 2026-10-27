@@ -11,6 +11,8 @@ public record OrderSummaryView(
         OrderOrigin origin,
         OrderStatus status,
         String customerBusinessId,
+        String customerName,
+        String productNames,
         LocalDate orderDate,
         LocalDate expectedDeliveryDate,
         SettlementMoney currentReceivable,

@@ -40,7 +40,7 @@ void load()
     <div class="toolbar">
       <el-input
         v-model="filters.keyword"
-        placeholder="订单号或客户"
+        placeholder="订单号、客户或商品"
         clearable
         class="keyword"
         @keyup.enter="search"
@@ -69,6 +69,8 @@ void load()
     <PageState :loading="loading" :error="errorText" @retry="load">
       <el-table :data="rows" empty-text="没有匹配的订单" border>
         <el-table-column prop="orderNo" label="订单号" width="150" />
+        <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="productNames" label="商品" min-width="160" show-overflow-tooltip />
         <el-table-column label="来源" width="150">
           <template #default="{ row }"
             ><CodeTag category="order.origin" :code="row.origin"

@@ -205,6 +205,12 @@ public class CustomerService implements CustomerApplicationService, CustomerQuer
     }
 
     @Override
+    public long countActive() {
+        authorization.require(PermissionCodes.CUSTOMER_READ, ResourceScope.GLOBAL);
+        return customers.count("", CustomerStatus.ACTIVE);
+    }
+
+    @Override
     public List<CustomerView> search(String keyword, CustomerStatus status, int page, int size) {
         authorization.require(PermissionCodes.CUSTOMER_READ, ResourceScope.GLOBAL);
         int safePage = Math.max(1, page);

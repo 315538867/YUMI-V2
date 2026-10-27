@@ -136,8 +136,11 @@ onMounted(() => {
         <template #header>
           <div class="order-head">
             <div>
-              <strong>订单 {{ group.orderBusinessId }}</strong>
-              <span class="meta">· {{ group.items.length }} 个订单项</span>
+              <strong>订单 {{ group.items[0]?.orderNo || group.orderBusinessId }}</strong>
+              <span class="meta">
+                · {{ group.items[0]?.productNames || '未关联商品' }} ·
+                {{ group.items.length }} 个订单项
+              </span>
             </div>
             <el-button link type="primary" @click="toggle(group.orderBusinessId)">
               {{ isExpanded(group.orderBusinessId) ? '收起链路' : '查看链路' }}

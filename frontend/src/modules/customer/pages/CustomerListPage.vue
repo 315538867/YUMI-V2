@@ -14,6 +14,7 @@ const router = useRouter()
 const rows = ref<CustomerView[]>([])
 const loading = ref(false)
 const errorText = ref('')
+const activeCount = ref<number | null>(null)
 const { filters, page, size, sizes, search, reset, goPage, changeSize } = useListQuery(
   { keyword: '', status: '' as CustomerStatus | '' },
   { onSearch: () => void load() },
@@ -23,7 +24,12 @@ async function load(): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    rows.value = await customerService.list(filters.keyword, filters.status, page.value, size.value)
+    const [list, count] = await Promise.all([
+      customerService.list(filters.keyword, filters.status, page.value, size.value),
+      customerService.activeCount(),
+    ])
+    rows.value = list
+    activeCount.value = count
   } catch (error) {
     errorText.value = userMessageOf(error, '客户列表加载失败')
   } finally {
@@ -36,7 +42,10 @@ void load()
 
 <template>
   <section class="customer-list">
-    <h1>客户</h1>
+    <div class="head">
+      <h1>客户</h1>
+      <span class="meta">启用客户 {{ activeCount ?? '—' }}</span>
+    </div>
     <div class="toolbar">
       <el-input
         v-model="filters.keyword"
@@ -129,6 +138,18 @@ void load()
 
 .status {
   width: 130px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.meta {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .alert {

@@ -9,11 +9,13 @@ import com.yumi.workforce.api.ChangeQualificationCommand;
 import com.yumi.workforce.api.CreateTeamCommand;
 import com.yumi.workforce.api.DeactivateTeamCommand;
 import com.yumi.workforce.api.EmployeeRef;
+import com.yumi.workforce.api.EmploymentStatus;
 import com.yumi.workforce.api.EmployeeView;
 import com.yumi.workforce.api.HireEmployeeCommand;
 import com.yumi.workforce.api.LeaveEmployeeCommand;
 import com.yumi.workforce.api.RehireEmployeeCommand;
 import com.yumi.workforce.api.TeamRef;
+import com.yumi.workforce.api.TeamStatus;
 import com.yumi.workforce.api.TeamView;
 import com.yumi.workforce.api.UpdateEmployeeCommand;
 import com.yumi.workforce.api.UpdateTeamCommand;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -184,8 +187,17 @@ public class WorkforceController {
     }
 
     @GetMapping("/employees")
-    public List<EmployeeView> listEmployees() {
-        return workforce.listEmployees();
+    public List<EmployeeView> listEmployees(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) EmploymentStatus status,
+            @RequestParam(required = false) String workTypeCode,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            return workforce.listEmployees();
+        }
+        return workforce.searchEmployees(keyword, status, workTypeCode,
+                page == null ? 1 : page, size == null ? 20 : size);
     }
 
     @GetMapping("/employees/{employeeBusinessId}")
@@ -253,8 +265,16 @@ public class WorkforceController {
     }
 
     @GetMapping("/teams")
-    public List<TeamView> listTeams() {
-        return workforce.listTeams();
+    public List<TeamView> listTeams(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) TeamStatus status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            return workforce.listTeams();
+        }
+        return workforce.searchTeams(keyword, status,
+                page == null ? 1 : page, size == null ? 20 : size);
     }
 
     @GetMapping("/teams/{teamBusinessId}")

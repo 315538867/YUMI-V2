@@ -71,7 +71,10 @@ public class ProductionTraceServiceImpl implements ProductionQuery, ProductionRe
         for (DemandRecord demand : demands) {
             tracesOfDemand.add(traceOfDemand(demand));
         }
-        return new OrderProductionTrace(orderBusinessId, orderItemBusinessId, tracesOfDemand);
+        var header = traces.findTraceHeader(orderItemBusinessId)
+                .orElse(new TraceRepository.TraceHeader(orderBusinessId, ""));
+        return new OrderProductionTrace(orderBusinessId, header.orderNo(), orderItemBusinessId,
+                header.productNames(), tracesOfDemand);
     }
 
     @Override

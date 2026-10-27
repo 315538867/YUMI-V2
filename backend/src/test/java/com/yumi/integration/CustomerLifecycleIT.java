@@ -213,6 +213,7 @@ class CustomerLifecycleIT extends AbstractMySqlIntegrationTest {
         List<CustomerView> active = customerQuery.search("示例", CustomerStatus.ACTIVE, 1, 10);
         assertThat(active).hasSize(2);
         assertThat(active).allMatch(view -> view.status() == CustomerStatus.ACTIVE);
+        assertThat(customerQuery.countActive()).isEqualTo(2);
 
         List<CustomerView> firstPage = customerQuery.search(null, null, 1, 2);
         List<CustomerView> secondPage = customerQuery.search(null, null, 2, 2);

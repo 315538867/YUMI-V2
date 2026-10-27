@@ -184,6 +184,15 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
         assertThat(view.members()).extracting(TeamView.TeamMemberView::employeeBusinessId).isSorted();
         assertThat(view.efficiencyFactor()).isEqualByComparingTo("1.3");
         assertThat(view.members()).allMatch(member -> member.employmentStatus() == EmploymentStatus.EMPLOYED);
+        assertThat(workforce.searchTeams("三人", TeamStatus.ACTIVE, 1, 10))
+                .singleElement()
+                .satisfies(teamView -> assertThat(teamView.teamBusinessId())
+                        .isEqualTo(team.teamBusinessId()));
+        assertThat(workforce.searchEmployees("李四", EmploymentStatus.EMPLOYED, "", 1, 10))
+                .singleElement()
+                .satisfies(employeeView -> assertThat(employeeView.name()).isEqualTo("李四"));
+        assertThat(workforce.searchEmployees("", EmploymentStatus.EMPLOYED, "", 1, 2))
+                .hasSize(2);
     }
 
     @Test

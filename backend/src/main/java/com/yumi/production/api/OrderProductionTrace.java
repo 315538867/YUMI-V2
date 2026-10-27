@@ -12,7 +12,9 @@ import java.util.List;
  */
 public record OrderProductionTrace(
         String orderBusinessId,
+        String orderNo,
         String orderItemBusinessId,
+        String productNames,
         List<DemandTrace> demands) {
 
     public OrderProductionTrace {

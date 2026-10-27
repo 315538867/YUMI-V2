@@ -431,6 +431,17 @@ public class WorkforceCommandService
     }
 
     @Override
+    public List<EmployeeView> searchEmployees(
+            String keyword, EmploymentStatus status, String workTypeCode, int page, int size) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        int safePage = Math.max(1, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+        return repository.searchEmployees(keyword, status, workTypeCode,
+                        (safePage - 1) * safeSize, safeSize)
+                .stream().map(this::toView).toList();
+    }
+
+    @Override
     public EmployeeView getEmployee(String employeeBusinessId) {
         authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
         return toView(requireEmployee(employeeBusinessId));
@@ -440,6 +451,16 @@ public class WorkforceCommandService
     public List<TeamView> listTeams() {
         authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
         return repository.listTeams().stream().map(this::toView).toList();
+    }
+
+    @Override
+    public List<TeamView> searchTeams(
+            String keyword, TeamStatus status, int page, int size) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        int safePage = Math.max(1, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+        return repository.searchTeams(keyword, status, (safePage - 1) * safeSize, safeSize)
+                .stream().map(this::toView).toList();
     }
 
     @Override

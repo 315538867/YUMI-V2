@@ -127,6 +127,11 @@ public class CustomerController {
         return customerQuery.getCurrent(customerBusinessId);
     }
 
+    @GetMapping("/active-count")
+    public long activeCount() {
+        return customerQuery.countActive();
+    }
+
     @GetMapping
     public List<CustomerView> search(
             @RequestParam(required = false) String keyword,

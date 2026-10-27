@@ -25,6 +25,8 @@ test('员工详情、资格、整页编辑与离职返聘使用真实接口', as
 
   await login(page)
   await page.goto('/workforce/employees')
+  await page.getByLabel('姓名、编号或电话').fill(name)
+  await page.getByRole('button', { name: '查询' }).click()
   const row = page.locator('.el-table__row').filter({ hasText: name })
   await expect(row).toBeVisible()
   await row.getByRole('button', { name: '查看' }).click()

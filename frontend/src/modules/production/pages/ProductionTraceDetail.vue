@@ -45,7 +45,10 @@ onMounted(loadOffline)
 
 <template>
   <div class="trace-detail">
-    <p class="meta">订单项 {{ trace.orderItemBusinessId }}</p>
+    <p class="meta">
+      订单项 {{ trace.orderItemBusinessId }}
+      <template v-if="trace.productNames">· {{ trace.productNames }}</template>
+    </p>
     <el-alert
       v-if="offlineError"
       type="error"

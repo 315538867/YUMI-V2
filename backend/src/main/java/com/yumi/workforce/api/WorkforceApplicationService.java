@@ -33,9 +33,16 @@ public interface WorkforceApplicationService {
 
     List<EmployeeView> listEmployees();
 
+    List<EmployeeView> searchEmployees(
+            String keyword, com.yumi.workforce.api.EmploymentStatus status, String workTypeCode,
+            int page, int size);
+
     EmployeeView getEmployee(String employeeBusinessId);
 
     List<TeamView> listTeams();
+
+    List<TeamView> searchTeams(
+            String keyword, com.yumi.workforce.api.TeamStatus status, int page, int size);
 
     TeamView getTeam(String teamBusinessId);
 }

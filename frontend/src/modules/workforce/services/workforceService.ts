@@ -3,6 +3,8 @@ import { newIdempotencyKey } from '@/platform/services/idempotency'
 import type {
   AssignmentSubjectCurrentView,
   EmployeeView,
+  EmploymentStatus,
+  TeamStatus,
   TeamView,
   WorkforceStandardView,
 } from '@/modules/workforce/contracts'
@@ -10,6 +12,26 @@ import type {
 export const workforceService = {
   employees(): Promise<EmployeeView[]> {
     return api.query<EmployeeView[]>('/api/workforce/employees')
+  },
+
+  searchEmployees(
+    keyword: string,
+    status: EmploymentStatus | '',
+    workTypeCode: string,
+    page = 1,
+    size = 20,
+  ): Promise<EmployeeView[]> {
+    const search = new URLSearchParams({ page: String(page), size: String(size) })
+    if (keyword.trim() !== '') {
+      search.set('keyword', keyword.trim())
+    }
+    if (status !== '') {
+      search.set('status', status)
+    }
+    if (workTypeCode !== '') {
+      search.set('workTypeCode', workTypeCode)
+    }
+    return api.query<EmployeeView[]>(`/api/workforce/employees?${search.toString()}`)
   },
 
   employee(employeeBusinessId: string): Promise<EmployeeView> {
@@ -20,6 +42,17 @@ export const workforceService = {
 
   teams(): Promise<TeamView[]> {
     return api.query<TeamView[]>('/api/workforce/teams')
+  },
+
+  searchTeams(keyword: string, status: TeamStatus | '', page = 1, size = 20): Promise<TeamView[]> {
+    const search = new URLSearchParams({ page: String(page), size: String(size) })
+    if (keyword.trim() !== '') {
+      search.set('keyword', keyword.trim())
+    }
+    if (status !== '') {
+      search.set('status', status)
+    }
+    return api.query<TeamView[]>(`/api/workforce/teams?${search.toString()}`)
   },
 
   team(teamBusinessId: string): Promise<TeamView> {

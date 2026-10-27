@@ -42,7 +42,10 @@ class OrderWorkspaceQueryIT extends AbstractOrderFixtureTest {
         assertThat(view.events()).anyMatch(event -> "COMPLETION".equals(event.kind()));
 
         var summaries = asAdmin(() -> orderQuery.search(order.orderNo(), null, 1, 10));
-        assertThat(summaries).singleElement().satisfies(summary ->
-                assertThat(summary.netReceipts().value()).isEqualByComparingTo("176.00"));
+        assertThat(summaries).singleElement().satisfies(summary -> {
+            assertThat(summary.netReceipts().value()).isEqualByComparingTo("176.00");
+            assertThat(summary.customerName()).isNotBlank();
+            assertThat(summary.productNames()).isNotBlank();
+        });
     }
 }

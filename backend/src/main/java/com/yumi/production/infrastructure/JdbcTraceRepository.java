@@ -87,6 +87,25 @@ public class JdbcTraceRepository implements TraceRepository {
     }
 
     @Override
+    public Optional<TraceHeader> findTraceHeader(String orderItemBusinessId) {
+        return jdbc.sql("""
+                        SELECT o.order_no,
+                               COALESCE(GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.name SEPARATOR '、'),
+                                        '') AS product_names
+                        FROM orders_items oi
+                        JOIN orders_orders o ON o.order_business_id = oi.order_business_id
+                        LEFT JOIN product_products pp
+                               ON pp.product_business_id = oi.product_business_id
+                        WHERE oi.order_item_business_id = :id
+                        GROUP BY o.order_no
+                        """)
+                .param("id", orderItemBusinessId)
+                .query((resultSet, rowNumber) -> new TraceHeader(
+                        resultSet.getString("order_no"), resultSet.getString("product_names")))
+                .optional();
+    }
+
+    @Override
     public List<OverviewDemandRow> overviewDemands() {
         return jdbc.sql("""
                         SELECT d.demand_business_id, d.order_business_id, d.target_process,

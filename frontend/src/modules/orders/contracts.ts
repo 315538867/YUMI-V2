@@ -27,6 +27,8 @@ export interface OrderSummaryView {
   origin: OrderOrigin
   status: OrderStatus
   customerBusinessId: string
+  customerName: string
+  productNames: string
   orderDate: string
   expectedDeliveryDate: string
   currentReceivable: MoneyWire

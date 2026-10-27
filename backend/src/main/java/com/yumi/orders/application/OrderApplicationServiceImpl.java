@@ -223,19 +223,22 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
             throw new ApiException(
                     ApiErrorType.VALIDATION, "ORDER_PAGE_INVALID", "分页参数不合法");
         }
-        return orders.searchOrders(
+        return orders.searchOrderSummaries(
                         keyword == null ? "" : keyword.strip(),
                         status == null ? null : status.name(), (page - 1) * size, size)
                 .stream()
-                .map(record -> new OrderSummaryView(
-                        record.orderBusinessId(), record.orderNo(),
-                        OrderOrigin.valueOf(record.origin()), OrderStatus.valueOf(record.status()),
-                        record.customerBusinessId(), record.orderDate(),
-                        record.expectedDeliveryDate(),
-                        SettlementMoney.of(record.currentReceivableAmount(), CurrencyCode.CNY),
-                        SettlementMoney.of(record.netReceipts(), CurrencyCode.CNY),
-                        record.deliveryFulfilled(), record.paymentFulfilled(),
-                        record.contentVersion(), record.updatedAt()))
+                .map(summary -> {
+                    var record = summary.order();
+                    return new OrderSummaryView(
+                            record.orderBusinessId(), record.orderNo(),
+                            OrderOrigin.valueOf(record.origin()), OrderStatus.valueOf(record.status()),
+                            record.customerBusinessId(), summary.customerName(), summary.productNames(),
+                            record.orderDate(), record.expectedDeliveryDate(),
+                            SettlementMoney.of(record.currentReceivableAmount(), CurrencyCode.CNY),
+                            SettlementMoney.of(record.netReceipts(), CurrencyCode.CNY),
+                            record.deliveryFulfilled(), record.paymentFulfilled(),
+                            record.contentVersion(), record.updatedAt());
+                })
                 .toList();
     }
 

@@ -1033,6 +1033,55 @@ public class JdbcOrderRepository implements OrderRepository {
     }
 
     @Override
+    public List<OrderSummaryRecord> searchOrderSummaries(
+            String keyword, String status, int offset, int limit) {
+        return jdbc.sql("""
+                        SELECT o.order_business_id, o.order_no, o.origin, o.customer_business_id,
+                               o.customer_snapshot_ref, o.order_date, o.expected_delivery_date,
+                               o.order_note, o.status, o.current_receivable_amount,
+                               COALESCE(p.received_amount, 0) - COALESCE(p.refunded_amount, 0)
+                                   AS net_receipts,
+                               o.currency_code, o.delivery_fulfilled, o.payment_fulfilled,
+                               o.content_version, o.row_version, o.created_at, o.created_by,
+                               o.updated_at,
+                               COALESCE(c.name, '') AS customer_name,
+                               COALESCE((
+                                   SELECT GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.name SEPARATOR '、')
+                                   FROM orders_items oi
+                                   JOIN product_products pp
+                                     ON pp.product_business_id = oi.product_business_id
+                                   WHERE oi.order_business_id = o.order_business_id
+                               ), '') AS product_names
+                        FROM orders_orders o
+                        LEFT JOIN orders_fulfillment_projections p
+                               ON p.order_business_id = o.order_business_id
+                        LEFT JOIN customer_customers c
+                               ON c.customer_business_id = o.customer_business_id
+                        WHERE (:keyword = '' OR o.order_no LIKE CONCAT('%', :keyword, '%')
+                               OR c.name LIKE CONCAT('%', :keyword, '%')
+                               OR EXISTS (
+                                   SELECT 1 FROM orders_items oi2
+                                   JOIN product_products pp2
+                                     ON pp2.product_business_id = oi2.product_business_id
+                                   WHERE oi2.order_business_id = o.order_business_id
+                                     AND pp2.name LIKE CONCAT('%', :keyword, '%')
+                               ))
+                          AND (:status = '' OR o.status = :status)
+                        ORDER BY o.created_at DESC, o.order_business_id DESC
+                        LIMIT :limit OFFSET :offset
+                        """)
+                .param("keyword", keyword == null ? "" : keyword)
+                .param("status", status == null ? "" : status)
+                .param("limit", limit)
+                .param("offset", offset)
+                .query((resultSet, rowNumber) -> new OrderSummaryRecord(
+                        mapOrder(resultSet, rowNumber),
+                        resultSet.getString("customer_name"),
+                        resultSet.getString("product_names")))
+                .list();
+    }
+
+    @Override
     public List<OrderRecord> findOrdersChangedAfter(
             Instant updatedAfter, String afterOrderBusinessId, int limit) {
         return jdbc.sql("""

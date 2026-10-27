@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import type { EmployeeView } from '@/modules/workforce/contracts'
+import { useListQuery } from '@/platform/composables/useListQuery'
+import { codeLabel, codesOf } from '@/platform/display/codeCatalog'
+import type { EmployeeView, EmploymentStatus } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPager from '@/shared/components/ListPager.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
@@ -12,12 +15,23 @@ const router = useRouter()
 const employees = ref<EmployeeView[]>([])
 const loading = ref(false)
 const errorText = ref('')
+const workTypeOptions = codesOf('workforce.workType')
+const { filters, page, size, sizes, search, reset, goPage, changeSize } = useListQuery(
+  { keyword: '', status: '' as EmploymentStatus | '', workType: '' },
+  { onSearch: () => void load() },
+)
 
 async function load(): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    employees.value = await workforceService.employees()
+    employees.value = await workforceService.searchEmployees(
+      filters.keyword,
+      filters.status,
+      filters.workType,
+      page.value,
+      size.value,
+    )
   } catch (error) {
     errorText.value = userMessageOf(error, '员工列表加载失败')
   } finally {
@@ -25,12 +39,12 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(load)
+void load()
 </script>
 
 <template>
   <section class="employee-page">
-    <div class="toolbar">
+    <div class="head">
       <h1>员工与资格</h1>
       <PermissionButton
         permission="workforce.employee.manage"
@@ -40,8 +54,32 @@ onMounted(load)
         新增员工
       </PermissionButton>
     </div>
+    <div class="toolbar">
+      <el-input
+        v-model="filters.keyword"
+        placeholder="姓名、编号或电话"
+        clearable
+        class="keyword"
+        aria-label="姓名、编号或电话"
+        @keyup.enter="search"
+      />
+      <el-select v-model="filters.status" placeholder="全部状态" clearable aria-label="在职状态">
+        <el-option label="在职" value="EMPLOYED" />
+        <el-option label="离职" value="LEFT" />
+      </el-select>
+      <el-select v-model="filters.workType" placeholder="全部工种" clearable aria-label="工种资格">
+        <el-option
+          v-for="code in workTypeOptions"
+          :key="code"
+          :label="codeLabel('workforce.workType', code)"
+          :value="code"
+        />
+      </el-select>
+      <el-button type="primary" @click="search">查询</el-button>
+      <el-button @click="reset">重置</el-button>
+    </div>
     <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-table :data="employees" empty-text="暂无员工" border>
+      <el-table :data="employees" empty-text="没有匹配的员工" border>
         <el-table-column prop="employeeNo" label="员工编号" width="130" />
         <el-table-column prop="name" label="姓名" width="130" />
         <el-table-column prop="phone" label="电话" width="150" />
@@ -74,6 +112,14 @@ onMounted(load)
           </template>
         </el-table-column>
       </el-table>
+      <ListPager
+        :page="page"
+        :size="size"
+        :count="employees.length"
+        :sizes="sizes"
+        @update:page="goPage"
+        @update:size="changeSize"
+      />
     </PageState>
   </section>
 </template>
@@ -86,11 +132,23 @@ onMounted(load)
   padding: 16px;
 }
 
-.toolbar {
+.head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.keyword {
+  width: 220px;
 }
 
 h1 {

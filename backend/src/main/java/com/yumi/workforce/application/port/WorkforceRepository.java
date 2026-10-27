@@ -2,6 +2,7 @@ package com.yumi.workforce.application.port;
 
 import com.yumi.workforce.api.EmploymentStatus;
 import com.yumi.workforce.api.QualificationStatus;
+import com.yumi.workforce.api.TeamStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -15,6 +16,9 @@ public interface WorkforceRepository {
     Optional<EmployeeRecord> findEmployeeByNo(String employeeNo);
 
     List<EmployeeRecord> listEmployees(EmploymentStatus status);
+
+    List<EmployeeRecord> searchEmployees(
+            String keyword, EmploymentStatus status, String workTypeCode, int offset, int limit);
 
     void insertEmployee(EmployeeRecord record, String operatorId);
 
@@ -51,6 +55,8 @@ public interface WorkforceRepository {
     Optional<TeamRecord> findTeam(String teamBusinessId);
 
     List<TeamRecord> listTeams();
+
+    List<TeamRecord> searchTeams(String keyword, TeamStatus status, int offset, int limit);
 
     void insertTeam(TeamRecord record, String operatorId);
 

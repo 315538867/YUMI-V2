@@ -88,6 +88,8 @@ class ProductionTraceIT extends AbstractProductionFixtureTest {
 
         var trace = asAdmin(() -> productionQuery.traceOfOrderItem("ORD-TR-1"));
         assertThat(trace.orderBusinessId()).isEqualTo("ORD-ORD-TR-1");
+        assertThat(trace.orderNo()).isNotBlank();
+        assertThat(trace.productNames()).isNotNull();
         assertThat(trace.demands()).hasSize(1);
         var demandTrace = trace.demands().getFirst();
 

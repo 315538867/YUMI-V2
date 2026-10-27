@@ -130,7 +130,9 @@ export interface CorrectionFeedItem {
 
 export interface OrderProductionTrace {
   orderBusinessId: string
+  orderNo: string
   orderItemBusinessId: string
+  productNames: string
   demands: Array<{
     demandBusinessId: string
     demandType: CodeOf<'production.demandType'>
