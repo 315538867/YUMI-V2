@@ -12,8 +12,18 @@ export const workforceService = {
     return api.query<EmployeeView[]>('/api/workforce/employees')
   },
 
+  employee(employeeBusinessId: string): Promise<EmployeeView> {
+    return api.query<EmployeeView>(
+      `/api/workforce/employees/${encodeURIComponent(employeeBusinessId)}`,
+    )
+  },
+
   teams(): Promise<TeamView[]> {
     return api.query<TeamView[]>('/api/workforce/teams')
+  },
+
+  team(teamBusinessId: string): Promise<TeamView> {
+    return api.query<TeamView>(`/api/workforce/teams/${encodeURIComponent(teamBusinessId)}`)
   },
 
   hire(input: { name: string; phone: string; effectiveDate: string }): Promise<EmployeeView> {

@@ -84,7 +84,7 @@ onMounted(load)
   <section class="customer-editor">
     <h1>编辑客户</h1>
     <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-form label-width="96px" class="form" @submit.prevent>
+      <el-form v-if="!loading" label-width="96px" class="form" @submit.prevent>
         <el-alert
           v-if="formError"
           type="error"

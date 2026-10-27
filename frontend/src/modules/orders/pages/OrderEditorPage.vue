@@ -266,7 +266,7 @@ onMounted(load)
     </header>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
 
-    <el-form label-width="110px" class="form">
+    <el-form v-if="!loading" label-width="110px" class="form">
       <h2>1. 客户与交付</h2>
       <el-form-item label="客户">
         <el-select v-model="form.customerBusinessId" filterable @change="applyCustomer">

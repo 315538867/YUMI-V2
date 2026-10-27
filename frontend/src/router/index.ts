@@ -138,10 +138,38 @@ export const routes: RouteRecordRaw[] = [
             meta: { requiresAuth: true, title: '员工与资格', permission: 'workforce.read' },
           },
           {
+            path: 'employees/:employeeBusinessId',
+            name: 'workforce-employee-detail',
+            component: () => import('@/modules/workforce/pages/EmployeeDetailPage.vue'),
+            meta: { requiresAuth: true, title: '员工详情', permission: 'workforce.read' },
+          },
+          {
+            path: 'employees/:employeeBusinessId/edit',
+            name: 'workforce-employee-edit',
+            component: () => import('@/modules/workforce/pages/EmployeeEditorPage.vue'),
+            meta: {
+              requiresAuth: true,
+              title: '编辑员工',
+              permission: 'workforce.employee.manage',
+            },
+          },
+          {
             path: 'teams',
             name: 'workforce-teams',
             component: () => import('@/modules/workforce/pages/TeamPage.vue'),
             meta: { requiresAuth: true, title: '小组', permission: 'workforce.read' },
+          },
+          {
+            path: 'teams/:teamBusinessId',
+            name: 'workforce-team-detail',
+            component: () => import('@/modules/workforce/pages/TeamDetailPage.vue'),
+            meta: { requiresAuth: true, title: '小组详情', permission: 'workforce.read' },
+          },
+          {
+            path: 'teams/:teamBusinessId/edit',
+            name: 'workforce-team-edit',
+            component: () => import('@/modules/workforce/pages/TeamEditorPage.vue'),
+            meta: { requiresAuth: true, title: '编辑小组', permission: 'workforce.team.manage' },
           },
           {
             path: 'standards',

@@ -245,7 +245,7 @@ onMounted(load)
     </header>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
 
-    <el-form label-width="128px" class="form">
+    <el-form v-if="!loading" label-width="128px" class="form">
       <h2>1. 基本信息</h2>
       <el-form-item label="商品名称" required>
         <el-input v-model="form.name" />
