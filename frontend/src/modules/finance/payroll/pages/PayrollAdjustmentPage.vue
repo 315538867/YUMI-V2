@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { computed, reactive } from 'vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 
-const errorText = ref('')
-const successText = ref('')
+const validationErrors = reactive<Record<string, string>>({})
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
+const formAlert = computed(() =>
+  otherFieldErrors('resultBusinessId', 'amountDelta', 'reasonText', 'referenceRunBusinessId').join(
+    '；',
+  ),
+)
 const form = reactive({
   resultBusinessId: '',
   amountDelta: '',
@@ -13,24 +17,40 @@ const form = reactive({
   referenceRunBusinessId: '',
 })
 
+function validate(): boolean {
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
+  }
+  if (form.resultBusinessId.trim() === '') {
+    validationErrors.resultBusinessId = '请填写工资结果'
+  }
+  if (!/^-?\d+(\.\d{1,2})?$/.test(form.amountDelta) || Number(form.amountDelta) === 0) {
+    validationErrors.amountDelta = '差额必须为非 0 且最多两位小数'
+  }
+  if (form.reasonText.trim() === '') {
+    validationErrors.reasonText = '请填写调整原因'
+  }
+  return Object.keys(validationErrors).length === 0
+}
+
 async function submit(): Promise<void> {
-  if (form.resultBusinessId.trim() === '' || form.reasonText.trim() === '') {
-    errorText.value = '请填写工资结果与调整原因'
+  if (!validate()) {
     return
   }
-  try {
-    await payrollService.adjust({
-      resultBusinessId: form.resultBusinessId.trim(),
-      amountDelta: form.amountDelta,
-      reasonText: form.reasonText,
-      referenceRunBusinessId:
-        form.referenceRunBusinessId.trim() === '' ? null : form.referenceRunBusinessId.trim(),
-    })
-    successText.value = '人工差额已追加；不产生第二笔现金'
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资调整失败')
-  }
+  await run(
+    () =>
+      payrollService.adjust({
+        resultBusinessId: form.resultBusinessId.trim(),
+        amountDelta: form.amountDelta,
+        reasonText: form.reasonText,
+        referenceRunBusinessId:
+          form.referenceRunBusinessId.trim() === '' ? null : form.referenceRunBusinessId.trim(),
+      }),
+    {
+      success: '人工差额已追加；不产生第二笔现金',
+      fallback: '工资调整失败',
+    },
+  )
 }
 </script>
 
@@ -43,26 +63,24 @@ async function submit(): Promise<void> {
       title="调整只改变应付与人工成本，不改原核定金额，也不产生现金。"
       class="alert"
     />
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert
-      v-if="successText"
-      type="success"
-      :closable="false"
-      :title="successText"
-      class="alert"
-    />
     <el-form label-width="120px" class="form">
-      <el-form-item label="工资结果"><el-input v-model="form.resultBusinessId" /></el-form-item>
-      <el-form-item label="差额"
-        ><el-input v-model="form.amountDelta" placeholder="可带负号"
-      /></el-form-item>
-      <el-form-item label="原因"
-        ><el-input v-model="form.reasonText" type="textarea" :rows="2"
-      /></el-form-item>
-      <el-form-item label="复核运行（可选）"
-        ><el-input v-model="form.referenceRunBusinessId"
-      /></el-form-item>
-      <el-button type="primary" @click="submit">提交调整</el-button>
+      <el-alert v-if="formAlert" type="error" :closable="false" :title="formAlert" class="alert" />
+      <el-form-item
+        label="工资结果"
+        :error="validationErrors.resultBusinessId || fieldError('resultBusinessId')"
+      >
+        <el-input v-model="form.resultBusinessId" />
+      </el-form-item>
+      <el-form-item label="差额" :error="validationErrors.amountDelta || fieldError('amountDelta')">
+        <el-input v-model="form.amountDelta" placeholder="可带负号" />
+      </el-form-item>
+      <el-form-item label="原因" :error="validationErrors.reasonText || fieldError('reasonText')">
+        <el-input v-model="form.reasonText" type="textarea" :rows="2" />
+      </el-form-item>
+      <el-form-item label="复核运行（可选）" :error="fieldError('referenceRunBusinessId')">
+        <el-input v-model="form.referenceRunBusinessId" />
+      </el-form-item>
+      <el-button type="primary" :loading="saving" @click="submit">提交调整</el-button>
     </el-form>
   </section>
 </template>

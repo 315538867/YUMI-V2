@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type { CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
@@ -11,11 +13,15 @@ import { productService } from '@/modules/product/services/productService'
 import { orderService } from '@/modules/orders/services/orderService'
 
 const router = useRouter()
+const loading = ref(true)
 const customers = ref<CustomerView[]>([])
 const products = ref<ProductView[]>([])
 const schemes = ref<SchemeView[]>([])
-const saving = ref(false)
 const errorText = ref('')
+const conflictError = ref('')
+const validationErrors = reactive<Record<string, string>>({})
+const initialSnapshot = ref('')
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
 const form = reactive({
   customerBusinessId: '',
   originalOrderReference: '',
@@ -31,8 +37,30 @@ const form = reactive({
   recipientAddress: '',
   stageCode: 'NOT_STARTED',
 })
+const isDirty = computed(
+  () =>
+    loading.value !== true &&
+    initialSnapshot.value !== '' &&
+    JSON.stringify(form) !== initialSnapshot.value,
+)
+const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const formAlert = computed(
+  () =>
+    conflictError.value ||
+    otherFieldErrors(
+      'customerBusinessId',
+      'productBusinessId',
+      'schemeBusinessId',
+      'quantity',
+      'unitPrice',
+      'recipientName',
+      'recipientPhone',
+      'recipientAddress',
+    ).join('；'),
+)
 
 async function load(): Promise<void> {
+  loading.value = true
   try {
     ;[customers.value, products.value] = await Promise.all([
       customerService.list('', 'ACTIVE', 1, 100),
@@ -47,8 +75,11 @@ async function load(): Promise<void> {
     form.recipientName = customer?.contactName ?? ''
     form.recipientPhone = customer?.phone ?? ''
     form.recipientAddress = customer?.defaultAddress ?? ''
+    initialSnapshot.value = JSON.stringify(form)
   } catch (error) {
     errorText.value = userMessageOf(error, '接管录入数据加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -60,59 +91,95 @@ async function loadSchemes(): Promise<void> {
   form.unitPrice = schemes.value[0]?.salePrice.amount ?? '0.00'
 }
 
+function validate(): boolean {
+  conflictError.value = ''
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
+  }
+  if (form.customerBusinessId === '') {
+    validationErrors.customerBusinessId = '请选择客户'
+  }
+  if (form.productBusinessId === '') {
+    validationErrors.productBusinessId = '请选择商品'
+  }
+  if (form.schemeBusinessId === '') {
+    validationErrors.schemeBusinessId = '请选择方案'
+  }
+  if (!Number.isFinite(Number(form.quantity)) || Number(form.quantity) <= 0) {
+    validationErrors.quantity = '接管数量必须大于 0'
+  }
+  if (!/^\d+(\.\d{1,2})?$/.test(form.unitPrice) || Number(form.unitPrice) <= 0) {
+    validationErrors.unitPrice = '单件价格必须大于 0 且最多两位小数'
+  }
+  if (form.recipientName.trim() === '') {
+    validationErrors.recipientName = '请填写收货人'
+  }
+  if (form.recipientPhone.trim() === '') {
+    validationErrors.recipientPhone = '请填写电话'
+  }
+  if (form.recipientAddress.trim() === '') {
+    validationErrors.recipientAddress = '请填写地址'
+  }
+  return Object.keys(validationErrors).length === 0
+}
+
 async function save(): Promise<void> {
-  if (form.customerBusinessId === '' || form.schemeBusinessId === '') {
-    errorText.value = '请选择客户与方案'
+  if (!validate()) {
     return
   }
-  saving.value = true
-  errorText.value = ''
   try {
     const entry = await productService.orderEntry(form.schemeBusinessId)
-    const created = await orderService.intake({
-      customerBusinessId: form.customerBusinessId,
-      originalOrderReference: form.originalOrderReference,
-      orderDate: form.orderDate,
-      expectedDeliveryDate: form.expectedDeliveryDate,
-      note: form.note,
-      items: [
-        {
-          agreement: {
-            productBusinessId: form.productBusinessId,
-            schemeSnapshotRef: entry.ref,
-            targetProcess: 'SEAM_CUTTING',
-            quantity: Number(form.quantity),
-            unitPrice: money(form.unitPrice),
-            materialSources: {
-              glue: 'STUDIO',
-              colorPaste: 'STUDIO',
-              bag: 'STUDIO',
-              decoration: 'STUDIO',
-            },
-            recipient: {
-              customerName: form.recipientName,
-              phone: form.recipientPhone,
-              address: form.recipientAddress,
-            },
-          },
-          openingLines: [
+    await run(
+      () =>
+        orderService.intake({
+          customerBusinessId: form.customerBusinessId,
+          originalOrderReference: form.originalOrderReference,
+          orderDate: form.orderDate,
+          expectedDeliveryDate: form.expectedDeliveryDate,
+          note: form.note,
+          items: [
             {
-              stageCode: form.stageCode,
-              physicalDestination: null,
-              reworkProcessCode: null,
-              quantity: Number(form.quantity),
-              reasonText: null,
+              agreement: {
+                productBusinessId: form.productBusinessId,
+                schemeSnapshotRef: entry.ref,
+                targetProcess: 'SEAM_CUTTING',
+                quantity: Number(form.quantity),
+                unitPrice: money(form.unitPrice),
+                materialSources: {
+                  glue: 'STUDIO',
+                  colorPaste: 'STUDIO',
+                  bag: 'STUDIO',
+                  decoration: 'STUDIO',
+                },
+                recipient: {
+                  customerName: form.recipientName,
+                  phone: form.recipientPhone,
+                  address: form.recipientAddress,
+                },
+              },
+              openingLines: [
+                {
+                  stageCode: form.stageCode,
+                  physicalDestination: null,
+                  reworkProcessCode: null,
+                  quantity: Number(form.quantity),
+                  reasonText: null,
+                },
+              ],
             },
           ],
+        }),
+      {
+        success: '已有订单已接管',
+        fallback: '订单接管失败',
+        onSuccess: async (created) => {
+          allowLeave()
+          await router.replace(`/orders/${created.orderBusinessId}`)
         },
-      ],
-    })
-    ElMessage.success('已有订单已接管')
-    await router.replace(`/orders/${created.orderBusinessId}`)
+      },
+    )
   } catch (error) {
-    errorText.value = userMessageOf(error, '订单接管失败')
-  } finally {
-    saving.value = false
+    ElMessage.error(userMessageOf(error, '订单接管失败'))
   }
 }
 
@@ -120,7 +187,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="opening-page">
+  <section v-loading="loading" class="opening-page">
     <header class="head">
       <h1>已有订单接管</h1>
       <div>
@@ -136,7 +203,11 @@ onMounted(load)
       class="alert"
     />
     <el-form label-width="120px" class="form">
-      <el-form-item label="客户">
+      <el-alert v-if="formAlert" type="error" :closable="false" :title="formAlert" class="alert" />
+      <el-form-item
+        label="客户"
+        :error="validationErrors.customerBusinessId || fieldError('customerBusinessId')"
+      >
         <el-select v-model="form.customerBusinessId" filterable>
           <el-option
             v-for="customer in customers"
@@ -155,7 +226,10 @@ onMounted(load)
       <el-form-item label="预计交付"
         ><el-date-picker v-model="form.expectedDeliveryDate" type="date" value-format="YYYY-MM-DD"
       /></el-form-item>
-      <el-form-item label="商品">
+      <el-form-item
+        label="商品"
+        :error="validationErrors.productBusinessId || fieldError('productBusinessId')"
+      >
         <el-select v-model="form.productBusinessId" filterable @change="loadSchemes">
           <el-option
             v-for="product in products"
@@ -165,7 +239,10 @@ onMounted(load)
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="方案">
+      <el-form-item
+        label="方案"
+        :error="validationErrors.schemeBusinessId || fieldError('schemeBusinessId')"
+      >
         <el-select v-model="form.schemeBusinessId" filterable>
           <el-option
             v-for="scheme in schemes"
@@ -175,10 +252,12 @@ onMounted(load)
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="接管数量"
-        ><el-input v-model.number="form.quantity" type="number"
-      /></el-form-item>
-      <el-form-item label="单件价格"><el-input v-model="form.unitPrice" /></el-form-item>
+      <el-form-item label="接管数量" :error="validationErrors.quantity || fieldError('quantity')">
+        <el-input v-model.number="form.quantity" type="number" />
+      </el-form-item>
+      <el-form-item label="单件价格" :error="validationErrors.unitPrice || fieldError('unitPrice')">
+        <el-input v-model="form.unitPrice" />
+      </el-form-item>
       <el-form-item label="当前阶段">
         <el-select v-model="form.stageCode">
           <el-option label="未开始" value="NOT_STARTED" />
@@ -187,11 +266,15 @@ onMounted(load)
           <el-option label="缝边剪袋中" value="SEAM_CUTTING" />
         </el-select>
       </el-form-item>
-      <el-form-item label="收货人"><el-input v-model="form.recipientName" /></el-form-item>
-      <el-form-item label="电话"><el-input v-model="form.recipientPhone" /></el-form-item>
-      <el-form-item label="地址"
-        ><el-input v-model="form.recipientAddress" type="textarea" :rows="2"
-      /></el-form-item>
+      <el-form-item label="收货人" :error="validationErrors.recipientName">
+        <el-input v-model="form.recipientName" />
+      </el-form-item>
+      <el-form-item label="电话" :error="validationErrors.recipientPhone">
+        <el-input v-model="form.recipientPhone" />
+      </el-form-item>
+      <el-form-item label="地址" :error="validationErrors.recipientAddress">
+        <el-input v-model="form.recipientAddress" type="textarea" :rows="2" />
+      </el-form-item>
       <el-form-item label="接管说明"
         ><el-input v-model="form.note" type="textarea" :rows="2"
       /></el-form-item>
