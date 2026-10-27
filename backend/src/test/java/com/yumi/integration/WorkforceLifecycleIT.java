@@ -179,10 +179,7 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
                 "三人组", Set.of(third.employeeBusinessId(), first.employeeBusinessId(),
                         second.employeeBusinessId())));
 
-        TeamView view = workforce.listTeams().stream()
-                .filter(candidate -> candidate.teamBusinessId().equals(team.teamBusinessId()))
-                .findFirst()
-                .orElseThrow();
+        TeamView view = workforce.getTeam(team.teamBusinessId());
         assertThat(view.members()).hasSize(3);
         assertThat(view.members()).extracting(TeamView.TeamMemberView::employeeBusinessId).isSorted();
         assertThat(view.efficiencyFactor()).isEqualByComparingTo("1.3");
@@ -202,6 +199,22 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
     }
 
     @Test
+    @DisplayName("员工与小组详情按标识读取，不存在时返回明确错误")
+    void detailLookupUsesBusinessId() {
+        EmployeeRef hired = hire("详情员工");
+        assertThat(workforce.getEmployee(hired.employeeBusinessId()).name()).isEqualTo("详情员工");
+
+        assertThatThrownBy(() -> workforce.getEmployee("EMP-NOT-EXIST"))
+                .isInstanceOf(ApiException.class)
+                .satisfies(exception -> assertThat(((ApiException) exception).code())
+                        .isEqualTo("EMPLOYEE_NOT_FOUND"));
+        assertThatThrownBy(() -> workforce.getTeam("TEAM-NOT-EXIST"))
+                .isInstanceOf(ApiException.class)
+                .satisfies(exception -> assertThat(((ApiException) exception).code())
+                        .isEqualTo("WORKFORCE_TEAM_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("资格授予与撤销写入事实，可追溯")
     void qualificationChangesAreTraced() {
         EmployeeRef hired = hire("张三");
@@ -211,10 +224,7 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
         workforce.revokeWorkType(new ChangeQualificationCommand(
                 hired.employeeBusinessId(), "MAKING", LocalDate.parse("2026-10-10")));
 
-        EmployeeView view = workforce.listEmployees().stream()
-                .filter(employee -> employee.employeeBusinessId().equals(hired.employeeBusinessId()))
-                .findFirst()
-                .orElseThrow();
+        EmployeeView view = workforce.getEmployee(hired.employeeBusinessId());
         assertThat(view.qualifications()).singleElement().satisfies(qualification -> {
             assertThat(qualification.workTypeCode()).isEqualTo("MAKING");
             assertThat(qualification.status()).isEqualTo(QualificationStatus.REVOKED);

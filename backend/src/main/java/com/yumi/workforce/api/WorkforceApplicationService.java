@@ -33,5 +33,9 @@ public interface WorkforceApplicationService {
 
     List<EmployeeView> listEmployees();
 
+    EmployeeView getEmployee(String employeeBusinessId);
+
     List<TeamView> listTeams();
+
+    TeamView getTeam(String teamBusinessId);
 }

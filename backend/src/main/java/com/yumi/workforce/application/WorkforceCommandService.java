@@ -431,9 +431,21 @@ public class WorkforceCommandService
     }
 
     @Override
+    public EmployeeView getEmployee(String employeeBusinessId) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        return toView(requireEmployee(employeeBusinessId));
+    }
+
+    @Override
     public List<TeamView> listTeams() {
         authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
         return repository.listTeams().stream().map(this::toView).toList();
+    }
+
+    @Override
+    public TeamView getTeam(String teamBusinessId) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        return toView(requireTeam(teamBusinessId));
     }
 
     @Override

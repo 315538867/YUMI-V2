@@ -188,6 +188,11 @@ public class WorkforceController {
         return workforce.listEmployees();
     }
 
+    @GetMapping("/employees/{employeeBusinessId}")
+    public EmployeeView getEmployee(@PathVariable String employeeBusinessId) {
+        return workforce.getEmployee(employeeBusinessId);
+    }
+
     @PostMapping("/teams")
     public ResponseEntity<TeamView> createTeam(
             @RequestBody CreateTeamCommand request, HttpServletRequest servletRequest) {
@@ -252,6 +257,11 @@ public class WorkforceController {
         return workforce.listTeams();
     }
 
+    @GetMapping("/teams/{teamBusinessId}")
+    public TeamView getTeam(@PathVariable String teamBusinessId) {
+        return workforce.getTeam(teamBusinessId);
+    }
+
     private EmployeeView changeQualification(
             String scope,
             String employeeBusinessId,
@@ -278,18 +288,10 @@ public class WorkforceController {
     }
 
     private EmployeeView findEmployee(String employeeBusinessId) {
-        return workforce.listEmployees().stream()
-                .filter(employee -> employee.employeeBusinessId().equals(employeeBusinessId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "员工写入后无法读取：" + employeeBusinessId));
+        return workforce.getEmployee(employeeBusinessId);
     }
 
     private TeamView findTeam(String teamBusinessId) {
-        return workforce.listTeams().stream()
-                .filter(team -> team.teamBusinessId().equals(teamBusinessId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "小组写入后无法读取：" + teamBusinessId));
+        return workforce.getTeam(teamBusinessId);
     }
 }
