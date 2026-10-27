@@ -18,6 +18,13 @@ const BUSINESS_PAGES = [
   ['设置与账号', '/settings'],
 ] as const
 
+const FORM_PAGES = [
+  ['新建客户', '/customers/new'],
+  ['新增员工', '/workforce/employees/new'],
+  ['新增小组', '/workforce/teams/new'],
+  ['新增商品', '/products/new'],
+] as const
+
 function seriousViolations(results: Awaited<ReturnType<AxeBuilder['analyze']>>) {
   return results.violations.filter(
     (violation) => violation.impact === 'serious' || violation.impact === 'critical',
@@ -30,6 +37,22 @@ test.describe('无障碍门禁', () => {
     await expect(page.getByRole('button', { name: '登录' })).toBeVisible()
     const violations = seriousViolations(await new AxeBuilder({ page }).withTags(TAGS).analyze())
     expect(violations, JSON.stringify(violations, null, 2)).toEqual([])
+  })
+
+  test('新建表单无严重无障碍问题', async ({ page }) => {
+    await login(page)
+    const failures: string[] = []
+    for (const [name, path] of FORM_PAGES) {
+      await page.goto(path)
+      await expect(page.getByRole('heading', { name })).toBeVisible()
+      await page.waitForLoadState('networkidle')
+      const violations = seriousViolations(await new AxeBuilder({ page }).withTags(TAGS).analyze())
+      for (const violation of violations) {
+        const targets = violation.nodes.map((node) => node.target.join(' ')).join(' | ')
+        failures.push(`${name} ${violation.id}: ${targets}`)
+      }
+    }
+    expect(failures, failures.join('\n')).toEqual([])
   })
 
   test('主要业务页无严重无障碍问题', async ({ page }) => {

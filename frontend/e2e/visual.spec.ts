@@ -35,7 +35,7 @@ test('经营总览视觉基线', async ({ page }) => {
 test('订单空态视觉基线', async ({ page }) => {
   await login(page)
   await page.goto('/orders')
-  await expectNoMatch(page, '订单号或客户', '没有匹配的订单')
+  await expectNoMatch(page, '订单号、客户或商品', '没有匹配的订单')
   await freezeAnimations(page)
   await expect(page).toHaveScreenshot('orders-empty.png', { maxDiffPixelRatio: 0.01 })
 })
@@ -46,4 +46,12 @@ test('商品空态视觉基线', async ({ page }) => {
   await expectNoMatch(page, '商品名称或编号', '没有匹配的商品')
   await freezeAnimations(page)
   await expect(page).toHaveScreenshot('products-empty.png', { maxDiffPixelRatio: 0.01 })
+})
+
+test('新建客户表单视觉基线', async ({ page }) => {
+  await login(page)
+  await page.goto('/customers/new')
+  await expect(page.getByRole('heading', { name: '新建客户' })).toBeVisible()
+  await freezeAnimations(page)
+  await expect(page).toHaveScreenshot('customer-new.png', { maxDiffPixelRatio: 0.01 })
 })

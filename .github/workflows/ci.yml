@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main, making-centered-rebuild]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.23.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm run lint
+        working-directory: frontend
+      - run: pnpm run format:check
+        working-directory: frontend
+      - run: pnpm run typecheck
+        working-directory: frontend
+      - run: pnpm run test:unit
+        working-directory: frontend
+      - run: pnpm run build
+        working-directory: frontend
+
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: yumi_it
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Verify backend
+        run: ./mvnw -B verify
+        working-directory: backend
+        env:
+          YUMI_DB_URL: jdbc:mysql://127.0.0.1:3306/yumi_it?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+          YUMI_DB_USER: root
+          YUMI_DB_PASSWORD: ""
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: yumi_it
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.23.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Build backend
+        run: ./mvnw -B -DskipTests package
+        working-directory: backend
+      - name: Bootstrap E2E administrator
+        working-directory: backend
+        env:
+          YUMI_DB_URL: jdbc:mysql://127.0.0.1:3306/yumi_it?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+          YUMI_DB_USER: root
+          YUMI_DB_PASSWORD: ""
+          YUMI_INITIAL_ADMIN_LOGIN: it-admin
+          YUMI_INITIAL_ADMIN_PASSWORD: it-pass-1234
+        run: java -cp target/yumi-backend-0.1.0-SNAPSHOT.jar com.yumi.platform.identity.bootstrap.InitialAdministratorCommand
+      - name: Start backend
+        working-directory: backend
+        env:
+          YUMI_DB_URL: jdbc:mysql://127.0.0.1:3306/yumi_it?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+          YUMI_DB_USER: root
+          YUMI_DB_PASSWORD: ""
+          YUMI_SERVER_PORT: "8080"
+        run: |
+          nohup java -jar target/yumi-backend-0.1.0-SNAPSHOT.jar > backend.log 2>&1 &
+          for i in {1..60}; do
+            if curl -sf -X POST http://127.0.0.1:8080/api/platform/identity/sessions \
+              -H 'Content-Type: application/json' \
+              -d '{"loginName":"it-admin","password":"it-pass-1234"}' > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat backend.log
+          exit 1
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Seed E2E baseline
+        working-directory: frontend
+        run: pnpm exec playwright test e2e/customers.spec.ts e2e/products.spec.ts
+      - name: Run E2E
+        working-directory: frontend
+        run: pnpm exec playwright test
