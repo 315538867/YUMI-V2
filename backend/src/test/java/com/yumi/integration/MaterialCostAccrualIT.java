@@ -12,10 +12,19 @@ import com.yumi.platform.api.value.CurrencyCode;
 import com.yumi.platform.api.value.SettlementMoney;
 import com.yumi.product.api.MaterialSource;
 import com.yumi.product.api.SchemeView;
+import com.yumi.production.api.ArrangeTaskCommand;
+import com.yumi.production.api.SubjectRef;
+import com.yumi.production.api.SubjectType;
+import com.yumi.production.api.TargetProcess;
+import com.yumi.production.api.TaskItemRequest;
+import com.yumi.production.api.TaskItemResultRequest;
+import com.yumi.production.api.TaskType;
+import com.yumi.production.api.VerifyTaskCommand;
 import com.yumi.support.AbstractOrderFixtureTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,6 +101,71 @@ class MaterialCostAccrualIT extends AbstractOrderFixtureTest {
                 .query(Long.class).single()).isEqualTo(entries);
         assertThat(orderJdbc.sql("SELECT COUNT(*) FROM finance_cost_source_guards")
                 .query(Long.class).single()).isEqualTo(entries);
+    }
+
+    @Test
+    @DisplayName("三道工序的材料成本只在 MAKING 计一次，不在包装/缝边重复")
+    void materialCostIsCountedOncePerPieceAcrossProcesses() {
+        OrderRef order = confirm(uniqueKey("ORDER"), 2);
+        String sourceId = orderSourceId(order);
+        produceAt(sourceId, 2, TargetProcess.MAKING);
+        produceAt(sourceId, 2, TargetProcess.BAGGING);
+        produceAt(sourceId, 2, TargetProcess.SEAM_CUTTING);
+
+        asAdmin(() -> costLedger.accrueProductionMaterialCosts(
+                new AccrueProductionMaterialCostsCommand(
+                        uniqueKey("COST-RUN"), LocalDate.parse("2026-10-01"),
+                        LocalDate.parse("2026-10-31"))));
+
+        BigDecimal material = orderJdbc.sql("""
+                        SELECT COALESCE(SUM(l.amount), 0)
+                        FROM finance_cost_entry_lines l
+                        JOIN finance_cost_entries e
+                          ON e.cost_entry_business_id = l.cost_entry_business_id
+                        WHERE e.subject_business_id = :orderId
+                          AND l.component_code IN ('GLUE', 'COLOR_PASTE')
+                        """).param("orderId", order.orderBusinessId())
+                .query(BigDecimal.class).single();
+        assertThat(material)
+                .as("2 件 ×（胶水 126 + 色浆 126）")
+                .isEqualByComparingTo("504.0000");
+
+        long nonMaking = orderJdbc.sql("""
+                        SELECT COUNT(*)
+                        FROM finance_cost_entry_lines l
+                        JOIN finance_cost_entries e
+                          ON e.cost_entry_business_id = l.cost_entry_business_id
+                        JOIN production_material_cost_sources m
+                          ON m.material_source_business_id = e.source_business_id
+                        WHERE e.subject_business_id = :orderId
+                          AND m.process_code <> 'MAKING'
+                          AND l.component_code IN ('GLUE', 'COLOR_PASTE')
+                        """).param("orderId", order.orderBusinessId())
+                .query(Long.class).single();
+        assertThat(nonMaking).as("包装/缝边不得重复取用制造材料").isZero();
+
+        BigDecimal glueQuantity = orderJdbc.sql("""
+                        SELECT COALESCE(SUM(l.quantity), 0)
+                        FROM finance_cost_entry_lines l
+                        JOIN finance_cost_entries e
+                          ON e.cost_entry_business_id = l.cost_entry_business_id
+                        WHERE e.subject_business_id = :orderId AND l.component_code = 'GLUE'
+                        """).param("orderId", order.orderBusinessId())
+                .query(BigDecimal.class).single();
+        assertThat(glueQuantity).as("两件各一条胶水数量").isEqualByComparingTo("2");
+    }
+
+    private void produceAt(String sourceId, int quantity, TargetProcess process) {
+        var employee = hireEmployee("成本工人-" + UUID.randomUUID(), process.name());
+        var task = asAdmin(() -> orderTaskService.arrange(new ArrangeTaskCommand(
+                TaskType.NORMAL_PRODUCTION,
+                new SubjectRef(SubjectType.EMPLOYEE, employee.employeeBusinessId()),
+                LocalDate.parse("2026-10-06"), process,
+                List.of(new TaskItemRequest(sourceId, quantity)), null, null, null)));
+        String itemId = asAdmin(() -> orderTaskService.getTask(task.taskBusinessId()))
+                .items().getFirst().taskItemBusinessId();
+        asAdmin(() -> orderVerificationService.verify(new VerifyTaskCommand(List.of(
+                new TaskItemResultRequest(itemId, 0, quantity, 0, 0, List.of(), null)))));
     }
 
     private OrderRef completedCustomerSupplyOrder(int quantity) {

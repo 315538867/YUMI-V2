@@ -25,8 +25,8 @@ public class ProductionPayrollMaterialSourceFeedImpl
     public List<MaterialItem> listForPeriod(java.time.LocalDate start, java.time.LocalDate end) {
         return jdbc.sql("""
                         SELECT m.material_source_business_id, m.task_business_id, m.demand_business_id,
-                               d.order_business_id, m.component_code, m.quantity, m.business_date,
-                               m.occurred_at, d.production_basis_json
+                               d.order_business_id, m.component_code, m.process_code, m.quantity,
+                               m.business_date, m.occurred_at, d.production_basis_json
                         FROM production_material_cost_sources m
                         JOIN production_demands d ON d.demand_business_id = m.demand_business_id
                         WHERE m.business_date BETWEEN :start AND :end
@@ -37,8 +37,9 @@ public class ProductionPayrollMaterialSourceFeedImpl
                 .param("end", java.sql.Date.valueOf(end))
                 .query((resultSet, rowNumber) -> {
                     String component = resultSet.getString("component_code");
+                    String processCode = resultSet.getString("process_code");
                     JsonNode basis = readBasis(resultSet.getString("production_basis_json"));
-                    JsonNode line = findCostLine(basis, component);
+                    JsonNode line = findCostLine(basis, component, processCode);
                     String source = line == null ? null : line.path("source").asText(null);
                     BigDecimal unit = line == null ? BigDecimal.ZERO
                             : new BigDecimal(line.path("fullResourceCost").asText("0"));
@@ -81,11 +82,14 @@ public class ProductionPayrollMaterialSourceFeedImpl
         return lines;
     }
 
-    private JsonNode findCostLine(JsonNode basis, String component) {
-        if (basis == null || component == null) {
+    private JsonNode findCostLine(JsonNode basis, String component, String processCode) {
+        if (basis == null || component == null || processCode == null) {
             return null;
         }
         for (JsonNode line : basis.path("costLines")) {
+            if (!processCode.equals(line.path("processCode").asText(null))) {
+                continue;
+            }
             if (component.equals(line.path("componentCode").asText())
                     && "NON_LABOR_MATERIAL".equals(line.path("nature").asText())) {
                 return line;
