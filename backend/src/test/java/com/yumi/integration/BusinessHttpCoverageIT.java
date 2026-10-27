@@ -310,7 +310,8 @@ class BusinessHttpCoverageIT extends AbstractOrderFixtureTest {
     void orderAndDeliveryRoutes() throws Exception {
         OrderController.CreateOrderRequest request = new OrderController.CreateOrderRequest(
                 defaultCustomer.customerBusinessId(), null, ORDER_DATE, ORDER_DATE.plusDays(7),
-                List.of(new com.yumi.orders.api.OrderItemRequest(
+                null,
+List.of(new com.yumi.orders.api.OrderItemRequest(
                         defaultProduct.productBusinessId(), standardSchemeSnapshotRef(),
                         com.yumi.product.api.SchemeView.ProcessCode.MAKING, 2,
                         money("88.00"),

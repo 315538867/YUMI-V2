@@ -95,7 +95,8 @@ class OrderChangeIT extends AbstractOrderFixtureTest {
         CreateConfirmedOrderCommand command = new CreateConfirmedOrderCommand(
                 idem("CH-2"), defaultCustomer.customerBusinessId(), null, ORDER_DATE,
                 ORDER_DATE.plusDays(5),
-                List.of(item(2, TargetProcess.MAKING), item(3, TargetProcess.MAKING)));
+                null,
+List.of(item(2, TargetProcess.MAKING), item(3, TargetProcess.MAKING)));
         OrderRef order = asAdmin(() -> orders.createAndConfirm(command));
         var items = orderJdbc.sql("""
                         SELECT order_item_business_id FROM orders_items

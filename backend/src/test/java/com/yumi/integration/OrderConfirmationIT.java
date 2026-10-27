@@ -92,7 +92,8 @@ class OrderConfirmationIT extends AbstractOrderFixtureTest {
     void invalidCommandsAreRejectedBeforeWriting() {
         assertThatThrownBy(() -> new CreateConfirmedOrderCommand(
                 "", defaultCustomer.customerBusinessId(), null, ORDER_DATE, ORDER_DATE.plusDays(7),
-                List.of()))
+                null,
+List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() -> new OrderItemRequest(

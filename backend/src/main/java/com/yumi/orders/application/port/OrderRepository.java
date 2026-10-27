@@ -152,8 +152,6 @@ public interface OrderRepository {
     void insertLegacyStateLine(LegacyStateLineRecord record);
 
     /** 订单列表：订单号模糊检索，按创建倒序。 */
-    List<OrderRecord> searchOrders(String keyword, String status, int offset, int limit);
-
     /** 列表摘要附带客户名与商品名；客户/商品名称取当前主数据，不替代历史快照。 */
     List<OrderSummaryRecord> searchOrderSummaries(String keyword, String status, int offset, int limit);
 

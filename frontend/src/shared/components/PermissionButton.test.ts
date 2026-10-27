@@ -3,7 +3,6 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Component } from 'vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
-import Can from '@/shared/components/Can.vue'
 import { useAuthStore } from '@/platform/stores/auth'
 import { installElementPlus } from '@/platform/i18n/elementLocale'
 
@@ -50,15 +49,16 @@ describe('权限显隐组件', () => {
     expect(click).toHaveBeenCalledTimes(1)
   })
 
-  it('无权限时按钮与片段都不渲染', () => {
+  it('无权限时按钮不渲染', () => {
     useAuthStore().account = accountWith([])
     expect(mountWith(PermissionButton, { permission: 'order.ship' }).find('.inner').exists()).toBe(
       false,
     )
-    expect(mountWith(Can, { permission: 'order.ship' }).find('.inner').exists()).toBe(false)
   })
 
-  it('未登录时视为无权限', () => {
-    expect(mountWith(Can, { permission: 'order.read' }).find('.inner').exists()).toBe(false)
+  it('未登录时按钮不渲染', () => {
+    expect(mountWith(PermissionButton, { permission: 'order.read' }).find('.inner').exists()).toBe(
+      false,
+    )
   })
 })

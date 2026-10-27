@@ -24,17 +24,6 @@ public record CreateConfirmedOrderCommand(
         String note,
         List<OrderItemRequest> items) {
 
-    public CreateConfirmedOrderCommand(
-            String idempotencyKey,
-            String customerBusinessId,
-            DeliveryContactOverride contactOverride,
-            LocalDate orderDate,
-            LocalDate expectedDeliveryDate,
-            List<OrderItemRequest> items) {
-        this(idempotencyKey, customerBusinessId, contactOverride, orderDate, expectedDeliveryDate,
-                null, items);
-    }
-
     public CreateConfirmedOrderCommand {
         items = List.copyOf(items == null ? List.of() : items);
         if (idempotencyKey == null || idempotencyKey.isBlank()) {

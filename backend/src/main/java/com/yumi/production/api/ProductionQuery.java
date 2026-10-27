@@ -25,9 +25,6 @@ public interface ProductionQuery {
     /** 整体进度：订单需求、首个工序排班/生产事实与订单履约。 */
     ProductionOverviewView overview();
 
-    /** 默认展示全部订单追溯，按最近需求更新倒序。 */
-    java.util.List<OrderProductionTrace> recentTraces(int offset, int limit);
-
     /** 追溯列表摘要；展开订单后再读取完整链路。 */
     java.util.List<ProductionTraceSummary> recentTraceSummaries(int offset, int limit);
 }

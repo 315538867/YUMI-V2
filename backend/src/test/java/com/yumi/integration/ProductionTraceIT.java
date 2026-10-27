@@ -135,9 +135,6 @@ class ProductionTraceIT extends AbstractProductionFixtureTest {
         assertThat(overview.processes().getFirst().process()).isEqualTo(TargetProcess.MAKING);
         assertThat(overview.processes().getFirst().scheduledQuantity()).isEqualTo(100);
         assertThat(overview.processes().getFirst().completedQuantity()).isEqualTo(90);
-        assertThat(asAdmin(() -> productionQuery.recentTraces(0, 10)))
-                .extracting(itemTrace -> itemTrace.orderItemBusinessId())
-                .contains("ORD-TR-1");
     }
 
     @Test

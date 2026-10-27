@@ -1006,33 +1006,6 @@ public class JdbcOrderRepository implements OrderRepository {
     }
 
     @Override
-    public List<OrderRecord> searchOrders(String keyword, String status, int offset, int limit) {
-        return jdbc.sql("""
-                        SELECT o.order_business_id, o.order_no, o.origin, o.customer_business_id,
-                               o.customer_snapshot_ref, o.order_date, o.expected_delivery_date,
-                               o.order_note, o.status, o.current_receivable_amount,
-                               COALESCE(p.received_amount, 0) - COALESCE(p.refunded_amount, 0)
-                                   AS net_receipts,
-                               o.currency_code, o.delivery_fulfilled, o.payment_fulfilled,
-                               o.content_version, o.row_version, o.created_at, o.created_by,
-                               o.updated_at
-                        FROM orders_orders o
-                        LEFT JOIN orders_fulfillment_projections p
-                               ON p.order_business_id = o.order_business_id
-                        WHERE (:keyword = '' OR o.order_no LIKE CONCAT('%', :keyword, '%'))
-                          AND (:status = '' OR o.status = :status)
-                        ORDER BY o.created_at DESC, o.order_business_id DESC
-                        LIMIT :limit OFFSET :offset
-                        """)
-                .param("keyword", keyword == null ? "" : keyword)
-                .param("status", status == null ? "" : status)
-                .param("limit", limit)
-                .param("offset", offset)
-                .query(JdbcOrderRepository::mapOrder)
-                .list();
-    }
-
-    @Override
     public List<OrderSummaryRecord> searchOrderSummaries(
             String keyword, String status, int offset, int limit) {
         return jdbc.sql("""

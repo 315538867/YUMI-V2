@@ -207,7 +207,8 @@ class PayrollReferenceIT extends AbstractOrderFixtureTest {
         CreateConfirmedOrderCommand command = new CreateConfirmedOrderCommand(
                 uniqueKey("ORDER"), defaultCustomer.customerBusinessId(), null, ORDER_DATE,
                 ORDER_DATE.plusDays(7),
-                List.of(new OrderItemRequest(
+                null,
+List.of(new OrderItemRequest(
                         defaultProduct.productBusinessId(), standardSchemeSnapshotRef(),
                         SchemeView.ProcessCode.MAKING, quantity,
                         SettlementMoney.of(new BigDecimal("88.00"), CurrencyCode.CNY),

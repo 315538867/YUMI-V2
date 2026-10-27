@@ -52,14 +52,6 @@ public class ProductionTraceServiceImpl implements ProductionQuery, ProductionRe
         return buildTrace(orderItemBusinessId);
     }
 
-    @Override
-    public List<OrderProductionTrace> recentTraces(int offset, int limit) {
-        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
-        return traces.listOrderItemsWithDemands(Math.max(0, offset), clamp(limit)).stream()
-                .map(this::buildTrace)
-                .toList();
-    }
-
     private OrderProductionTrace buildTrace(String orderItemBusinessId) {
         List<DemandRecord> demands = traces.findDemandsOfOrderItem(orderItemBusinessId);
         if (demands.isEmpty()) {

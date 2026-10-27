@@ -39,7 +39,6 @@
 | `MoneyText` | 金额对象/字符串统一展示 |
 | `DateTimeText` | 时间统一格式化 |
 | `PermissionButton` | 按权限显隐的按钮 |
-| `Can` | 按权限显隐的任意片段 |
 | `BusinessFileUpload` | 附件上传与授权读取 |
 
 - 金额、时间不得在模板里直接输出或格式化：
@@ -56,7 +55,7 @@
   <PermissionButton permission="order.ship" @click="openShipment">登记发货</PermissionButton>
   ```
 
-- 非按钮片段（页签、卡片、表格列）使用 `Can`。
+- 非按钮片段（页签、卡片、表格列）使用 `canManage` 等权限计算属性控制；按钮必须使用 `PermissionButton`。
 - 权限编码来自码表分类 `platform.permission`，与后端 `PermissionCodes` 同名。
 - 只隐藏入口不等于授权：后端仍必须校验权限；前端只在“无权限时不展示”这一层负责。
 - 权限判定集中在 `auth` store，页面不自行拼接角色或权限前缀。

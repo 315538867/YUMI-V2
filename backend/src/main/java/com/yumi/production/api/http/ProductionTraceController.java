@@ -61,13 +61,6 @@ public class ProductionTraceController {
         return production.recentTraceSummaries(offset, limit);
     }
 
-    @GetMapping("/traces")
-    public List<OrderProductionTrace> recentTraces(
-            @RequestParam(defaultValue = "0") int offset,
-            @RequestParam(defaultValue = "50") int limit) {
-        return production.recentTraces(offset, limit);
-    }
-
     @GetMapping("/offline-transfers")
     public java.util.List<com.yumi.production.api.OfflineTransferView> offlineTransfers(
             @RequestParam String productionSourceBusinessId) {

@@ -12,9 +12,6 @@ public interface TraceRepository {
 
     List<DemandRecord> findDemandsOfOrderItem(String orderItemBusinessId);
 
-    /** 有生产需求的订单项，按最近更新倒序；用于默认展示全部订单追溯。 */
-    List<String> listOrderItemsWithDemands(int offset, int limit);
-
     /** 追溯摘要分页：有生产需求的订单项，附订单号、商品名与数量概览。 */
     List<TraceSummaryRow> listTraceSummaries(int offset, int limit);
 

@@ -86,12 +86,6 @@ export const productionService = {
     )
   },
 
-  recentTraces(offset = 0, limit = 50): Promise<OrderProductionTrace[]> {
-    return api.query<OrderProductionTrace[]>(
-      `/api/production/traces?offset=${offset}&limit=${limit}`,
-    )
-  },
-
   tasksBetween(startDate?: string, endDate?: string): Promise<TaskView[]> {
     const search = new URLSearchParams()
     if (startDate !== undefined) {

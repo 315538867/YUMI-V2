@@ -74,14 +74,6 @@ public class OrderController {
             String note,
             List<OrderItemRequest> items) {
 
-        public CreateOrderRequest(
-                String customerBusinessId,
-                DeliveryContactOverride contactOverride,
-                LocalDate orderDate,
-                LocalDate expectedDeliveryDate,
-                List<OrderItemRequest> items) {
-            this(customerBusinessId, contactOverride, orderDate, expectedDeliveryDate, null, items);
-        }
     }
 
     /** 正式变更请求体；变更分类与内容由公开命令校验。 */

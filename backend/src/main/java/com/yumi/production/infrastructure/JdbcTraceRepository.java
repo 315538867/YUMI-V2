@@ -71,22 +71,6 @@ public class JdbcTraceRepository implements TraceRepository {
     }
 
     @Override
-    public List<String> listOrderItemsWithDemands(int offset, int limit) {
-        return jdbc.sql("""
-                        SELECT order_item_business_id
-                        FROM production_demands
-                        WHERE order_item_business_id IS NOT NULL AND status <> 'CANCELLED'
-                        GROUP BY order_item_business_id
-                        ORDER BY MAX(updated_at) DESC
-                        LIMIT :limit OFFSET :offset
-                        """)
-                .param("limit", limit)
-                .param("offset", offset)
-                .query(String.class)
-                .list();
-    }
-
-    @Override
     public List<TraceSummaryRow> listTraceSummaries(int offset, int limit) {
         return jdbc.sql("""
                         SELECT oi.order_item_business_id, o.order_business_id, o.order_no,
