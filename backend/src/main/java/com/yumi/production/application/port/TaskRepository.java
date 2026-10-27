@@ -23,6 +23,9 @@ public interface TaskRepository {
     /** 按工作日期读取任务（排班页只读）。 */
     List<TaskRecord> findTasksByWorkDate(LocalDate workDate);
 
+    /** 按可选日期区间读取任务；两端为空时读取全部任务（排班周视图/全部列表）。 */
+    List<TaskRecord> findTasksBetween(LocalDate startDate, LocalDate endDate);
+
     List<TaskItemRecord> findTaskItems(String taskBusinessId);
 
     /** 按明细标识查找（核验只提交明细标识，服务端据此定位任务）。 */

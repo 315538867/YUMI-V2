@@ -26,4 +26,7 @@ public interface TaskApplicationService {
 
     /** 按工作日期读取任务列表；排班页只读展示，不推导生产事实。 */
     java.util.List<TaskView> listTasks(java.time.LocalDate workDate);
+
+    /** 按可选日期区间读取任务；两端为空时返回全部任务。 */
+    java.util.List<TaskView> listTasks(java.time.LocalDate startDate, java.time.LocalDate endDate);
 }

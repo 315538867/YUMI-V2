@@ -116,10 +116,12 @@ class OrderConfirmationIT extends AbstractOrderFixtureTest {
     void multipleItemsCreateOneDemandEach() {
         CreateConfirmedOrderCommand command = new CreateConfirmedOrderCommand(
                 idem("IDEM-6"), defaultCustomer.customerBusinessId(), null, ORDER_DATE, ORDER_DATE.plusDays(3),
-                List.of(item(2), item(3)));
+                "客户要求分两批交付", List.of(item(2), item(3)));
 
         OrderRef order = asAdmin(() -> orders.createAndConfirm(command));
         assertThat(order.totalQuantity()).isEqualTo(5);
+        assertThat(asAdmin(() -> orderQuery.get(order.orderBusinessId())).note())
+                .isEqualTo("客户要求分两批交付");
         assertThat(countDemandsOfOrder(order.orderBusinessId())).isEqualTo(2);
         assertThat(orderJdbc.sql("""
                         SELECT COUNT(*) FROM orders_agreement_groups g

@@ -102,6 +102,29 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
+    public List<TaskRecord> findTasksBetween(LocalDate startDate, LocalDate endDate) {
+        StringBuilder sql = new StringBuilder(TASK_SELECT);
+        if (startDate != null || endDate != null) {
+            sql.append(" WHERE 1=1");
+            if (startDate != null) {
+                sql.append(" AND work_date >= :startDate");
+            }
+            if (endDate != null) {
+                sql.append(" AND work_date <= :endDate");
+            }
+        }
+        sql.append(" ORDER BY work_date DESC, task_no");
+        var spec = jdbc.sql(sql.toString());
+        if (startDate != null) {
+            spec = spec.param("startDate", startDate);
+        }
+        if (endDate != null) {
+            spec = spec.param("endDate", endDate);
+        }
+        return spec.query(JdbcTaskRepository::mapTask).list();
+    }
+
+    @Override
     public List<TaskItemRecord> findTaskItems(String taskBusinessId) {
         return jdbc.sql(ITEM_SELECT + " WHERE task_business_id = :id ORDER BY item_order")
                 .param("id", taskBusinessId)

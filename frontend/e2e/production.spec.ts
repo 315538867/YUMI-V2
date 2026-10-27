@@ -13,7 +13,6 @@ test('无生产来源的其他任务可安排并核验', async ({ page, request 
     data: { name: worker, phone: '13500000001', effectiveDate: '2026-10-01' },
   })
   expect(hired.status()).toBe(201)
-  const employeeId = ((await hired.json()) as { employeeBusinessId: string }).employeeBusinessId
   await login(page)
   await page.goto('/production/schedule')
   await page.getByRole('button', { name: '安排任务' }).click()
@@ -35,7 +34,8 @@ test('无生产来源的其他任务可安排并核验', async ({ page, request 
   await dialog.getByRole('button', { name: '保存' }).click()
 
   await expect(page.getByText('任务已安排')).toBeVisible()
-  const row = page.locator('.el-table__row').filter({ hasText: employeeId })
+  await page.getByText('全部列表', { exact: true }).click()
+  const row = page.locator('.el-table__row').filter({ hasText: worker })
   await expect(row).toBeVisible()
   await row.getByRole('button', { name: '核验' }).click()
 
@@ -48,7 +48,7 @@ test('无生产来源的其他任务可安排并核验', async ({ page, request 
     headers: authHeaders(token, `e2e-cancel-${Date.now()}`),
     data: { name: secondName, phone: '13500000002', effectiveDate: '2026-10-01' },
   })
-  const secondId = ((await secondHired.json()) as { employeeBusinessId: string }).employeeBusinessId
+  expect(secondHired.status()).toBe(201)
   await page.goto('/production/schedule')
   await page.getByRole('button', { name: '安排任务' }).click()
   const cancelDialog = page.locator('.el-dialog')
@@ -67,7 +67,8 @@ test('无生产来源的其他任务可安排并核验', async ({ page, request 
   await formInput(page, '整体标准分钟').fill('30')
   await cancelDialog.getByRole('button', { name: '保存' }).click()
   await expect(page.getByText('任务已安排')).toBeVisible()
-  const cancelRow = page.locator('.el-table__row').filter({ hasText: secondId })
+  await page.getByText('全部列表', { exact: true }).click()
+  const cancelRow = page.locator('.el-table__row').filter({ hasText: secondName })
   await cancelRow.getByRole('button', { name: '取消' }).click()
   await page.locator('.el-message-box input').fill('接口验收取消')
   await page.locator('.el-message-box__btns .el-button--primary').click()

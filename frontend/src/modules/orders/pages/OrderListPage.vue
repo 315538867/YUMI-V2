@@ -84,6 +84,9 @@ void load()
         <el-table-column label="当前应收" width="150">
           <template #default="{ row }"><MoneyText :value="row.currentReceivable" /></template>
         </el-table-column>
+        <el-table-column label="净收款" width="150">
+          <template #default="{ row }"><MoneyText :value="row.netReceipts" /></template>
+        </el-table-column>
         <el-table-column label="交付/付款" width="130">
           <template #default="{ row }">
             {{ row.deliveryFulfilled ? '已交付' : '未交付' }} /
@@ -112,7 +115,7 @@ void load()
 
 <style scoped>
 .order-list {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 16px;

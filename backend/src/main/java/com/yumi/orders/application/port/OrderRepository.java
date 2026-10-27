@@ -262,8 +262,9 @@ public interface OrderRepository {
     record OrderRecord(
             String orderBusinessId, String orderNo, String origin, String customerBusinessId,
             String customerSnapshotRef, LocalDate orderDate, LocalDate expectedDeliveryDate,
-            String status, BigDecimal currentReceivableAmount, String currencyCode,
-            boolean deliveryFulfilled, boolean paymentFulfilled, long contentVersion, long rowVersion,
+            String note, String status, BigDecimal currentReceivableAmount, BigDecimal netReceipts,
+            String currencyCode, boolean deliveryFulfilled, boolean paymentFulfilled,
+            long contentVersion, long rowVersion,
             Instant createdAt, String createdBy, Instant updatedAt) {
     }
 

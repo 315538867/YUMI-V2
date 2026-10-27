@@ -12,6 +12,7 @@ import java.util.List;
  * @param contactOverride 本次收货覆盖值；不修改客户默认地址
  * @param orderDate 订单日期
  * @param expectedDeliveryDate 预计交付日期
+ * @param note 订单说明；选填，不参与履约计算
  * @param items 订单项；每项一个交付约定组与一个生产需求
  */
 public record CreateConfirmedOrderCommand(
@@ -20,7 +21,19 @@ public record CreateConfirmedOrderCommand(
         DeliveryContactOverride contactOverride,
         LocalDate orderDate,
         LocalDate expectedDeliveryDate,
+        String note,
         List<OrderItemRequest> items) {
+
+    public CreateConfirmedOrderCommand(
+            String idempotencyKey,
+            String customerBusinessId,
+            DeliveryContactOverride contactOverride,
+            LocalDate orderDate,
+            LocalDate expectedDeliveryDate,
+            List<OrderItemRequest> items) {
+        this(idempotencyKey, customerBusinessId, contactOverride, orderDate, expectedDeliveryDate,
+                null, items);
+    }
 
     public CreateConfirmedOrderCommand {
         items = List.copyOf(items == null ? List.of() : items);
@@ -38,6 +51,9 @@ public record CreateConfirmedOrderCommand(
         }
         if (expectedDeliveryDate.isBefore(orderDate)) {
             throw new IllegalArgumentException("预计交付日期不能早于订单日期");
+        }
+        if (note != null && note.length() > 500) {
+            throw new IllegalArgumentException("订单说明不能超过 500 字");
         }
     }
 }

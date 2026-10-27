@@ -148,8 +148,9 @@ public class OpeningOrderServiceImpl implements OpeningOrderService {
         orders.insertOrder(new OrderRepository.OrderRecord(
                 orderBusinessId, orderNo, OrderOrigin.LEGACY_INTAKE.name(),
                 command.customerBusinessId(), customerSnapshot.snapshotBusinessId(),
-                command.orderDate(), command.expectedDeliveryDate(), OrderStatus.CONFIRMED.name(),
-                receivable.value(), "CNY", false, false, 1L, 1L, now, operatorId, now));
+                command.orderDate(), command.expectedDeliveryDate(), command.note(),
+                OrderStatus.CONFIRMED.name(), receivable.value(), java.math.BigDecimal.ZERO, "CNY",
+                false, false, 1L, 1L, now, operatorId, now));
         orders.insertConfirmationFact(new OrderRepository.ConfirmationRecord(
                 "OCF-" + UUID.randomUUID(), orderBusinessId, "LEGACY_INTAKE", totalQuantity,
                 totalAmount, now, operatorId));

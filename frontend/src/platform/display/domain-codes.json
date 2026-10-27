@@ -57,6 +57,28 @@
         "tag": "warning"
       }
     },
+    "order.eventKind": {
+      "CONFIRMATION": {
+        "label": "订单确认",
+        "tag": ""
+      },
+      "CHANGE": {
+        "label": "订单变更",
+        "tag": ""
+      },
+      "SHIPMENT": {
+        "label": "发货",
+        "tag": ""
+      },
+      "PAYMENT": {
+        "label": "收退款",
+        "tag": ""
+      },
+      "COMPLETION": {
+        "label": "订单完成",
+        "tag": ""
+      }
+    },
     "order.changeKind": {
       "PRICE_OR_RECIPIENT": {
         "label": "价格或收货人变更",

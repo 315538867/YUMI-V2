@@ -541,6 +541,16 @@ public class TaskArrangementService implements TaskApplicationService {
         return tasks.findTasksByWorkDate(workDate).stream().map(this::viewOf).toList();
     }
 
+    @Override
+    public List<TaskView> listTasks(java.time.LocalDate startDate, java.time.LocalDate endDate) {
+        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "TASK_DATE_RANGE_INVALID", "开始日期不能晚于结束日期");
+        }
+        return tasks.findTasksBetween(startDate, endDate).stream().map(this::viewOf).toList();
+    }
+
     private TaskView viewOf(TaskRecord task) {
         String taskBusinessId = task.taskBusinessId();
         List<TaskItemRecord> items = tasks.findTaskItems(taskBusinessId);

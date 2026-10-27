@@ -140,8 +140,14 @@ public class ProductionTaskController {
     }
 
     @GetMapping
-    public List<TaskView> listTasks(@RequestParam java.time.LocalDate workDate) {
-        return tasks.listTasks(workDate);
+    public List<TaskView> listTasks(
+            @RequestParam(required = false) java.time.LocalDate workDate,
+            @RequestParam(required = false) java.time.LocalDate startDate,
+            @RequestParam(required = false) java.time.LocalDate endDate) {
+        if (workDate != null) {
+            return tasks.listTasks(workDate);
+        }
+        return tasks.listTasks(startDate, endDate);
     }
 
     @GetMapping("/{taskBusinessId}")

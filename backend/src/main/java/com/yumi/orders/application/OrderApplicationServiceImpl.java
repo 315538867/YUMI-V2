@@ -233,6 +233,7 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
                         record.customerBusinessId(), record.orderDate(),
                         record.expectedDeliveryDate(),
                         SettlementMoney.of(record.currentReceivableAmount(), CurrencyCode.CNY),
+                        SettlementMoney.of(record.netReceipts(), CurrencyCode.CNY),
                         record.deliveryFulfilled(), record.paymentFulfilled(),
                         record.contentVersion(), record.updatedAt()))
                 .toList();
@@ -265,8 +266,9 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
         orders.insertOrder(new OrderRepository.OrderRecord(
                 orderBusinessId, orderNo, OrderOrigin.NEW_ORDER.name(), command.customerBusinessId(),
                 customerSnapshot.snapshotBusinessId(), command.orderDate(),
-                command.expectedDeliveryDate(), OrderStatus.CONFIRMED.name(), receivable.value(),
-                "CNY", false, false, 1L, 1L, now, operatorId, now));
+                command.expectedDeliveryDate(), command.note(), OrderStatus.CONFIRMED.name(),
+                receivable.value(),
+                java.math.BigDecimal.ZERO, "CNY", false, false, 1L, 1L, now, operatorId, now));
         orders.insertConfirmationFact(new OrderRepository.ConfirmationRecord(
                 "OCF-" + UUID.randomUUID(), orderBusinessId, "ORIGINAL", totalQuantity,
                 totalAmount, now, operatorId));
@@ -439,6 +441,7 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
                 record.orderBusinessId(), record.orderNo(), OrderOrigin.valueOf(record.origin()),
                 OrderStatus.valueOf(record.status()), record.customerBusinessId(),
                 record.customerSnapshotRef(), record.orderDate(), record.expectedDeliveryDate(),
+                record.note(),
                 SettlementMoney.of(record.currentReceivableAmount(), CurrencyCode.CNY),
                 record.deliveryFulfilled(), record.paymentFulfilled(), items,
                 new OrderView.FulfillmentView(
@@ -451,7 +454,8 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
 
     private String fingerprint(CreateConfirmedOrderCommand command) {
         StringBuilder builder = new StringBuilder(command.customerBusinessId())
-                .append('|').append(command.orderDate()).append('|').append(command.expectedDeliveryDate());
+                .append('|').append(command.orderDate()).append('|').append(command.expectedDeliveryDate())
+                .append('|').append(command.note());
         for (OrderItemRequest item : command.items()) {
             builder.append('|').append(item.productBusinessId())
                     .append(':').append(item.schemeSnapshotRef().snapshotBusinessId())

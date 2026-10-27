@@ -40,6 +40,7 @@ const saving = ref(false)
 const errorText = ref('')
 const previewVisible = ref(false)
 const recipient = reactive({ name: '', phone: '', address: '' })
+const note = ref('')
 const form = reactive({
   customerBusinessId: '',
   orderDate: new Date().toISOString().slice(0, 10),
@@ -227,6 +228,7 @@ async function confirmCreate(): Promise<void> {
       contactOverride: null,
       orderDate: form.orderDate,
       expectedDeliveryDate: form.expectedDeliveryDate,
+      note: note.value.trim() === '' ? null : note.value.trim(),
       items: orderItems,
     }
     const created = await orderService.create(input)
@@ -289,7 +291,18 @@ onMounted(load)
       <el-form-item label="地址">
         <el-input v-model="recipient.address" type="textarea" :rows="2" />
       </el-form-item>
-      <p class="hint">本页所有明细共用上方收货信息。</p>
+      <el-form-item label="订单说明">
+        <el-input
+          v-model="note"
+          type="textarea"
+          :rows="2"
+          maxlength="500"
+          show-word-limit
+          aria-label="订单说明"
+          placeholder="选填，例如交付约定或客户特别要求"
+        />
+      </el-form-item>
+      <p class="hint">本页所有明细共用上方收货信息与订单说明。</p>
 
       <div class="section-head">
         <h2>2. 商品与成交约定</h2>
@@ -385,6 +398,9 @@ onMounted(load)
           >{{ recipient.name }} · {{ recipient.phone }}</el-descriptions-item
         >
         <el-descriptions-item label="地址">{{ recipient.address }}</el-descriptions-item>
+        <el-descriptions-item v-if="note.trim() !== ''" label="订单说明" :span="2">
+          {{ note }}
+        </el-descriptions-item>
       </el-descriptions>
       <el-table :data="items" border size="small" class="preview-table">
         <el-table-column label="商品" min-width="150">
@@ -412,7 +428,7 @@ onMounted(load)
 
 <style scoped>
 .order-editor {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 20px;

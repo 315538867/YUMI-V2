@@ -74,6 +74,18 @@ export const productionService = {
     return api.query<TaskView[]>(`/api/production/tasks?workDate=${workDate}`)
   },
 
+  tasksBetween(startDate?: string, endDate?: string): Promise<TaskView[]> {
+    const search = new URLSearchParams()
+    if (startDate !== undefined) {
+      search.set('startDate', startDate)
+    }
+    if (endDate !== undefined) {
+      search.set('endDate', endDate)
+    }
+    const text = search.toString()
+    return api.query<TaskView[]>(`/api/production/tasks${text === '' ? '' : `?${text}`}`)
+  },
+
   task(taskBusinessId: string): Promise<TaskView> {
     return api.query<TaskView>(`/api/production/tasks/${encodeURIComponent(taskBusinessId)}`)
   },

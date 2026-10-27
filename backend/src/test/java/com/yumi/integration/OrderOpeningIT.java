@@ -172,6 +172,7 @@ class OrderOpeningIT extends AbstractOrderFixtureTest {
         assertThat(summaries).singleElement().satisfies(summary -> {
             assertThat(summary.orderBusinessId()).isEqualTo(order.orderBusinessId());
             assertThat(summary.origin()).isEqualTo(OrderOrigin.LEGACY_INTAKE);
+            assertThat(summary.netReceipts().value()).isEqualByComparingTo("0.00");
         });
 
         var page = orderReportingFeed.changedSince(null, 10);

@@ -249,6 +249,35 @@ class TaskArrangementIT extends AbstractProductionFixtureTest {
                 null, null, null);
     }
 
+    @Test
+    @DisplayName("任务可按日期区间读取，日期为空时读取全部")
+    void listTasksByRangeAndAll() {
+        EmployeeRef employee = hireEmployee("区间员工", "MAKING");
+        LocalDate firstDate = LocalDate.parse("2026-10-19");
+        LocalDate secondDate = LocalDate.parse("2026-10-26");
+        ProductionDemandRef first = createNewProductDemand("ORD-RANGE-1", TargetProcess.SEAM_CUTTING, 1);
+        ProductionDemandRef second = createNewProductDemand("ORD-RANGE-2", TargetProcess.SEAM_CUTTING, 1);
+        asAdmin(() -> taskService.arrange(new ArrangeTaskCommand(
+                TaskType.NORMAL_PRODUCTION, employeeSubject(employee), firstDate, TargetProcess.MAKING,
+                List.of(new com.yumi.production.api.TaskItemRequest(
+                        first.productionSourceBusinessId(), 1)),
+                null, null, null)));
+        asAdmin(() -> taskService.arrange(new ArrangeTaskCommand(
+                TaskType.NORMAL_PRODUCTION, employeeSubject(employee), secondDate, TargetProcess.MAKING,
+                List.of(new com.yumi.production.api.TaskItemRequest(
+                        second.productionSourceBusinessId(), 1)),
+                null, null, null)));
+
+        assertThat(asAdmin(() -> taskService.listTasks(firstDate, firstDate)))
+                .singleElement()
+                .satisfies(task -> assertThat(task.workDate()).isEqualTo(firstDate));
+        assertThat(asAdmin(() -> taskService.listTasks(firstDate, secondDate)))
+                .hasSize(2);
+        assertThat(asAdmin(() -> taskService.listTasks(null, null)))
+                .extracting(TaskView::workDate)
+                .contains(firstDate, secondDate);
+    }
+
     private static SubjectRef employeeSubject(EmployeeRef employee) {
         return new SubjectRef(SubjectType.EMPLOYEE, employee.employeeBusinessId());
     }

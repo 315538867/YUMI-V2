@@ -25,13 +25,14 @@ public class JdbcOrderRepository implements OrderRepository {
         jdbc.sql("""
                         INSERT INTO orders_orders (
                             order_business_id, order_no, origin, customer_business_id,
-                            customer_snapshot_ref, order_date, expected_delivery_date, status,
+                            customer_snapshot_ref, order_date, expected_delivery_date, order_note, status,
                             current_receivable_amount, currency_code, delivery_fulfilled,
                             payment_fulfilled, content_version, row_version, created_at, created_by,
                             updated_at)
                         VALUES (:orderId, :orderNo, :origin, :customerId, :customerSnapshotRef, :orderDate,
-                                :expectedDeliveryDate, :status, :receivable, :currency, :deliveryFulfilled,
-                                :paymentFulfilled, 1, 1, :createdAt, :createdBy, :updatedAt)
+                                :expectedDeliveryDate, :note, :status, :receivable, :currency,
+                                :deliveryFulfilled, :paymentFulfilled, 1, 1, :createdAt, :createdBy,
+                                :updatedAt)
                         """)
                 .param("orderId", record.orderBusinessId())
                 .param("orderNo", record.orderNo())
@@ -40,6 +41,7 @@ public class JdbcOrderRepository implements OrderRepository {
                 .param("customerSnapshotRef", record.customerSnapshotRef())
                 .param("orderDate", Date.valueOf(record.orderDate()))
                 .param("expectedDeliveryDate", Date.valueOf(record.expectedDeliveryDate()))
+                .param("note", record.note())
                 .param("status", record.status())
                 .param("receivable", record.currentReceivableAmount())
                 .param("currency", record.currencyCode())
@@ -1006,15 +1008,20 @@ public class JdbcOrderRepository implements OrderRepository {
     @Override
     public List<OrderRecord> searchOrders(String keyword, String status, int offset, int limit) {
         return jdbc.sql("""
-                        SELECT order_business_id, order_no, origin, customer_business_id,
-                               customer_snapshot_ref, order_date, expected_delivery_date, status,
-                               current_receivable_amount, currency_code, delivery_fulfilled,
-                               payment_fulfilled, content_version, row_version, created_at, created_by,
-                               updated_at
-                        FROM orders_orders
-                        WHERE (:keyword = '' OR order_no LIKE CONCAT('%', :keyword, '%'))
-                          AND (:status = '' OR status = :status)
-                        ORDER BY created_at DESC, order_business_id DESC
+                        SELECT o.order_business_id, o.order_no, o.origin, o.customer_business_id,
+                               o.customer_snapshot_ref, o.order_date, o.expected_delivery_date,
+                               o.order_note, o.status, o.current_receivable_amount,
+                               COALESCE(p.received_amount, 0) - COALESCE(p.refunded_amount, 0)
+                                   AS net_receipts,
+                               o.currency_code, o.delivery_fulfilled, o.payment_fulfilled,
+                               o.content_version, o.row_version, o.created_at, o.created_by,
+                               o.updated_at
+                        FROM orders_orders o
+                        LEFT JOIN orders_fulfillment_projections p
+                               ON p.order_business_id = o.order_business_id
+                        WHERE (:keyword = '' OR o.order_no LIKE CONCAT('%', :keyword, '%'))
+                          AND (:status = '' OR o.status = :status)
+                        ORDER BY o.created_at DESC, o.order_business_id DESC
                         LIMIT :limit OFFSET :offset
                         """)
                 .param("keyword", keyword == null ? "" : keyword)
@@ -1029,15 +1036,20 @@ public class JdbcOrderRepository implements OrderRepository {
     public List<OrderRecord> findOrdersChangedAfter(
             Instant updatedAfter, String afterOrderBusinessId, int limit) {
         return jdbc.sql("""
-                        SELECT order_business_id, order_no, origin, customer_business_id,
-                               customer_snapshot_ref, order_date, expected_delivery_date, status,
-                               current_receivable_amount, currency_code, delivery_fulfilled,
-                               payment_fulfilled, content_version, row_version, created_at, created_by,
-                               updated_at
-                        FROM orders_orders
-                        WHERE updated_at > :after
-                           OR (updated_at = :after AND order_business_id > :afterId)
-                        ORDER BY updated_at, order_business_id
+                        SELECT o.order_business_id, o.order_no, o.origin, o.customer_business_id,
+                               o.customer_snapshot_ref, o.order_date, o.expected_delivery_date,
+                               o.order_note, o.status, o.current_receivable_amount,
+                               COALESCE(p.received_amount, 0) - COALESCE(p.refunded_amount, 0)
+                                   AS net_receipts,
+                               o.currency_code, o.delivery_fulfilled, o.payment_fulfilled,
+                               o.content_version, o.row_version, o.created_at, o.created_by,
+                               o.updated_at
+                        FROM orders_orders o
+                        LEFT JOIN orders_fulfillment_projections p
+                               ON p.order_business_id = o.order_business_id
+                        WHERE o.updated_at > :after
+                           OR (o.updated_at = :after AND o.order_business_id > :afterId)
+                        ORDER BY o.updated_at, o.order_business_id
                         LIMIT :limit
                         """)
                 .param("after", JdbcTimes.toUtc(updatedAfter))
@@ -1076,12 +1088,18 @@ public class JdbcOrderRepository implements OrderRepository {
     @Override
     public Optional<OrderRecord> findOrder(String orderBusinessId) {
         return jdbc.sql("""
-                        SELECT order_business_id, order_no, origin, customer_business_id,
-                               customer_snapshot_ref, order_date, expected_delivery_date, status,
-                               current_receivable_amount, currency_code, delivery_fulfilled,
-                               payment_fulfilled, content_version, row_version, created_at, created_by,
-                               updated_at
-                        FROM orders_orders WHERE order_business_id = :id
+                        SELECT o.order_business_id, o.order_no, o.origin, o.customer_business_id,
+                               o.customer_snapshot_ref, o.order_date, o.expected_delivery_date,
+                               o.order_note, o.status, o.current_receivable_amount,
+                               COALESCE(p.received_amount, 0) - COALESCE(p.refunded_amount, 0)
+                                   AS net_receipts,
+                               o.currency_code, o.delivery_fulfilled, o.payment_fulfilled,
+                               o.content_version, o.row_version, o.created_at, o.created_by,
+                               o.updated_at
+                        FROM orders_orders o
+                        LEFT JOIN orders_fulfillment_projections p
+                               ON p.order_business_id = o.order_business_id
+                        WHERE o.order_business_id = :id
                         """)
                 .param("id", orderBusinessId)
                 .query(JdbcOrderRepository::mapOrder)
@@ -1098,8 +1116,10 @@ public class JdbcOrderRepository implements OrderRepository {
                 resultSet.getString("customer_snapshot_ref"),
                 resultSet.getObject("order_date", LocalDate.class),
                 resultSet.getObject("expected_delivery_date", LocalDate.class),
+                resultSet.getString("order_note"),
                 resultSet.getString("status"),
                 resultSet.getBigDecimal("current_receivable_amount"),
+                resultSet.getBigDecimal("net_receipts"),
                 resultSet.getString("currency_code"),
                 resultSet.getBoolean("delivery_fulfilled"),
                 resultSet.getBoolean("payment_fulfilled"),

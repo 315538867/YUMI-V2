@@ -30,6 +30,7 @@ export interface OrderSummaryView {
   orderDate: string
   expectedDeliveryDate: string
   currentReceivable: MoneyWire
+  netReceipts: MoneyWire
   deliveryFulfilled: boolean
   paymentFulfilled: boolean
   contentVersion: number
@@ -45,6 +46,7 @@ export interface OrderView {
   customerSnapshotRef: string
   orderDate: string
   expectedDeliveryDate: string
+  note: string | null
   currentReceivableAmount: MoneyWire
   deliveryFulfilled: boolean
   paymentFulfilled: boolean
@@ -123,8 +125,8 @@ export interface OrderWorkspacePayment {
 }
 
 export interface OrderWorkspaceEvent {
-  kind: string
-  code: string | null
+  kind: CodeOf<'order.eventKind'>
+  code: CodeOf<'order.changeKind'> | null
   occurredAt: string
   title: string
   description: string
@@ -157,5 +159,6 @@ export interface CreateOrderInput {
   contactOverride: null
   orderDate: string
   expectedDeliveryDate: string
+  note: string | null
   items: OrderItemDraft[]
 }

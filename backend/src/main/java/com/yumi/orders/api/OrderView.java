@@ -13,6 +13,7 @@ public record OrderView(
         String customerSnapshotRef,
         LocalDate orderDate,
         LocalDate expectedDeliveryDate,
+        String note,
         com.yumi.platform.api.value.SettlementMoney currentReceivableAmount,
         boolean deliveryFulfilled,
         boolean paymentFulfilled,

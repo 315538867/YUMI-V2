@@ -464,6 +464,9 @@ onMounted(load)
 
         <el-tabs v-model="activeTab" class="tabs">
           <el-tab-pane label="成交约定" name="agreements">
+            <el-descriptions v-if="order.note" :column="1" border class="order-note">
+              <el-descriptions-item label="订单说明">{{ order.note }}</el-descriptions-item>
+            </el-descriptions>
             <el-table :data="order.items" border>
               <el-table-column label="商品" min-width="180">
                 <template #default="{ row }">
@@ -772,7 +775,7 @@ onMounted(load)
 
 <style scoped>
 .order-detail {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 20px;
@@ -839,5 +842,8 @@ h1 {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+.order-note {
+  margin-bottom: 12px;
 }
 </style>
