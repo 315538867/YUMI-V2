@@ -79,6 +79,26 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  admin-password-reset:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+    image: "yumi-backend:${YUMI_VERSION:-latest}"
+    entrypoint:
+      - java
+      - -Dloader.main=com.yumi.platform.identity.bootstrap.ResetAdministratorPasswordCommand
+      - -cp
+      - /app/app.jar
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    environment:
+      <<: *backend-environment
+      YUMI_ADMIN_LOGIN: "${YUMI_ADMIN_LOGIN:-admin}"
+      YUMI_ADMIN_NEW_PASSWORD: "${YUMI_ADMIN_NEW_PASSWORD:-}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    logging: *default-logging
+
   admin-bootstrap:
     profiles: ["tools"]
     build:

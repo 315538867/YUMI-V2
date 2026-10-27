@@ -154,6 +154,20 @@ unset YUMI_INITIAL_ADMIN_PASSWORD
 
 登录后立即在「账号与角色」中创建日常账号；初始管理员口令只用于首次进入。
 
+### 管理员口令轮换
+
+口令泄露或需要轮换时，在 `.42` 上执行（会立即吊销该账号全部会话）：
+
+```bash
+cd /srv/yumi/app
+read -r -s -p "管理员登录名: " YUMI_ADMIN_LOGIN; echo
+read -r -s -p "新口令: " YUMI_ADMIN_NEW_PASSWORD; echo
+docker compose --profile tools run --rm admin-password-reset
+unset YUMI_ADMIN_NEW_PASSWORD
+```
+
+成功后用新口令重新登录；命令不打印口令，也不修改角色或账号状态。
+
 ## 8. 验收清单
 
 - [ ] `docker compose ps` 中 `mysql`、`backend`、`frontend` 均为 healthy
