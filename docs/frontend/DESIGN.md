@@ -22,14 +22,14 @@
 | `--el-text-color-primary` | Element Plus 默认 | 正文与数值 |
 | `--el-text-color-secondary` | `#5f6673` | 说明、辅助字段 |
 | `--el-text-color-placeholder` | `#6b7280` | 输入占位 |
-| 页面背景 | `#f7f8fa` | 内容区底色 |
-| 工作区背景 | `#ffffff` | 页面卡片、侧栏、顶栏 |
+| 页面背景 | `var(--yumi-canvas)`（`#f7f8fa`） | 内容区底色 |
+| 工作区背景 | `var(--yumi-surface)`（`--el-bg-color`） | 页面卡片、侧栏、顶栏 |
 
 规则：
 
 - 状态色只用于标签、图标和小面积强调，不整行、整卡铺色。
 - 所有文字与背景对比度至少 4.5:1；主色、成功、警告、危险、辅助文字均已按此校验。
-- 业务页面禁止写死十六进制色值；新颜色先加到 `tokens.css`，再更新本表。
+- 业务页面禁止写死十六进制色值；白底用 `--yumi-surface`、内容区底色用 `--yumi-canvas`，新颜色先加到 `tokens.css`，再更新本表；`display.contract.test.ts` 扫描 `<style>` 并拦截色值。
 
 ## 3. 字体与层级
 

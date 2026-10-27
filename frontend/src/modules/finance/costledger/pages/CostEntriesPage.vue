@@ -134,7 +134,7 @@ void load()
 
 <style scoped>
 .entries-page {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 16px;

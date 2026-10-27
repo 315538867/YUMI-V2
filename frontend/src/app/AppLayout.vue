@@ -56,11 +56,11 @@ async function logout(): Promise<void> {
 <style scoped>
 .app-layout {
   min-height: 100vh;
-  background: #f7f8fa;
+  background: var(--yumi-canvas);
 }
 
 .sidebar {
-  background: #fff;
+  background: var(--yumi-surface);
   border-right: 1px solid var(--el-border-color-light);
 }
 
@@ -89,7 +89,7 @@ async function logout(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
+  background: var(--yumi-surface);
   border-bottom: 1px solid var(--el-border-color-light);
 }
 

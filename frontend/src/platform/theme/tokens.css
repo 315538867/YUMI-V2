@@ -18,4 +18,7 @@
 
   --el-text-color-secondary: #5f6673;
   --el-text-color-placeholder: #6b7280;
+
+  --yumi-surface: var(--el-bg-color);
+  --yumi-canvas: #f7f8fa;
 }

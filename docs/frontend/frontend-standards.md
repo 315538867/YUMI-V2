@@ -114,7 +114,7 @@
 - 类型命名：接口返回 `XxxView`，命令入参 `XxxInput`，领域记录 `XxxRecord`。
 - 布尔值用 `is/has/can/should` 前缀；事件处理函数用 `openXxx`、`submit`、`load`、`saveXxx`。
 - 测试与源码同目录：`*.test.ts`；E2E 放 `e2e/<domain>.spec.ts`，按中文标签断言。
-- CSS class 用 kebab-case，样式默认 `scoped`；颜色只用 `tokens.css` 变量，禁止行内样式（动态尺寸/颜色绑定除外）。
+- CSS class 用 kebab-case，样式默认 `scoped`；颜色只用 `tokens.css` 变量（白底 `--yumi-surface`、内容区底色 `--yumi-canvas`），禁止行内样式（动态尺寸/颜色绑定除外）；`<style>` 中的十六进制色值由展示契约测试拦截。
 - 依赖方向：`pages → services → platform`；`shared` 和 `platform` 不得导入 `@/modules/**`（ESLint 强制）。
 - 类型导入一律 `import type`；页面不得直接导入 `apiClient`、`api` 或使用 `fetch`。
 

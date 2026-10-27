@@ -70,12 +70,12 @@ async function submit(): Promise<void> {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: #f7f8fa;
+  background: var(--yumi-canvas);
 }
 
 .login-card {
   width: 360px;
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 28px;

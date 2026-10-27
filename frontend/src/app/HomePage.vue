@@ -34,7 +34,7 @@ const entries = computed(() =>
 
 <style scoped>
 .dashboard {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 24px;
@@ -60,7 +60,7 @@ h1 {
 .entry {
   padding: 18px;
   text-align: left;
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   cursor: pointer;

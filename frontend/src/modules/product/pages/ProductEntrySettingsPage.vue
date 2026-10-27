@@ -276,7 +276,7 @@ onMounted(load)
 
 <style scoped>
 .entry-settings {
-  background: #fff;
+  background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 20px;
