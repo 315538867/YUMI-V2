@@ -57,4 +57,10 @@ describe('一级菜单默认跳转', () => {
 
     expect(router.currentRoute.value.path).toBe(expected)
   })
+
+  it('未知路径回到首页而不是白屏', async () => {
+    await router.push('/payroll/reporting/monthly')
+
+    expect(router.currentRoute.value.path).toBe('/')
+  })
 })

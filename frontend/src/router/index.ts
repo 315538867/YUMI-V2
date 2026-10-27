@@ -382,6 +382,10 @@ export const routes: RouteRecordRaw[] = [
       ...moduleRoutes,
     ],
   },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/',
+  },
 ]
 
 const router = createRouter({
