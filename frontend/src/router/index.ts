@@ -107,7 +107,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'workforce',
         component: () => import('@/modules/workforce/pages/WorkforceLayout.vue'),
         meta: { requiresAuth: true, title: '人员与小组', permission: 'workforce.read' },
-        redirect: 'workforce/employees',
+        redirect: '/workforce/employees',
         children: [
           {
             path: 'employees',
@@ -139,7 +139,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'production',
         component: () => import('@/modules/production/pages/ProductionLayout.vue'),
         meta: { requiresAuth: true, title: '生产', permission: 'production.read' },
-        redirect: 'production/schedule',
+        redirect: '/production/schedule',
         children: [
           {
             path: 'schedule',
@@ -230,7 +230,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'payroll',
         component: () => import('@/modules/finance/payroll/pages/PayrollLayout.vue'),
-        redirect: 'payroll/periods',
+        redirect: '/payroll/periods',
         meta: { requiresAuth: true, title: '工资', permission: 'payroll.read' },
         children: [
           {
@@ -274,7 +274,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'finance',
         component: () => import('@/modules/finance/pages/FinanceLayout.vue'),
-        redirect: 'finance/daily-cash',
+        redirect: '/finance/daily-cash',
         meta: { requiresAuth: true, title: '现金与成本', permission: 'finance.read' },
         children: [
           {
@@ -318,7 +318,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'reporting',
         component: () => import('@/modules/reporting/pages/ReportingLayout.vue'),
-        redirect: 'reporting/monthly',
+        redirect: '/reporting/monthly',
         meta: { requiresAuth: true, title: '报表', permission: 'reporting.read' },
         children: [
           {
@@ -350,7 +350,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'settings',
         component: () => import('@/modules/platform-admin/pages/PlatformAdminLayout.vue'),
-        redirect: 'settings/accounts',
+        redirect: '/settings/accounts',
         meta: { requiresAuth: true, title: '设置与账号', permission: 'platform.account.manage' },
         children: [
           {
