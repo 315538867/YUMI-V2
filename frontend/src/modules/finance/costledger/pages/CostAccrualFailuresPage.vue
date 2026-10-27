@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { CostFailureView } from '@/modules/finance/costledger/contracts'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const failures = ref<CostFailureView[]>([])
 const errorText = ref('')
@@ -49,8 +50,12 @@ onMounted(load)
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
     <el-table :data="failures" border empty-text="暂无待恢复的归集失败">
-      <el-table-column prop="sourceModule" label="来源模块" width="140" />
-      <el-table-column prop="sourceType" label="来源类型" width="170" />
+      <el-table-column label="来源模块" width="140">
+        <template #default="{ row }"><CodeTag category="finance.costSourceModule" :code="row.sourceModule" /></template>
+      </el-table-column>
+      <el-table-column label="来源类型" width="170">
+        <template #default="{ row }"><CodeTag category="finance.costSourceType" :code="row.sourceType" /></template>
+      </el-table-column>
       <el-table-column prop="sourceBusinessId" label="来源标识" min-width="200" />
       <el-table-column prop="lastError" label="失败原因" min-width="220" />
       <el-table-column prop="attempts" label="尝试" width="80" />

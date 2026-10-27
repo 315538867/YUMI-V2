@@ -56,7 +56,7 @@ test('无生产来源的其他任务可安排并核验', async ({ page, request 
   await page.locator('.el-message-box input').fill('接口验收取消')
   await page.locator('.el-message-box__btns .el-button--primary').click()
   await expect(page.getByText('任务已取消；未核验计划占用已释放').first()).toBeVisible()
-  await expect(cancelRow.getByText('CANCELLED')).toBeVisible()
+  await expect(cancelRow.getByText('已取消')).toBeVisible()
 })
 
 test('独立调整其他任务的工作内容与标准分钟', async ({ page, request }) => {

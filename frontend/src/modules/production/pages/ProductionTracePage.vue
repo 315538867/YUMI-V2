@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { OrderProductionTrace } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
+import CodeTag from '@/shared/components/CodeTag.vue'
+import CodeLabel from '@/shared/components/CodeLabel.vue'
 
 const orderItemId = ref('')
 const trace = ref<OrderProductionTrace | null>(null)
@@ -47,18 +49,24 @@ async function load(): Promise<void> {
       <el-card v-for="demand in trace.demands" :key="demand.demandBusinessId" class="demand">
         <template #header>
           <strong>{{ demand.demandBusinessId }}</strong>
-          <span class="meta"> · {{ demand.demandType }} · {{ demand.status }}</span>
+          <span class="meta"> · <CodeTag category="production.demandType" :code="demand.demandType" /> · <CodeTag category="production.demandStatus" :code="demand.status" /></span>
         </template>
         <p class="meta">
           来源 {{ demand.productionSourceBusinessId }} · 物理根 {{ demand.physicalRootSourceBusinessId }}
         </p>
         <el-table :data="demand.tasks" border size="small">
           <el-table-column prop="taskNo" label="任务" width="130" />
-          <el-table-column prop="taskType" label="类型" width="150" />
+          <el-table-column label="类型" width="150">
+            <template #default="{ row }"><CodeTag category="production.taskType" :code="row.taskType" /></template>
+          </el-table-column>
           <el-table-column prop="workDate" label="工作日期" width="120" />
-          <el-table-column prop="processCode" label="工序" width="120" />
+          <el-table-column label="工序" width="120">
+            <template #default="{ row }"><CodeTag category="production.targetProcess" :code="row.processCode" /></template>
+          </el-table-column>
           <el-table-column prop="plannedQuantity" label="计划" width="80" />
-          <el-table-column prop="status" label="状态" width="120" />
+          <el-table-column label="状态" width="120">
+            <template #default="{ row }"><CodeTag category="production.taskStatus" :code="row.status" /></template>
+          </el-table-column>
           <el-table-column label="明细结果" min-width="260">
             <template #default="{ row }">
               <div v-for="item in row.items" :key="item.taskItemBusinessId">
@@ -75,7 +83,9 @@ async function load(): Promise<void> {
           延迟原因：{{ demand.delayReasons.join('；') }}
         </div>
         <el-table :data="demand.facts" border size="small" class="facts">
-          <el-table-column prop="factKind" label="事实" width="160" />
+          <el-table-column label="事实" width="160">
+            <template #default="{ row }"><CodeLabel category="production.factKind" :code="row.factKind" fallback="其他事实" /></template>
+          </el-table-column>
           <el-table-column prop="factBusinessId" label="事实标识" min-width="200" />
           <el-table-column prop="quantity" label="数量" width="80" />
           <el-table-column prop="occurredAt" label="发生时间" width="220" />
@@ -83,7 +93,9 @@ async function load(): Promise<void> {
         </el-table>
         <h3>转线下记录</h3>
         <el-table :data="offline.filter((row) => row.productionSourceBusinessId === demand.productionSourceBusinessId)" border size="small">
-          <el-table-column prop="factKind" label="类型" width="160" />
+          <el-table-column label="类型" width="160">
+            <template #default="{ row }"><CodeLabel category="production.factKind" :code="row.factKind" fallback="其他事实" /></template>
+          </el-table-column>
           <el-table-column prop="quantity" label="数量" width="80" />
           <el-table-column prop="destination" label="去向" width="190" />
           <el-table-column prop="detail" label="原因" min-width="150" />

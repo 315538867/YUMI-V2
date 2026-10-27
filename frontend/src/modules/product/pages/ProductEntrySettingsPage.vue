@@ -7,6 +7,7 @@ import { newIdempotencyKey } from '@/platform/services/idempotency'
 import { money } from '@/platform/services/money'
 import type { EntryConfiguration } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const router = useRouter()
 const configuration = ref<EntryConfiguration | null>(null)
@@ -217,7 +218,9 @@ onMounted(load)
 
       <h2>工序标准时间选项</h2>
       <el-table :data="configuration.processTimeOptions" border size="small">
-        <el-table-column prop="processCode" label="工序" width="130" />
+        <el-table-column label="工序" width="130">
+        <template #default="{ row }"><CodeTag category="product.targetProcess" :code="row.processCode" /></template>
+      </el-table-column>
         <el-table-column prop="optionCode" label="选项代码" width="150" />
         <el-table-column label="名称" min-width="140">
           <template #default="{ row }"><el-input v-model="row.name" /></template>

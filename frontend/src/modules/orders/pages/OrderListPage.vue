@@ -5,6 +5,8 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { OrderStatus, OrderSummaryView } from '@/modules/orders/contracts'
 import { orderService } from '@/modules/orders/services/orderService'
+import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -46,14 +48,16 @@ onMounted(load)
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="rows" empty-text="暂无订单" border>
       <el-table-column prop="orderNo" label="订单号" width="150" />
-      <el-table-column prop="origin" label="来源" width="150" />
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }"><CodeTag category="order.origin" :code="row.origin" /></template>
+      </el-table-column>
       <el-table-column label="状态" width="120">
-        <template #default="{ row }">{{ row.status }}</template>
+        <template #default="{ row }"><CodeTag category="order.status" :code="row.status" /></template>
       </el-table-column>
       <el-table-column prop="orderDate" label="订单日期" width="120" />
       <el-table-column prop="expectedDeliveryDate" label="预计交付" width="120" />
       <el-table-column label="当前应收" width="150">
-        <template #default="{ row }">{{ row.currentReceivable.amount }}</template>
+        <template #default="{ row }"><MoneyText :value="row.currentReceivable" /></template>
       </el-table-column>
       <el-table-column label="交付/付款" width="130">
         <template #default="{ row }">

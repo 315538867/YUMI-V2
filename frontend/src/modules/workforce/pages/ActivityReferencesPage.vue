@@ -7,6 +7,7 @@ import type {
   TeamView,
 } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const employees = ref<EmployeeView[]>([])
 const teams = ref<TeamView[]>([])
@@ -76,9 +77,10 @@ onMounted(load)
       <el-descriptions-item label="名称">{{ current.name }}</el-descriptions-item>
       <el-descriptions-item label="内容版本">{{ current.contentVersion }}</el-descriptions-item>
       <el-descriptions-item label="资格" :span="2">
-        <el-tag v-for="item in current.qualifications" :key="item.workTypeCode" class="tag">
-          {{ item.workTypeCode }} / {{ item.status }}
-        </el-tag>
+        <span v-for="item in current.qualifications" :key="item.workTypeCode" class="tag">
+          <CodeTag category="workforce.workType" :code="item.workTypeCode" />
+          <CodeTag category="workforce.qualificationStatus" :code="item.status" />
+        </span>
       </el-descriptions-item>
       <el-descriptions-item label="成员" :span="2">
         <el-tag v-for="id in current.memberEmployeeBusinessIds" :key="id" class="tag">

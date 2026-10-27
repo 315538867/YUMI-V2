@@ -6,6 +6,7 @@ import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { GlueMonthReferenceView, GluePolicyView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const month = ref(new Date().toISOString().slice(0, 7))
 const policy = ref<GluePolicyView | null>(null)
@@ -129,7 +130,7 @@ onMounted(load)
 
     <template v-if="reference">
       <el-descriptions :column="3" border>
-        <el-descriptions-item label="状态">{{ reference.status }}</el-descriptions-item>
+        <el-descriptions-item label="状态"><CodeTag category="finance.glueReferenceStatus" :code="reference.status" /></el-descriptions-item>
         <el-descriptions-item label="分配重量">{{ reference.allocatedWeight }}</el-descriptions-item>
         <el-descriptions-item label="免扣重量">{{ reference.exemptWeight }}</el-descriptions-item>
         <el-descriptions-item label="不完整原因" :span="2">{{ reference.incompleteReason ?? '无' }}</el-descriptions-item>

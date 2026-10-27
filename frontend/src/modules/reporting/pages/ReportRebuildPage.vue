@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import { reportingService } from '@/modules/reporting/services/reportingService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const auth = useAuthStore()
 const errorText = ref('')
@@ -63,7 +64,9 @@ onMounted(load)
     </div>
     <el-table :data="versions" border empty-text="暂无投影版本">
       <el-table-column prop="versionBusinessId" label="版本" min-width="240" />
-      <el-table-column prop="status" label="状态" width="120" />
+      <el-table-column label="状态" width="120">
+        <template #default="{ row }"><CodeTag category="reporting.versionStatus" :code="row.status" /></template>
+      </el-table-column>
       <el-table-column prop="recordCount" label="记录数" width="110" />
       <el-table-column prop="differenceCount" label="差异数" width="110" />
     </el-table>

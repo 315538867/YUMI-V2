@@ -6,6 +6,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { CustomerChangeView, CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -138,9 +139,7 @@ onMounted(load)
           {{ customer.defaultAddress }}
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="customer.status === 'ACTIVE' ? 'success' : 'info'">
-            {{ customer.status === 'ACTIVE' ? '启用' : '停用' }}
-          </el-tag>
+          <CodeTag category="common.status" :code="customer.status" />
         </el-descriptions-item>
         <el-descriptions-item label="内容版本">{{ customer.contentVersion }}</el-descriptions-item>
       </el-descriptions>
@@ -166,7 +165,9 @@ onMounted(load)
 
       <h2>资料变化历史</h2>
       <el-table :data="history" empty-text="暂无变化记录" border size="small">
-        <el-table-column prop="operationType" label="操作" width="120" />
+        <el-table-column label="操作" width="120">
+          <template #default="{ row }"><CodeTag category="customer.changeOperation" :code="row.operationType" /></template>
+        </el-table-column>
         <el-table-column label="版本" width="120">
           <template #default="{ row }">{{ row.versionBefore }} → {{ row.versionAfter }}</template>
         </el-table-column>

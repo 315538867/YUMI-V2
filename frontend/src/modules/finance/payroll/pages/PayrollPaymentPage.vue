@@ -6,6 +6,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const route = useRoute()
 const periods = ref<PayrollPeriodRef[]>([])
@@ -78,7 +79,9 @@ onMounted(load)
     <el-table :data="results" border @selection-change="selectionChanged">
       <el-table-column type="selection" width="50" />
       <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
-      <el-table-column prop="status" label="状态" width="130" />
+      <el-table-column label="状态" width="130">
+        <template #default="{ row }"><CodeTag category="finance.payrollResultStatus" :code="row.status" /></template>
+      </el-table-column>
       <el-table-column label="应付" width="130">
         <template #default="{ row }">{{ row.payableAmount?.amount ?? '—' }}</template>
       </el-table-column>

@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const router = useRouter()
 const periods = ref<PayrollPeriodRef[]>([])
@@ -94,7 +95,9 @@ onMounted(load)
     <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
     <el-table :data="results" empty-text="该期间暂无工资结果；请先刷新参考" border>
       <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
-      <el-table-column prop="status" label="状态" width="130" />
+      <el-table-column label="状态" width="130">
+        <template #default="{ row }"><CodeTag category="finance.payrollResultStatus" :code="row.status" /></template>
+      </el-table-column>
       <el-table-column label="参考行" width="100">
         <template #default="{ row }">{{ row.lines.length }}</template>
       </el-table-column>

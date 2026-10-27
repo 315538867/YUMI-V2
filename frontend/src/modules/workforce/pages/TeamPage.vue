@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const auth = useAuthStore()
 const teams = ref<TeamView[]>([])
@@ -91,9 +92,7 @@ onMounted(load)
       <el-table-column prop="name" label="名称" width="160" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-            {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-          </el-tag>
+          <CodeTag category="common.status" :code="row.status" />
         </template>
       </el-table-column>
       <el-table-column label="成员" min-width="240">

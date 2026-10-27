@@ -72,5 +72,5 @@ test('已有订单接管只记录当前阶段并可回查', async ({ page }) => 
   await page.getByRole('button', { name: '确认接管' }).click()
 
   await expect(page).toHaveURL(/\/orders\/ORD-/)
-  await expect(page.getByText('LEGACY_INTAKE')).toBeVisible()
+  await expect(page.getByText('已有订单接管')).toBeVisible()
 })

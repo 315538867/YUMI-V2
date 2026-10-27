@@ -4,6 +4,8 @@ import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { AccountView, RoleView } from '@/modules/platform-admin/services/administrationService'
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
+import CodeTag from '@/shared/components/CodeTag.vue'
+import { codeLabel } from '@/platform/display/codeCatalog'
 
 const accounts = ref<AccountView[]>([])
 const roles = ref<RoleView[]>([])
@@ -100,6 +102,10 @@ async function saveRole(): Promise<void> {
   }
 }
 
+function roleName(code: string): string {
+  return roles.value.find((role) => role.roleCode === code)?.name ?? '未知角色'
+}
+
 onMounted(load)
 </script>
 
@@ -113,14 +119,12 @@ onMounted(load)
       <el-table-column prop="displayName" label="显示名" width="160" />
       <el-table-column label="状态" width="110">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-            {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-          </el-tag>
+          <CodeTag category="common.status" :code="row.status" />
         </template>
       </el-table-column>
       <el-table-column label="角色" min-width="200">
         <template #default="{ row }">
-          <el-tag v-for="code in row.roleCodes" :key="code" class="tag">{{ code }}</el-tag>
+          <el-tag v-for="code in row.roleCodes" :key="code" class="tag">{{ roleName(code) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="190">
@@ -142,7 +146,7 @@ onMounted(load)
       <el-table-column prop="name" label="名称" width="160" />
       <el-table-column label="权限" min-width="300">
         <template #default="{ row }">
-          <el-tag v-for="code in row.permissionCodes" :key="code" class="tag">{{ code }}</el-tag>
+          <CodeTag v-for="code in row.permissionCodes" :key="code" category="platform.permission" :code="code" class="tag" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="100">
@@ -157,7 +161,7 @@ onMounted(load)
         <el-form-item label="账号">{{ activeAccount?.loginName }}</el-form-item>
         <el-form-item label="角色">
           <el-select v-model="selectedRoles" multiple>
-            <el-option v-for="role in roles" :key="role.roleCode" :label="role.roleCode" :value="role.roleCode" />
+            <el-option v-for="role in roles" :key="role.roleCode" :label="role.name" :value="role.roleCode" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -173,7 +177,7 @@ onMounted(load)
         <el-form-item label="角色名称"><el-input v-model="roleForm.name" /></el-form-item>
         <el-form-item label="权限">
           <el-select v-model="roleForm.permissionCodes" multiple filterable>
-            <el-option v-for="code in permissions" :key="code" :label="code" :value="code" />
+            <el-option v-for="code in permissions" :key="code" :label="codeLabel('platform.permission', code)" :value="code" />
           </el-select>
         </el-form-item>
       </el-form>

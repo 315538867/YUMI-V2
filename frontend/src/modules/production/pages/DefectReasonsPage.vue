@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { DefectReasonView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const auth = useAuthStore()
 const reasons = ref<DefectReasonView[]>([])
@@ -68,9 +69,7 @@ onMounted(load)
       </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-            {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-          </el-tag>
+          <CodeTag category="common.status" :code="row.status" />
         </template>
       </el-table-column>
       <el-table-column v-if="canManage" label="操作" width="110">

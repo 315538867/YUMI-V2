@@ -8,6 +8,7 @@ import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { TargetProcess, TaskType, TaskView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -142,14 +143,20 @@ onMounted(load)
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="tasks" empty-text="当日暂无任务" border>
       <el-table-column prop="taskNo" label="任务编号" width="140" />
-      <el-table-column prop="taskType" label="类型" width="150" />
+      <el-table-column label="类型" width="150">
+        <template #default="{ row }"><CodeTag category="production.taskType" :code="row.taskType" /></template>
+      </el-table-column>
       <el-table-column label="执行主体" min-width="150">
         <template #default="{ row }">{{ row.subject.subjectBusinessId }}</template>
       </el-table-column>
-      <el-table-column prop="processCode" label="工序" width="120" />
+      <el-table-column label="工序" width="120">
+        <template #default="{ row }"><CodeTag category="production.targetProcess" :code="row.processCode" /></template>
+      </el-table-column>
       <el-table-column prop="plannedWorkQuantity" label="计划量" width="90" />
       <el-table-column prop="taskStandardSeconds" label="标准秒数" width="110" />
-      <el-table-column prop="status" label="状态" width="150" />
+      <el-table-column label="状态" width="150">
+        <template #default="{ row }"><CodeTag category="production.taskStatus" :code="row.status" /></template>
+      </el-table-column>
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="router.push(`/production/tasks/${row.taskBusinessId}`)">

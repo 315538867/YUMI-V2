@@ -7,6 +7,7 @@ import type {
   PhysicalDestination,
 } from '@/modules/production/contracts'
 import { productionService, type VerifyItemInput } from '@/modules/production/services/productionService'
+import CodeLabel from '@/shared/components/CodeLabel.vue'
 
 const feed = ref<CorrectionFeedItem[]>([])
 const errorText = ref('')
@@ -130,8 +131,12 @@ onMounted(loadFeed)
       <el-table-column prop="feedSequence" label="序号" width="90" />
       <el-table-column prop="correctionCommandBusinessId" label="命令批次" min-width="200" />
       <el-table-column prop="taskItemBusinessId" label="任务明细" min-width="200" />
-      <el-table-column prop="itemKind" label="类型" width="120" />
-      <el-table-column prop="effectType" label="效果" width="100" />
+      <el-table-column label="类型" width="120">
+        <template #default="{ row }"><CodeLabel category="production.correctionItemKind" :code="row.itemKind" fallback="其他" /></template>
+      </el-table-column>
+      <el-table-column label="效果" width="100">
+        <template #default="{ row }"><CodeLabel category="production.correctionEffectType" :code="row.effectType" fallback="其他" /></template>
+      </el-table-column>
       <el-table-column prop="quantity" label="数量" width="80" />
       <el-table-column prop="businessDate" label="业务日期" width="120" />
     </el-table>

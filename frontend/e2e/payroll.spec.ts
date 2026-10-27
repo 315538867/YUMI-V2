@@ -20,7 +20,7 @@ test('逐人参考、独立核定、人工调整与部分付款分离提交', as
   await page.getByRole('button', { name: '刷新参考' }).click()
   await expect(page.getByText(/参考已刷新/).first()).toBeVisible()
 
-  const firstRow = page.locator('.el-table__row').filter({ hasText: 'REFERENCE_READY' }).first()
+  const firstRow = page.locator('.el-table__row').filter({ hasText: '参考就绪' }).first()
   await expect(firstRow).toBeVisible()
   await firstRow.getByRole('button', { name: '逐人核对' }).click()
 

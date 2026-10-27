@@ -8,7 +8,8 @@ function formInput(page: import('@playwright/test').Page, label: string) {
 test('日常收支按业务日期归月并与现金流水一致', async ({ page }) => {
   await login(page)
   await page.goto('/finance/daily-cash')
-  await formInput(page, '分类编码').fill('E2E_DAILY')
+  await page.locator('.el-form-item').filter({ hasText: '分类' }).locator('.el-select').click()
+  await page.getByRole('option', { name: '日常杂项' }).click()
   await formInput(page, '金额').fill('50.00')
   await page.locator('.el-form-item').filter({ hasText: '说明' }).locator('textarea').fill('验收日常收入')
   await page.getByRole('button', { name: '登记收支' }).click()
@@ -16,7 +17,7 @@ test('日常收支按业务日期归月并与现金流水一致', async ({ page 
 
   await page.goto('/finance/cash-history')
   await page.getByRole('button', { name: '查询' }).click()
-  await expect(page.getByRole('cell', { name: 'DAILY_INCOME' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: '日常收入' }).first()).toBeVisible()
   await expect(page.getByText('有效流入').first()).toBeVisible()
   await expect(page.getByText('现金净额').first()).toBeVisible()
 })

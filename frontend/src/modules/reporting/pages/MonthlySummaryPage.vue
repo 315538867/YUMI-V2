@@ -7,6 +7,7 @@ import type {
   MonthlyOperatingSummary,
 } from '@/modules/reporting/contracts'
 import { reportingService } from '@/modules/reporting/services/reportingService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const month = ref(new Date().toISOString().slice(0, 7))
 const summary = ref<MonthlyOperatingSummary | null>(null)
@@ -97,8 +98,12 @@ onMounted(load)
         <span v-if="freshness?.activatedAt"> · 切换于 {{ freshness.activatedAt }}</span>
       </p>
       <el-table :data="freshness?.feeds ?? []" border size="small">
-        <el-table-column prop="feedCode" label="来源" width="150" />
-        <el-table-column prop="status" label="状态" width="110" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }"><CodeTag category="reporting.feedCode" :code="row.feedCode" /></template>
+        </el-table-column>
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }"><CodeTag category="reporting.feedStatus" :code="row.status" /></template>
+        </el-table-column>
         <el-table-column prop="lagSeconds" label="延迟秒数" width="110" />
         <el-table-column prop="lastError" label="最近错误" min-width="260" />
       </el-table>

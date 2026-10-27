@@ -29,6 +29,16 @@ describe('前端接口消费边界', () => {
     expect(offenders).toEqual([])
   })
 
+  it('业务页面不直接导入平台 api 对象', () => {
+    const offenders = walk(join(SRC, 'modules'))
+      .filter((file) => file.endsWith('.vue'))
+      .filter((file) =>
+        readFileSync(file, 'utf8').includes("from '@/platform/services/api'"),
+      )
+
+    expect(offenders).toEqual([])
+  })
+
   it('只有 platform/services 与模块 services 可以创建 API 客户端', () => {
     const offenders = walk(SRC)
       .filter((file) => file.endsWith('.ts'))

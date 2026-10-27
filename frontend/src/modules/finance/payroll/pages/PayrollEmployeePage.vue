@@ -5,6 +5,8 @@ import { ElMessage } from 'element-plus'
 import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeePayrollView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
+import CodeTag from '@/shared/components/CodeTag.vue'
+import CodeLabel from '@/shared/components/CodeLabel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -142,7 +144,7 @@ onMounted(load)
         <div>
           <h1>逐人工资核定</h1>
           <span class="meta">
-            {{ result.employeeBusinessId }} · {{ result.status }} · 参考指纹
+            {{ result.employeeBusinessId }} · <CodeTag category="finance.payrollResultStatus" :code="result.status" /> · 参考指纹
             {{ result.referenceFingerprint.slice(0, 12) }}…
           </span>
         </div>
@@ -160,8 +162,12 @@ onMounted(load)
 
       <h2>逐项成本参考</h2>
       <el-table :data="result.lines" border size="small">
-        <el-table-column prop="componentCode" label="成本项" width="160" />
-        <el-table-column prop="lineType" label="类型" width="120" />
+        <el-table-column label="成本项" width="160">
+          <template #default="{ row }"><CodeLabel category="finance.costComponent" :code="row.componentCode" /></template>
+        </el-table-column>
+        <el-table-column label="类型" width="120">
+          <template #default="{ row }"><CodeLabel category="finance.costLineType" :code="row.lineType" /></template>
+        </el-table-column>
         <el-table-column prop="quantity" label="数量" width="80" />
         <el-table-column prop="unitAmount" label="单价" width="100" />
         <el-table-column label="参考金额" width="130">

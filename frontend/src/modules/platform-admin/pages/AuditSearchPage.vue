@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { AuditEntry } from '@/modules/platform-admin/services/administrationService'
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
+import CodeTag from '@/shared/components/CodeTag.vue'
+import CodeLabel from '@/shared/components/CodeLabel.vue'
 
 const targetType = ref('ORDER')
 const targetBusinessId = ref('')
@@ -46,9 +48,15 @@ async function load(): Promise<void> {
     </div>
     <el-table :data="entries" border empty-text="暂无审计记录">
       <el-table-column prop="occurredAt" label="时间" width="230" />
-      <el-table-column prop="moduleCode" label="模块" width="160" />
-      <el-table-column prop="actionCode" label="动作" min-width="190" />
-      <el-table-column prop="resultCode" label="结果" width="110" />
+      <el-table-column label="模块" width="160">
+        <template #default="{ row }"><CodeTag category="platform.auditModule" :code="row.moduleCode" fallback="其他模块" /></template>
+      </el-table-column>
+      <el-table-column label="动作" min-width="190">
+        <template #default="{ row }"><CodeLabel category="platform.auditAction" :code="row.actionCode" fallback="其他操作" /></template>
+      </el-table-column>
+      <el-table-column label="结果" width="110">
+        <template #default="{ row }"><CodeTag category="platform.auditResult" :code="row.resultCode" /></template>
+      </el-table-column>
       <el-table-column prop="accountBusinessId" label="账号" min-width="160" />
       <el-table-column prop="requestId" label="请求编号" min-width="200" />
       <el-table-column label="详情" min-width="200">

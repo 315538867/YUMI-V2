@@ -44,7 +44,13 @@ async function submit(): Promise<void> {
           <el-radio value="OUT">支出</el-radio>
         </el-radio-group>
       </el-form-item>
-      <el-form-item label="分类编码"><el-input v-model="form.categoryCode" /></el-form-item>
+      <el-form-item label="分类">
+        <el-select v-model="form.categoryCode" filterable allow-create default-first-option>
+          <el-option label="日常杂项" value="DAILY_MISC" />
+          <el-option label="日常收入" value="DAILY_INCOME" />
+          <el-option label="日常支出" value="DAILY_EXPENSE" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="业务日期">
         <el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" />
       </el-form-item>

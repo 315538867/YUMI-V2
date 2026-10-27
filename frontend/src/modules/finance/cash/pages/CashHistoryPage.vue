@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { CashFactView, CashPeriodSummary } from '@/modules/finance/cash/contracts'
 import { cashService } from '@/modules/finance/cash/services/cashService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const startDate = ref(new Date().toISOString().slice(0, 8) + '01')
 const endDate = ref(new Date().toISOString().slice(0, 10))
@@ -88,9 +89,11 @@ onMounted(load)
     <el-table :data="facts" border empty-text="期间内无现金流水">
       <el-table-column prop="cashNo" label="现金单号" width="140" />
       <el-table-column prop="businessDate" label="业务日期" width="120" />
-      <el-table-column prop="cashType" label="类型" width="180" />
+      <el-table-column label="类型" width="180">
+        <template #default="{ row }"><CodeTag category="finance.cashType" :code="row.cashType" /></template>
+      </el-table-column>
       <el-table-column label="方向" width="80">
-        <template #default="{ row }">{{ row.direction === 'IN' ? '流入' : '流出' }}</template>
+        <template #default="{ row }"><CodeTag category="finance.cashDirection" :code="row.direction" /></template>
       </el-table-column>
       <el-table-column prop="amount" label="金额" width="130" />
       <el-table-column label="有效" width="80">

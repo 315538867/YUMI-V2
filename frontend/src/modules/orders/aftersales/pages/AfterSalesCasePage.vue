@@ -14,6 +14,7 @@ import type {
 } from '@/modules/orders/aftersales/contracts'
 import { afterSalesService } from '@/modules/orders/aftersales/services/afterSalesService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const caseId = ref('')
 const current = ref<AfterSalesCaseView | null>(null)
@@ -282,7 +283,9 @@ async function submit(): Promise<void> {
       <el-table-column prop="caseNo" label="案例号" width="150" />
       <el-table-column prop="orderBusinessId" label="订单" min-width="200" />
       <el-table-column prop="issueSummary" label="问题" min-width="180" />
-      <el-table-column prop="status" label="状态" width="120" />
+      <el-table-column label="状态" width="120">
+        <template #default="{ row }"><CodeTag category="afterSales.caseStatus" :code="row.status" /></template>
+      </el-table-column>
       <el-table-column label="操作" width="90">
         <template #default="{ row }">
           <el-button link type="primary" @click="caseId = row.caseBusinessId; load()">查看</el-button>
@@ -296,21 +299,25 @@ async function submit(): Promise<void> {
       <el-descriptions :column="3" border>
         <el-descriptions-item label="案例号">{{ current.caseNo }}</el-descriptions-item>
         <el-descriptions-item label="订单">{{ current.orderBusinessId }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ current.status }}</el-descriptions-item>
-        <el-descriptions-item label="路线">{{ current.routeType }}</el-descriptions-item>
+        <el-descriptions-item label="状态"><CodeTag category="afterSales.caseStatus" :code="current.status" /></el-descriptions-item>
+        <el-descriptions-item label="路线"><CodeTag category="afterSales.routeType" :code="current.routeType" /></el-descriptions-item>
         <el-descriptions-item label="问题" :span="2">{{ current.issueSummary }}</el-descriptions-item>
       </el-descriptions>
 
       <h2>义务</h2>
       <el-table :data="current.obligations" border>
         <el-table-column prop="obligationBusinessId" label="义务标识" min-width="200" />
-        <el-table-column prop="obligationType" label="类型" width="170" />
+        <el-table-column label="类型" width="170">
+          <template #default="{ row }"><CodeTag category="afterSales.obligationType" :code="row.obligationType" /></template>
+        </el-table-column>
         <el-table-column label="目标" width="120">
           <template #default="{ row }">
             {{ row.targetQuantity ?? row.targetAmount?.amount ?? '—' }}
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="150" />
+        <el-table-column label="状态" width="150">
+          <template #default="{ row }"><CodeTag category="afterSales.obligationStatus" :code="row.status" /></template>
+        </el-table-column>
         <el-table-column label="操作" width="330" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openAction('pay', row.obligationBusinessId)">赔付/退款</el-button>
@@ -324,12 +331,16 @@ async function submit(): Promise<void> {
       <h2>售后费用（不属于现金）</h2>
       <el-table :data="costs" empty-text="暂无售后费用" border size="small" class="case-list">
         <el-table-column prop="sourceBusinessId" label="费用来源" min-width="200" />
-        <el-table-column prop="costCategory" label="分类" width="150" />
+        <el-table-column label="分类" width="150">
+          <template #default="{ row }"><CodeTag category="finance.costCategory" :code="row.costCategory" /></template>
+        </el-table-column>
         <el-table-column label="金额" width="130">
           <template #default="{ row }">{{ row.amount.amount }}</template>
         </el-table-column>
         <el-table-column prop="businessDate" label="业务日期" width="120" />
-        <el-table-column prop="operationType" label="操作" width="110" />
+        <el-table-column label="操作" width="110">
+          <template #default="{ row }"><CodeTag category="finance.costOperation" :code="row.operationType" /></template>
+        </el-table-column>
         <el-table-column prop="reasonText" label="原因" min-width="160" />
       </el-table>
 
@@ -337,7 +348,9 @@ async function submit(): Promise<void> {
       <el-table :data="received" empty-text="尚未通过本页接收退回" border size="small">
         <el-table-column prop="receiptItemBusinessId" label="接收明细" min-width="200" />
         <el-table-column prop="quantity" label="数量" width="80" />
-        <el-table-column prop="conditionCode" label="状态" width="100" />
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }"><CodeTag category="afterSales.conditionCode" :code="row.conditionCode" /></template>
+        </el-table-column>
         <el-table-column label="操作" width="240">
           <template #default="{ row }">
             <el-button link type="primary" @click="openAction('dispose', row.obligationBusinessId, row.receiptItemBusinessId)">
@@ -388,7 +401,13 @@ async function submit(): Promise<void> {
         </template>
         <template v-if="action === 'return'">
           <el-form-item label="数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
-          <el-form-item label="状态"><el-input v-model="form.conditionCode" /></el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="form.conditionCode">
+              <el-option label="良好" value="GOOD" />
+              <el-option label="损坏" value="DAMAGED" />
+              <el-option label="有缺陷" value="DEFECTIVE" />
+            </el-select>
+          </el-form-item>
         </template>
         <template v-if="action === 'dispose'">
           <el-form-item label="数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>

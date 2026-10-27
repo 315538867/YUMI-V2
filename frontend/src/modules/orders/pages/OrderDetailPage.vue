@@ -18,6 +18,7 @@ import { customerService } from '@/modules/customer/services/customerService'
 import { productService } from '@/modules/product/services/productService'
 import { fileService } from '@/platform/services/fileService'
 import BusinessFileUpload from '@/shared/components/BusinessFileUpload.vue'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 interface TraceLedger {
   requiredQuantity?: number
@@ -400,19 +401,7 @@ async function viewVouchers(payment: OrderWorkspacePayment): Promise<void> {
   }
 }
 
-function statusLabel(status: string): string {
-  return (
-    {
-      CONFIRMED: '已确认',
-      IN_FULFILLMENT: '履约中',
-      COMPLETED: '已完成',
-      CANCELLED: '已取消',
-    }[status] ?? status
-  )
-}
-
-onMounted(load)
-</script>
+onMounted(load)</script>
 
 <template>
   <section v-loading="loading" class="order-detail">
@@ -423,7 +412,8 @@ onMounted(load)
         <div>
           <h1>{{ order.orderNo }}</h1>
           <span class="meta">
-            {{ order.origin }} · {{ statusLabel(order.status) }} · {{ order.orderDate }} →
+            <CodeTag category="order.origin" :code="order.origin" /> ·
+            <CodeTag category="order.status" :code="order.status" /> · {{ order.orderDate }} →
             {{ order.expectedDeliveryDate }}
           </span>
         </div>
@@ -459,7 +449,9 @@ onMounted(load)
               </template>
             </el-table-column>
             <el-table-column label="目标工序" width="120">
-              <template #default="{ row }">{{ row.agreement.targetProcess }}</template>
+              <template #default="{ row }">
+                <CodeTag category="production.targetProcess" :code="row.agreement.targetProcess" />
+              </template>
             </el-table-column>
             <el-table-column label="数量 / 已交付" width="130">
               <template #default="{ row }">
@@ -491,11 +483,17 @@ onMounted(load)
           <el-table :data="progressRows" border empty-text="暂无生产需求">
             <el-table-column prop="productName" label="商品" min-width="160" />
             <el-table-column prop="demandBusinessId" label="需求" min-width="200" />
-            <el-table-column prop="targetProcess" label="目标工序" width="120" />
+            <el-table-column label="目标工序" width="120">
+              <template #default="{ row }"><CodeTag category="production.targetProcess" :code="row.targetProcess" /></template>
+            </el-table-column>
             <el-table-column prop="required" label="需求数量" width="100" />
             <el-table-column prop="qualified" label="合格完成" width="100" />
             <el-table-column prop="shipped" label="有效已发货" width="110" />
-            <el-table-column prop="status" label="需求状态" width="140" />
+            <el-table-column label="需求状态" width="140">
+              <template #default="{ row }">
+                <CodeTag category="production.demandStatus" :code="row.status" />
+              </template>
+            </el-table-column>
           </el-table>
         </el-tab-pane>
 
@@ -523,7 +521,9 @@ onMounted(load)
               </el-table-column>
             </el-table>
             <el-table v-if="shipment.corrections.length" :data="shipment.corrections" border size="small" class="corrections">
-              <el-table-column prop="correctionType" label="更正类型" width="130" />
+              <el-table-column label="更正类型" width="130">
+                <template #default="{ row }"><CodeTag category="order.correctionType" :code="row.correctionType" /></template>
+              </el-table-column>
               <el-table-column prop="quantityDelta" label="数量变化" width="100" />
               <el-table-column prop="reasonText" label="原因" min-width="220" />
               <el-table-column label="时间" width="200">

@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { TaskView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,7 +36,7 @@ onMounted(load)
       <header class="head">
         <div>
           <h1>{{ task.taskNo }}</h1>
-          <span class="meta">{{ task.taskType }} · {{ task.status }} · {{ task.workDate }}</span>
+          <span class="meta"><CodeTag category="production.taskType" :code="task.taskType" /> · <CodeTag category="production.taskStatus" :code="task.status" /> · {{ task.workDate }}</span>
         </div>
         <el-space>
           <el-button
@@ -49,9 +50,12 @@ onMounted(load)
       </header>
       <el-descriptions :column="3" border>
         <el-descriptions-item label="执行主体">
-          {{ task.subject.subjectType }} / {{ task.subject.subjectBusinessId }}
+          <CodeTag category="production.subjectType" :code="task.subject.subjectType" /> / {{ task.subject.subjectBusinessId }}
         </el-descriptions-item>
-        <el-descriptions-item label="工序">{{ task.processCode ?? '其他任务' }}</el-descriptions-item>
+        <el-descriptions-item label="工序">
+          <CodeTag v-if="task.processCode" category="production.targetProcess" :code="task.processCode" />
+          <span v-else>其他任务</span>
+        </el-descriptions-item>
         <el-descriptions-item label="计划量">{{ task.plannedWorkQuantity }}</el-descriptions-item>
         <el-descriptions-item label="标准秒数">{{ task.taskStandardSeconds }}</el-descriptions-item>
         <el-descriptions-item v-if="task.otherTask" label="工作内容" :span="2">

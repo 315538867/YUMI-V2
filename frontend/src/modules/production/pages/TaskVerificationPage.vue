@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { PhysicalDestination, TaskView } from '@/modules/production/contracts'
 import { productionService, type VerifyItemInput } from '@/modules/production/services/productionService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 interface ItemForm {
   taskItemBusinessId: string
@@ -136,8 +137,8 @@ onMounted(load)
     <template v-if="task">
       <el-descriptions :column="3" border class="summary">
         <el-descriptions-item label="任务">{{ task.taskNo }}</el-descriptions-item>
-        <el-descriptions-item label="类型">{{ task.taskType }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ task.status }}</el-descriptions-item>
+        <el-descriptions-item label="类型"><CodeTag category="production.taskType" :code="task.taskType" /></el-descriptions-item>
+        <el-descriptions-item label="状态"><CodeTag category="production.taskStatus" :code="task.status" /></el-descriptions-item>
       </el-descriptions>
 
       <template v-if="task.taskType === 'OTHER_TASK'">

@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const auth = useAuthStore()
 const employees = ref<EmployeeView[]>([])
@@ -101,10 +102,6 @@ function leave(employee: EmployeeView): void {
   open('leave', employee)
 }
 
-function statusText(employee: EmployeeView): string {
-  return employee.employmentStatus === 'EMPLOYED' ? '在职' : '离职'
-}
-
 onMounted(load)
 </script>
 
@@ -121,21 +118,18 @@ onMounted(load)
       <el-table-column prop="phone" label="电话" width="150" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.employmentStatus === 'EMPLOYED' ? 'success' : 'info'">
-            {{ statusText(row) }}
-          </el-tag>
+          <CodeTag category="workforce.employmentStatus" :code="row.employmentStatus" />
         </template>
       </el-table-column>
       <el-table-column label="资格" min-width="200">
         <template #default="{ row }">
-          <el-tag
+          <CodeTag
             v-for="item in row.qualifications"
             :key="item.workTypeCode"
-            :type="item.status === 'ACTIVE' ? 'success' : 'info'"
+            category="workforce.workType"
+            :code="item.workTypeCode"
             class="tag"
-          >
-            {{ item.workTypeCode }}
-          </el-tag>
+          />
         </template>
       </el-table-column>
       <el-table-column prop="latestEffectiveDate" label="最近生效日" width="130" />

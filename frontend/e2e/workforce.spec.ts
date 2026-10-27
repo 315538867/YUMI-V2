@@ -32,7 +32,7 @@ test('员工资格、资料、离职返聘与活动引用使用真实接口', as
   await page.locator('.el-dialog .el-form-item').filter({ hasText: '工种' }).locator('.el-select').click()
   await page.getByRole('option', { name: '制作' }).click()
   await page.getByRole('button', { name: '确认' }).click()
-  await expect(row.getByText('MAKING')).toBeVisible()
+  await expect(row.getByText('制作')).toBeVisible()
 
   await row.getByRole('button', { name: '编辑' }).click()
   await formInput(page, '姓名').fill(`${name}-已改`)

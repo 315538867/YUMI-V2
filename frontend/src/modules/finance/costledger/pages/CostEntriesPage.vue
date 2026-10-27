@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { CostEntryView, CostSubjectSummary } from '@/modules/finance/costledger/contracts'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const filters = reactive({
   subjectType: 'ORDER',
@@ -65,9 +66,13 @@ onMounted(load)
     </el-descriptions>
     <el-table :data="entries" border empty-text="暂无成本明细">
       <el-table-column prop="costEntryBusinessId" label="成本事实" min-width="200" />
-      <el-table-column prop="costCategory" label="分类" width="150" />
+      <el-table-column label="分类" width="150">
+        <template #default="{ row }"><CodeTag category="finance.costCategory" :code="row.costCategory" /></template>
+      </el-table-column>
       <el-table-column prop="businessDate" label="业务日期" width="120" />
-      <el-table-column prop="operationType" label="操作" width="110" />
+      <el-table-column label="操作" width="110">
+        <template #default="{ row }"><CodeTag category="finance.costOperation" :code="row.operationType" /></template>
+      </el-table-column>
       <el-table-column prop="amount" label="金额" width="130" />
       <el-table-column label="已分摊" width="90">
         <template #default="{ row }">{{ row.allocated ? '是' : '否' }}</template>

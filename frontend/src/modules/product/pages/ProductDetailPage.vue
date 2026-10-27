@@ -6,6 +6,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { ProductView, SchemeView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -115,7 +116,7 @@ onMounted(load)
           {{ product.makingCommission.amount }}
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          {{ product.status === 'ACTIVE' ? '启用' : '停用' }}
+          <CodeTag category="common.status" :code="product.status" />
         </el-descriptions-item>
       </el-descriptions>
 
@@ -133,11 +134,11 @@ onMounted(load)
         <el-table-column prop="name" label="方案" min-width="150" />
         <el-table-column label="类型" width="110">
           <template #default="{ row }">
-            {{ row.schemeType === 'SYSTEM_STANDARD' ? '标准' : '自定义' }}
+            <CodeTag category="product.schemeType" :code="row.schemeType" />
           </template>
         </el-table-column>
         <el-table-column label="目标工序" width="120">
-          <template #default="{ row }">{{ row.targetProcess }}</template>
+          <template #default="{ row }"><CodeTag category="product.targetProcess" :code="row.targetProcess" /></template>
         </el-table-column>
         <el-table-column label="售价" width="130">
           <template #default="{ row }">{{ row.salePrice.amount }}</template>

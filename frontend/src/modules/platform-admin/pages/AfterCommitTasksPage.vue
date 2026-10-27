@@ -4,6 +4,8 @@ import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { AfterCommitTask } from '@/modules/platform-admin/services/administrationService'
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
+import CodeTag from '@/shared/components/CodeTag.vue'
+import CodeLabel from '@/shared/components/CodeLabel.vue'
 
 const status = ref('DEAD')
 const tasks = ref<AfterCommitTask[]>([])
@@ -72,9 +74,13 @@ onMounted(load)
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
     <el-table :data="tasks" border empty-text="暂无任务">
-      <el-table-column prop="taskType" label="任务类型" width="170" />
+      <el-table-column label="任务类型" width="170">
+        <template #default="{ row }"><CodeLabel category="platform.afterCommitTaskType" :code="row.taskType" fallback="其他任务" /></template>
+      </el-table-column>
       <el-table-column prop="deduplicationKey" label="去重键" min-width="220" />
-      <el-table-column prop="status" label="状态" width="120" />
+      <el-table-column label="状态" width="120">
+        <template #default="{ row }"><CodeTag category="platform.afterCommitTaskStatus" :code="row.status" /></template>
+      </el-table-column>
       <el-table-column prop="attempts" label="尝试" width="80" />
       <el-table-column prop="lastError" label="失败原因" min-width="240" />
       <el-table-column label="来源" min-width="220">

@@ -15,6 +15,7 @@ import type {
   ProductSnapshotRef,
 } from '@/modules/orders/contracts'
 import { orderService } from '@/modules/orders/services/orderService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 interface DraftItem {
   key: string
@@ -390,7 +391,9 @@ onMounted(load)
         <el-table-column label="方案" min-width="140">
           <template #default="{ row }">{{ schemeName(row) }}</template>
         </el-table-column>
-        <el-table-column prop="targetProcess" label="目标工序" width="120" />
+        <el-table-column label="目标工序" width="120">
+          <template #default="{ row }"><CodeTag category="production.targetProcess" :code="row.targetProcess" /></template>
+        </el-table-column>
         <el-table-column prop="quantity" label="数量" width="80" />
         <el-table-column prop="unitPrice" label="单价" width="100" />
       </el-table>

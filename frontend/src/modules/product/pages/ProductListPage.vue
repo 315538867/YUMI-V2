@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { ProductStatus, ProductView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -70,9 +71,7 @@ onMounted(load)
       <el-table-column prop="dailyCapacity" label="日产能" width="90" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-            {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-          </el-tag>
+          <CodeTag category="common.status" :code="row.status" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="120" fixed="right">
