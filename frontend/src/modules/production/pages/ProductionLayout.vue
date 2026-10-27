@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
+import ProductionOverviewCard from '@/modules/production/pages/ProductionOverviewCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,7 @@ const tabs = [
 </script>
 
 <template>
+  <ProductionOverviewCard />
   <el-tabs
     :model-value="active"
     class="production-tabs"

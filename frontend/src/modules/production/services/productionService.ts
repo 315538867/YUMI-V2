@@ -11,6 +11,7 @@ import type {
   ResponsibilityType,
   TargetProcess,
   TaskType,
+  ProductionOverview,
   TaskView,
 } from '@/modules/production/contracts'
 
@@ -72,6 +73,16 @@ export interface VerifyItemInput {
 export const productionService = {
   tasks(workDate: string): Promise<TaskView[]> {
     return api.query<TaskView[]>(`/api/production/tasks?workDate=${workDate}`)
+  },
+
+  overview(): Promise<ProductionOverview> {
+    return api.query<ProductionOverview>('/api/production/tasks/overview')
+  },
+
+  recentTraces(offset = 0, limit = 50): Promise<OrderProductionTrace[]> {
+    return api.query<OrderProductionTrace[]>(
+      `/api/production/traces?offset=${offset}&limit=${limit}`,
+    )
   },
 
   tasksBetween(startDate?: string, endDate?: string): Promise<TaskView[]> {

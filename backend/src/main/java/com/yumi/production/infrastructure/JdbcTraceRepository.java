@@ -71,6 +71,92 @@ public class JdbcTraceRepository implements TraceRepository {
     }
 
     @Override
+    public List<String> listOrderItemsWithDemands(int offset, int limit) {
+        return jdbc.sql("""
+                        SELECT order_item_business_id
+                        FROM production_demands
+                        WHERE order_item_business_id IS NOT NULL AND status <> 'CANCELLED'
+                        GROUP BY order_item_business_id
+                        ORDER BY MAX(updated_at) DESC
+                        LIMIT :limit OFFSET :offset
+                        """)
+                .param("limit", limit)
+                .param("offset", offset)
+                .query(String.class)
+                .list();
+    }
+
+    @Override
+    public List<OverviewDemandRow> overviewDemands() {
+        return jdbc.sql("""
+                        SELECT d.demand_business_id, d.order_business_id, d.target_process,
+                               p.required_quantity, p.fulfilled_quantity,
+                               COALESCE(agg.scheduled_making, 0) AS scheduled_making,
+                               COALESCE(agg.scheduled_bagging, 0) AS scheduled_bagging,
+                               COALESCE(agg.scheduled_seam, 0) AS scheduled_seam,
+                               COALESCE(agg.processed_making, 0) AS processed_making,
+                               COALESCE(agg.processed_bagging, 0) AS processed_bagging,
+                               COALESCE(agg.processed_seam, 0) AS processed_seam,
+                               COALESCE(agg.completed_making, 0) AS completed_making,
+                               COALESCE(agg.completed_bagging, 0) AS completed_bagging,
+                               COALESCE(agg.completed_seam, 0) AS completed_seam
+                        FROM production_demands d
+                        JOIN production_demand_quantity_projections p
+                               ON p.demand_business_id = d.demand_business_id
+                        LEFT JOIN (
+                            SELECT ti.demand_business_id,
+                                   SUM(CASE WHEN t.process_code = 'MAKING'
+                                            THEN ti.planned_quantity ELSE 0 END) AS scheduled_making,
+                                   SUM(CASE WHEN t.process_code = 'BAGGING'
+                                            THEN ti.planned_quantity ELSE 0 END) AS scheduled_bagging,
+                                   SUM(CASE WHEN t.process_code = 'SEAM_CUTTING'
+                                            THEN ti.planned_quantity ELSE 0 END) AS scheduled_seam,
+                                   SUM(CASE WHEN t.process_code = 'MAKING'
+                                            THEN COALESCE(ti.completed_quantity, 0) ELSE 0 END)
+                                       AS processed_making,
+                                   SUM(CASE WHEN t.process_code = 'BAGGING'
+                                            THEN COALESCE(ti.completed_quantity, 0) ELSE 0 END)
+                                       AS processed_bagging,
+                                   SUM(CASE WHEN t.process_code = 'SEAM_CUTTING'
+                                            THEN COALESCE(ti.completed_quantity, 0) ELSE 0 END)
+                                       AS processed_seam,
+                                   SUM(CASE WHEN t.process_code = 'MAKING'
+                                            THEN COALESCE(ti.qualified_quantity, 0) ELSE 0 END)
+                                       AS completed_making,
+                                   SUM(CASE WHEN t.process_code = 'BAGGING'
+                                            THEN COALESCE(ti.qualified_quantity, 0) ELSE 0 END)
+                                       AS completed_bagging,
+                                   SUM(CASE WHEN t.process_code = 'SEAM_CUTTING'
+                                            THEN COALESCE(ti.qualified_quantity, 0) ELSE 0 END)
+                                       AS completed_seam
+                            FROM production_tasks t
+                            JOIN production_task_items ti ON ti.task_business_id = t.task_business_id
+                            WHERE t.status <> 'CANCELLED'
+                            GROUP BY ti.demand_business_id
+                        ) agg ON agg.demand_business_id = d.demand_business_id
+                        WHERE d.status <> 'CANCELLED'
+                        ORDER BY d.order_business_id, d.demand_business_id
+                        """)
+                .query((resultSet, rowNumber) -> new OverviewDemandRow(
+                        resultSet.getString("demand_business_id"),
+                        resultSet.getString("order_business_id"),
+                        com.yumi.production.api.TargetProcess.valueOf(
+                                resultSet.getString("target_process")),
+                        resultSet.getInt("required_quantity"),
+                        resultSet.getInt("fulfilled_quantity"),
+                        resultSet.getInt("scheduled_making"),
+                        resultSet.getInt("scheduled_bagging"),
+                        resultSet.getInt("scheduled_seam"),
+                        resultSet.getInt("processed_making"),
+                        resultSet.getInt("processed_bagging"),
+                        resultSet.getInt("processed_seam"),
+                        resultSet.getInt("completed_making"),
+                        resultSet.getInt("completed_bagging"),
+                        resultSet.getInt("completed_seam")))
+                .list();
+    }
+
+    @Override
     public List<TaskRow> findTasksOfSource(String productionSourceBusinessId) {
         return jdbc.sql("""
                         SELECT t.task_business_id, t.task_no, t.task_type, t.work_date, t.process_code,

@@ -12,6 +12,12 @@ public interface TraceRepository {
 
     List<DemandRecord> findDemandsOfOrderItem(String orderItemBusinessId);
 
+    /** 有生产需求的订单项，按最近更新倒序；用于默认展示全部订单追溯。 */
+    List<String> listOrderItemsWithDemands(int offset, int limit);
+
+    /** 整体进度按需求的聚合行。 */
+    List<OverviewDemandRow> overviewDemands();
+
     List<TaskRow> findTasksOfSource(String productionSourceBusinessId);
 
     List<ItemRow> findItemsOfSource(String productionSourceBusinessId);
@@ -50,6 +56,16 @@ public interface TraceRepository {
             String factKind, String factBusinessId, String productionSourceBusinessId,
             String physicalRootSourceBusinessId, String taskBusinessId, LocalDate taskWorkDate,
             Instant occurredAt, int quantity, String detail) {
+    }
+
+    /** 整体进度聚合行：需求、履约与三道工序的排班/完成数量。 */
+    record OverviewDemandRow(
+            String demandBusinessId, String orderBusinessId,
+            com.yumi.production.api.TargetProcess targetProcess,
+            int requiredQuantity, int fulfilledQuantity,
+            int scheduledMaking, int scheduledBagging, int scheduledSeam,
+            int processedMaking, int processedBagging, int processedSeam,
+            int completedMaking, int completedBagging, int completedSeam) {
     }
 
     /** 公开投影行。 */

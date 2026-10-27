@@ -49,6 +49,18 @@ public class ProductionTraceServiceImpl implements ProductionQuery, ProductionRe
         if (orderItemBusinessId == null || orderItemBusinessId.isBlank()) {
             throw new ApiException(ApiErrorType.VALIDATION, "MISSING_ORDER_ITEM", "订单项标识不能为空");
         }
+        return buildTrace(orderItemBusinessId);
+    }
+
+    @Override
+    public List<OrderProductionTrace> recentTraces(int offset, int limit) {
+        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
+        return traces.listOrderItemsWithDemands(Math.max(0, offset), clamp(limit)).stream()
+                .map(this::buildTrace)
+                .toList();
+    }
+
+    private OrderProductionTrace buildTrace(String orderItemBusinessId) {
         List<DemandRecord> demands = traces.findDemandsOfOrderItem(orderItemBusinessId);
         if (demands.isEmpty()) {
             throw new ApiException(
@@ -60,6 +72,75 @@ public class ProductionTraceServiceImpl implements ProductionQuery, ProductionRe
             tracesOfDemand.add(traceOfDemand(demand));
         }
         return new OrderProductionTrace(orderBusinessId, orderItemBusinessId, tracesOfDemand);
+    }
+
+    @Override
+    public com.yumi.production.api.ProductionOverviewView overview() {
+        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
+        var rows = traces.overviewDemands();
+        int orderCount = (int) rows.stream()
+                .map(TraceRepository.OverviewDemandRow::orderBusinessId)
+                .distinct()
+                .count();
+        int required = 0;
+        int scheduled = 0;
+        int facts = 0;
+        int fulfilled = 0;
+        int[] processRequired = new int[3];
+        int[] processScheduled = new int[3];
+        int[] processCompleted = new int[3];
+        for (var row : rows) {
+            int demandRequired = row.requiredQuantity();
+            required += demandRequired;
+            fulfilled += row.fulfilledQuantity();
+            int firstScheduled = switch (row.targetProcess()) {
+                case MAKING -> row.scheduledMaking();
+                case BAGGING -> row.scheduledBagging();
+                case SEAM_CUTTING -> row.scheduledMaking();
+            };
+            int firstProcessed = switch (row.targetProcess()) {
+                case MAKING -> row.processedMaking();
+                case BAGGING -> row.processedBagging();
+                case SEAM_CUTTING -> row.processedMaking();
+            };
+            scheduled += Math.min(demandRequired, firstScheduled);
+            facts += Math.min(demandRequired, firstProcessed);
+
+            if (row.targetProcess() == TargetProcess.MAKING
+                    || row.targetProcess() == TargetProcess.SEAM_CUTTING) {
+                processRequired[0] += demandRequired;
+                processScheduled[0] += Math.min(demandRequired, row.scheduledMaking());
+                processCompleted[0] += Math.min(demandRequired, row.completedMaking());
+            }
+            if (row.targetProcess() == TargetProcess.BAGGING
+                    || row.targetProcess() == TargetProcess.SEAM_CUTTING) {
+                processRequired[1] += demandRequired;
+                processScheduled[1] += Math.min(demandRequired, row.scheduledBagging());
+                processCompleted[1] += Math.min(demandRequired, row.completedBagging());
+            }
+            if (row.targetProcess() == TargetProcess.SEAM_CUTTING) {
+                processRequired[2] += demandRequired;
+                processScheduled[2] += Math.min(demandRequired, row.scheduledSeam());
+                processCompleted[2] += Math.min(demandRequired, row.completedSeam());
+            }
+        }
+        List<com.yumi.production.api.ProductionOverviewView.ProcessProgress> processes = List.of(
+                processProgress(TargetProcess.MAKING, processRequired[0], processScheduled[0],
+                        processCompleted[0]),
+                processProgress(TargetProcess.BAGGING, processRequired[1], processScheduled[1],
+                        processCompleted[1]),
+                processProgress(TargetProcess.SEAM_CUTTING, processRequired[2],
+                        processScheduled[2], processCompleted[2]));
+        return new com.yumi.production.api.ProductionOverviewView(
+                orderCount, required, Math.min(scheduled, required), Math.min(facts, required),
+                fulfilled, Math.max(0, required - fulfilled), processes);
+    }
+
+    private static com.yumi.production.api.ProductionOverviewView.ProcessProgress processProgress(
+            TargetProcess process, int required, int scheduled, int completed) {
+        return new com.yumi.production.api.ProductionOverviewView.ProcessProgress(
+                process, required, Math.min(scheduled, required), Math.min(completed, required),
+                Math.max(0, required - completed));
     }
 
     @Override

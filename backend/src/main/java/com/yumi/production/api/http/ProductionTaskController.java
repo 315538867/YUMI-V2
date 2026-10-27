@@ -139,6 +139,11 @@ public class ProductionTaskController {
         return commandResult(result.get(), execution.replayed(), HttpStatus.OK);
     }
 
+    @GetMapping("/overview")
+    public com.yumi.production.api.ProductionOverviewView overview() {
+        return production.overview();
+    }
+
     @GetMapping
     public List<TaskView> listTasks(
             @RequestParam(required = false) java.time.LocalDate workDate,

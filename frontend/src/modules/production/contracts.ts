@@ -8,6 +8,24 @@ export type ResponsibilityType = CodeOf<'production.responsibilityType'>
 export type DefectReasonStatus = CodeOf<'production.defectReasonStatus'>
 export type VerificationStatus = CodeOf<'production.verificationStatus'>
 
+export interface ProductionOverviewProcess {
+  process: TargetProcess
+  requiredQuantity: number
+  scheduledQuantity: number
+  completedQuantity: number
+  remainingQuantity: number
+}
+
+export interface ProductionOverview {
+  orderCount: number
+  requiredQuantity: number
+  scheduledQuantity: number
+  productionFactQuantity: number
+  fulfilledQuantity: number
+  remainingQuantity: number
+  processes: ProductionOverviewProcess[]
+}
+
 export interface TaskItemView {
   taskItemBusinessId: string
   itemOrder: number

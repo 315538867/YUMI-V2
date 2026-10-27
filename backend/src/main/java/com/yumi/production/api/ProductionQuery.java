@@ -21,4 +21,10 @@ public interface ProductionQuery {
 
     /** 某生产来源的转线下记录（报废转线下与业务移交分别标记）。 */
     java.util.List<OfflineTransferView> offlineTransfersOfSource(String productionSourceBusinessId);
+
+    /** 整体进度：订单需求、首个工序排班/生产事实与订单履约。 */
+    ProductionOverviewView overview();
+
+    /** 默认展示全部订单追溯，按最近需求更新倒序。 */
+    java.util.List<OrderProductionTrace> recentTraces(int offset, int limit);
 }

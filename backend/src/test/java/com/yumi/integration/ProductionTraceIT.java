@@ -123,6 +123,19 @@ class ProductionTraceIT extends AbstractProductionFixtureTest {
                 .contains("EXECUTION", "DEFECT", "TERMINAL_EXIT", "CONSUMPTION");
         assertThat(demandTrace.gapReasons()).anySatisfy(reason ->
                 assertThat(reason).contains("履约缺口 3"));
+
+        var overview = asAdmin(() -> productionQuery.overview());
+        assertThat(overview.requiredQuantity()).isEqualTo(100);
+        assertThat(overview.scheduledQuantity()).isEqualTo(100);
+        assertThat(overview.productionFactQuantity()).as("首个工序已处理 98 件").isEqualTo(98);
+        assertThat(overview.fulfilledQuantity()).isEqualTo(90);
+        assertThat(overview.remainingQuantity()).isEqualTo(10);
+        assertThat(overview.processes().getFirst().process()).isEqualTo(TargetProcess.MAKING);
+        assertThat(overview.processes().getFirst().scheduledQuantity()).isEqualTo(100);
+        assertThat(overview.processes().getFirst().completedQuantity()).isEqualTo(90);
+        assertThat(asAdmin(() -> productionQuery.recentTraces(0, 10)))
+                .extracting(itemTrace -> itemTrace.orderItemBusinessId())
+                .contains("ORD-TR-1");
     }
 
     @Test

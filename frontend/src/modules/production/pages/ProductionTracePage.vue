@@ -1,57 +1,105 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import type { OrderProductionTrace } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
-import CodeTag from '@/shared/components/CodeTag.vue'
-import CodeLabel from '@/shared/components/CodeLabel.vue'
-import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import ProductionTraceDetail from '@/modules/production/pages/ProductionTraceDetail.vue'
 
-const trace = ref<OrderProductionTrace | null>(null)
-const offline = ref<
-  Array<{
-    factKind: string
-    factBusinessId: string
-    productionSourceBusinessId: string
-    quantity: number
-    occurredAt: string
-    detail: string | null
-    destination: string
-  }>
->([])
+const traces = ref<OrderProductionTrace[]>([])
 const loading = ref(false)
+const loadingMore = ref(false)
+const hasMore = ref(false)
+const nextOffset = ref(0)
+const pageSize = 50
 const errorText = ref('')
+const expandedOrders = ref<Set<string>>(new Set())
 const { filters, search, reset } = useListQuery(
-  { orderItemId: '' },
-  { paged: false, onSearch: () => void load() },
+  { keyword: '' },
+  { paged: false, onSearch: () => {} },
 )
 
-async function load(): Promise<void> {
-  if (filters.orderItemId.trim() === '') {
-    trace.value = null
-    offline.value = []
-    errorText.value = ''
-    return
+const filtered = computed(() => {
+  const keyword = filters.keyword.trim().toLowerCase()
+  if (keyword === '') {
+    return traces.value
   }
-  loading.value = true
+  return traces.value.filter(
+    (trace) =>
+      trace.orderBusinessId.toLowerCase().includes(keyword) ||
+      trace.orderItemBusinessId.toLowerCase().includes(keyword) ||
+      trace.demands.some(
+        (demand) =>
+          demand.demandBusinessId.toLowerCase().includes(keyword) ||
+          demand.tasks.some((task) => task.taskNo.toLowerCase().includes(keyword)),
+      ),
+  )
+})
+
+const groups = computed(() => {
+  const map = new Map<string, OrderProductionTrace[]>()
+  for (const trace of filtered.value) {
+    const items = map.get(trace.orderBusinessId) ?? []
+    items.push(trace)
+    map.set(trace.orderBusinessId, items)
+  }
+  return [...map.entries()]
+    .map(([orderBusinessId, items]) => ({ orderBusinessId, items }))
+    .sort((left, right) => right.items.length - left.items.length)
+})
+
+function isExpanded(orderBusinessId: string): boolean {
+  return expandedOrders.value.has(orderBusinessId)
+}
+
+function toggle(orderBusinessId: string): void {
+  const next = new Set(expandedOrders.value)
+  if (next.has(orderBusinessId)) {
+    next.delete(orderBusinessId)
+  } else {
+    next.add(orderBusinessId)
+  }
+  expandedOrders.value = next
+}
+
+function expandAll(): void {
+  expandedOrders.value = new Set(groups.value.map((group) => group.orderBusinessId))
+}
+
+function collapseAll(): void {
+  expandedOrders.value = new Set()
+}
+
+async function load(reset = true): Promise<void> {
+  if (reset) {
+    loading.value = true
+  } else {
+    loadingMore.value = true
+  }
   errorText.value = ''
   try {
-    trace.value = await productionService.orderTrace(filters.orderItemId.trim())
-    const batches = await Promise.all(
-      trace.value.demands.map((demand) =>
-        productionService.offlineTransfers(demand.productionSourceBusinessId),
-      ),
-    )
-    offline.value = batches.flat()
+    const page = await productionService.recentTraces(reset ? 0 : nextOffset.value, pageSize)
+    traces.value = reset ? page : [...traces.value, ...page]
+    nextOffset.value = traces.value.length
+    hasMore.value = page.length === pageSize
+    if (reset && groups.value.length > 0) {
+      expandedOrders.value = new Set([groups.value[0]!.orderBusinessId])
+    }
   } catch (error) {
-    trace.value = null
+    if (reset) {
+      traces.value = []
+    }
     errorText.value = userMessageOf(error, '生产追溯加载失败')
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
+
+onMounted(() => {
+  void load(true)
+})
 </script>
 
 <template>
@@ -59,117 +107,55 @@ async function load(): Promise<void> {
     <h1>订单生产追溯</h1>
     <div class="toolbar">
       <el-input
-        v-model="filters.orderItemId"
-        placeholder="订单项业务标识"
+        v-model="filters.keyword"
+        placeholder="订单、订单项或任务编号"
+        clearable
         class="input"
-        aria-label="订单项业务标识"
+        aria-label="订单、订单项或任务编号"
         @keyup.enter="search"
       />
-      <el-button type="primary" @click="search">追溯</el-button>
+      <el-button type="primary" @click="search">查询</el-button>
+      <el-button @click="load(true)">刷新</el-button>
       <el-button @click="reset">重置</el-button>
+      <el-button @click="expandAll">展开全部</el-button>
+      <el-button @click="collapseAll">收起全部</el-button>
     </div>
     <PageState
       :loading="loading"
       :error="errorText"
-      :empty="!loading && errorText === '' && trace === null"
-      empty-text="输入订单项标识后查询生产追溯"
-      @retry="load"
+      :empty="!loading && errorText === '' && groups.length === 0"
+      :empty-text="filters.keyword.trim() === '' ? '暂无生产追溯记录' : '没有匹配的生产记录'"
+      @retry="load(true)"
     >
-      <template v-if="trace">
-        <p class="meta">
-          订单 {{ trace.orderBusinessId }} / 订单项 {{ trace.orderItemBusinessId }}
-        </p>
-        <el-card v-for="demand in trace.demands" :key="demand.demandBusinessId" class="demand">
-          <template #header>
-            <strong>{{ demand.demandBusinessId }}</strong>
-            <span class="meta">
-              · <CodeTag category="production.demandType" :code="demand.demandType" /> ·
-              <CodeTag category="production.demandStatus" :code="demand.status"
-            /></span>
-          </template>
-          <p class="meta">
-            来源 {{ demand.productionSourceBusinessId }} · 物理根
-            {{ demand.physicalRootSourceBusinessId }}
-          </p>
-          <el-table :data="demand.tasks" border size="small">
-            <el-table-column prop="taskNo" label="任务" width="130" />
-            <el-table-column label="类型" width="150">
-              <template #default="{ row }"
-                ><CodeTag category="production.taskType" :code="row.taskType"
-              /></template>
-            </el-table-column>
-            <el-table-column prop="workDate" label="工作日期" width="120" />
-            <el-table-column label="工序" width="120">
-              <template #default="{ row }"
-                ><CodeTag category="production.targetProcess" :code="row.processCode"
-              /></template>
-            </el-table-column>
-            <el-table-column prop="plannedQuantity" label="计划" width="80" />
-            <el-table-column label="状态" width="120">
-              <template #default="{ row }"
-                ><CodeTag category="production.taskStatus" :code="row.status"
-              /></template>
-            </el-table-column>
-            <el-table-column label="明细结果" min-width="260">
-              <template #default="{ row }">
-                <div v-for="item in row.items" :key="item.taskItemBusinessId">
-                  合格 {{ item.qualifiedQuantity }} / 返工 {{ item.reworkQuantity }} / 报废
-                  {{ item.scrappedQuantity }} / 未完成 {{ item.unfinishedQuantity }}
-                </div>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div v-if="demand.gapReasons.length" class="reasons">
-            缺口原因：{{ demand.gapReasons.join('；') }}
+      <el-card
+        v-for="group in groups"
+        :key="group.orderBusinessId"
+        class="order-card"
+        shadow="never"
+      >
+        <template #header>
+          <div class="order-head">
+            <div>
+              <strong>订单 {{ group.orderBusinessId }}</strong>
+              <span class="meta">· {{ group.items.length }} 个订单项</span>
+            </div>
+            <el-button link type="primary" @click="toggle(group.orderBusinessId)">
+              {{ isExpanded(group.orderBusinessId) ? '收起链路' : '查看链路' }}
+            </el-button>
           </div>
-          <div v-if="demand.delayReasons.length" class="reasons">
-            延迟原因：{{ demand.delayReasons.join('；') }}
-          </div>
-          <el-table :data="demand.facts" border size="small" class="facts">
-            <el-table-column label="事实" width="160">
-              <template #default="{ row }"
-                ><CodeLabel category="production.factKind" :code="row.factKind" fallback="其他事实"
-              /></template>
-            </el-table-column>
-            <el-table-column prop="factBusinessId" label="事实标识" min-width="200" />
-            <el-table-column prop="quantity" label="数量" width="80" />
-            <el-table-column label="发生时间" width="220">
-              <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
-            </el-table-column>
-            <el-table-column prop="detail" label="说明" min-width="160" />
-          </el-table>
-          <h3>转线下记录</h3>
-          <el-table
-            :data="
-              offline.filter(
-                (row) => row.productionSourceBusinessId === demand.productionSourceBusinessId,
-              )
-            "
-            border
-            size="small"
-          >
-            <el-table-column label="类型" width="160">
-              <template #default="{ row }"
-                ><CodeLabel category="production.factKind" :code="row.factKind" fallback="其他事实"
-              /></template>
-            </el-table-column>
-            <el-table-column prop="quantity" label="数量" width="80" />
-            <el-table-column label="去向" width="190">
-              <template #default="{ row }">
-                <CodeLabel
-                  category="production.physicalDestination"
-                  :code="row.destination"
-                  :fallback="row.destination"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="detail" label="原因" min-width="150" />
-            <el-table-column label="时间" width="220">
-              <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </template>
+        </template>
+        <div v-if="isExpanded(group.orderBusinessId)" class="order-body">
+          <ProductionTraceDetail
+            v-for="trace in group.items"
+            :key="trace.orderItemBusinessId"
+            :trace="trace"
+          />
+        </div>
+        <p v-else class="meta">展开查看需求、任务与生产事实链路。</p>
+      </el-card>
+      <div v-if="hasMore" class="load-more">
+        <el-button :loading="loadingMore" @click="load(false)">加载更多</el-button>
+      </div>
     </PageState>
   </section>
 </template>
@@ -179,7 +165,7 @@ async function load(): Promise<void> {
   background: var(--yumi-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  padding: 20px;
+  padding: 16px;
 }
 
 h1 {
@@ -190,38 +176,38 @@ h1 {
 .toolbar {
   display: flex;
   gap: 8px;
+  align-items: center;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .input {
-  width: 280px;
+  width: 260px;
+}
+
+.order-card {
+  margin-bottom: 12px;
+}
+
+.order-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .meta {
   color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-h3 {
-  margin: 14px 0 8px;
-  font-size: 14px;
-}
-
-.demand {
-  margin-bottom: 12px;
-}
-
-.reasons {
-  margin: 8px 0;
-  color: var(--el-color-warning);
   font-size: 13px;
 }
 
-.facts {
-  margin-top: 10px;
+.order-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.alert {
-  margin-bottom: 12px;
+.load-more {
+  display: flex;
+  justify-content: center;
 }
 </style>

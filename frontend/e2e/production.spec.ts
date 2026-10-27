@@ -140,3 +140,16 @@ test('缺陷原因维护与需求缺口分列展示', async ({ page }) => {
   await expect(page.locator('.el-table__header').filter({ hasText: '实际销毁' })).toBeVisible()
   await expect(page.locator('.el-table__header').filter({ hasText: '转线下' })).toBeVisible()
 })
+
+test('整体进度与默认全部订单追溯可查看', async ({ page }) => {
+  await login(page)
+  await page.goto('/production/schedule')
+  await expect(page.getByText('整体进度', { exact: true })).toBeVisible()
+  await expect(page.getByText('真实需求')).toBeVisible()
+  await expect(page.getByText('生产事实')).toBeVisible()
+
+  await page.goto('/production/trace')
+  await expect(page.getByRole('heading', { name: '订单生产追溯' })).toBeVisible()
+  await expect(page.getByText(/^订单 /).first()).toBeVisible()
+  await expect(page.getByText('查看链路').or(page.getByText('收起链路')).first()).toBeVisible()
+})
