@@ -7,6 +7,7 @@ import type { TaskView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,7 +32,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="task-detail">
+  <WorkspacePage class="task-detail">
     <PageState :loading="loading" :error="errorText" @retry="load">
       <template v-if="task">
         <header class="head">
@@ -93,17 +94,10 @@ onMounted(load)
         </el-table>
       </template>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.task-detail {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

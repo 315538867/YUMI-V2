@@ -10,6 +10,7 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,7 +71,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="product-detail">
+  <WorkspacePage class="product-detail">
     <PageState :loading="loading" :error="errorText" @retry="load">
       <template v-if="product">
         <header class="head">
@@ -192,17 +193,10 @@ onMounted(load)
         </el-table>
       </template>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.product-detail {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

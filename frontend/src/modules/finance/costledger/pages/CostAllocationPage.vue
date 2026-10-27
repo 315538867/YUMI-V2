@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const entryId = ref('')
 const errorText = ref('')
@@ -31,7 +32,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <section class="allocation-page">
+  <WorkspacePage class="allocation-page">
     <h1>成本显式分摊</h1>
     <el-alert
       type="info"
@@ -63,16 +64,10 @@ async function submit(): Promise<void> {
       <el-button @click="add">增加分摊行</el-button>
       <el-button type="primary" @click="submit">保存分摊</el-button>
     </el-form>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.allocation-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

@@ -8,6 +8,7 @@ import { payrollService } from '@/modules/finance/payroll/services/payrollServic
 import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -137,7 +138,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="employee-payroll">
+  <WorkspacePage v-loading="loading" class="employee-payroll">
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert
       v-if="successText"
@@ -240,16 +241,10 @@ onMounted(load)
         <el-button type="primary" @click="adjust">提交调整</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.employee-payroll {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 .head {
   display: flex;
   justify-content: space-between;

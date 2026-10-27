@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import type { DispositionView, ResponsibilityType } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const taskItemId = ref('')
 const dispositions = ref<DispositionView[]>([])
@@ -73,7 +74,7 @@ function destinationText(value: string): string {
 </script>
 
 <template>
-  <section class="disposition-page">
+  <WorkspacePage class="disposition-page">
     <h1>质量处置与责任</h1>
     <div class="toolbar">
       <el-input v-model="taskItemId" placeholder="任务明细标识" class="input" @keyup.enter="load" />
@@ -150,17 +151,10 @@ function destinationText(value: string): string {
         <el-button type="primary" @click="correct">提交更正</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.disposition-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

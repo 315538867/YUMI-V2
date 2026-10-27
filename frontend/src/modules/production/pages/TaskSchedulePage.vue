@@ -11,6 +11,7 @@ import { productionService } from '@/modules/production/services/productionServi
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const tasks = ref<TaskView[]>([])
@@ -243,7 +244,7 @@ void load()
 </script>
 
 <template>
-  <section class="schedule-page">
+  <WorkspacePage class="schedule-page">
     <div class="toolbar">
       <el-radio-group v-model="filters.view" @change="search">
         <el-radio-button value="week">周视图</el-radio-button>
@@ -447,17 +448,10 @@ void load()
         <el-button type="primary" :loading="saving" @click="arrange">保存</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.schedule-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 .toolbar {
   display: flex;
   gap: 8px;

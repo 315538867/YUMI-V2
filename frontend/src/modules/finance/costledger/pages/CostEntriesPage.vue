@@ -8,6 +8,7 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const entries = ref<CostEntryView[]>([])
 const summary = ref<CostSubjectSummary | null>(null)
@@ -58,7 +59,7 @@ void load()
 </script>
 
 <template>
-  <section class="entries-page">
+  <WorkspacePage class="entries-page">
     <h1>成本明细与汇总</h1>
     <div class="toolbar">
       <el-select v-model="filters.subjectType" class="subject-type" aria-label="成本主体类型">
@@ -129,16 +130,10 @@ void load()
       </el-table>
     </PageState>
     <p class="hint">成本合计不是现金支出；参考工资与处理金额不自动成为成本。</p>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.entries-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

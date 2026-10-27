@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { navigationGroups } from '@/app/navigation'
 import { useAuthStore } from '@/platform/stores/auth'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -15,7 +16,7 @@ const entries = computed(() =>
 </script>
 
 <template>
-  <section class="dashboard">
+  <WorkspacePage class="dashboard">
     <h1>经营总览</h1>
     <p class="hint">选择模块进入；所有数字以服务端接口为准。</p>
     <div class="grid">
@@ -29,17 +30,10 @@ const entries = computed(() =>
         {{ entry.title }}
       </button>
     </div>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.dashboard {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 24px;
-}
-
 h1 {
   margin: 0 0 4px;
   font-size: 20px;

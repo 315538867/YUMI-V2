@@ -8,6 +8,7 @@ import {
   type VerifyItemInput,
 } from '@/modules/production/services/productionService'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const feed = ref<CorrectionFeedItem[]>([])
 const errorText = ref('')
@@ -87,7 +88,7 @@ onMounted(loadFeed)
 </script>
 
 <template>
-  <section class="correction-page">
+  <WorkspacePage class="correction-page">
     <h1>生产事实更正</h1>
     <el-alert
       type="info"
@@ -147,17 +148,10 @@ onMounted(loadFeed)
       <el-table-column prop="quantity" label="数量" width="80" />
       <el-table-column prop="businessDate" label="业务日期" width="120" />
     </el-table>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.correction-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

@@ -9,6 +9,7 @@ import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const periods = ref<PayrollPeriodRef[]>([])
 const results = ref<EmployeePayrollView[]>([])
@@ -75,7 +76,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="payment-page">
+  <WorkspacePage class="payment-page">
     <h1>工资付款</h1>
     <div class="toolbar">
       <el-select v-model="filters.period" class="period" aria-label="工资期间" @change="search">
@@ -126,7 +127,7 @@ onMounted(load)
       </el-table>
     </PageState>
     <p class="hint">只能选择已核定员工付款；部分付款与多人付款由 cash 在同一事务校验上限。</p>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
@@ -135,12 +136,6 @@ onMounted(load)
   font-size: 18px;
 }
 
-.payment-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
 .toolbar {
   display: flex;
   gap: 8px;

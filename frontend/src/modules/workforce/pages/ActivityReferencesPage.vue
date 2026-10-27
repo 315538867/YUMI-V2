@@ -8,6 +8,7 @@ import type {
 } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const employees = ref<EmployeeView[]>([])
 const teams = ref<TeamView[]>([])
@@ -47,7 +48,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="activity-page">
+  <WorkspacePage class="activity-page">
     <h1>活动引用</h1>
     <p class="hint">
       活动仍被排班、任务或核验引用时，离职、停用小组和资格撤销会被后端拒绝；本页只读查询当前主体。
@@ -96,17 +97,10 @@ onMounted(load)
         </el-tag>
       </el-descriptions-item>
     </el-descriptions>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.activity-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 h1 {
   margin: 0 0 4px;
   font-size: 18px;

@@ -10,6 +10,7 @@ import ListPager from '@/shared/components/ListPager.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const rows = ref<ProductView[]>([])
@@ -36,7 +37,7 @@ void load()
 </script>
 
 <template>
-  <section class="product-list">
+  <WorkspacePage class="product-list">
     <h1>商品</h1>
     <div class="toolbar">
       <el-input
@@ -101,20 +102,13 @@ void load()
         @update:size="changeSize"
       />
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
 .product-list h1 {
   margin: 0 0 12px;
   font-size: 18px;
-}
-
-.product-list {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
 }
 
 .toolbar {

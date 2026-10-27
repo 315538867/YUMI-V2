@@ -6,6 +6,7 @@ import type { OrderProductionTrace, ProductionTraceSummary } from '@/modules/pro
 import { productionService } from '@/modules/production/services/productionService'
 import PageState from '@/shared/components/PageState.vue'
 import ProductionTraceDetail from '@/modules/production/pages/ProductionTraceDetail.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const summaries = ref<ProductionTraceSummary[]>([])
 const traceCache = ref<Record<string, OrderProductionTrace>>({})
@@ -135,7 +136,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="trace-page">
+  <WorkspacePage class="trace-page">
     <h1>订单生产追溯</h1>
     <div class="toolbar">
       <el-input
@@ -208,17 +209,10 @@ onMounted(() => {
         <el-button :loading="loadingMore" @click="load(false)">加载更多</el-button>
       </div>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.trace-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

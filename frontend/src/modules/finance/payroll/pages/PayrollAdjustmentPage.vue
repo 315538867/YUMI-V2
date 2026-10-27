@@ -2,6 +2,7 @@
 import { computed, reactive } from 'vue'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const validationErrors = reactive<Record<string, string>>({})
 const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
@@ -55,7 +56,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <section class="adjust-page">
+  <WorkspacePage class="adjust-page">
     <h1>工资人工调整</h1>
     <el-alert
       type="info"
@@ -82,16 +83,10 @@ async function submit(): Promise<void> {
       </el-form-item>
       <el-button type="primary" :loading="saving" @click="submit">提交调整</el-button>
     </el-form>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.adjust-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

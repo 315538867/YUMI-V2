@@ -11,6 +11,7 @@ import { customerService } from '@/modules/customer/services/customerService'
 import type { ProductView, SchemeView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import { orderService } from '@/modules/orders/services/orderService'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const loading = ref(true)
@@ -187,7 +188,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="opening-page">
+  <WorkspacePage v-loading="loading" class="opening-page">
     <header class="head">
       <h1>已有订单接管</h1>
       <div>
@@ -279,16 +280,10 @@ onMounted(load)
         ><el-input v-model="form.note" type="textarea" :rows="2"
       /></el-form-item>
     </el-form>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.opening-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 .head {
   display: flex;
   justify-content: space-between;

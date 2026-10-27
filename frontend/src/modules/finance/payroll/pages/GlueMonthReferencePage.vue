@@ -9,6 +9,7 @@ import type { GlueMonthReferenceView, GluePolicyView } from '@/modules/finance/p
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const policy = ref<GluePolicyView | null>(null)
 const employees = ref<EmployeeView[]>([])
@@ -123,7 +124,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="glue-page">
+  <WorkspacePage class="glue-page">
     <h1>胶水自然月参考</h1>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert
@@ -218,16 +219,10 @@ onMounted(load)
         </el-table>
       </template>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.glue-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

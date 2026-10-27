@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import type { CostFailureView } from '@/modules/finance/costledger/contracts'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const failures = ref<CostFailureView[]>([])
 const errorText = ref('')
@@ -41,7 +42,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="failures-page">
+  <WorkspacePage class="failures-page">
     <h1>成本归集失败</h1>
     <div class="toolbar">
       <el-date-picker v-model="dates.startDate" type="date" value-format="YYYY-MM-DD" />
@@ -76,16 +77,10 @@ onMounted(load)
       </el-table-column>
     </el-table>
     <p class="hint">失败不推进来源水位；重试沿用原命令，不重复归集。</p>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.failures-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

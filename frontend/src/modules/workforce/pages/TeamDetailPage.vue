@@ -8,6 +8,7 @@ import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,7 +54,7 @@ load()
 </script>
 
 <template>
-  <section class="team-detail">
+  <WorkspacePage class="team-detail">
     <PageState :loading="loading" :error="errorText" @retry="load">
       <template v-if="team">
         <header class="head">
@@ -110,17 +111,10 @@ load()
         </el-table>
       </template>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.team-detail {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 .head {
   display: flex;
   align-items: flex-start;

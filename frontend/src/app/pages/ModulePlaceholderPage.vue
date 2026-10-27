@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 /**
  * 模块入口占位：仅证明导航与首个动作入口可达。
@@ -11,20 +12,13 @@ const title = computed(() => String(route.meta.title ?? '业务模块'))
 </script>
 
 <template>
-  <section class="module-placeholder">
+  <WorkspacePage class="module-placeholder">
     <h1>{{ title }}</h1>
     <p>入口已接入统一导航；业务列表、详情与操作将在对应模块任务中接入真实接口。</p>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.module-placeholder {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 24px;
-}
-
 h1 {
   margin: 0 0 8px;
   font-size: 20px;

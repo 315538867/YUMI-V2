@@ -20,6 +20,7 @@ import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const current = ref<AfterSalesCaseView | null>(null)
 const received = ref<ReceivedReturn[]>([])
@@ -320,7 +321,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <section class="aftersales-page">
+  <WorkspacePage class="aftersales-page">
     <div class="toolbar">
       <el-input
         v-model="filters.case"
@@ -666,16 +667,10 @@ async function submit(): Promise<void> {
         <el-button type="primary" @click="submit">确认</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.aftersales-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 .toolbar {
   display: flex;
   gap: 8px;

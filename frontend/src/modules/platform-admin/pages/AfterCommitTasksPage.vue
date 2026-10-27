@@ -8,6 +8,7 @@ import { administrationService } from '@/modules/platform-admin/services/adminis
 import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const tasks = ref<AfterCommitTask[]>([])
 const loading = ref(false)
@@ -70,7 +71,7 @@ void load()
 </script>
 
 <template>
-  <section class="tasks-page">
+  <WorkspacePage class="tasks-page">
     <h1>提交后任务</h1>
     <div class="toolbar">
       <el-select v-model="filters.status" class="status" aria-label="任务状态" @change="search">
@@ -136,16 +137,10 @@ void load()
         <el-button type="danger" @click="abandon">确认放弃</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.tasks-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

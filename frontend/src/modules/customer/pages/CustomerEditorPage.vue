@@ -8,6 +8,7 @@ import type { CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -122,7 +123,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="customer-editor">
+  <WorkspacePage class="customer-editor">
     <header class="head">
       <h1>{{ editing ? '编辑客户' : '新建客户' }}</h1>
       <div>
@@ -195,17 +196,10 @@ onMounted(load)
         </aside>
       </div>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.customer-editor {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 .head {
   display: flex;
   align-items: center;

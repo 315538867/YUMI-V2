@@ -8,6 +8,7 @@ import { reportingService } from '@/modules/reporting/services/reportingService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const auth = useAuthStore()
 const loadError = ref('')
@@ -54,7 +55,7 @@ void load()
 </script>
 
 <template>
-  <section class="rebuild-page">
+  <WorkspacePage class="rebuild-page">
     <h1>影子重建</h1>
     <el-alert
       type="info"
@@ -100,16 +101,10 @@ void load()
         <el-table-column prop="differenceCount" label="差异数" width="110" />
       </el-table>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.rebuild-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

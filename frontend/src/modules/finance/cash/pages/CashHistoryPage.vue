@@ -8,6 +8,7 @@ import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const facts = ref<CashFactView[]>([])
 const summary = ref<CashPeriodSummary | null>(null)
@@ -84,7 +85,7 @@ void load()
 </script>
 
 <template>
-  <section class="history-page">
+  <WorkspacePage class="history-page">
     <h1>现金流水</h1>
     <div class="toolbar">
       <el-date-picker
@@ -190,16 +191,10 @@ void load()
         <el-button type="primary" @click="submit">确认</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.history-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

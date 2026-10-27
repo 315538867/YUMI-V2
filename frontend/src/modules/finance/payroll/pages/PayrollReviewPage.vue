@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const resultId = ref('')
 const errorText = ref('')
@@ -24,7 +25,7 @@ async function review(): Promise<void> {
 </script>
 
 <template>
-  <section class="review-page">
+  <WorkspacePage class="review-page">
     <h1>已核定工资只读复核</h1>
     <el-alert
       type="info"
@@ -46,16 +47,10 @@ async function review(): Promise<void> {
       </el-form-item>
       <el-button type="primary" @click="review">生成复核运行</el-button>
     </el-form>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.review-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

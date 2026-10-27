@@ -5,6 +5,7 @@ import { useListQuery } from '@/platform/composables/useListQuery'
 import type { MonthlyOperatingSummary } from '@/modules/reporting/contracts'
 import { reportingService } from '@/modules/reporting/services/reportingService'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const summary = ref<MonthlyOperatingSummary | null>(null)
 const loading = ref(false)
@@ -38,7 +39,7 @@ void load()
 </script>
 
 <template>
-  <section class="explorer-page">
+  <WorkspacePage class="explorer-page">
     <div class="toolbar">
       <el-input
         v-model="filters.month"
@@ -117,16 +118,10 @@ void load()
       </el-descriptions>
     </PageState>
     <p class="hint">主题按授权查看；金额口径不互相替代，现金净额不是利润。</p>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.explorer-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 .toolbar {
   display: flex;
   gap: 8px;

@@ -6,6 +6,7 @@ import type { AccountView, RoleView } from '@/modules/platform-admin/services/ad
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import { codeLabel } from '@/platform/display/codeCatalog'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const accounts = ref<AccountView[]>([])
 const roles = ref<RoleView[]>([])
@@ -110,7 +111,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="account-role-page">
+  <WorkspacePage class="account-role-page">
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert
       v-if="successText"
@@ -220,16 +221,10 @@ onMounted(load)
         <el-button type="primary" @click="saveRole">保存</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.account-role-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

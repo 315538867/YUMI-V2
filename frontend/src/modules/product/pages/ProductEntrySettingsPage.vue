@@ -8,6 +8,7 @@ import { money } from '@/platform/services/money'
 import type { EntryConfiguration } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const configuration = ref<EntryConfiguration | null>(null)
@@ -157,7 +158,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="entry-settings">
+  <WorkspacePage v-loading="loading" class="entry-settings">
     <header class="head">
       <h1>商品录入设置</h1>
       <el-button @click="router.push('/products')">返回商品列表</el-button>
@@ -271,17 +272,10 @@ onMounted(load)
         <el-button @click="addOption">新增选项</el-button>
       </el-form>
     </template>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.entry-settings {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

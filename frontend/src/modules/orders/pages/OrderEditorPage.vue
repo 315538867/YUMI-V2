@@ -17,6 +17,7 @@ import type {
 } from '@/modules/orders/contracts'
 import { orderService } from '@/modules/orders/services/orderService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 interface DraftItem {
   key: string
@@ -303,7 +304,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="order-editor">
+  <WorkspacePage v-loading="loading" class="order-editor">
     <header class="head">
       <div>
         <h1>新增订单</h1>
@@ -482,17 +483,10 @@ onMounted(load)
         <el-button type="primary" :loading="saving" @click="confirmCreate">确认建单</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.order-editor {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

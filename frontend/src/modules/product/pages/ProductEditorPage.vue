@@ -13,6 +13,7 @@ import type {
 } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 type MoneyKey =
   | 'standardSalePrice'
@@ -289,7 +290,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="product-editor">
+  <WorkspacePage v-loading="loading" class="product-editor">
     <header class="head">
       <h1>{{ editing ? '编辑商品' : '新增商品' }}</h1>
       <div>
@@ -406,7 +407,7 @@ onMounted(load)
         <p v-else class="hint">填写商品名称和制作星级后显示预算预览。</p>
       </aside>
     </div>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
@@ -445,13 +446,6 @@ onMounted(load)
 .budget-preview dd {
   margin: 0;
   font-size: 13px;
-}
-
-.product-editor {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
 }
 
 .head {

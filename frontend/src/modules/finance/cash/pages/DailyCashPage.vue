@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { cashService } from '@/modules/finance/cash/services/cashService'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const form = reactive({
   direction: 'IN' as 'IN' | 'OUT',
@@ -33,7 +34,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <section class="daily-page">
+  <WorkspacePage class="daily-page">
     <h1>日常经营收支</h1>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert
@@ -70,16 +71,10 @@ async function submit(): Promise<void> {
       <el-button type="primary" @click="submit">登记收支</el-button>
     </el-form>
     <p class="hint">业务日期决定归属月份；现金与成本分别保存，不混合成一个总额。</p>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.daily-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

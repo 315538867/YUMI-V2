@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
 import type { GluePolicyView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const month = ref(new Date().toISOString().slice(0, 7))
 const policy = ref<GluePolicyView | null>(null)
@@ -48,7 +49,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="glue-policy-page">
+  <WorkspacePage class="glue-policy-page">
     <h1>胶水减免设置</h1>
     <el-alert
       type="info"
@@ -90,16 +91,10 @@ onMounted(load)
         >{{ policy.exemptWeightGrams }} 克/人/月</el-descriptions-item
       >
     </el-descriptions>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.glue-policy-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

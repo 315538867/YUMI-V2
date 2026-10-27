@@ -9,6 +9,7 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -59,7 +60,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="customer-detail">
+  <WorkspacePage class="customer-detail">
     <PageState :loading="loading" :error="errorText" @retry="load">
       <template v-if="customer">
         <header class="head">
@@ -133,17 +134,10 @@ onMounted(load)
         </el-table>
       </template>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.customer-detail {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 .head {
   display: flex;
   align-items: flex-start;

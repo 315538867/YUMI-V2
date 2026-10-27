@@ -23,6 +23,7 @@ import PageState from '@/shared/components/PageState.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 import { formatDateTime } from '@/platform/display/dateTime'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 interface TraceLedger {
   requiredQuantity?: number
@@ -409,7 +410,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="order-detail">
+  <WorkspacePage class="order-detail">
     <PageState :loading="loading" :error="errorText" @retry="load">
       <template v-if="order">
         <header class="head">
@@ -770,17 +771,10 @@ onMounted(load)
         </div>
       </el-dialog>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.order-detail {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

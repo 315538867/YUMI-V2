@@ -9,6 +9,7 @@ import {
   type VerifyItemInput,
 } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 interface ItemForm {
   taskItemBusinessId: string
@@ -131,7 +132,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="verify-page">
+  <WorkspacePage v-loading="loading" class="verify-page">
     <h1>任务核验</h1>
     <el-alert
       v-if="taskId === ''"
@@ -218,17 +219,10 @@ onMounted(load)
 
       <el-button type="primary" :loading="saving" @click="submit">提交最终核验</el-button>
     </template>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.verify-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

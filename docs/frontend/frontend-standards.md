@@ -38,6 +38,7 @@
 | `CodeLabel` | 不需要标签样式的编码中文名 |
 | `MoneyText` | 金额对象/字符串统一展示 |
 | `DateTimeText` | 时间统一格式化 |
+| `WorkspacePage` | 工作区白底卡片外壳：边框、圆角、默认 16px 内边距 |
 | `PermissionButton` | 按权限显隐的按钮 |
 | `BusinessFileUpload` | 附件上传与授权读取 |
 

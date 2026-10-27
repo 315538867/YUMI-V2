@@ -6,6 +6,7 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { WorkforceStandardView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const auth = useAuthStore()
 const standards = ref<WorkforceStandardView | null>(null)
@@ -75,7 +76,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="standards-page">
+  <WorkspacePage v-loading="loading" class="standards-page">
     <h1>人员标准</h1>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <template v-if="standards">
@@ -119,17 +120,10 @@ onMounted(load)
         </el-table-column>
       </el-table>
     </template>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.standards-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 h1 {
   margin: 0 0 8px;
   font-size: 18px;

@@ -6,6 +6,7 @@ import { reportingService } from '@/modules/reporting/services/reportingService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 interface VersionRow {
   versionBusinessId: string
@@ -62,7 +63,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="reconciliation-page">
+  <WorkspacePage class="reconciliation-page">
     <h1>来源对账</h1>
     <PageState
       :loading="loading"
@@ -103,16 +104,10 @@ onMounted(load)
         <el-table-column prop="detailText" label="说明" min-width="320" />
       </el-table>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.reconciliation-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

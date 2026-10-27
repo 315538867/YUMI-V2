@@ -9,6 +9,7 @@ import { payrollService } from '@/modules/finance/payroll/services/payrollServic
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const periods = ref<PayrollPeriodRef[]>([])
@@ -82,7 +83,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="periods-page">
+  <WorkspacePage class="periods-page">
     <h1>工资期间</h1>
     <div class="toolbar">
       <el-select
@@ -151,19 +152,13 @@ onMounted(load)
         <el-button type="primary" @click="createPeriod">创建</el-button>
       </template>
     </el-dialog>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
 .periods-page h1 {
   margin: 0 0 12px;
   font-size: 18px;
-}
-.periods-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
 }
 .toolbar {
   display: flex;

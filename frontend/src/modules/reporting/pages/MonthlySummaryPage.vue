@@ -10,6 +10,7 @@ import type {
 import { reportingService } from '@/modules/reporting/services/reportingService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const summary = ref<MonthlyOperatingSummary | null>(null)
 const freshness = ref<FreshnessView | null>(null)
@@ -41,7 +42,7 @@ void load()
 </script>
 
 <template>
-  <section class="summary-page">
+  <WorkspacePage class="summary-page">
     <div class="toolbar">
       <el-input
         v-model="filters.month"
@@ -141,16 +142,10 @@ void load()
         <p class="hint">应收、净收款、成本与现金分列；工资退回不充当经营收入，现金净额不叫利润。</p>
       </template>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.summary-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 .toolbar {
   display: flex;
   gap: 8px;

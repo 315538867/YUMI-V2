@@ -8,6 +8,7 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const entries = ref<AuditEntry[]>([])
 const loading = ref(false)
@@ -39,7 +40,7 @@ async function load(): Promise<void> {
 </script>
 
 <template>
-  <section class="audit-page">
+  <WorkspacePage class="audit-page">
     <h1>审计检索</h1>
     <el-alert
       type="info"
@@ -100,16 +101,10 @@ async function load(): Promise<void> {
         </el-table-column>
       </el-table>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.audit-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

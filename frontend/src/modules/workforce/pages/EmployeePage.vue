@@ -10,6 +10,7 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import ListPager from '@/shared/components/ListPager.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const employees = ref<EmployeeView[]>([])
@@ -43,7 +44,7 @@ void load()
 </script>
 
 <template>
-  <section class="employee-page">
+  <WorkspacePage class="employee-page">
     <div class="head">
       <h1>员工与资格</h1>
       <PermissionButton
@@ -121,17 +122,10 @@ void load()
         @update:size="changeSize"
       />
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.employee-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 .head {
   display: flex;
   align-items: center;

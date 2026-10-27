@@ -7,6 +7,7 @@ import { productService } from '@/modules/product/services/productService'
 import type { ProductionProjectionRow } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const products = ref<ProductView[]>([])
 const rows = ref<ProductionProjectionRow[]>([])
@@ -51,7 +52,7 @@ onMounted(loadProducts)
 </script>
 
 <template>
-  <section class="gap-page">
+  <WorkspacePage class="gap-page">
     <h1>需求缺口</h1>
     <div class="toolbar">
       <el-select
@@ -91,17 +92,10 @@ onMounted(loadProducts)
       </el-table>
     </PageState>
     <p class="hint">报废与转线下分列，不相加为“总损失”；四个物理分量相互独立。</p>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.gap-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 h1 {
   margin: 0 0 12px;
   font-size: 18px;

@@ -11,6 +11,7 @@ import {
   type AdjustTaskInput,
 } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -195,7 +196,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="adjust-page">
+  <WorkspacePage v-loading="loading" class="adjust-page">
     <header class="head">
       <div>
         <h1>调整任务{{ task ? ` ${task.taskNo}` : '' }}</h1>
@@ -336,17 +337,10 @@ onMounted(load)
         <el-button type="primary" :loading="saving" @click="save">保存调整</el-button>
       </div>
     </el-form>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.adjust-page {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

@@ -8,6 +8,7 @@ import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,7 +117,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="team-editor">
+  <WorkspacePage class="team-editor">
     <header class="head">
       <h1>{{ editing ? '编辑小组' : '新增小组' }}</h1>
       <div>
@@ -181,17 +182,10 @@ onMounted(load)
         </aside>
       </div>
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.team-editor {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
-
 .head {
   display: flex;
   align-items: center;

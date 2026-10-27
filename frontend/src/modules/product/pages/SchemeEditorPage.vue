@@ -15,6 +15,7 @@ import type {
 } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -183,7 +184,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="scheme-editor">
+  <WorkspacePage v-loading="loading" class="scheme-editor">
     <header class="head">
       <h1>{{ editing ? '编辑自定义方案' : '新建自定义方案' }}</h1>
       <div>
@@ -293,7 +294,7 @@ onMounted(load)
         <p v-else class="hint">填写目标工序和销售价后显示预算预览。</p>
       </aside>
     </div>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
@@ -332,13 +333,6 @@ onMounted(load)
 .budget-preview dd {
   margin: 0;
   font-size: 13px;
-}
-
-.scheme-editor {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 20px;
 }
 
 .head {

@@ -10,6 +10,7 @@ import ListPager from '@/shared/components/ListPager.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
+import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const rows = ref<OrderSummaryView[]>([])
@@ -35,7 +36,7 @@ void load()
 </script>
 
 <template>
-  <section class="order-list">
+  <WorkspacePage class="order-list">
     <h1>订单</h1>
     <div class="toolbar">
       <el-input
@@ -112,16 +113,10 @@ void load()
         @update:size="changeSize"
       />
     </PageState>
-  </section>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.order-list {
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 16px;
-}
 .order-list h1 {
   margin: 0 0 12px;
   font-size: 18px;
