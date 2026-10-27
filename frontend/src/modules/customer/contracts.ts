@@ -1,3 +1,5 @@
+import type { CodeOf } from '@/platform/display/codeCatalog'
+
 export type CustomerStatus = 'ACTIVE' | 'INACTIVE'
 
 export interface CustomerView {
@@ -17,7 +19,7 @@ export interface CustomerChangeView {
   factBusinessId: string
   versionBefore: number
   versionAfter: number
-  operationType: string
+  operationType: CodeOf<'customer.changeOperation'>
   changedFieldsJson: string
   reasonText: string | null
   occurredAt: string
