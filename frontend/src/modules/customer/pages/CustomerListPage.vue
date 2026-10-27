@@ -3,13 +3,12 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import { useAuthStore } from '@/platform/stores/auth'
 import type { CustomerStatus, CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
 const rows = ref<CustomerView[]>([])
 const loading = ref(false)
 const errorText = ref('')
@@ -79,9 +78,9 @@ onMounted(load)
         <el-option label="停用" value="INACTIVE" />
       </el-select>
       <el-button type="primary" @click="load">查询</el-button>
-      <el-button v-if="auth.hasPermission('customer.manage')" @click="openCreate">
+      <PermissionButton permission="customer.manage" @click="openCreate">
         新增客户
-      </el-button>
+      </PermissionButton>
     </div>
 
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />

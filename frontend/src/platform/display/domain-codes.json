@@ -233,6 +233,20 @@
         "tag": "info"
       }
     },
+    "production.verificationStatus": {
+      "PENDING": {
+        "label": "待核验",
+        "tag": "warning"
+      },
+      "VERIFIED": {
+        "label": "已核验",
+        "tag": "success"
+      },
+      "CANCELLED": {
+        "label": "已取消",
+        "tag": "info"
+      }
+    },
     "production.demandType": {
       "NEW_PRODUCT": {
         "label": "新制需求",
@@ -910,6 +924,10 @@
         "label": "生产转线下",
         "tag": ""
       },
+      "production.defect-reason.manage": {
+        "label": "缺陷原因管理",
+        "tag": ""
+      },
       "order.read": {
         "label": "订单查看",
         "tag": ""
@@ -970,6 +988,14 @@
         "label": "工资敏感数据查看",
         "tag": ""
       },
+      "payroll.glue-allowance.manage": {
+        "label": "胶水额度管理",
+        "tag": ""
+      },
+      "payroll.glue-allowance.read": {
+        "label": "胶水额度查看",
+        "tag": ""
+      },
       "cost.accrue": {
         "label": "成本归集",
         "tag": ""
@@ -996,6 +1022,10 @@
       },
       "finance.cash.reverse": {
         "label": "现金冲销",
+        "tag": ""
+      },
+      "finance.cash.payroll-return": {
+        "label": "工资退回",
         "tag": ""
       },
       "finance.read": {

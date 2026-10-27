@@ -1,32 +1,18 @@
 import type { MoneyWire } from '@/platform/services/money'
+import type { CodeOf } from '@/platform/display/codeCatalog'
 
-export type AfterSalesRouteType =
-  | 'REFUND_ONLY'
-  | 'COMPENSATION_ONLY'
-  | 'RETURN_AND_REWORK'
-  | 'DIRECT_REPLACEMENT'
-  | 'MIXED'
-export type ObligationType =
-  | 'REFUND'
-  | 'COMPENSATION'
-  | 'RETURN_AND_REPAIR'
-  | 'REPLACEMENT'
-  | 'CUSTOMER_COOPERATION'
-export type ObligationStatus = 'OPEN' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'CANCELLED'
-export type ReturnDispositionType = 'REPAIR_REQUIRED' | 'SCRAPPED'
-export type PhysicalDestination = 'IN_SYSTEM' | 'DESTROYED' | 'TRANSFERRED_OFFLINE_INVENTORY'
-export type ResponsibilityType = 'EMPLOYEE' | 'TEAM' | 'STUDIO' | 'CUSTOMER' | 'WAIVED'
-export type ObligationChangeRoute =
-  | 'REFUND'
-  | 'COMPENSATION'
-  | 'REPAIR'
-  | 'REPLACEMENT'
-  | 'CUSTOMER_COOPERATION'
+export type AfterSalesRouteType = CodeOf<'afterSales.routeType'>
+export type ObligationType = CodeOf<'afterSales.obligationType'>
+export type ObligationStatus = CodeOf<'afterSales.obligationStatus'>
+export type ReturnDispositionType = CodeOf<'afterSales.dispositionType'>
+export type PhysicalDestination = CodeOf<'production.physicalDestination'>
+export type ResponsibilityType = CodeOf<'production.responsibilityType'>
+export type ObligationChangeRoute = CodeOf<'afterSales.changeRoute'>
 
 export interface ObligationView {
   obligationBusinessId: string
   obligationType: ObligationType
-  bearerType: string
+  bearerType: CodeOf<'afterSales.bearerType'>
   targetQuantity: number | null
   targetAmount: MoneyWire | null
   dueDate: string | null
@@ -42,7 +28,7 @@ export interface AfterSalesCaseView {
   customerBusinessId: string
   issueSummary: string
   routeType: AfterSalesRouteType
-  status: string
+  status: CodeOf<'afterSales.caseStatus'>
   openedAt: string
   contentVersion: number
   obligations: ObligationView[]
@@ -53,17 +39,17 @@ export interface ReceivedReturn {
   receiptItemBusinessId: string
   obligationBusinessId: string
   quantity: number
-  conditionCode: string
+  conditionCode: CodeOf<'afterSales.conditionCode'>
 }
 
 export interface AfterSalesCostView {
   sourceBusinessId: string
   caseBusinessId: string
   orderBusinessId: string
-  costCategory: string
+  costCategory: CodeOf<'finance.costCategory'>
   amount: MoneyWire
   businessDate: string
-  operationType: string
+  operationType: CodeOf<'finance.costOperation'>
   reasonText: string | null
   occurredAt: string
 }

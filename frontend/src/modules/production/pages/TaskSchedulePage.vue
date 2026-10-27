@@ -3,15 +3,14 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { TargetProcess, TaskType, TaskView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
 const workDate = ref(new Date().toISOString().slice(0, 10))
 const tasks = ref<TaskView[]>([])
 const employees = ref<EmployeeView[]>([])
@@ -19,7 +18,6 @@ const loading = ref(false)
 const errorText = ref('')
 const dialogVisible = ref(false)
 const saving = ref(false)
-const canSchedule = auth.hasPermission('production.schedule')
 
 const form = reactive({
   taskType: 'OTHER_TASK' as TaskType,
@@ -138,7 +136,7 @@ onMounted(load)
         @change="load"
       />
       <el-button type="primary" @click="load">查询</el-button>
-      <el-button v-if="canSchedule" @click="open">安排任务</el-button>
+      <PermissionButton permission="production.schedule" @click="open">安排任务</PermissionButton>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="tasks" empty-text="当日暂无任务" border>

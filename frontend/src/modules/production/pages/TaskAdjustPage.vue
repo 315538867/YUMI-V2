@@ -7,6 +7,7 @@ import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { TargetProcess, TaskView } from '@/modules/production/contracts'
 import { productionService, type AdjustTaskInput } from '@/modules/production/services/productionService'
+import CodeTag from '@/shared/components/CodeTag.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -309,7 +310,11 @@ onMounted(load)
           <el-table :data="verifiedItems" border class="verified-table">
             <el-table-column prop="productionSourceBusinessId" label="生产来源" min-width="260" />
             <el-table-column prop="plannedQuantity" label="计划数量" width="100" />
-            <el-table-column prop="verificationStatus" label="状态" width="110" />
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }">
+                <CodeTag category="production.verificationStatus" :code="row.verificationStatus" />
+              </template>
+            </el-table-column>
           </el-table>
         </template>
       </template>

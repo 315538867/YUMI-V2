@@ -1,25 +1,26 @@
 import type { MoneyWire } from '@/platform/services/money'
+import type { CodeOf } from '@/platform/display/codeCatalog'
 
 export interface PayrollPeriodRef {
   periodBusinessId: string
   periodNo: string
   startDate: string
   endDate: string
-  status: string
+  status: CodeOf<'finance.payrollPeriodStatus'>
   contentVersion: number
 }
 
 export interface ReferenceLineView {
   lineBusinessId: string
-  lineType: string
+  lineType: CodeOf<'finance.costLineType'>
   sourceBusinessId: string
-  componentCode: string
+  componentCode: CodeOf<'finance.costComponent'>
   quantity: number | null
   unitAmount: string | null
   referenceAmount?: MoneyWire | null
   occurred: boolean
   estimated: boolean
-  materialSource: string | null
+  materialSource: CodeOf<'product.materialSource'> | null
   incomplete: boolean
   note: string | null
 }
@@ -28,7 +29,7 @@ export interface EmployeePayrollView {
   resultBusinessId: string
   periodBusinessId: string
   employeeBusinessId: string
-  status: string
+  status: CodeOf<'finance.payrollResultStatus'>
   referenceRunBusinessId: string
   referenceFingerprint: string
   confirmedAmount: MoneyWire | null
@@ -50,7 +51,7 @@ export interface GlueMonthReferenceView {
   employeeBusinessId: string
   monthStart: string
   policyBusinessId: string
-  status: string
+  status: CodeOf<'finance.glueReferenceStatus'>
   incompleteReason: string | null
   allocatedWeight: string
   exemptWeight: string

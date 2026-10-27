@@ -97,7 +97,15 @@ async function load(): Promise<void> {
             <template #default="{ row }"><CodeLabel category="production.factKind" :code="row.factKind" fallback="其他事实" /></template>
           </el-table-column>
           <el-table-column prop="quantity" label="数量" width="80" />
-          <el-table-column prop="destination" label="去向" width="190" />
+          <el-table-column label="去向" width="190">
+            <template #default="{ row }">
+              <CodeLabel
+                category="production.physicalDestination"
+                :code="row.destination"
+                :fallback="row.destination"
+              />
+            </template>
+          </el-table-column>
           <el-table-column prop="detail" label="原因" min-width="150" />
           <el-table-column prop="occurredAt" label="时间" width="220" />
         </el-table>

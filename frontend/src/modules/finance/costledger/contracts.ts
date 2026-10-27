@@ -1,17 +1,19 @@
+import type { CodeOf } from '@/platform/display/codeCatalog'
+
 export interface CostEntryView {
   costEntryBusinessId: string
-  costCategory: string
-  subjectType: string
+  costCategory: CodeOf<'finance.costCategory'>
+  subjectType: CodeOf<'finance.costSubjectType'>
   subjectBusinessId: string
   amount: string
   businessDate: string
-  operationType: string
+  operationType: CodeOf<'finance.costOperation'>
   allocated: boolean
   occurredAt: string
 }
 
 export interface CostSubjectSummary {
-  subjectType: string
+  subjectType: CodeOf<'finance.costSubjectType'>
   subjectId: string
   totalAmount: string
   fullyAllocated: boolean
@@ -19,8 +21,8 @@ export interface CostSubjectSummary {
 
 export interface CostFailureView {
   failureBusinessId: string
-  sourceModule: string
-  sourceType: string
+  sourceModule: CodeOf<'finance.costSourceModule'>
+  sourceType: CodeOf<'finance.costSourceType'>
   sourceBusinessId: string
   reasonText: string
   attempts: number

@@ -2,13 +2,13 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import { useAuthStore } from '@/platform/stores/auth'
 import type { ProductStatus, ProductView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
 const rows = ref<ProductView[]>([])
 const loading = ref(false)
 const errorText = ref('')
@@ -48,12 +48,9 @@ onMounted(load)
         <el-option label="停用" value="INACTIVE" />
       </el-select>
       <el-button type="primary" @click="load">查询</el-button>
-      <el-button
-        v-if="auth.hasPermission('product.create')"
-        @click="router.push('/products/new')"
-      >
+      <PermissionButton permission="product.create" @click="router.push('/products/new')">
         新增商品
-      </el-button>
+      </PermissionButton>
       <el-button @click="router.push('/products/entry-settings')">录入设置</el-button>
     </div>
 
@@ -65,7 +62,7 @@ onMounted(load)
       <el-table-column prop="makingStarName" label="制作星级" width="110" />
       <el-table-column label="标准售价" width="140">
         <template #default="{ row }">
-          {{ row.standardSalePrice.amount }} {{ row.standardSalePrice.currency }}
+          <MoneyText :value="row.standardSalePrice" />
         </template>
       </el-table-column>
       <el-table-column prop="dailyCapacity" label="日产能" width="90" />

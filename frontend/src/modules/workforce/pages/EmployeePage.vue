@@ -6,6 +6,7 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
 const employees = ref<EmployeeView[]>([])
@@ -109,7 +110,7 @@ onMounted(load)
   <section class="employee-page">
     <div class="toolbar">
       <h1>员工与资格</h1>
-      <el-button v-if="canManage" type="primary" @click="open('create')">新增员工</el-button>
+      <PermissionButton permission="workforce.employee.manage" type="primary" @click="open('create')">新增员工</PermissionButton>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="employees" empty-text="暂无员工" border>

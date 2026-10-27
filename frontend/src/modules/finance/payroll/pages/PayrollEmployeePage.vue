@@ -7,6 +7,7 @@ import type { EmployeePayrollView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -171,7 +172,7 @@ onMounted(load)
         <el-table-column prop="quantity" label="数量" width="80" />
         <el-table-column prop="unitAmount" label="单价" width="100" />
         <el-table-column label="参考金额" width="130">
-          <template #default="{ row }">{{ row.referenceAmount?.amount ?? '—' }}</template>
+          <template #default="{ row }"><MoneyText :value="row.referenceAmount" /></template>
         </el-table-column>
         <el-table-column label="状态" width="160">
           <template #default="{ row }">

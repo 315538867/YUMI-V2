@@ -64,9 +64,10 @@ public record OrderWorkspaceView(
             Instant occurredAt) {
     }
 
-    /** 订单时间线事件。 */
+    /** 订单时间线事件；code 为可选业务编码，由前端按展示词典翻译。 */
     public record EventView(
             String kind,
+            String code,
             Instant occurredAt,
             String title,
             String description) {

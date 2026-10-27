@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { formatDateTime } from '@/platform/display/dateTime'
 
 const props = defineProps<{
   value: string | null | undefined
 }>()
 
-const text = computed(() =>
-  props.value ? new Date(props.value).toLocaleString('zh-CN', { hour12: false }) : '—',
-)
+const text = computed(() => formatDateTime(props.value))
 </script>
 
 <template>

@@ -1,3 +1,5 @@
+import type { CodeOf } from '@/platform/display/codeCatalog'
+
 export interface MonthlyOperatingSummary {
   monthStart: string
   orderCount: number
@@ -27,8 +29,8 @@ export interface MonthlyOperatingSummary {
 }
 
 export interface FeedFreshness {
-  feedCode: string
-  status: string
+  feedCode: CodeOf<'reporting.feedCode'>
+  status: CodeOf<'reporting.feedStatus'>
   lastError: string | null
   updatedAt: string | null
   lagSeconds: number

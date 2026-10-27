@@ -2,6 +2,8 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { codesOf, codeLabel } from '@/platform/display/codeCatalog'
+import type { CodeOf } from '@/platform/display/codeCatalog'
 import type {
   AfterSalesCaseView,
   AfterSalesRouteType,
@@ -15,6 +17,7 @@ import type {
 import { afterSalesService } from '@/modules/orders/aftersales/services/afterSalesService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
 
 const caseId = ref('')
 const current = ref<AfterSalesCaseView | null>(null)
@@ -27,6 +30,7 @@ const costs = ref<Array<{ sourceBusinessId: string; costCategory: string; amount
 const successText = ref('')
 const dialogVisible = ref(false)
 const action = ref('open')
+const costCategoryOptions = codesOf('finance.costCategory')
 const form = reactive({
   orderBusinessId: '',
   issueSummary: '',
@@ -37,7 +41,7 @@ const form = reactive({
   dueDate: new Date().toISOString().slice(0, 10),
   obligationId: '',
   receiptItemId: '',
-  conditionCode: 'GOOD',
+  conditionCode: 'GOOD' as CodeOf<'afterSales.conditionCode'>,
   dispositionType: 'SCRAPPED' as ReturnDispositionType,
   destination: 'DESTROYED' as PhysicalDestination,
   responsibilityType: 'STUDIO' as ResponsibilityType,
@@ -46,7 +50,7 @@ const form = reactive({
   reason: '',
   changeRoute: 'REFUND' as ObligationChangeRoute,
   businessDate: new Date().toISOString().slice(0, 10),
-  costCategory: 'AFTER_SALES_GOODWILL',
+  costCategory: 'AFTER_SALES' as CodeOf<'finance.costCategory'>,
   costSourceId: '',
   recipientName: '',
   recipientPhone: '',
@@ -312,7 +316,7 @@ async function submit(): Promise<void> {
         </el-table-column>
         <el-table-column label="目标" width="120">
           <template #default="{ row }">
-            {{ row.targetQuantity ?? row.targetAmount?.amount ?? '—' }}
+            <span v-if="row.targetQuantity !== null">{{ row.targetQuantity }}</span><MoneyText v-else :value="row.targetAmount" />
           </template>
         </el-table-column>
         <el-table-column label="状态" width="150">
@@ -335,7 +339,7 @@ async function submit(): Promise<void> {
           <template #default="{ row }"><CodeTag category="finance.costCategory" :code="row.costCategory" /></template>
         </el-table-column>
         <el-table-column label="金额" width="130">
-          <template #default="{ row }">{{ row.amount.amount }}</template>
+          <template #default="{ row }"><MoneyText :value="row.amount" /></template>
         </el-table-column>
         <el-table-column prop="businessDate" label="业务日期" width="120" />
         <el-table-column label="操作" width="110">
@@ -487,7 +491,11 @@ async function submit(): Promise<void> {
           <el-form-item v-if="action === 'cost-correct'" label="费用来源">
             <el-input v-model="form.costSourceId" />
           </el-form-item>
-          <el-form-item label="费用分类"><el-input v-model="form.costCategory" /></el-form-item>
+          <el-form-item label="费用分类">
+            <el-select v-model="form.costCategory">
+              <el-option v-for="code in costCategoryOptions" :key="code" :value="code" :label="codeLabel('finance.costCategory', code)" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="金额"><el-input v-model="form.amount" /></el-form-item>
           <el-form-item label="业务日期"><el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" /></el-form-item>
           <el-form-item label="原因"><el-input v-model="form.reason" type="textarea" :rows="2" /></el-form-item>

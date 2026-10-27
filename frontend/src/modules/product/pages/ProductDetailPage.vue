@@ -7,6 +7,8 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { ProductView, SchemeView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -83,37 +85,37 @@ onMounted(load)
           </span>
         </div>
         <div class="actions">
-          <el-button v-if="canManage" @click="router.push(`/products/${productId}/edit`)">
+          <PermissionButton permission="product.update" @click="router.push(`/products/${productId}/edit`)">
             编辑商品
-          </el-button>
-          <el-button
-            v-if="canManage"
+          </PermissionButton>
+          <PermissionButton
+            permission="product.deactivate"
             :type="product.status === 'ACTIVE' ? 'warning' : 'success'"
             @click="toggleStatus"
           >
             {{ product.status === 'ACTIVE' ? '停用商品' : '启用商品' }}
-          </el-button>
+          </PermissionButton>
         </div>
       </header>
 
       <el-descriptions :column="3" border>
         <el-descriptions-item label="标准售价">
-          {{ product.standardSalePrice.amount }} {{ product.standardSalePrice.currency }}
+          <MoneyText :value="product.standardSalePrice" />
         </el-descriptions-item>
         <el-descriptions-item label="标准重量">{{ product.standardWeightGrams }} g</el-descriptions-item>
         <el-descriptions-item label="星级">{{ product.makingStarName }}</el-descriptions-item>
         <el-descriptions-item label="胶水损耗率">{{ product.glueLossRate }}</el-descriptions-item>
         <el-descriptions-item label="胶水单价">
-          {{ product.glueUnitPrice.amount }}
+          <MoneyText :value="product.glueUnitPrice" />
         </el-descriptions-item>
         <el-descriptions-item label="色浆单价">
-          {{ product.colorPasteUnitPrice.amount }}
+          <MoneyText :value="product.colorPasteUnitPrice" />
         </el-descriptions-item>
         <el-descriptions-item label="制作分钟">
           {{ product.makingStandardMinutes }}
         </el-descriptions-item>
         <el-descriptions-item label="制作提成">
-          {{ product.makingCommission.amount }}
+          <MoneyText :value="product.makingCommission" />
         </el-descriptions-item>
         <el-descriptions-item label="状态">
           <CodeTag category="common.status" :code="product.status" />
@@ -122,13 +124,13 @@ onMounted(load)
 
       <div class="section-head">
         <h2>方案与预算</h2>
-        <el-button
-          v-if="canManage"
+        <PermissionButton
+          permission="product.scheme.manage"
           size="small"
           @click="router.push(`/products/${productId}/schemes/new`)"
         >
           新建自定义方案
-        </el-button>
+        </PermissionButton>
       </div>
       <el-table :data="schemes" border>
         <el-table-column prop="name" label="方案" min-width="150" />
@@ -141,21 +143,21 @@ onMounted(load)
           <template #default="{ row }"><CodeTag category="product.targetProcess" :code="row.targetProcess" /></template>
         </el-table-column>
         <el-table-column label="售价" width="130">
-          <template #default="{ row }">{{ row.salePrice.amount }}</template>
+          <template #default="{ row }"><MoneyText :value="row.salePrice" /></template>
         </el-table-column>
         <el-table-column label="全资源成本" width="130">
           <template #default="{ row }">
-            {{ row.latestBudget?.fullResourceUnitCost.amount ?? '—' }}
+            <MoneyText :value="row.latestBudget?.fullResourceUnitCost" />
           </template>
         </el-table-column>
         <el-table-column label="工作室成本" width="130">
           <template #default="{ row }">
-            {{ row.latestBudget?.studioBorneUnitCost.amount ?? '—' }}
+            <MoneyText :value="row.latestBudget?.studioBorneUnitCost" />
           </template>
         </el-table-column>
         <el-table-column label="预计利润" width="130">
           <template #default="{ row }">
-            {{ row.latestBudget?.expectedUnitProfit.amount ?? '—' }}
+            <MoneyText :value="row.latestBudget?.expectedUnitProfit" />
           </template>
         </el-table-column>
         <el-table-column label="利润率" width="100">

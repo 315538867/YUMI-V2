@@ -6,6 +6,7 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
 const teams = ref<TeamView[]>([])
@@ -84,7 +85,7 @@ onMounted(load)
   <section class="team-page">
     <div class="toolbar">
       <h1>小组</h1>
-      <el-button v-if="canManage" type="primary" @click="open(null)">新增小组</el-button>
+      <PermissionButton permission="workforce.team.manage" type="primary" @click="open(null)">新增小组</PermissionButton>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="teams" empty-text="暂无小组" border>

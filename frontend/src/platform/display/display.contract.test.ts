@@ -41,6 +41,18 @@ const CODE_FIELDS = [
   'componentCode',
   'roleCodes',
   'permissionCodes',
+  'verificationStatus',
+  'dispositionType',
+  'physicalDestination',
+  'destination',
+  'assessmentResult',
+  'bearerType',
+  'changeRoute',
+  'workloadComparison',
+  'employmentStatus',
+  'caseStatus',
+  'periodStatus',
+  'payrollStatus',
 ]
 
 function walk(dir: string): string[] {
@@ -69,6 +81,20 @@ describe('前端展示编码门禁', () => {
         if (expressionPattern.test(template)) {
           offenders.push(`${file}: 模板表达式 .${field}`)
         }
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([])
+  })
+
+  it('模板不直接拼接金额或格式化时间', () => {
+    const offenders: string[] = []
+    for (const file of walk(SRC).filter((path) => path.endsWith('.vue'))) {
+      const template = templateOf(readFileSync(file, 'utf8'))
+      if (/\{\{[^}]*\.amount\b/.test(template)) {
+        offenders.push(`${file}: 金额字段直接输出`)
+      }
+      if (/toLocaleString|toISOString|new Date\(/.test(template)) {
+        offenders.push(`${file}: 模板内直接格式化时间`)
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([])

@@ -173,27 +173,27 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
         List<OrderWorkspaceView.EventView> events = new java.util.ArrayList<>();
         for (var confirmation : orders.findConfirmationsOfOrder(orderBusinessId)) {
             events.add(new OrderWorkspaceView.EventView(
-                    "CONFIRMATION", confirmation.occurredAt(), "订单确认",
+                    "CONFIRMATION", null, confirmation.occurredAt(), "订单确认",
                     "确认 " + confirmation.totalQuantity() + " 件 / "
                             + confirmation.totalAmount().setScale(2, java.math.RoundingMode.HALF_UP)
                             + " 元"));
         }
         for (var change : orders.findChangesOfOrder(orderBusinessId)) {
             events.add(new OrderWorkspaceView.EventView(
-                    "CHANGE", change.occurredAt(), "订单变更 · " + change.changeType(),
+                    "CHANGE", change.changeType(), change.occurredAt(), "订单变更",
                     (change.reasonText() == null ? "无说明" : change.reasonText())
                             + "；金额变化 "
                             + change.amountDelta().setScale(2, java.math.RoundingMode.HALF_UP)));
         }
         for (var shipment : shipments) {
             events.add(new OrderWorkspaceView.EventView(
-                    "SHIPMENT", shipment.shippedAt(), "发货 · " + shipment.shipmentNo(),
+                    "SHIPMENT", null, shipment.shippedAt(), "发货 · " + shipment.shipmentNo(),
                     (shipment.trackingNo() == null ? "未填写物流单号" : shipment.trackingNo())
                             + (shipment.valid() ? "" : "；记录已更正")));
         }
         for (var payment : payments) {
             events.add(new OrderWorkspaceView.EventView(
-                    "PAYMENT", payment.occurredAt(),
+                    "PAYMENT", null, payment.occurredAt(),
                     payment.reversesFactBusinessId() == null
                             ? ("RECEIPT".equals(payment.linkType()) ? "收款" : "退款")
                             : "收退款冲销",
@@ -202,7 +202,7 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
         }
         for (var completion : orders.findCompletionsOfOrder(orderBusinessId)) {
             events.add(new OrderWorkspaceView.EventView(
-                    "COMPLETION", completion.occurredAt(), "订单完成",
+                    "COMPLETION", null, completion.occurredAt(), "订单完成",
                     "交付与付款履约均满足"));
         }
         events.sort(java.util.Comparator.comparing(OrderWorkspaceView.EventView::occurredAt));

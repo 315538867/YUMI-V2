@@ -6,6 +6,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
 
 const router = useRouter()
 const periods = ref<PayrollPeriodRef[]>([])
@@ -102,10 +103,10 @@ onMounted(load)
         <template #default="{ row }">{{ row.lines.length }}</template>
       </el-table-column>
       <el-table-column label="实际核定" width="130">
-        <template #default="{ row }">{{ row.confirmedAmount?.amount ?? '—' }}</template>
+        <template #default="{ row }"><MoneyText :value="row.confirmedAmount" /></template>
       </el-table-column>
       <el-table-column label="应付" width="130">
-        <template #default="{ row }">{{ row.payableAmount?.amount ?? '—' }}</template>
+        <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
       </el-table-column>
       <el-table-column label="操作" width="110">
         <template #default="{ row }">

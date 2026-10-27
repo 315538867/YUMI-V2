@@ -69,7 +69,11 @@ onMounted(load)
         <el-table-column prop="productionSourceBusinessId" label="生产来源" min-width="200" />
         <el-table-column prop="plannedQuantity" label="计划量" width="90" />
         <el-table-column prop="itemStandardMinutes" label="单件分钟" width="100" />
-        <el-table-column prop="verificationStatus" label="核验状态" width="120" />
+        <el-table-column label="核验状态" width="120">
+          <template #default="{ row }">
+            <CodeTag category="production.verificationStatus" :code="row.verificationStatus" />
+          </template>
+        </el-table-column>
       </el-table>
     </template>
   </section>

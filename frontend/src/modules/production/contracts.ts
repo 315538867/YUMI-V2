@@ -1,21 +1,24 @@
-export type TaskType = 'NORMAL_PRODUCTION' | 'EXTRA_PRODUCTION' | 'REPAIR' | 'OTHER_TASK'
-export type TaskStatus = 'ARRANGED' | 'VERIFIED' | 'CANCELLED' | 'PARTIALLY_VERIFIED'
-export type TargetProcess = 'MAKING' | 'BAGGING' | 'SEAM_CUTTING'
-export type PhysicalDestination = 'IN_SYSTEM' | 'DESTROYED' | 'TRANSFERRED_OFFLINE_INVENTORY'
-export type ResponsibilityType = 'EMPLOYEE' | 'TEAM' | 'STUDIO' | 'CUSTOMER' | 'WAIVED'
-export type DefectReasonStatus = 'ACTIVE' | 'INACTIVE'
+import type { CodeOf } from '@/platform/display/codeCatalog'
+
+export type TaskType = CodeOf<'production.taskType'>
+export type TaskStatus = CodeOf<'production.taskStatus'>
+export type TargetProcess = CodeOf<'production.targetProcess'>
+export type PhysicalDestination = CodeOf<'production.physicalDestination'>
+export type ResponsibilityType = CodeOf<'production.responsibilityType'>
+export type DefectReasonStatus = CodeOf<'production.defectReasonStatus'>
+export type VerificationStatus = CodeOf<'production.verificationStatus'>
 
 export interface TaskItemView {
   taskItemBusinessId: string
   itemOrder: number
   demandBusinessId: string
-  demandType: string
+  demandType: CodeOf<'production.demandType'>
   productionSourceBusinessId: string | null
   repairSourceBusinessId: string | null
   productBusinessId: string
   plannedQuantity: number
   itemStandardMinutes: number
-  verificationStatus: string
+  verificationStatus: VerificationStatus
 }
 
 export interface TaskView {
@@ -24,7 +27,7 @@ export interface TaskView {
   taskType: TaskType
   status: TaskStatus
   workDate: string
-  subject: { subjectType: 'EMPLOYEE' | 'TEAM'; subjectBusinessId: string }
+  subject: { subjectType: CodeOf<'production.subjectType'>; subjectBusinessId: string }
   processCode: TargetProcess | null
   plannedWorkQuantity: number
   taskStandardSeconds: number
@@ -33,7 +36,7 @@ export interface TaskView {
     assessmentBusinessId: string
     standardSeconds: number
     availableEffectiveSeconds: number
-    assessmentResult: string
+    assessmentResult: CodeOf<'production.workloadComparison'>
   } | null
   otherTask: {
     workContent: string
@@ -49,7 +52,7 @@ export interface ProductionProjectionRow {
   productionSourceBusinessId: string
   orderItemBusinessId: string | null
   productBusinessId: string
-  demandType: string
+  demandType: CodeOf<'production.demandType'>
   requiredQuantity: number
   pendingWorkQuantity: number
   inProcessQuantity: number
@@ -76,7 +79,7 @@ export interface DispositionView {
     scrappedQuantity: number
     dispositions: Array<{
       dispositionFactBusinessId: string
-      dispositionType: string
+      dispositionType: CodeOf<'production.defectDispositionType'>
       physicalDestination: PhysicalDestination
       quantity: number
       terminalExitBusinessId: string | null
@@ -100,8 +103,8 @@ export interface CorrectionFeedItem {
   feedSequence: number
   correctionCommandBusinessId: string
   taskItemBusinessId: string
-  itemKind: string
-  effectType: string
+  itemKind: CodeOf<'production.correctionItemKind'>
+  effectType: CodeOf<'production.correctionEffectType'>
   referencedFactBusinessId: string | null
   quantity: number
   businessDate: string
@@ -112,23 +115,23 @@ export interface OrderProductionTrace {
   orderItemBusinessId: string
   demands: Array<{
     demandBusinessId: string
-    demandType: string
+    demandType: CodeOf<'production.demandType'>
     productionSourceBusinessId: string
     physicalRootSourceBusinessId: string
     productBusinessId: string
     targetProcess: TargetProcess
-    status: string
+    status: CodeOf<'production.demandStatus'>
     ledger: unknown
     tasks: Array<{
       taskBusinessId: string
       taskNo: string
-      taskType: string
+      taskType: TaskType
       workDate: string
-      processCode: string | null
-      subjectType: string
+      processCode: TargetProcess | null
+      subjectType: CodeOf<'production.subjectType'>
       subjectBusinessId: string
       plannedQuantity: number
-      status: string
+      status: TaskStatus
       items: Array<{
         taskItemBusinessId: string
         plannedQuantity: number
@@ -137,11 +140,11 @@ export interface OrderProductionTrace {
         qualifiedQuantity: number
         reworkQuantity: number
         scrappedQuantity: number
-        verificationStatus: string
+        verificationStatus: VerificationStatus
       }>
     }>
     facts: Array<{
-      factKind: string
+      factKind: CodeOf<'production.factKind'>
       factBusinessId: string
       productionSourceBusinessId: string
       occurredAt: string
@@ -154,7 +157,7 @@ export interface OrderProductionTrace {
 }
 
 export interface OfflineTransferView {
-  factKind: string
+  factKind: CodeOf<'production.factKind'>
   factBusinessId: string
   productionSourceBusinessId: string
   quantity: number

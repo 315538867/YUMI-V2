@@ -16,6 +16,7 @@ import com.yumi.orders.aftersales.api.AfterSalesObligationStatus;
 import com.yumi.orders.aftersales.api.AfterSalesObligationType;
 import com.yumi.orders.aftersales.api.AfterSalesRouteType;
 import com.yumi.platform.aftercommit.api.AfterCommitTaskStatus;
+import com.yumi.platform.api.authorization.PermissionCodes;
 import com.yumi.platform.api.identity.AccountStatus;
 import com.yumi.product.api.MaterialSource;
 import com.yumi.product.api.ProductStatus;
@@ -109,6 +110,24 @@ class DomainCodeCatalogTest {
                         .as("码表 %s.%s 缺少中文标签", category, constant.name())
                         .isNotBlank();
             }
+        }
+    }
+
+    @Test
+    @DisplayName("所有权限点都在共享码表中")
+    void allPermissionCodesExistInCatalog() throws Exception {
+        JsonNode root = new ObjectMapper().readTree(
+                Path.of("..", "frontend", "src", "platform", "display", "domain-codes.json").toFile());
+        JsonNode permissions = root.path("categories").path("platform.permission");
+
+        assertThat(permissions.isObject()).as("码表缺少分类 platform.permission").isTrue();
+        for (String code : PermissionCodes.all()) {
+            assertThat(permissions.has(code))
+                    .as("码表 platform.permission 缺少权限点 %s", code)
+                    .isTrue();
+            assertThat(permissions.path(code).path("label").asText())
+                    .as("码表 platform.permission.%s 缺少中文标签", code)
+                    .isNotBlank();
         }
     }
 }

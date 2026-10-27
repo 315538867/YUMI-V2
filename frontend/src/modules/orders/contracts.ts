@@ -1,9 +1,10 @@
 import type { MoneyWire } from '@/platform/services/money'
+import type { CodeOf } from '@/platform/display/codeCatalog'
 
-export type OrderStatus = 'CONFIRMED' | 'IN_FULFILLMENT' | 'COMPLETED' | 'CANCELLED'
-export type OrderOrigin = 'NEW_ORDER' | 'AFTER_SALES_RESHIP' | 'LEGACY_INTAKE'
-export type ProcessCode = 'MAKING' | 'BAGGING' | 'SEAM_CUTTING'
-export type MaterialSource = 'STUDIO' | 'CUSTOMER'
+export type OrderStatus = CodeOf<'order.status'>
+export type OrderOrigin = CodeOf<'order.origin'>
+export type ProcessCode = CodeOf<'product.targetProcess'>
+export type MaterialSource = CodeOf<'product.materialSource'>
 
 export interface RecipientInfo {
   customerName: string
@@ -53,7 +54,7 @@ export interface OrderView {
     productSnapshotRef: string
     orderedQuantity: number
     activeQuantity: number
-    status: string
+    status: CodeOf<'order.itemStatus'>
     agreement: {
       agreementGroupBusinessId: string
       agreementVersionBusinessId: string
@@ -94,7 +95,7 @@ export interface OrderWorkspaceShipmentItem {
 export interface OrderWorkspaceCorrection {
   factBusinessId: string
   shipmentItemBusinessId: string
-  correctionType: string
+  correctionType: CodeOf<'order.correctionType'>
   quantityDelta: number
   reasonText: string
   occurredAt: string
@@ -114,7 +115,7 @@ export interface OrderWorkspaceShipment {
 export interface OrderWorkspacePayment {
   factBusinessId: string
   financeCashFactBusinessId: string
-  linkType: string
+  linkType: CodeOf<'order.paymentType'>
   amount: MoneyWire
   reversesFactBusinessId: string | null
   valid: boolean
@@ -123,6 +124,7 @@ export interface OrderWorkspacePayment {
 
 export interface OrderWorkspaceEvent {
   kind: string
+  code: string | null
   occurredAt: string
   title: string
   description: string

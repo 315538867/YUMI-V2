@@ -3,7 +3,6 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import { useAuthStore } from '@/platform/stores/auth'
 import type {
   OrderView,
   OrderWorkspacePayment,
@@ -19,6 +18,10 @@ import { productService } from '@/modules/product/services/productService'
 import { fileService } from '@/platform/services/fileService'
 import BusinessFileUpload from '@/shared/components/BusinessFileUpload.vue'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
+import DateTimeText from '@/shared/components/DateTimeText.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
+import { formatDateTime } from '@/platform/display/dateTime'
 
 interface TraceLedger {
   requiredQuantity?: number
@@ -40,7 +43,6 @@ interface ProgressRow {
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
 const orderId = String(route.params.orderBusinessId ?? '')
 const order = ref<OrderView | null>(null)
 const workspace = ref<OrderWorkspaceView | null>(null)
@@ -101,14 +103,6 @@ const progressRows = computed(() =>
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
-}
-
-function formatAmount(value: { amount: string; currency: string } | null | undefined): string {
-  return value ? `${value.amount} ${value.currency}` : '—'
-}
-
-function formatInstant(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
 }
 
 function sourceLabel(value: string): string {
@@ -418,21 +412,27 @@ onMounted(load)</script>
           </span>
         </div>
         <div class="actions">
-          <el-button @click="openPayment('payment')">登记收款</el-button>
-          <el-button @click="openPayment('refund')">登记退款</el-button>
-          <el-button @click="openShipment()">登记发货</el-button>
-          <el-button v-if="auth.hasPermission('order.change')" @click="openChange">变更价格</el-button>
-          <el-button v-if="auth.hasPermission('order.complete')" type="primary" @click="complete">
+          <PermissionButton permission="finance.cash.receive" @click="openPayment('payment')">
+            登记收款
+          </PermissionButton>
+          <PermissionButton permission="finance.cash.receive" @click="openPayment('refund')">
+            登记退款
+          </PermissionButton>
+          <PermissionButton permission="order.ship" @click="openShipment()">
+            登记发货
+          </PermissionButton>
+          <PermissionButton permission="order.change" @click="openChange">变更价格</PermissionButton>
+          <PermissionButton permission="order.complete" type="primary" @click="complete">
             完成订单
-          </el-button>
+          </PermissionButton>
         </div>
       </header>
 
       <el-descriptions :column="3" border>
         <el-descriptions-item label="客户">{{ customerName }}</el-descriptions-item>
-        <el-descriptions-item label="当前应收">{{ formatAmount(order.fulfillment.currentReceivable) }}</el-descriptions-item>
-        <el-descriptions-item label="已收">{{ formatAmount(order.fulfillment.receivedAmount) }}</el-descriptions-item>
-        <el-descriptions-item label="已退">{{ formatAmount(order.fulfillment.refundedAmount) }}</el-descriptions-item>
+        <el-descriptions-item label="当前应收"><MoneyText :value="order.fulfillment.currentReceivable" /></el-descriptions-item>
+        <el-descriptions-item label="已收"><MoneyText :value="order.fulfillment.receivedAmount" /></el-descriptions-item>
+        <el-descriptions-item label="已退"><MoneyText :value="order.fulfillment.refundedAmount" /></el-descriptions-item>
         <el-descriptions-item label="交付履约">{{ order.fulfillment.deliveryFulfilled ? '已满足' : '未满足' }}</el-descriptions-item>
         <el-descriptions-item label="付款履约">{{ order.fulfillment.paymentFulfilled ? '已满足' : '未满足' }}</el-descriptions-item>
         <el-descriptions-item label="阻断原因" :span="3">
@@ -459,7 +459,7 @@ onMounted(load)</script>
               </template>
             </el-table-column>
             <el-table-column label="单价" width="120">
-              <template #default="{ row }">{{ formatAmount(row.agreement.unitPrice) }}</template>
+              <template #default="{ row }"><MoneyText :value="row.agreement.unitPrice" /></template>
             </el-table-column>
             <el-table-column label="供料" min-width="200">
               <template #default="{ row }">
@@ -503,7 +503,7 @@ onMounted(load)</script>
             <template #header>
               <div class="record-head">
                 <strong>{{ shipment.shipmentNo }}</strong>
-                <span class="meta">{{ formatInstant(shipment.shippedAt) }} · {{ shipment.trackingNo || '未填物流单号' }}</span>
+                <span class="meta"><DateTimeText :value="shipment.shippedAt" /> · {{ shipment.trackingNo || '未填物流单号' }}</span>
                 <el-tag :type="shipment.valid ? 'success' : 'info'" size="small">
                   {{ shipment.valid ? '有效' : '已更正' }}
                 </el-tag>
@@ -516,7 +516,14 @@ onMounted(load)</script>
               <el-table-column prop="effectiveQuantity" label="有效数量" width="100" />
               <el-table-column label="操作" width="100">
                 <template #default="{ row }">
-                  <el-button link type="primary" @click="openCorrection(shipment, row)">更正</el-button>
+                  <PermissionButton
+                    permission="order.ship"
+                    link
+                    type="primary"
+                    @click="openCorrection(shipment, row)"
+                  >
+                    更正
+                  </PermissionButton>
                 </template>
               </el-table-column>
             </el-table>
@@ -527,7 +534,7 @@ onMounted(load)</script>
               <el-table-column prop="quantityDelta" label="数量变化" width="100" />
               <el-table-column prop="reasonText" label="原因" min-width="220" />
               <el-table-column label="时间" width="200">
-                <template #default="{ row }">{{ formatInstant(row.occurredAt) }}</template>
+                <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
               </el-table-column>
             </el-table>
           </el-card>
@@ -542,10 +549,10 @@ onMounted(load)</script>
               <template #default="{ row }">{{ paymentLabel(row) }}</template>
             </el-table-column>
             <el-table-column label="金额" width="130">
-              <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
+              <template #default="{ row }"><MoneyText :value="row.amount" /></template>
             </el-table-column>
             <el-table-column label="发生时间" width="200">
-              <template #default="{ row }">{{ formatInstant(row.occurredAt) }}</template>
+              <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
             </el-table-column>
             <el-table-column label="有效性" width="100">
               <template #default="{ row }">{{ row.valid ? '有效' : '已更正' }}</template>
@@ -566,10 +573,15 @@ onMounted(load)</script>
             <el-timeline-item
               v-for="(event, index) in events"
               :key="`${event.kind}-${index}-${event.occurredAt}`"
-              :timestamp="formatInstant(event.occurredAt)"
+              :timestamp="formatDateTime(event.occurredAt)"
               placement="top"
             >
               <strong>{{ event.title }}</strong>
+              <CodeTag
+                v-if="event.kind === 'CHANGE' && event.code"
+                category="order.changeKind"
+                :code="event.code"
+              />
               <p class="event-description">{{ event.description }}</p>
             </el-timeline-item>
           </el-timeline>
@@ -599,7 +611,7 @@ onMounted(load)</script>
       <el-descriptions :column="1" border>
         <el-descriptions-item label="订单">{{ order?.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="客户">{{ customerName }}</el-descriptions-item>
-        <el-descriptions-item label="本次金额">{{ paymentForm.amount }} CNY</el-descriptions-item>
+        <el-descriptions-item label="本次金额"><MoneyText :value="{ amount: paymentForm.amount, currency: 'CNY' }" /></el-descriptions-item>
         <el-descriptions-item label="业务日期">{{ paymentForm.businessDate }}</el-descriptions-item>
         <el-descriptions-item label="凭证">{{ voucherId ? '已上传' : '未附凭证' }}</el-descriptions-item>
       </el-descriptions>

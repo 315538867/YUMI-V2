@@ -6,6 +6,7 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { DefectReasonView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
 const reasons = ref<DefectReasonView[]>([])
@@ -58,7 +59,7 @@ onMounted(load)
   <section class="reasons-page">
     <div class="toolbar">
       <h1>缺陷原因</h1>
-      <el-button v-if="canManage" type="primary" @click="dialogVisible = true">新增原因</el-button>
+      <PermissionButton permission="production.defect-reason.manage" type="primary" @click="dialogVisible = true">新增原因</PermissionButton>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table :data="reasons" border>

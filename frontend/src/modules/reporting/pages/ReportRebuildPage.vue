@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import { reportingService } from '@/modules/reporting/services/reportingService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
 const errorText = ref('')
@@ -59,8 +60,8 @@ onMounted(load)
     <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
     <el-alert v-if="!canManage" type="warning" :closable="false" title="当前账号没有报表管理权限，只能查看版本。" class="alert" />
     <div class="toolbar">
-      <el-button v-if="canManage" @click="ingest">归集来源</el-button>
-      <el-button v-if="canManage" type="primary" :loading="rebuilding" @click="rebuild">发起影子重建</el-button>
+      <PermissionButton permission="reporting.admin" @click="ingest">归集来源</PermissionButton>
+      <PermissionButton permission="reporting.admin" type="primary" :loading="rebuilding" @click="rebuild">发起影子重建</PermissionButton>
     </div>
     <el-table :data="versions" border empty-text="暂无投影版本">
       <el-table-column prop="versionBusinessId" label="版本" min-width="240" />

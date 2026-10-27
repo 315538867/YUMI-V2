@@ -2,14 +2,13 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import { useAuthStore } from '@/platform/stores/auth'
 import type { OrderStatus, OrderSummaryView } from '@/modules/orders/contracts'
 import { orderService } from '@/modules/orders/services/orderService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
 const rows = ref<OrderSummaryView[]>([])
 const loading = ref(false)
 const errorText = ref('')
@@ -40,10 +39,10 @@ onMounted(load)
         <el-option label="已取消" value="CANCELLED" />
       </el-select>
       <el-button type="primary" @click="load">查询</el-button>
-      <el-button v-if="auth.hasPermission('order.create')" @click="router.push('/orders/new')">新增订单</el-button>
-      <el-button v-if="auth.hasPermission('order.legacy.intake')" @click="router.push('/orders/opening')">
+      <PermissionButton permission="order.create" @click="router.push('/orders/new')">新增订单</PermissionButton>
+      <PermissionButton permission="order.legacy.intake" @click="router.push('/orders/opening')">
         已有订单接管
-      </el-button>
+      </PermissionButton>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="rows" empty-text="暂无订单" border>

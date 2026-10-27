@@ -7,6 +7,7 @@ import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/pa
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
 
 const route = useRoute()
 const periods = ref<PayrollPeriodRef[]>([])
@@ -83,7 +84,7 @@ onMounted(load)
         <template #default="{ row }"><CodeTag category="finance.payrollResultStatus" :code="row.status" /></template>
       </el-table-column>
       <el-table-column label="应付" width="130">
-        <template #default="{ row }">{{ row.payableAmount?.amount ?? '—' }}</template>
+        <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
       </el-table-column>
       <el-table-column label="本次付款" width="160">
         <template #default="{ row }">

@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
 import type { WorkforceStandardView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
+import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
 const standards = ref<WorkforceStandardView | null>(null)
@@ -83,7 +84,7 @@ onMounted(load)
         <el-form-item label="有效分钟">
           <el-input v-model.number="effectiveMinutes" type="number" class="short" :disabled="!canManage" />
         </el-form-item>
-        <el-button v-if="canManage" type="primary" @click="saveWorkTime">保存</el-button>
+        <PermissionButton permission="workforce.standard.manage" type="primary" @click="saveWorkTime">保存</PermissionButton>
       </el-form>
 
       <h2>小组人数效率标准</h2>
@@ -96,9 +97,9 @@ onMounted(load)
         </el-table-column>
         <el-table-column label="操作" width="100">
           <template #default="{ row }">
-            <el-button v-if="canManage" link type="primary" @click="saveEfficiency(row.standardBusinessId)">
+            <PermissionButton permission="workforce.standard.manage" link type="primary" @click="saveEfficiency(row.standardBusinessId)">
               保存
-            </el-button>
+            </PermissionButton>
           </template>
         </el-table-column>
       </el-table>

@@ -14,6 +14,12 @@ interface CodeCatalog {
 
 const catalog = raw as CodeCatalog
 
+type RawCatalog = typeof raw
+export type CodeCategory = keyof RawCatalog['categories'] & string
+
+/** 编码联合类型直接从码表推导，契约字段与展示词典不会漂移。 */
+export type CodeOf<C extends CodeCategory> = keyof RawCatalog['categories'][C] & string
+
 /** 展示层唯一编码词典：后端只返回稳定 code，中文与标签样式集中在这里。 */
 export function codeLabel(category: string, code: string | null | undefined, fallback = '未知'): string {
   if (code === null || code === undefined || code === '') {
