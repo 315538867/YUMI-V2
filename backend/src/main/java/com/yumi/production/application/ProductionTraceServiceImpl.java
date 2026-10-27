@@ -78,6 +78,18 @@ public class ProductionTraceServiceImpl implements ProductionQuery, ProductionRe
     }
 
     @Override
+    public List<com.yumi.production.api.ProductionTraceSummary> recentTraceSummaries(
+            int offset, int limit) {
+        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
+        return traces.listTraceSummaries(Math.max(0, offset), clamp(limit)).stream()
+                .map(row -> new com.yumi.production.api.ProductionTraceSummary(
+                        row.orderBusinessId(), row.orderNo(), row.orderItemBusinessId(),
+                        row.productNames(), row.demandCount(), row.requiredQuantity(),
+                        row.fulfilledQuantity()))
+                .toList();
+    }
+
+    @Override
     public com.yumi.production.api.ProductionOverviewView overview() {
         authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
         var rows = traces.overviewDemands();

@@ -15,6 +15,9 @@ public interface TraceRepository {
     /** 有生产需求的订单项，按最近更新倒序；用于默认展示全部订单追溯。 */
     List<String> listOrderItemsWithDemands(int offset, int limit);
 
+    /** 追溯摘要分页：有生产需求的订单项，附订单号、商品名与数量概览。 */
+    List<TraceSummaryRow> listTraceSummaries(int offset, int limit);
+
     /** 追溯头部：订单号与商品名，取当前主数据。 */
     java.util.Optional<TraceHeader> findTraceHeader(String orderItemBusinessId);
 
@@ -62,6 +65,11 @@ public interface TraceRepository {
     }
 
     record TraceHeader(String orderNo, String productNames) {
+    }
+
+    record TraceSummaryRow(
+            String orderBusinessId, String orderNo, String orderItemBusinessId,
+            String productNames, int demandCount, int requiredQuantity, int fulfilledQuantity) {
     }
 
     /** 整体进度聚合行：需求、履约与三道工序的排班/完成数量。 */

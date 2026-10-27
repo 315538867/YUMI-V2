@@ -12,6 +12,7 @@ import type {
   TargetProcess,
   TaskType,
   ProductionOverview,
+  ProductionTraceSummary,
   TaskView,
 } from '@/modules/production/contracts'
 
@@ -77,6 +78,12 @@ export const productionService = {
 
   overview(): Promise<ProductionOverview> {
     return api.query<ProductionOverview>('/api/production/tasks/overview')
+  },
+
+  traceSummaries(offset = 0, limit = 50): Promise<ProductionTraceSummary[]> {
+    return api.query<ProductionTraceSummary[]>(
+      `/api/production/trace-summaries?offset=${offset}&limit=${limit}`,
+    )
   },
 
   recentTraces(offset = 0, limit = 50): Promise<OrderProductionTrace[]> {

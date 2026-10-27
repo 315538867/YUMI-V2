@@ -87,13 +87,69 @@ public class JdbcTraceRepository implements TraceRepository {
     }
 
     @Override
+    public List<TraceSummaryRow> listTraceSummaries(int offset, int limit) {
+        return jdbc.sql("""
+                        SELECT oi.order_item_business_id, o.order_business_id, o.order_no,
+                               COALESCE((
+                                   SELECT GROUP_CONCAT(DISTINCT
+                                               COALESCE(
+                                                   JSON_UNQUOTE(JSON_EXTRACT(ps.base_payload_json, '$.name')),
+                                                   pp.name)
+                                               ORDER BY COALESCE(
+                                                   JSON_UNQUOTE(JSON_EXTRACT(ps.base_payload_json, '$.name')),
+                                                   pp.name)
+                                               SEPARATOR '、')
+                                   FROM orders_items oi2
+                                   LEFT JOIN product_snapshots ps
+                                          ON ps.snapshot_business_id = oi2.product_snapshot_ref
+                                   LEFT JOIN product_products pp
+                                          ON pp.product_business_id = oi2.product_business_id
+                                   WHERE oi2.order_item_business_id = oi.order_item_business_id
+                               ), '') AS product_names,
+                               COUNT(d.demand_business_id) AS demand_count,
+                               COALESCE(SUM(p.required_quantity), 0) AS required_quantity,
+                               COALESCE(SUM(p.fulfilled_quantity), 0) AS fulfilled_quantity,
+                               MAX(d.updated_at) AS last_updated
+                        FROM orders_items oi
+                        JOIN orders_orders o ON o.order_business_id = oi.order_business_id
+                        JOIN production_demands d
+                               ON d.order_item_business_id = oi.order_item_business_id
+                              AND d.status <> 'CANCELLED'
+                        LEFT JOIN production_demand_quantity_projections p
+                               ON p.demand_business_id = d.demand_business_id
+                        GROUP BY oi.order_item_business_id, o.order_business_id, o.order_no
+                        ORDER BY last_updated DESC, oi.order_item_business_id
+                        LIMIT :limit OFFSET :offset
+                        """)
+                .param("limit", limit)
+                .param("offset", offset)
+                .query((resultSet, rowNumber) -> new TraceSummaryRow(
+                        resultSet.getString("order_business_id"),
+                        resultSet.getString("order_no"),
+                        resultSet.getString("order_item_business_id"),
+                        resultSet.getString("product_names"),
+                        resultSet.getInt("demand_count"),
+                        resultSet.getInt("required_quantity"),
+                        resultSet.getInt("fulfilled_quantity")))
+                .list();
+    }
+
+    @Override
     public Optional<TraceHeader> findTraceHeader(String orderItemBusinessId) {
         return jdbc.sql("""
                         SELECT o.order_no,
-                               COALESCE(GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.name SEPARATOR '、'),
-                                        '') AS product_names
+                               COALESCE(GROUP_CONCAT(DISTINCT
+                                           COALESCE(
+                                               JSON_UNQUOTE(JSON_EXTRACT(ps.base_payload_json, '$.name')),
+                                               pp.name)
+                                           ORDER BY COALESCE(
+                                               JSON_UNQUOTE(JSON_EXTRACT(ps.base_payload_json, '$.name')),
+                                               pp.name)
+                                           SEPARATOR '、'), '') AS product_names
                         FROM orders_items oi
                         JOIN orders_orders o ON o.order_business_id = oi.order_business_id
+                        LEFT JOIN product_snapshots ps
+                               ON ps.snapshot_business_id = oi.product_snapshot_ref
                         LEFT JOIN product_products pp
                                ON pp.product_business_id = oi.product_business_id
                         WHERE oi.order_item_business_id = :id

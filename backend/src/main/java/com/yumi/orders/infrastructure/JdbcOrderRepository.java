@@ -1044,27 +1044,40 @@ public class JdbcOrderRepository implements OrderRepository {
                                o.currency_code, o.delivery_fulfilled, o.payment_fulfilled,
                                o.content_version, o.row_version, o.created_at, o.created_by,
                                o.updated_at,
-                               COALESCE(c.name, '') AS customer_name,
+                               COALESCE(cs.name, '') AS customer_name,
                                COALESCE((
-                                   SELECT GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.name SEPARATOR '、')
+                                   SELECT GROUP_CONCAT(DISTINCT
+                                               COALESCE(
+                                                   JSON_UNQUOTE(JSON_EXTRACT(ps.base_payload_json, '$.name')),
+                                                   pp.name)
+                                               ORDER BY COALESCE(
+                                                   JSON_UNQUOTE(JSON_EXTRACT(ps.base_payload_json, '$.name')),
+                                                   pp.name)
+                                               SEPARATOR '、')
                                    FROM orders_items oi
-                                   JOIN product_products pp
-                                     ON pp.product_business_id = oi.product_business_id
+                                   LEFT JOIN product_snapshots ps
+                                          ON ps.snapshot_business_id = oi.product_snapshot_ref
+                                   LEFT JOIN product_products pp
+                                          ON pp.product_business_id = oi.product_business_id
                                    WHERE oi.order_business_id = o.order_business_id
                                ), '') AS product_names
                         FROM orders_orders o
                         LEFT JOIN orders_fulfillment_projections p
                                ON p.order_business_id = o.order_business_id
-                        LEFT JOIN customer_customers c
-                               ON c.customer_business_id = o.customer_business_id
+                        LEFT JOIN customer_snapshots cs
+                               ON cs.snapshot_business_id = o.customer_snapshot_ref
                         WHERE (:keyword = '' OR o.order_no LIKE CONCAT('%', :keyword, '%')
-                               OR c.name LIKE CONCAT('%', :keyword, '%')
+                               OR cs.name LIKE CONCAT('%', :keyword, '%')
                                OR EXISTS (
                                    SELECT 1 FROM orders_items oi2
-                                   JOIN product_products pp2
-                                     ON pp2.product_business_id = oi2.product_business_id
+                                   LEFT JOIN product_snapshots ps2
+                                          ON ps2.snapshot_business_id = oi2.product_snapshot_ref
+                                   LEFT JOIN product_products pp2
+                                          ON pp2.product_business_id = oi2.product_business_id
                                    WHERE oi2.order_business_id = o.order_business_id
-                                     AND pp2.name LIKE CONCAT('%', :keyword, '%')
+                                     AND COALESCE(
+                                           JSON_UNQUOTE(JSON_EXTRACT(ps2.base_payload_json, '$.name')),
+                                           pp2.name) LIKE CONCAT('%', :keyword, '%')
                                ))
                           AND (:status = '' OR o.status = :status)
                         ORDER BY o.created_at DESC, o.order_business_id DESC

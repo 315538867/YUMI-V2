@@ -128,6 +128,16 @@ export interface CorrectionFeedItem {
   businessDate: string
 }
 
+export interface ProductionTraceSummary {
+  orderBusinessId: string
+  orderNo: string
+  orderItemBusinessId: string
+  productNames: string
+  demandCount: number
+  requiredQuantity: number
+  fulfilledQuantity: number
+}
+
 export interface OrderProductionTrace {
   orderBusinessId: string
   orderNo: string

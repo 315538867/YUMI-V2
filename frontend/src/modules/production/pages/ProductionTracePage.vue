@@ -2,12 +2,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
-import type { OrderProductionTrace } from '@/modules/production/contracts'
+import type { OrderProductionTrace, ProductionTraceSummary } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import PageState from '@/shared/components/PageState.vue'
 import ProductionTraceDetail from '@/modules/production/pages/ProductionTraceDetail.vue'
 
-const traces = ref<OrderProductionTrace[]>([])
+const summaries = ref<ProductionTraceSummary[]>([])
+const traceCache = ref<Record<string, OrderProductionTrace>>({})
+const traceLoading = ref<Record<string, boolean>>({})
+const traceErrors = ref<Record<string, string>>({})
 const loading = ref(false)
 const loadingMore = ref(false)
 const hasMore = ref(false)
@@ -23,26 +26,23 @@ const { filters, search, reset } = useListQuery(
 const filtered = computed(() => {
   const keyword = filters.keyword.trim().toLowerCase()
   if (keyword === '') {
-    return traces.value
+    return summaries.value
   }
-  return traces.value.filter(
-    (trace) =>
-      trace.orderBusinessId.toLowerCase().includes(keyword) ||
-      trace.orderItemBusinessId.toLowerCase().includes(keyword) ||
-      trace.demands.some(
-        (demand) =>
-          demand.demandBusinessId.toLowerCase().includes(keyword) ||
-          demand.tasks.some((task) => task.taskNo.toLowerCase().includes(keyword)),
-      ),
+  return summaries.value.filter(
+    (summary) =>
+      summary.orderBusinessId.toLowerCase().includes(keyword) ||
+      summary.orderNo.toLowerCase().includes(keyword) ||
+      summary.orderItemBusinessId.toLowerCase().includes(keyword) ||
+      summary.productNames.toLowerCase().includes(keyword),
   )
 })
 
 const groups = computed(() => {
-  const map = new Map<string, OrderProductionTrace[]>()
-  for (const trace of filtered.value) {
-    const items = map.get(trace.orderBusinessId) ?? []
-    items.push(trace)
-    map.set(trace.orderBusinessId, items)
+  const map = new Map<string, ProductionTraceSummary[]>()
+  for (const summary of filtered.value) {
+    const items = map.get(summary.orderBusinessId) ?? []
+    items.push(summary)
+    map.set(summary.orderBusinessId, items)
   }
   return [...map.entries()]
     .map(([orderBusinessId, items]) => ({ orderBusinessId, items }))
@@ -59,16 +59,46 @@ function toggle(orderBusinessId: string): void {
     next.delete(orderBusinessId)
   } else {
     next.add(orderBusinessId)
+    const group = groups.value.find((item) => item.orderBusinessId === orderBusinessId)
+    if (group) {
+      void loadGroupTraces(group.items)
+    }
   }
   expandedOrders.value = next
 }
 
 function expandAll(): void {
   expandedOrders.value = new Set(groups.value.map((group) => group.orderBusinessId))
+  for (const group of groups.value) {
+    void loadGroupTraces(group.items)
+  }
 }
 
 function collapseAll(): void {
   expandedOrders.value = new Set()
+}
+
+async function loadTrace(orderItemBusinessId: string): Promise<void> {
+  if (traceCache.value[orderItemBusinessId] !== undefined) {
+    return
+  }
+  traceLoading.value = { ...traceLoading.value, [orderItemBusinessId]: true }
+  traceErrors.value = { ...traceErrors.value, [orderItemBusinessId]: '' }
+  try {
+    const trace = await productionService.orderTrace(orderItemBusinessId)
+    traceCache.value = { ...traceCache.value, [orderItemBusinessId]: trace }
+  } catch (error) {
+    traceErrors.value = {
+      ...traceErrors.value,
+      [orderItemBusinessId]: userMessageOf(error, '生产链路加载失败'),
+    }
+  } finally {
+    traceLoading.value = { ...traceLoading.value, [orderItemBusinessId]: false }
+  }
+}
+
+async function loadGroupTraces(items: ProductionTraceSummary[]): Promise<void> {
+  await Promise.all(items.map((item) => loadTrace(item.orderItemBusinessId)))
 }
 
 async function load(reset = true): Promise<void> {
@@ -79,16 +109,18 @@ async function load(reset = true): Promise<void> {
   }
   errorText.value = ''
   try {
-    const page = await productionService.recentTraces(reset ? 0 : nextOffset.value, pageSize)
-    traces.value = reset ? page : [...traces.value, ...page]
-    nextOffset.value = traces.value.length
+    const page = await productionService.traceSummaries(reset ? 0 : nextOffset.value, pageSize)
+    summaries.value = reset ? page : [...summaries.value, ...page]
+    nextOffset.value = summaries.value.length
     hasMore.value = page.length === pageSize
     if (reset && groups.value.length > 0) {
-      expandedOrders.value = new Set([groups.value[0]!.orderBusinessId])
+      const first = groups.value[0]!
+      expandedOrders.value = new Set([first.orderBusinessId])
+      await loadGroupTraces(first.items)
     }
   } catch (error) {
     if (reset) {
-      traces.value = []
+      summaries.value = []
     }
     errorText.value = userMessageOf(error, '生产追溯加载失败')
   } finally {
@@ -108,10 +140,10 @@ onMounted(() => {
     <div class="toolbar">
       <el-input
         v-model="filters.keyword"
-        placeholder="订单、订单项或任务编号"
+        placeholder="订单、订单项或商品"
         clearable
         class="input"
-        aria-label="订单、订单项或任务编号"
+        aria-label="订单、订单项或商品"
         @keyup.enter="search"
       />
       <el-button type="primary" @click="search">查询</el-button>
@@ -148,11 +180,27 @@ onMounted(() => {
           </div>
         </template>
         <div v-if="isExpanded(group.orderBusinessId)" class="order-body">
-          <ProductionTraceDetail
-            v-for="trace in group.items"
-            :key="trace.orderItemBusinessId"
-            :trace="trace"
-          />
+          <div v-for="item in group.items" :key="item.orderItemBusinessId" class="trace-slot">
+            <ProductionTraceDetail
+              v-if="traceCache[item.orderItemBusinessId]"
+              :trace="traceCache[item.orderItemBusinessId]!"
+            />
+            <el-alert
+              v-else-if="traceErrors[item.orderItemBusinessId]"
+              type="error"
+              :closable="false"
+              :title="traceErrors[item.orderItemBusinessId]"
+            >
+              <template #default>
+                <el-button size="small" @click="loadTrace(item.orderItemBusinessId)">
+                  重试
+                </el-button>
+              </template>
+            </el-alert>
+            <p v-else class="meta">
+              {{ traceLoading[item.orderItemBusinessId] ? '正在加载链路…' : '等待加载链路' }}
+            </p>
+          </div>
         </div>
         <p v-else class="meta">展开查看需求、任务与生产事实链路。</p>
       </el-card>
@@ -207,6 +255,11 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.trace-slot {
+  display: flex;
+  flex-direction: column;
 }
 
 .load-more {
