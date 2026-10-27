@@ -26,7 +26,16 @@ const errorText = ref('')
 const keyword = ref('')
 const statusFilter = ref('')
 const cases = ref<AfterSalesCaseView[]>([])
-const costs = ref<Array<{ sourceBusinessId: string; costCategory: string; amount: { amount: string }; businessDate: string; operationType: string; reasonText: string | null }>>([])
+const costs = ref<
+  Array<{
+    sourceBusinessId: string
+    costCategory: string
+    amount: { amount: string }
+    businessDate: string
+    operationType: string
+    reasonText: string | null
+  }>
+>([])
 const successText = ref('')
 const dialogVisible = ref(false)
 const action = ref('open')
@@ -83,6 +92,11 @@ async function searchCases(): Promise<void> {
   } catch (error) {
     errorText.value = userMessageOf(error, '售后案例列表加载失败')
   }
+}
+
+async function viewCase(caseBusinessId: string): Promise<void> {
+  caseId.value = caseBusinessId
+  await load()
 }
 
 async function load(): Promise<void> {
@@ -158,9 +172,7 @@ async function submit(): Promise<void> {
           form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
         waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
         offlineInventoryName:
-          form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'
-            ? form.offlineInventoryName
-            : null,
+          form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.offlineInventoryName : null,
         offlineInventoryNote: null,
         handedOverBy: null,
         receivedBy: null,
@@ -275,8 +287,19 @@ async function submit(): Promise<void> {
       <el-button v-if="current" @click="openAction('cost-correct')">更正费用</el-button>
     </div>
     <div class="toolbar">
-      <el-input v-model="keyword" placeholder="案例号或订单标识" class="input" @keyup.enter="searchCases" />
-      <el-select v-model="statusFilter" placeholder="全部状态" class="status" clearable>
+      <el-input
+        v-model="keyword"
+        placeholder="案例号或订单标识"
+        class="input"
+        @keyup.enter="searchCases"
+      />
+      <el-select
+        v-model="statusFilter"
+        placeholder="全部状态"
+        class="status"
+        clearable
+        aria-label="售后状态筛选"
+      >
         <el-option label="受理中" value="OPEN" />
         <el-option label="处理中" value="PROCESSING" />
         <el-option label="已结案" value="COMPLETED" />
@@ -288,46 +311,73 @@ async function submit(): Promise<void> {
       <el-table-column prop="orderBusinessId" label="订单" min-width="200" />
       <el-table-column prop="issueSummary" label="问题" min-width="180" />
       <el-table-column label="状态" width="120">
-        <template #default="{ row }"><CodeTag category="afterSales.caseStatus" :code="row.status" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="afterSales.caseStatus" :code="row.status"
+        /></template>
       </el-table-column>
       <el-table-column label="操作" width="90">
         <template #default="{ row }">
-          <el-button link type="primary" @click="caseId = row.caseBusinessId; load()">查看</el-button>
+          <el-button link type="primary" @click="viewCase(row.caseBusinessId)">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
 
     <template v-if="current">
       <el-descriptions :column="3" border>
         <el-descriptions-item label="案例号">{{ current.caseNo }}</el-descriptions-item>
         <el-descriptions-item label="订单">{{ current.orderBusinessId }}</el-descriptions-item>
-        <el-descriptions-item label="状态"><CodeTag category="afterSales.caseStatus" :code="current.status" /></el-descriptions-item>
-        <el-descriptions-item label="路线"><CodeTag category="afterSales.routeType" :code="current.routeType" /></el-descriptions-item>
-        <el-descriptions-item label="问题" :span="2">{{ current.issueSummary }}</el-descriptions-item>
+        <el-descriptions-item label="状态"
+          ><CodeTag category="afterSales.caseStatus" :code="current.status"
+        /></el-descriptions-item>
+        <el-descriptions-item label="路线"
+          ><CodeTag category="afterSales.routeType" :code="current.routeType"
+        /></el-descriptions-item>
+        <el-descriptions-item label="问题" :span="2">{{
+          current.issueSummary
+        }}</el-descriptions-item>
       </el-descriptions>
 
       <h2>义务</h2>
       <el-table :data="current.obligations" border>
         <el-table-column prop="obligationBusinessId" label="义务标识" min-width="200" />
         <el-table-column label="类型" width="170">
-          <template #default="{ row }"><CodeTag category="afterSales.obligationType" :code="row.obligationType" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="afterSales.obligationType" :code="row.obligationType"
+          /></template>
         </el-table-column>
         <el-table-column label="目标" width="120">
           <template #default="{ row }">
-            <span v-if="row.targetQuantity !== null">{{ row.targetQuantity }}</span><MoneyText v-else :value="row.targetAmount" />
+            <span v-if="row.targetQuantity !== null">{{ row.targetQuantity }}</span
+            ><MoneyText v-else :value="row.targetAmount" />
           </template>
         </el-table-column>
         <el-table-column label="状态" width="150">
-          <template #default="{ row }"><CodeTag category="afterSales.obligationStatus" :code="row.status" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="afterSales.obligationStatus" :code="row.status"
+          /></template>
         </el-table-column>
         <el-table-column label="操作" width="330" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openAction('pay', row.obligationBusinessId)">赔付/退款</el-button>
-            <el-button link type="primary" @click="openAction('return', row.obligationBusinessId)">接收退回</el-button>
-            <el-button link type="primary" @click="openAction('change', row.obligationBusinessId)">变更路线</el-button>
-            <el-button link type="danger" @click="openAction('cancel', row.obligationBusinessId)">取消</el-button>
+            <el-button link type="primary" @click="openAction('pay', row.obligationBusinessId)"
+              >赔付/退款</el-button
+            >
+            <el-button link type="primary" @click="openAction('return', row.obligationBusinessId)"
+              >接收退回</el-button
+            >
+            <el-button link type="primary" @click="openAction('change', row.obligationBusinessId)"
+              >变更路线</el-button
+            >
+            <el-button link type="danger" @click="openAction('cancel', row.obligationBusinessId)"
+              >取消</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -336,14 +386,18 @@ async function submit(): Promise<void> {
       <el-table :data="costs" empty-text="暂无售后费用" border size="small" class="case-list">
         <el-table-column prop="sourceBusinessId" label="费用来源" min-width="200" />
         <el-table-column label="分类" width="150">
-          <template #default="{ row }"><CodeTag category="finance.costCategory" :code="row.costCategory" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="finance.costCategory" :code="row.costCategory"
+          /></template>
         </el-table-column>
         <el-table-column label="金额" width="130">
           <template #default="{ row }"><MoneyText :value="row.amount" /></template>
         </el-table-column>
         <el-table-column prop="businessDate" label="业务日期" width="120" />
         <el-table-column label="操作" width="110">
-          <template #default="{ row }"><CodeTag category="finance.costOperation" :code="row.operationType" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="finance.costOperation" :code="row.operationType"
+          /></template>
         </el-table-column>
         <el-table-column prop="reasonText" label="原因" min-width="160" />
       </el-table>
@@ -353,17 +407,33 @@ async function submit(): Promise<void> {
         <el-table-column prop="receiptItemBusinessId" label="接收明细" min-width="200" />
         <el-table-column prop="quantity" label="数量" width="80" />
         <el-table-column label="状态" width="100">
-          <template #default="{ row }"><CodeTag category="afterSales.conditionCode" :code="row.conditionCode" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="afterSales.conditionCode" :code="row.conditionCode"
+          /></template>
         </el-table-column>
         <el-table-column label="操作" width="240">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openAction('dispose', row.obligationBusinessId, row.receiptItemBusinessId)">
+            <el-button
+              link
+              type="primary"
+              @click="openAction('dispose', row.obligationBusinessId, row.receiptItemBusinessId)"
+            >
               池内处置
             </el-button>
-            <el-button link type="primary" @click="openAction('return-customer', row.obligationBusinessId, row.receiptItemBusinessId)">
+            <el-button
+              link
+              type="primary"
+              @click="
+                openAction('return-customer', row.obligationBusinessId, row.receiptItemBusinessId)
+              "
+            >
               原样退还
             </el-button>
-            <el-button link type="primary" @click="openAction('repair', row.obligationBusinessId, row.receiptItemBusinessId)">
+            <el-button
+              link
+              type="primary"
+              @click="openAction('repair', row.obligationBusinessId, row.receiptItemBusinessId)"
+            >
               返修
             </el-button>
           </template>
@@ -375,7 +445,9 @@ async function submit(): Promise<void> {
       <el-form label-width="110px">
         <template v-if="action === 'open'">
           <el-form-item label="订单标识"><el-input v-model="form.orderBusinessId" /></el-form-item>
-          <el-form-item label="问题说明"><el-input v-model="form.issueSummary" type="textarea" :rows="2" /></el-form-item>
+          <el-form-item label="问题说明"
+            ><el-input v-model="form.issueSummary" type="textarea" :rows="2"
+          /></el-form-item>
           <el-form-item label="处理路线">
             <el-select v-model="form.routeType">
               <el-option label="仅退款" value="REFUND_ONLY" />
@@ -394,17 +466,28 @@ async function submit(): Promise<void> {
               <el-option label="客户配合" value="CUSTOMER_COOPERATION" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="form.obligationType === 'REFUND' || form.obligationType === 'COMPENSATION'" label="目标金额">
+          <el-form-item
+            v-if="form.obligationType === 'REFUND' || form.obligationType === 'COMPENSATION'"
+            label="目标金额"
+          >
             <el-input v-model="form.amount" />
           </el-form-item>
-          <el-form-item v-else label="目标数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
+          <el-form-item v-else label="目标数量"
+            ><el-input v-model.number="form.quantity" type="number"
+          /></el-form-item>
         </template>
         <template v-if="action === 'pay'">
-          <el-form-item label="金额"><el-input v-model="form.amount" placeholder="留空使用义务目标金额" /></el-form-item>
-          <el-form-item label="业务日期"><el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+          <el-form-item label="金额"
+            ><el-input v-model="form.amount" placeholder="留空使用义务目标金额"
+          /></el-form-item>
+          <el-form-item label="业务日期"
+            ><el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD"
+          /></el-form-item>
         </template>
         <template v-if="action === 'return'">
-          <el-form-item label="数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
+          <el-form-item label="数量"
+            ><el-input v-model.number="form.quantity" type="number"
+          /></el-form-item>
           <el-form-item label="状态">
             <el-select v-model="form.conditionCode">
               <el-option label="良好" value="GOOD" />
@@ -414,7 +497,9 @@ async function submit(): Promise<void> {
           </el-form-item>
         </template>
         <template v-if="action === 'dispose'">
-          <el-form-item label="数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
+          <el-form-item label="数量"
+            ><el-input v-model.number="form.quantity" type="number"
+          /></el-form-item>
           <el-form-item label="处置">
             <el-select v-model="form.dispositionType">
               <el-option label="需返修" value="REPAIR_REQUIRED" />
@@ -427,7 +512,9 @@ async function submit(): Promise<void> {
               <el-option label="转线下库存" value="TRANSFERRED_OFFLINE_INVENTORY" />
             </el-select>
           </el-form-item>
-          <el-form-item label="线下名称"><el-input v-model="form.offlineInventoryName" /></el-form-item>
+          <el-form-item label="线下名称"
+            ><el-input v-model="form.offlineInventoryName"
+          /></el-form-item>
           <el-form-item label="责任类型">
             <el-select v-model="form.responsibilityType">
               <el-option label="工作室" value="STUDIO" />
@@ -446,7 +533,9 @@ async function submit(): Promise<void> {
           <el-form-item label="原因"><el-input v-model="form.reason" /></el-form-item>
         </template>
         <template v-if="action === 'return-customer'">
-          <el-form-item label="数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
+          <el-form-item label="数量"
+            ><el-input v-model.number="form.quantity" type="number"
+          /></el-form-item>
           <el-form-item label="收货人"><el-input v-model="form.recipientName" /></el-form-item>
           <el-form-item label="电话"><el-input v-model="form.recipientPhone" /></el-form-item>
           <el-form-item label="地址"><el-input v-model="form.recipientAddress" /></el-form-item>
@@ -454,10 +543,14 @@ async function submit(): Promise<void> {
         </template>
         <template v-if="action === 'repair'">
           <el-form-item label="接收明细"><el-input v-model="form.receiptItemId" /></el-form-item>
-          <el-form-item label="数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
+          <el-form-item label="数量"
+            ><el-input v-model.number="form.quantity" type="number"
+          /></el-form-item>
         </template>
         <template v-if="action === 'change'">
-          <el-form-item label="数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
+          <el-form-item label="数量"
+            ><el-input v-model.number="form.quantity" type="number"
+          /></el-form-item>
           <el-form-item label="新路线">
             <el-select v-model="form.changeRoute">
               <el-option label="退款" value="REFUND" />
@@ -467,7 +560,10 @@ async function submit(): Promise<void> {
               <el-option label="客户配合" value="CUSTOMER_COOPERATION" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="form.changeRoute === 'REFUND' || form.changeRoute === 'COMPENSATION'" label="金额">
+          <el-form-item
+            v-if="form.changeRoute === 'REFUND' || form.changeRoute === 'COMPENSATION'"
+            label="金额"
+          >
             <el-input v-model="form.amount" />
           </el-form-item>
           <el-form-item label="说明"><el-input v-model="form.reason" /></el-form-item>
@@ -493,12 +589,21 @@ async function submit(): Promise<void> {
           </el-form-item>
           <el-form-item label="费用分类">
             <el-select v-model="form.costCategory">
-              <el-option v-for="code in costCategoryOptions" :key="code" :value="code" :label="codeLabel('finance.costCategory', code)" />
+              <el-option
+                v-for="code in costCategoryOptions"
+                :key="code"
+                :value="code"
+                :label="codeLabel('finance.costCategory', code)"
+              />
             </el-select>
           </el-form-item>
           <el-form-item label="金额"><el-input v-model="form.amount" /></el-form-item>
-          <el-form-item label="业务日期"><el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" /></el-form-item>
-          <el-form-item label="原因"><el-input v-model="form.reason" type="textarea" :rows="2" /></el-form-item>
+          <el-form-item label="业务日期"
+            ><el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD"
+          /></el-form-item>
+          <el-form-item label="原因"
+            ><el-input v-model="form.reason" type="textarea" :rows="2"
+          /></el-form-item>
         </template>
       </el-form>
       <template #footer>
@@ -510,11 +615,32 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-.aftersales-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.input { width: 260px; }
-.status { width: 140px; }
-.case-list { margin-bottom: 12px; }
-h2 { margin: 22px 0 10px; font-size: 16px; }
-.alert { margin-bottom: 12px; }
+.aftersales-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.input {
+  width: 260px;
+}
+.status {
+  width: 140px;
+}
+.case-list {
+  margin-bottom: 12px;
+}
+h2 {
+  margin: 22px 0 10px;
+  font-size: 16px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

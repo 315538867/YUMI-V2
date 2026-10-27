@@ -94,7 +94,13 @@ onMounted(load)
   <section class="glue-page">
     <h1>胶水自然月参考</h1>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-form inline>
       <el-form-item label="月份">
         <el-input v-model="month" type="month" class="month" @change="loadPolicy" />
@@ -108,7 +114,8 @@ onMounted(load)
       <el-button type="primary" @click="publish">发布设置</el-button>
     </el-form>
     <p v-if="policy" class="meta">
-      当前版本 v{{ policy.version }}，生效月 {{ policy.effectiveMonth }}，免扣 {{ policy.exemptWeightGrams }} 克
+      当前版本 v{{ policy.version }}，生效月 {{ policy.effectiveMonth }}，免扣
+      {{ policy.exemptWeightGrams }} 克
     </p>
     <el-alert
       v-if="policyMissing"
@@ -120,8 +127,13 @@ onMounted(load)
 
     <el-form inline class="employee-row">
       <el-form-item label="员工">
-        <el-select v-model="employeeId" filterable class="employee">
-          <el-option v-for="employee in employees" :key="employee.employeeBusinessId" :label="employee.name" :value="employee.employeeBusinessId" />
+        <el-select v-model="employeeId" filterable class="employee" aria-label="员工">
+          <el-option
+            v-for="employee in employees"
+            :key="employee.employeeBusinessId"
+            :label="employee.name"
+            :value="employee.employeeBusinessId"
+          />
         </el-select>
       </el-form-item>
       <el-button @click="query">查询参考</el-button>
@@ -130,11 +142,19 @@ onMounted(load)
 
     <template v-if="reference">
       <el-descriptions :column="3" border>
-        <el-descriptions-item label="状态"><CodeTag category="finance.glueReferenceStatus" :code="reference.status" /></el-descriptions-item>
-        <el-descriptions-item label="分配重量">{{ reference.allocatedWeight }}</el-descriptions-item>
+        <el-descriptions-item label="状态"
+          ><CodeTag category="finance.glueReferenceStatus" :code="reference.status"
+        /></el-descriptions-item>
+        <el-descriptions-item label="分配重量">{{
+          reference.allocatedWeight
+        }}</el-descriptions-item>
         <el-descriptions-item label="免扣重量">{{ reference.exemptWeight }}</el-descriptions-item>
-        <el-descriptions-item label="不完整原因" :span="2">{{ reference.incompleteReason ?? '无' }}</el-descriptions-item>
-        <el-descriptions-item label="是否过期">{{ reference.stale ? '是' : '否' }}</el-descriptions-item>
+        <el-descriptions-item label="不完整原因" :span="2">{{
+          reference.incompleteReason ?? '无'
+        }}</el-descriptions-item>
+        <el-descriptions-item label="是否过期">{{
+          reference.stale ? '是' : '否'
+        }}</el-descriptions-item>
       </el-descriptions>
       <el-table :data="reference.lines" border size="small" class="lines">
         <el-table-column prop="businessDate" label="日期" width="120" />
@@ -150,14 +170,39 @@ onMounted(load)
 </template>
 
 <style scoped>
-.glue-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.month { width: 150px; }
-.weight { width: 140px; }
-.reason { width: 220px; }
-.employee { width: 260px; }
-.employee-row { margin-top: 16px; }
-.meta { color: var(--el-text-color-secondary); font-size: 13px; }
-.lines { margin-top: 12px; }
-.alert { margin-bottom: 12px; }
+.glue-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.month {
+  width: 150px;
+}
+.weight {
+  width: 140px;
+}
+.reason {
+  width: 220px;
+}
+.employee {
+  width: 260px;
+}
+.employee-row {
+  margin-top: 16px;
+}
+.meta {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.lines {
+  margin-top: 12px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

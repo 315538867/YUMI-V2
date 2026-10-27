@@ -15,7 +15,9 @@ interface VersionRow {
 
 const versions = ref<VersionRow[]>([])
 const selected = ref('')
-const differences = ref<Array<{ differenceBusinessId: string; feedCode: string; detailText: string }>>([])
+const differences = ref<
+  Array<{ differenceBusinessId: string; feedCode: string; detailText: string }>
+>([])
 const errorText = ref('')
 
 async function load(): Promise<void> {
@@ -28,6 +30,11 @@ async function load(): Promise<void> {
   } catch (error) {
     errorText.value = userMessageOf(error, '投影版本加载失败')
   }
+}
+
+async function selectVersion(versionBusinessId: string): Promise<void> {
+  selected.value = versionBusinessId
+  await loadDifferences()
 }
 
 async function loadDifferences(): Promise<void> {
@@ -48,18 +55,16 @@ onMounted(load)
     <el-table :data="versions" border>
       <el-table-column prop="versionBusinessId" label="投影版本" min-width="220" />
       <el-table-column label="状态" width="110">
-        <template #default="{ row }"><CodeTag category="reporting.versionStatus" :code="row.status" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="reporting.versionStatus" :code="row.status"
+        /></template>
       </el-table-column>
       <el-table-column prop="recordCount" label="记录数" width="100" />
       <el-table-column prop="differenceCount" label="差异数" width="100" />
       <el-table-column prop="activatedAt" label="切换时间" width="230" />
       <el-table-column label="操作" width="110">
         <template #default="{ row }">
-          <el-button
-            link
-            type="primary"
-            @click="selected = row.versionBusinessId; loadDifferences()"
-          >
+          <el-button link type="primary" @click="selectVersion(row.versionBusinessId)">
             查看差异
           </el-button>
         </template>
@@ -69,7 +74,9 @@ onMounted(load)
     <h2>差异 {{ selected }}</h2>
     <el-table :data="differences" border empty-text="该版本无来源差异">
       <el-table-column label="来源" width="160">
-        <template #default="{ row }"><CodeTag category="reporting.feedCode" :code="row.feedCode" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="reporting.feedCode" :code="row.feedCode"
+        /></template>
       </el-table-column>
       <el-table-column prop="differenceBusinessId" label="差异标识" min-width="220" />
       <el-table-column prop="detailText" label="说明" min-width="320" />
@@ -78,8 +85,21 @@ onMounted(load)
 </template>
 
 <style scoped>
-.reconciliation-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-h2 { margin: 20px 0 10px; font-size: 15px; }
-.alert { margin-bottom: 12px; }
+.reconciliation-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+h2 {
+  margin: 20px 0 10px;
+  font-size: 16px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

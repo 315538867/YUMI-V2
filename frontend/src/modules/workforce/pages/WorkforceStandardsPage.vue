@@ -82,9 +82,19 @@ onMounted(load)
       <h2>每日有效时间</h2>
       <el-form inline>
         <el-form-item label="有效分钟">
-          <el-input v-model.number="effectiveMinutes" type="number" class="short" :disabled="!canManage" />
+          <el-input
+            v-model.number="effectiveMinutes"
+            type="number"
+            class="short"
+            :disabled="!canManage"
+          />
         </el-form-item>
-        <PermissionButton permission="workforce.standard.manage" type="primary" @click="saveWorkTime">保存</PermissionButton>
+        <PermissionButton
+          permission="workforce.standard.manage"
+          type="primary"
+          @click="saveWorkTime"
+          >保存</PermissionButton
+        >
       </el-form>
 
       <h2>小组人数效率标准</h2>
@@ -97,7 +107,12 @@ onMounted(load)
         </el-table-column>
         <el-table-column label="操作" width="100">
           <template #default="{ row }">
-            <PermissionButton permission="workforce.standard.manage" link type="primary" @click="saveEfficiency(row.standardBusinessId)">
+            <PermissionButton
+              permission="workforce.standard.manage"
+              link
+              type="primary"
+              @click="saveEfficiency(row.standardBusinessId)"
+            >
               保存
             </PermissionButton>
           </template>
@@ -122,7 +137,7 @@ h1 {
 
 h2 {
   margin: 20px 0 10px;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .short {

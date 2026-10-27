@@ -40,8 +40,12 @@ function openCreate(): void {
 }
 
 async function create(): Promise<void> {
-  if (form.name.trim() === '' || form.contactName.trim() === '' || form.phone.trim() === ''
-      || form.defaultAddress.trim() === '') {
+  if (
+    form.name.trim() === '' ||
+    form.contactName.trim() === '' ||
+    form.phone.trim() === '' ||
+    form.defaultAddress.trim() === ''
+  ) {
     createError.value = '请填写客户名称、联系人、电话和默认收货地址'
     return
   }
@@ -73,7 +77,13 @@ onMounted(load)
         class="keyword"
         @keyup.enter="load"
       />
-      <el-select v-model="filters.status" placeholder="全部状态" clearable class="status">
+      <el-select
+        v-model="filters.status"
+        placeholder="全部状态"
+        clearable
+        class="status"
+        aria-label="客户状态筛选"
+      >
         <el-option label="启用" value="ACTIVE" />
         <el-option label="停用" value="INACTIVE" />
       </el-select>
@@ -90,7 +100,12 @@ onMounted(load)
       <el-table-column prop="name" label="客户名称" min-width="160" />
       <el-table-column prop="contactName" label="联系人" width="120" />
       <el-table-column prop="phone" label="电话" width="150" />
-      <el-table-column prop="defaultAddress" label="默认地址" min-width="220" show-overflow-tooltip />
+      <el-table-column
+        prop="defaultAddress"
+        label="默认地址"
+        min-width="220"
+        show-overflow-tooltip
+      />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <CodeTag category="common.status" :code="row.status" />
@@ -98,7 +113,11 @@ onMounted(load)
       </el-table-column>
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="router.push(`/customers/${row.customerBusinessId}`)">
+          <el-button
+            link
+            type="primary"
+            @click="router.push(`/customers/${row.customerBusinessId}`)"
+          >
             查看
           </el-button>
         </template>
@@ -136,7 +155,10 @@ onMounted(load)
 </template>
 
 <style scoped>
-.customer-list h1 { margin: 0 0 12px; font-size: 18px; }
+.customer-list h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
 
 .customer-list {
   background: #fff;

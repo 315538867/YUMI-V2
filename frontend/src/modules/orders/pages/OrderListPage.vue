@@ -31,15 +31,29 @@ onMounted(load)
 <template>
   <section class="order-list">
     <div class="toolbar">
-      <el-input v-model="filters.keyword" placeholder="订单号或客户" clearable class="keyword" @keyup.enter="load" />
-      <el-select v-model="filters.status" placeholder="全部状态" clearable class="status">
+      <el-input
+        v-model="filters.keyword"
+        placeholder="订单号或客户"
+        clearable
+        class="keyword"
+        @keyup.enter="load"
+      />
+      <el-select
+        v-model="filters.status"
+        placeholder="全部状态"
+        clearable
+        class="status"
+        aria-label="订单状态筛选"
+      >
         <el-option label="已确认" value="CONFIRMED" />
         <el-option label="履约中" value="IN_FULFILLMENT" />
         <el-option label="已完成" value="COMPLETED" />
         <el-option label="已取消" value="CANCELLED" />
       </el-select>
       <el-button type="primary" @click="load">查询</el-button>
-      <PermissionButton permission="order.create" @click="router.push('/orders/new')">新增订单</PermissionButton>
+      <PermissionButton permission="order.create" @click="router.push('/orders/new')"
+        >新增订单</PermissionButton
+      >
       <PermissionButton permission="order.legacy.intake" @click="router.push('/orders/opening')">
         已有订单接管
       </PermissionButton>
@@ -48,10 +62,14 @@ onMounted(load)
     <el-table v-loading="loading" :data="rows" empty-text="暂无订单" border>
       <el-table-column prop="orderNo" label="订单号" width="150" />
       <el-table-column label="来源" width="150">
-        <template #default="{ row }"><CodeTag category="order.origin" :code="row.origin" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="order.origin" :code="row.origin"
+        /></template>
       </el-table-column>
       <el-table-column label="状态" width="120">
-        <template #default="{ row }"><CodeTag category="order.status" :code="row.status" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="order.status" :code="row.status"
+        /></template>
       </el-table-column>
       <el-table-column prop="orderDate" label="订单日期" width="120" />
       <el-table-column prop="expectedDeliveryDate" label="预计交付" width="120" />
@@ -66,7 +84,9 @@ onMounted(load)
       </el-table-column>
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="router.push(`/orders/${row.orderBusinessId}`)">查看</el-button>
+          <el-button link type="primary" @click="router.push(`/orders/${row.orderBusinessId}`)"
+            >查看</el-button
+          >
         </template>
       </el-table-column>
     </el-table>
@@ -80,8 +100,19 @@ onMounted(load)
   border-radius: 8px;
   padding: 16px;
 }
-.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-.keyword { width: 240px; }
-.status { width: 130px; }
-.alert { margin-bottom: 12px; }
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.keyword {
+  width: 240px;
+}
+.status {
+  width: 130px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

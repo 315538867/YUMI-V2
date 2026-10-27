@@ -68,9 +68,7 @@ async function ingestAndCalculate(): Promise<void> {
 }
 
 function openEmployee(row: EmployeePayrollView): void {
-  void router.push(
-    `/payroll/employees?period=${selected.value}&employee=${row.employeeBusinessId}`,
-  )
+  void router.push(`/payroll/employees?period=${selected.value}&employee=${row.employeeBusinessId}`)
 }
 
 onMounted(load)
@@ -79,7 +77,13 @@ onMounted(load)
 <template>
   <section v-loading="loading" class="periods-page">
     <div class="toolbar">
-      <el-select v-model="selected" placeholder="选择工资期间" class="period" @change="load">
+      <el-select
+        v-model="selected"
+        placeholder="选择工资期间"
+        class="period"
+        aria-label="工资期间"
+        @change="load"
+      >
         <el-option
           v-for="period in periods"
           :key="period.periodBusinessId"
@@ -93,11 +97,19 @@ onMounted(load)
       <el-button @click="router.push('/payroll/glue')">胶水月参考</el-button>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-table :data="results" empty-text="该期间暂无工资结果；请先刷新参考" border>
       <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
       <el-table-column label="状态" width="130">
-        <template #default="{ row }"><CodeTag category="finance.payrollResultStatus" :code="row.status" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.payrollResultStatus" :code="row.status"
+        /></template>
       </el-table-column>
       <el-table-column label="参考行" width="100">
         <template #default="{ row }">{{ row.lines.length }}</template>
@@ -134,8 +146,22 @@ onMounted(load)
 </template>
 
 <style scoped>
-.periods-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 16px; }
-.toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.period { width: 320px; }
-.alert { margin-bottom: 12px; }
+.periods-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 16px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.period {
+  width: 320px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

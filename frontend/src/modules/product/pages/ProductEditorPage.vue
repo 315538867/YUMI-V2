@@ -64,9 +64,8 @@ interface EditorForm {
 
 const route = useRoute()
 const router = useRouter()
-const productId = typeof route.params.productBusinessId === 'string'
-  ? route.params.productBusinessId
-  : ''
+const productId =
+  typeof route.params.productBusinessId === 'string' ? route.params.productBusinessId : ''
 const editing = productId !== ''
 const loading = ref(true)
 const saving = ref(false)
@@ -133,8 +132,7 @@ async function load(): Promise<void> {
   loading.value = true
   try {
     configuration.value = await productService.entryConfiguration()
-    form.makingStarCode =
-      configuration.value.makingStars[0]?.starCode ?? form.makingStarCode
+    form.makingStarCode = configuration.value.makingStars[0]?.starCode ?? form.makingStarCode
     form.glueLossRate = configuration.value.glueLossRate
     form.glueUnitPrice = configuration.value.glueUnitPrice.amount
     form.colorPasteUnitPrice = configuration.value.colorPasteUnitPrice.amount
@@ -220,9 +218,10 @@ async function save(): Promise<void> {
   saving.value = true
   errorText.value = ''
   try {
-    const saved = editing && original.value !== null
-      ? await productService.update(productId, definition(), original.value.rowVersion)
-      : await productService.create(definition())
+    const saved =
+      editing && original.value !== null
+        ? await productService.update(productId, definition(), original.value.rowVersion)
+        : await productService.create(definition())
     ElMessage.success('商品已保存')
     await router.replace(`/products/${saved.productBusinessId}`)
   } catch (error) {
@@ -340,7 +339,7 @@ h1 {
 
 h2 {
   margin: 20px 0 10px;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--el-text-color-primary);
 }
 

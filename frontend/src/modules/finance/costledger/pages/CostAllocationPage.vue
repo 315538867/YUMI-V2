@@ -7,9 +7,9 @@ import { costLedgerService } from '@/modules/finance/costledger/services/costLed
 const entryId = ref('')
 const errorText = ref('')
 const successText = ref('')
-const allocations = reactive<Array<{ subjectType: string; subjectBusinessId: string; amount: string }>>([
-  { subjectType: 'ORDER', subjectBusinessId: '', amount: '' },
-])
+const allocations = reactive<
+  Array<{ subjectType: string; subjectBusinessId: string; amount: string }>
+>([{ subjectType: 'ORDER', subjectBusinessId: '', amount: '' }])
 
 function add(): void {
   allocations.push({ subjectType: 'ORDER', subjectBusinessId: '', amount: '' })
@@ -33,14 +33,25 @@ async function submit(): Promise<void> {
 <template>
   <section class="allocation-page">
     <h1>成本显式分摊</h1>
-    <el-alert type="info" :closable="false" title="分摊只保存人工依据，不另生成成本；未分摊成本在报表提示不完整。" class="alert" />
+    <el-alert
+      type="info"
+      :closable="false"
+      title="分摊只保存人工依据，不另生成成本；未分摊成本在报表提示不完整。"
+      class="alert"
+    />
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-form label-width="110px" class="form">
       <el-form-item label="成本事实"><el-input v-model="entryId" /></el-form-item>
       <el-form-item v-for="(item, index) in allocations" :key="index" :label="`分摊 ${index + 1}`">
         <div class="row">
-          <el-select v-model="item.subjectType" class="type">
+          <el-select v-model="item.subjectType" class="type" aria-label="成本主体类型">
             <el-option label="订单" value="ORDER" />
             <el-option label="员工" value="EMPLOYEE" />
             <el-option label="商品" value="PRODUCT" />
@@ -56,11 +67,31 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-.allocation-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.form { max-width: 720px; }
-.row { display: flex; gap: 8px; width: 100%; }
-.type { width: 120px; }
-.amount { width: 140px; }
-.alert { margin-bottom: 12px; }
+.allocation-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.form {
+  max-width: 720px;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.type {
+  width: 120px;
+}
+.amount {
+  width: 140px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

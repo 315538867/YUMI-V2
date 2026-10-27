@@ -101,9 +101,7 @@ async function load(): Promise<void> {
 }
 
 function applyCustomer(): void {
-  const customer = customers.value.find(
-    (row) => row.customerBusinessId === form.customerBusinessId,
-  )
+  const customer = customers.value.find((row) => row.customerBusinessId === form.customerBusinessId)
   if (customer) {
     recipient.name = customer.contactName
     recipient.phone = customer.phone
@@ -175,7 +173,11 @@ function validate(): boolean {
       return false
     }
   }
-  if (recipient.name.trim() === '' || recipient.phone.trim() === '' || recipient.address.trim() === '') {
+  if (
+    recipient.name.trim() === '' ||
+    recipient.phone.trim() === '' ||
+    recipient.address.trim() === ''
+  ) {
     errorText.value = '请填写收货人、电话和地址'
     return false
   }
@@ -302,11 +304,7 @@ onMounted(load)
         </div>
         <el-form label-width="110px">
           <el-form-item label="商品">
-            <el-select
-              v-model="item.productBusinessId"
-              filterable
-              @change="loadSchemes(item)"
-            >
+            <el-select v-model="item.productBusinessId" filterable @change="loadSchemes(item)">
               <el-option
                 v-for="product in products"
                 :key="product.productBusinessId"
@@ -369,7 +367,9 @@ onMounted(load)
       <el-descriptions :column="3" border>
         <el-descriptions-item label="明细数">{{ items.length }}</el-descriptions-item>
         <el-descriptions-item label="订购数量">{{ totalQuantity }}</el-descriptions-item>
-        <el-descriptions-item label="金额合计">{{ totalAmount.toFixed(2) }} CNY</el-descriptions-item>
+        <el-descriptions-item label="金额合计"
+          >{{ totalAmount.toFixed(2) }} CNY</el-descriptions-item
+        >
       </el-descriptions>
     </el-form>
 
@@ -381,7 +381,9 @@ onMounted(load)
         <el-descriptions-item label="订单 / 预计交付">
           {{ form.orderDate }} → {{ form.expectedDeliveryDate }}
         </el-descriptions-item>
-        <el-descriptions-item label="收货人">{{ recipient.name }} · {{ recipient.phone }}</el-descriptions-item>
+        <el-descriptions-item label="收货人"
+          >{{ recipient.name }} · {{ recipient.phone }}</el-descriptions-item
+        >
         <el-descriptions-item label="地址">{{ recipient.address }}</el-descriptions-item>
       </el-descriptions>
       <el-table :data="items" border size="small" class="preview-table">
@@ -392,7 +394,9 @@ onMounted(load)
           <template #default="{ row }">{{ schemeName(row) }}</template>
         </el-table-column>
         <el-table-column label="目标工序" width="120">
-          <template #default="{ row }"><CodeTag category="production.targetProcess" :code="row.targetProcess" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="production.targetProcess" :code="row.targetProcess"
+          /></template>
         </el-table-column>
         <el-table-column prop="quantity" label="数量" width="80" />
         <el-table-column prop="unitPrice" label="单价" width="100" />
@@ -433,7 +437,7 @@ h1 {
 
 h2 {
   margin: 20px 0 10px;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .form {

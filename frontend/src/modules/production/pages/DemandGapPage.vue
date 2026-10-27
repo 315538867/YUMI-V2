@@ -45,7 +45,7 @@ onMounted(loadProducts)
   <section class="gap-page">
     <h1>需求缺口</h1>
     <div class="toolbar">
-      <el-select v-model="productId" filterable class="product" @change="load">
+      <el-select v-model="productId" filterable class="product" aria-label="商品" @change="load">
         <el-option
           v-for="product in products"
           :key="product.productBusinessId"

@@ -63,7 +63,7 @@ onMounted(load)
   <section class="tasks-page">
     <h1>提交后任务</h1>
     <div class="toolbar">
-      <el-select v-model="status" class="status" @change="load">
+      <el-select v-model="status" class="status" aria-label="任务状态" @change="load">
         <el-option label="待执行" value="PENDING" />
         <el-option label="等待重试" value="RETRY_WAIT" />
         <el-option label="需人工处理" value="DEAD" />
@@ -72,14 +72,27 @@ onMounted(load)
       <el-button @click="load">查询</el-button>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-table :data="tasks" border empty-text="暂无任务">
       <el-table-column label="任务类型" width="170">
-        <template #default="{ row }"><CodeLabel category="platform.afterCommitTaskType" :code="row.taskType" fallback="其他任务" /></template>
+        <template #default="{ row }"
+          ><CodeLabel
+            category="platform.afterCommitTaskType"
+            :code="row.taskType"
+            fallback="其他任务"
+        /></template>
       </el-table-column>
       <el-table-column prop="deduplicationKey" label="去重键" min-width="220" />
       <el-table-column label="状态" width="120">
-        <template #default="{ row }"><CodeTag category="platform.afterCommitTaskStatus" :code="row.status" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="platform.afterCommitTaskStatus" :code="row.status"
+        /></template>
       </el-table-column>
       <el-table-column prop="attempts" label="尝试" width="80" />
       <el-table-column prop="lastError" label="失败原因" min-width="240" />
@@ -96,7 +109,9 @@ onMounted(load)
 
     <el-dialog v-model="abandonVisible" title="放弃任务" width="420px">
       <el-form label-width="92px">
-        <el-form-item label="原因"><el-input v-model="form.reason" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item label="原因"
+          ><el-input v-model="form.reason" type="textarea" :rows="2"
+        /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="abandonVisible = false">取消</el-button>
@@ -107,9 +122,25 @@ onMounted(load)
 </template>
 
 <style scoped>
-.tasks-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.status { width: 160px; }
-.alert { margin-bottom: 12px; }
+.tasks-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.status {
+  width: 160px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

@@ -48,7 +48,7 @@ onMounted(load)
   <section class="entries-page">
     <h1>成本明细与汇总</h1>
     <div class="toolbar">
-      <el-select v-model="filters.subjectType" class="subject-type">
+      <el-select v-model="filters.subjectType" class="subject-type" aria-label="成本主体类型">
         <el-option label="订单" value="ORDER" />
         <el-option label="员工" value="EMPLOYEE" />
         <el-option label="商品" value="PRODUCT" />
@@ -61,17 +61,23 @@ onMounted(load)
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-descriptions v-if="summary" :column="3" border class="summary">
       <el-descriptions-item label="归集金额">{{ summary.totalAmount }}</el-descriptions-item>
-      <el-descriptions-item label="完整分摊">{{ summary.fullyAllocated ? '是' : '否' }}</el-descriptions-item>
+      <el-descriptions-item label="完整分摊">{{
+        summary.fullyAllocated ? '是' : '否'
+      }}</el-descriptions-item>
       <el-descriptions-item label="口径">材料 + 实际人工 + 售后 + 经营分摊</el-descriptions-item>
     </el-descriptions>
     <el-table :data="entries" border empty-text="暂无成本明细">
       <el-table-column prop="costEntryBusinessId" label="成本事实" min-width="200" />
       <el-table-column label="分类" width="150">
-        <template #default="{ row }"><CodeTag category="finance.costCategory" :code="row.costCategory" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.costCategory" :code="row.costCategory"
+        /></template>
       </el-table-column>
       <el-table-column prop="businessDate" label="业务日期" width="120" />
       <el-table-column label="操作" width="110">
-        <template #default="{ row }"><CodeTag category="finance.costOperation" :code="row.operationType" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.costOperation" :code="row.operationType"
+        /></template>
       </el-table-column>
       <el-table-column prop="amount" label="金额" width="130" />
       <el-table-column label="已分摊" width="90">
@@ -84,12 +90,36 @@ onMounted(load)
 </template>
 
 <style scoped>
-.entries-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 16px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.subject-type { width: 110px; }
-.subject { width: 260px; }
-.summary { margin-bottom: 12px; }
-.hint { color: var(--el-text-color-secondary); font-size: 12px; }
-.alert { margin-bottom: 12px; }
+.entries-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 16px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.subject-type {
+  width: 110px;
+}
+.subject {
+  width: 260px;
+}
+.summary {
+  margin-bottom: 12px;
+}
+.hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

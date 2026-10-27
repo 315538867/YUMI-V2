@@ -69,26 +69,42 @@ onMounted(load)
   <section class="payment-page">
     <h1>工资付款</h1>
     <div class="toolbar">
-      <el-select v-model="selected" class="period" @change="load">
-        <el-option v-for="period in periods" :key="period.periodBusinessId" :label="period.periodNo" :value="period.periodBusinessId" />
+      <el-select v-model="selected" class="period" aria-label="工资期间" @change="load">
+        <el-option
+          v-for="period in periods"
+          :key="period.periodBusinessId"
+          :label="period.periodNo"
+          :value="period.periodBusinessId"
+        />
       </el-select>
       <el-date-picker v-model="businessDate" type="date" value-format="YYYY-MM-DD" />
       <el-button type="primary" @click="pay">按选中员工付款</el-button>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-table :data="results" border @selection-change="selectionChanged">
       <el-table-column type="selection" width="50" />
       <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
       <el-table-column label="状态" width="130">
-        <template #default="{ row }"><CodeTag category="finance.payrollResultStatus" :code="row.status" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.payrollResultStatus" :code="row.status"
+        /></template>
       </el-table-column>
       <el-table-column label="应付" width="130">
         <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
       </el-table-column>
       <el-table-column label="本次付款" width="160">
         <template #default="{ row }">
-          <el-input v-model="amounts[row.resultBusinessId]" :disabled="row.status !== 'CONFIRMED'" />
+          <el-input
+            v-model="amounts[row.resultBusinessId]"
+            :disabled="row.status !== 'CONFIRMED'"
+          />
         </template>
       </el-table-column>
     </el-table>
@@ -97,11 +113,30 @@ onMounted(load)
 </template>
 
 <style scoped>
-.payment-page h1 { margin: 0 0 12px; font-size: 18px; }
+.payment-page h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
 
-.payment-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 16px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.period { width: 240px; }
-.hint { color: var(--el-text-color-secondary); font-size: 12px; }
-.alert { margin-bottom: 12px; }
+.payment-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 16px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.period {
+  width: 240px;
+}
+.hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

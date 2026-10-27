@@ -102,11 +102,42 @@
 5. 运行前端 `codeCatalog.test.ts`、`display.contract.test.ts` 和后端 `DomainCodeCatalogTest`。
 6. 涉及页面流程时，E2E 按中文标签断言，不按原始编码断言。
 
-## 8. 门禁命令
+## 8. 目录与命名
+
+- 业务模块：`src/modules/<domain>/`，至少包含：
+  - `pages/`：路由页面，文件名 `XxxPage.vue`；布局用 `XxxLayout.vue`。
+  - `services/`：`xxxService.ts`，导出一个 `xxxService` 对象，页面只通过它访问接口。
+  - `contracts.ts`：接口入参与返回类型，编码字段使用 `CodeOf<'分类'>`。
+- 跨模块能力：`src/platform/`（认证、请求、展示码表、主题、通用 composable）。
+- 纯展示组件：`src/shared/components/`，文件名 PascalCase，组件名与文件名一致。
+- Composable：`useXxx.ts`，返回 `ref`/`computed` 与动作函数；不直接操作 DOM。
+- 类型命名：接口返回 `XxxView`，命令入参 `XxxInput`，领域记录 `XxxRecord`。
+- 布尔值用 `is/has/can/should` 前缀；事件处理函数用 `openXxx`、`submit`、`load`、`saveXxx`。
+- 测试与源码同目录：`*.test.ts`；E2E 放 `e2e/<domain>.spec.ts`，按中文标签断言。
+- CSS class 用 kebab-case，样式默认 `scoped`；颜色只用 `tokens.css` 变量，禁止行内样式（动态尺寸/颜色绑定除外）。
+- 依赖方向：`pages → services → platform`；`shared` 和 `platform` 不得导入 `@/modules/**`（ESLint 强制）。
+- 类型导入一律 `import type`；页面不得直接导入 `apiClient`、`api` 或使用 `fetch`。
+
+## 9. 工程门禁
+
+- ESLint 9 扁平配置：`frontend/eslint.config.js`，规则包含 Vue 推荐集、TypeScript 推荐集、禁止 `any`、禁止共享层依赖业务模块。
+- Prettier 配置：`frontend/.prettierrc.json`；`.prettierignore` 排除构建产物与 Markdown。
+- 提交前必须全部通过：
 
 ```bash
-cd frontend && pnpm run typecheck && pnpm run test:unit && pnpm run build
-cd backend && ./mvnw -Dtest=DomainCodeCatalogTest test
+cd frontend
+pnpm run lint
+pnpm run format:check
+pnpm run typecheck
+pnpm run test:unit
+pnpm run build
+pnpm run test:e2e        # 含无障碍 axe 与视觉回归
 ```
 
-`pnpm run test:unit` 已包含码表、展示契约、权限组件与 `useAsyncAction` 单测。
+```bash
+cd backend
+./mvnw test
+./mvnw -Dtest=DomainCodeCatalogTest test
+```
+
+- 视觉与无障碍契约见 [DESIGN.md](DESIGN.md)；颜色或布局变更必须同步更新该文件并重生成截图基线。

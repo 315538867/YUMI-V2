@@ -43,7 +43,13 @@ onMounted(load)
         class="keyword"
         @keyup.enter="load"
       />
-      <el-select v-model="filters.status" placeholder="全部状态" clearable class="status">
+      <el-select
+        v-model="filters.status"
+        placeholder="全部状态"
+        clearable
+        class="status"
+        aria-label="商品状态筛选"
+      >
         <el-option label="启用" value="ACTIVE" />
         <el-option label="停用" value="INACTIVE" />
       </el-select>
@@ -83,7 +89,10 @@ onMounted(load)
 </template>
 
 <style scoped>
-.product-list h1 { margin: 0 0 12px; font-size: 18px; }
+.product-list h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
 
 .product-list {
   background: #fff;
