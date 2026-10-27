@@ -102,7 +102,10 @@ jobs:
           YUMI_DB_PASSWORD: ""
           YUMI_INITIAL_ADMIN_LOGIN: it-admin
           YUMI_INITIAL_ADMIN_PASSWORD: it-pass-1234
-        run: java -cp target/yumi-backend-0.1.0-SNAPSHOT.jar com.yumi.platform.identity.bootstrap.InitialAdministratorCommand
+        run: >-
+          java -Dloader.main=com.yumi.platform.identity.bootstrap.InitialAdministratorCommand
+          -cp target/yumi-backend-0.1.0-SNAPSHOT.jar
+          org.springframework.boot.loader.launch.PropertiesLauncher
       - name: Start backend
         working-directory: backend
         env:

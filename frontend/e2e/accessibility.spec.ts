@@ -55,6 +55,19 @@ test.describe('无障碍门禁', () => {
     expect(failures, failures.join('\n')).toEqual([])
   })
 
+  test('离开确认弹窗无严重无障碍问题', async ({ page }) => {
+    await login(page)
+    await page.goto('/customers/new')
+    await page.getByLabel('客户名称').fill('无障碍检查')
+    await page.getByRole('button', { name: '取消' }).click()
+    await expect(page.locator('.el-message-box')).toBeVisible()
+    const violations = seriousViolations(
+      await new AxeBuilder({ page }).include('.el-message-box').withTags(TAGS).analyze(),
+    )
+    expect(violations, JSON.stringify(violations, null, 2)).toEqual([])
+    await page.locator('.el-message-box').getByRole('button', { name: '继续编辑' }).click()
+  })
+
   test('主要业务页无严重无障碍问题', async ({ page }) => {
     await login(page)
     const failures: string[] = []
