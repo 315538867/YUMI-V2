@@ -14,6 +14,9 @@ public interface CashQuery {
     SourceCashSummary getSourceSummary(
             String sourceModule, String sourceType, String sourceBusinessId);
 
+    /** 单笔现金事实与凭证文件标识，供订单/工资/成本页面查看。 */
+    CashFactDetailView getFact(String cashFactBusinessId);
+
     record CashPeriodSummary(
             LocalDate startDate, LocalDate endDate, BigDecimal income, BigDecimal outflow,
             BigDecimal netAmount) {
@@ -27,5 +30,15 @@ public interface CashQuery {
     record SourceCashSummary(
             String sourceModule, String sourceType, String sourceBusinessId,
             BigDecimal receivedAmount, BigDecimal paidAmount, BigDecimal refundedAmount) {
+    }
+
+    record CashFactDetailView(
+            String cashFactBusinessId, String cashNo, String direction, String cashType,
+            LocalDate businessDate, BigDecimal amount, String currencyCode, boolean valid,
+            String reversesFactBusinessId, List<String> voucherFileRefs) {
+
+        public CashFactDetailView {
+            voucherFileRefs = List.copyOf(voucherFileRefs);
+        }
     }
 }

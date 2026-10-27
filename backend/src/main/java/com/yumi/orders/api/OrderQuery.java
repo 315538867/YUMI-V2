@@ -12,4 +12,7 @@ public interface OrderQuery {
 
     /** 订单列表：按订单号模糊检索，可按状态过滤。 */
     List<OrderSummaryView> search(String keyword, OrderStatus status, int page, int size);
+
+    /** 订单详情工作区：订单、发货、支付关联与时间线。 */
+    OrderWorkspaceView workspace(String orderBusinessId);
 }

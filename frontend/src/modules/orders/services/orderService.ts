@@ -5,6 +5,7 @@ import type {
   OrderStatus,
   OrderSummaryView,
   OrderView,
+  OrderWorkspaceView,
 } from '@/modules/orders/contracts'
 
 export interface ShipmentRequest {
@@ -32,6 +33,12 @@ export const orderService = {
 
   get(orderBusinessId: string): Promise<OrderView> {
     return api.query<OrderView>(`/api/orders/${encodeURIComponent(orderBusinessId)}`)
+  },
+
+  workspace(orderBusinessId: string): Promise<OrderWorkspaceView> {
+    return api.query<OrderWorkspaceView>(
+      `/api/orders/${encodeURIComponent(orderBusinessId)}/workspace`,
+    )
   },
 
   create(input: CreateOrderInput): Promise<{ orderBusinessId: string; orderNo: string }> {

@@ -13,6 +13,7 @@ import com.yumi.orders.api.OrderRef;
 import com.yumi.orders.api.OrderStatus;
 import com.yumi.orders.api.OrderSummaryView;
 import com.yumi.orders.api.OrderView;
+import com.yumi.orders.api.OrderWorkspaceView;
 import com.yumi.orders.application.port.OrderRepository;
 import com.yumi.platform.api.audit.AuditService;
 import com.yumi.platform.api.audit.RecordAuditCommand;
@@ -123,6 +124,89 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
     public OrderView get(String orderBusinessId) {
         authorization.require(PermissionCodes.ORDER_READ, ResourceScope.GLOBAL);
         return toView(requireOrder(orderBusinessId));
+    }
+
+    @Override
+    public OrderWorkspaceView workspace(String orderBusinessId) {
+        authorization.require(PermissionCodes.ORDER_READ, ResourceScope.GLOBAL);
+        OrderView order = toView(requireOrder(orderBusinessId));
+
+        Map<String, List<OrderRepository.ShipmentItemOfOrderRecord>> itemsByShipment =
+                orders.findShipmentItemsOfOrderView(orderBusinessId).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                OrderRepository.ShipmentItemOfOrderRecord::shipmentBusinessId));
+        Map<String, List<OrderRepository.CorrectionOfOrderRecord>> correctionsByShipment =
+                orders.findCorrectionsOfOrder(orderBusinessId).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                OrderRepository.CorrectionOfOrderRecord::shipmentBusinessId));
+        List<OrderWorkspaceView.ShipmentView> shipments = orders
+                .findShipmentsOfOrder(orderBusinessId).stream()
+                .map(shipment -> new OrderWorkspaceView.ShipmentView(
+                        shipment.shipmentBusinessId(), shipment.shipmentNo(), shipment.shippedAt(),
+                        shipment.trackingNo(), shipment.valid(),
+                        itemsByShipment.getOrDefault(shipment.shipmentBusinessId(), List.of()).stream()
+                                .map(item -> new OrderWorkspaceView.ShipmentItemView(
+                                        item.shipmentItemBusinessId(), item.orderItemBusinessId(),
+                                        item.productionSourceBusinessId(), item.quantity(),
+                                        item.effectiveQuantity()))
+                                .toList(),
+                        correctionsByShipment.getOrDefault(
+                                        shipment.shipmentBusinessId(), List.of()).stream()
+                                .map(correction -> new OrderWorkspaceView.CorrectionView(
+                                        correction.factBusinessId(),
+                                        correction.shipmentItemBusinessId(),
+                                        correction.correctionType(), correction.quantityDelta(),
+                                        correction.reasonText(), correction.occurredAt(),
+                                        correction.valid()))
+                                .toList()))
+                .toList();
+
+        List<OrderWorkspaceView.PaymentLinkView> payments = orders
+                .findPaymentLinksOfOrder(orderBusinessId).stream()
+                .map(payment -> new OrderWorkspaceView.PaymentLinkView(
+                        payment.factBusinessId(), payment.financeCashFactBusinessId(),
+                        payment.linkType(),
+                        SettlementMoney.of(payment.linkedAmount(), CurrencyCode.CNY),
+                        payment.reversesFactBusinessId(), payment.valid(), payment.occurredAt()))
+                .toList();
+
+        List<OrderWorkspaceView.EventView> events = new java.util.ArrayList<>();
+        for (var confirmation : orders.findConfirmationsOfOrder(orderBusinessId)) {
+            events.add(new OrderWorkspaceView.EventView(
+                    "CONFIRMATION", confirmation.occurredAt(), "订单确认",
+                    "确认 " + confirmation.totalQuantity() + " 件 / "
+                            + confirmation.totalAmount().setScale(2, java.math.RoundingMode.HALF_UP)
+                            + " 元"));
+        }
+        for (var change : orders.findChangesOfOrder(orderBusinessId)) {
+            events.add(new OrderWorkspaceView.EventView(
+                    "CHANGE", change.occurredAt(), "订单变更 · " + change.changeType(),
+                    (change.reasonText() == null ? "无说明" : change.reasonText())
+                            + "；金额变化 "
+                            + change.amountDelta().setScale(2, java.math.RoundingMode.HALF_UP)));
+        }
+        for (var shipment : shipments) {
+            events.add(new OrderWorkspaceView.EventView(
+                    "SHIPMENT", shipment.shippedAt(), "发货 · " + shipment.shipmentNo(),
+                    (shipment.trackingNo() == null ? "未填写物流单号" : shipment.trackingNo())
+                            + (shipment.valid() ? "" : "；记录已更正")));
+        }
+        for (var payment : payments) {
+            events.add(new OrderWorkspaceView.EventView(
+                    "PAYMENT", payment.occurredAt(),
+                    payment.reversesFactBusinessId() == null
+                            ? ("RECEIPT".equals(payment.linkType()) ? "收款" : "退款")
+                            : "收退款冲销",
+                    payment.amount().value().toPlainString() + " CNY"
+                            + (payment.valid() ? "" : "；已更正")));
+        }
+        for (var completion : orders.findCompletionsOfOrder(orderBusinessId)) {
+            events.add(new OrderWorkspaceView.EventView(
+                    "COMPLETION", completion.occurredAt(), "订单完成",
+                    "交付与付款履约均满足"));
+        }
+        events.sort(java.util.Comparator.comparing(OrderWorkspaceView.EventView::occurredAt));
+        return new OrderWorkspaceView(order, shipments, payments, events);
     }
 
     @Override
@@ -343,6 +427,8 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
                             version.versionNo(), version.schemeSnapshotRef(), version.targetProcess(),
                             SettlementMoney.of(version.unitPrice(), CurrencyCode.CNY), version.quantity(),
                             group.fulfilledQuantity(), version.productionBasisFingerprint(),
+                            version.glueSource(), version.colorPasteSource(),
+                            version.bagSource(), version.decorationSource(),
                             readRecipient(version.recipientPayloadJson()))));
         }
         var projection = orders.findProjection(record.orderBusinessId()).orElseThrow();

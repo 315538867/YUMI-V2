@@ -509,6 +509,172 @@ public class JdbcOrderRepository implements OrderRepository {
     }
 
     @Override
+    public java.util.List<ShipmentOfOrderRecord> findShipmentsOfOrder(String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT shipment_business_id, shipment_no, shipped_at, tracking_no, is_valid
+                        FROM orders_shipments
+                        WHERE order_business_id = :id
+                        ORDER BY shipped_at, shipment_business_id
+                        """)
+                .param("id", orderBusinessId)
+                .query((resultSet, rowNumber) -> new ShipmentOfOrderRecord(
+                        resultSet.getString("shipment_business_id"),
+                        resultSet.getString("shipment_no"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "shipped_at", java.time.LocalDateTime.class)),
+                        resultSet.getString("tracking_no"),
+                        resultSet.getBoolean("is_valid")))
+                .list();
+    }
+
+    @Override
+    public java.util.List<ShipmentItemOfOrderRecord> findShipmentItemsOfOrderView(
+            String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT i.shipment_item_business_id, i.shipment_business_id,
+                               g.order_item_business_id, i.production_source_business_id,
+                               i.quantity,
+                               i.quantity + COALESCE(SUM(CASE WHEN c.is_valid = 1
+                                   THEN c.quantity_delta ELSE 0 END), 0) AS effective_quantity
+                        FROM orders_shipment_items i
+                        JOIN orders_shipments s
+                          ON s.shipment_business_id = i.shipment_business_id
+                        JOIN orders_agreement_groups g
+                          ON g.agreement_group_business_id = i.agreement_group_business_id
+                        LEFT JOIN orders_shipment_correction_facts c
+                          ON c.shipment_item_business_id = i.shipment_item_business_id
+                        WHERE s.order_business_id = :id
+                        GROUP BY i.shipment_item_business_id, i.shipment_business_id,
+                                 g.order_item_business_id, i.production_source_business_id,
+                                 i.quantity
+                        ORDER BY i.shipment_item_business_id
+                        """)
+                .param("id", orderBusinessId)
+                .query((resultSet, rowNumber) -> new ShipmentItemOfOrderRecord(
+                        resultSet.getString("shipment_item_business_id"),
+                        resultSet.getString("shipment_business_id"),
+                        resultSet.getString("order_item_business_id"),
+                        resultSet.getString("production_source_business_id"),
+                        resultSet.getInt("quantity"),
+                        resultSet.getInt("effective_quantity")))
+                .list();
+    }
+
+    @Override
+    public java.util.List<CorrectionOfOrderRecord> findCorrectionsOfOrder(String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT c.fact_business_id, c.shipment_business_id,
+                               c.shipment_item_business_id, c.correction_type,
+                               c.quantity_delta, c.reason_text, c.occurred_at, c.is_valid
+                        FROM orders_shipment_correction_facts c
+                        JOIN orders_shipments s
+                          ON s.shipment_business_id = c.shipment_business_id
+                        WHERE s.order_business_id = :id
+                        ORDER BY c.occurred_at, c.fact_business_id
+                        """)
+                .param("id", orderBusinessId)
+                .query((resultSet, rowNumber) -> new CorrectionOfOrderRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("shipment_business_id"),
+                        resultSet.getString("shipment_item_business_id"),
+                        resultSet.getString("correction_type"),
+                        resultSet.getInt("quantity_delta"),
+                        resultSet.getString("reason_text"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "occurred_at", java.time.LocalDateTime.class)),
+                        resultSet.getBoolean("is_valid")))
+                .list();
+    }
+
+    @Override
+    public java.util.List<PaymentLinkOfOrderRecord> findPaymentLinksOfOrder(
+            String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT fact_business_id, finance_cash_fact_business_id, link_type,
+                               linked_amount, reverses_fact_business_id, is_valid, occurred_at
+                        FROM orders_payment_link_facts
+                        WHERE order_business_id = :id
+                        ORDER BY occurred_at, fact_business_id
+                        """)
+                .param("id", orderBusinessId)
+                .query((resultSet, rowNumber) -> new PaymentLinkOfOrderRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("finance_cash_fact_business_id"),
+                        resultSet.getString("link_type"),
+                        resultSet.getBigDecimal("linked_amount"),
+                        resultSet.getString("reverses_fact_business_id"),
+                        resultSet.getBoolean("is_valid"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "occurred_at", java.time.LocalDateTime.class))))
+                .list();
+    }
+
+    @Override
+    public java.util.List<ConfirmationRecord> findConfirmationsOfOrder(String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT fact_business_id, order_business_id, confirmation_type,
+                               total_quantity, total_amount, occurred_at, operator_id
+                        FROM orders_confirmation_facts
+                        WHERE order_business_id = :id
+                        ORDER BY occurred_at, fact_business_id
+                        """)
+                .param("id", orderBusinessId)
+                .query((resultSet, rowNumber) -> new ConfirmationRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("order_business_id"),
+                        resultSet.getString("confirmation_type"),
+                        resultSet.getInt("total_quantity"),
+                        resultSet.getBigDecimal("total_amount"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "occurred_at", java.time.LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public java.util.List<ChangeRecord> findChangesOfOrder(String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT change_business_id, order_business_id, change_type, reason_text,
+                               amount_delta, occurred_at, operator_id
+                        FROM orders_change_facts
+                        WHERE order_business_id = :id AND is_valid = 1
+                        ORDER BY occurred_at, change_business_id
+                        """)
+                .param("id", orderBusinessId)
+                .query((resultSet, rowNumber) -> new ChangeRecord(
+                        resultSet.getString("change_business_id"),
+                        resultSet.getString("order_business_id"),
+                        resultSet.getString("change_type"),
+                        resultSet.getString("reason_text"),
+                        resultSet.getBigDecimal("amount_delta"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "occurred_at", java.time.LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public java.util.List<CompletionRecord> findCompletionsOfOrder(String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT fact_business_id, order_business_id, fact_type,
+                               fulfillment_fingerprint, occurred_at, operator_id
+                        FROM orders_completion_facts
+                        WHERE order_business_id = :id AND is_valid = 1
+                        ORDER BY occurred_at, fact_business_id
+                        """)
+                .param("id", orderBusinessId)
+                .query((resultSet, rowNumber) -> new CompletionRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("order_business_id"),
+                        resultSet.getString("fact_type"),
+                        resultSet.getString("fulfillment_fingerprint"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "occurred_at", java.time.LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
     public void updateShipmentItemQuantity(String shipmentItemBusinessId, int quantity) {
         jdbc.sql("""
                         UPDATE orders_shipment_items SET quantity = :quantity

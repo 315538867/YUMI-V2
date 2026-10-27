@@ -2,12 +2,19 @@ import { api } from '@/platform/services/api'
 import { newIdempotencyKey } from '@/platform/services/idempotency'
 import { money } from '@/platform/services/money'
 import type {
+  CashFactDetailView,
   CashFactRef,
   CashFactView,
   CashPeriodSummary,
 } from '@/modules/finance/cash/contracts'
 
 export const cashService = {
+  factDetail(cashFactBusinessId: string): Promise<CashFactDetailView> {
+    return api.query<CashFactDetailView>(
+      `/api/finance/cash/facts/${encodeURIComponent(cashFactBusinessId)}`,
+    )
+  },
+
   receiveOrder(
     orderBusinessId: string,
     amount: string,

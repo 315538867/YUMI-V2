@@ -61,6 +61,39 @@ public class CashQueryImpl implements CashQuery {
     }
 
     @Override
+    public CashFactDetailView getFact(String cashFactBusinessId) {
+        return jdbc.sql("""
+                        SELECT cash_fact_business_id, cash_no, direction, cash_type, business_date,
+                               amount, currency_code, is_valid, reverses_fact_business_id
+                        FROM finance_cash_facts
+                        WHERE cash_fact_business_id = :id
+                        """)
+                .param("id", cashFactBusinessId)
+                .query((resultSet, rowNumber) -> new CashFactDetailView(
+                        resultSet.getString("cash_fact_business_id"),
+                        resultSet.getString("cash_no"),
+                        resultSet.getString("direction"),
+                        resultSet.getString("cash_type"),
+                        resultSet.getObject("business_date", java.time.LocalDate.class),
+                        resultSet.getBigDecimal("amount"),
+                        resultSet.getString("currency_code"),
+                        resultSet.getBoolean("is_valid"),
+                        resultSet.getString("reverses_fact_business_id"),
+                        jdbc.sql("""
+                                        SELECT file_business_id FROM finance_cash_voucher_links
+                                        WHERE cash_fact_business_id = :id
+                                        ORDER BY created_at, link_business_id
+                                        """)
+                                .param("id", cashFactBusinessId)
+                                .query(String.class)
+                                .list()))
+                .optional()
+                .orElseThrow(() -> new com.yumi.platform.api.http.ApiException(
+                        com.yumi.platform.api.http.ApiErrorType.NOT_FOUND,
+                        "CASH_FACT_NOT_FOUND", "现金事实不存在"));
+    }
+
+    @Override
     public SourceCashSummary getSourceSummary(
             String sourceModule, String sourceType, String sourceBusinessId) {
         return jdbc.sql("""

@@ -26,3 +26,16 @@ export interface CashPeriodSummary {
   outflow: string
   netAmount: string
 }
+
+export interface CashFactDetailView {
+  cashFactBusinessId: string
+  cashNo: string
+  direction: 'IN' | 'OUT'
+  cashType: string
+  businessDate: string
+  amount: string
+  currencyCode: string
+  valid: boolean
+  reversesFactBusinessId: string | null
+  voucherFileRefs: string[]
+}

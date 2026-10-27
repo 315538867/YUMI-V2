@@ -16,6 +16,7 @@ import com.yumi.orders.api.OrderRef;
 import com.yumi.orders.api.OrderStatus;
 import com.yumi.orders.api.OrderSummaryView;
 import com.yumi.orders.api.OrderView;
+import com.yumi.orders.api.OrderWorkspaceView;
 import com.yumi.platform.api.http.HttpHeaders;
 import java.time.LocalDate;
 import java.util.List;
@@ -152,5 +153,10 @@ public class OrderController {
     @GetMapping("/{orderBusinessId}")
     public OrderView get(@PathVariable String orderBusinessId) {
         return query.get(orderBusinessId);
+    }
+
+    @GetMapping("/{orderBusinessId}/workspace")
+    public OrderWorkspaceView workspace(@PathVariable String orderBusinessId) {
+        return query.workspace(orderBusinessId);
     }
 }

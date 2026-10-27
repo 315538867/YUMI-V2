@@ -64,6 +64,10 @@ export interface OrderView {
       quantity: number
       fulfilledQuantity: number
       productionBasisFingerprint: string
+      glueSource: MaterialSource
+      colorPasteSource: MaterialSource
+      bagSource: MaterialSource
+      decorationSource: MaterialSource
       recipient: RecipientInfo
     }
   }>
@@ -77,6 +81,58 @@ export interface OrderView {
     paymentFulfilled: boolean
     blockingReasons: string[]
   }
+}
+
+export interface OrderWorkspaceShipmentItem {
+  shipmentItemBusinessId: string
+  orderItemBusinessId: string
+  productionSourceBusinessId: string
+  quantity: number
+  effectiveQuantity: number
+}
+
+export interface OrderWorkspaceCorrection {
+  factBusinessId: string
+  shipmentItemBusinessId: string
+  correctionType: string
+  quantityDelta: number
+  reasonText: string
+  occurredAt: string
+  valid: boolean
+}
+
+export interface OrderWorkspaceShipment {
+  shipmentBusinessId: string
+  shipmentNo: string
+  shippedAt: string
+  trackingNo: string | null
+  valid: boolean
+  items: OrderWorkspaceShipmentItem[]
+  corrections: OrderWorkspaceCorrection[]
+}
+
+export interface OrderWorkspacePayment {
+  factBusinessId: string
+  financeCashFactBusinessId: string
+  linkType: string
+  amount: MoneyWire
+  reversesFactBusinessId: string | null
+  valid: boolean
+  occurredAt: string
+}
+
+export interface OrderWorkspaceEvent {
+  kind: string
+  occurredAt: string
+  title: string
+  description: string
+}
+
+export interface OrderWorkspaceView {
+  order: OrderView
+  shipments: OrderWorkspaceShipment[]
+  payments: OrderWorkspacePayment[]
+  events: OrderWorkspaceEvent[]
 }
 
 export interface OrderItemDraft {

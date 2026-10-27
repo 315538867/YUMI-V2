@@ -27,15 +27,20 @@ test('六模块、售后、设置与报表真实页面链路可操作', async ({
 
   await page.goto('/orders/new')
   await page.getByRole('button', { name: '确认建单' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '确认建单' }).click()
   await expect(page).toHaveURL(/\/orders\/ORD-/)
-  await page.getByRole('button', { name: '收款' }).click()
+  await page.getByRole('button', { name: '登记收款' }).click()
   await page.locator('.el-dialog .business-file-upload input[type="file"]').setInputFiles({
     name: 'voucher.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from(`phase-one-voucher-${Date.now()}`),
   })
   await expect(page.getByText('附件已上传')).toBeVisible()
-  await page.locator('.el-dialog').getByRole('button', { name: '确认' }).click()
+  await page.getByRole('button', { name: '核对本次收款' }).click()
+  await expect(
+    page.getByRole('dialog').filter({ hasText: '确认订单实际收款' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: '确认已收到款项' }).click()
   await expect(page.getByText('已收').first()).toBeVisible()
 
   await page.goto('/after-sales')

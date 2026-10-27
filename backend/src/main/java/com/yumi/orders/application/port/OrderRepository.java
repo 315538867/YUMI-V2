@@ -154,6 +154,27 @@ public interface OrderRepository {
     /** 订单列表：订单号模糊检索，按创建倒序。 */
     List<OrderRecord> searchOrders(String keyword, String status, int offset, int limit);
 
+    /** 订单工作区：发货头。 */
+    List<ShipmentOfOrderRecord> findShipmentsOfOrder(String orderBusinessId);
+
+    /** 订单工作区：发货明细（含订单项与有效数量）。 */
+    List<ShipmentItemOfOrderRecord> findShipmentItemsOfOrderView(String orderBusinessId);
+
+    /** 订单工作区：发货更正事实。 */
+    List<CorrectionOfOrderRecord> findCorrectionsOfOrder(String orderBusinessId);
+
+    /** 订单工作区：支付关联事实。 */
+    List<PaymentLinkOfOrderRecord> findPaymentLinksOfOrder(String orderBusinessId);
+
+    /** 订单工作区：确认事实。 */
+    List<ConfirmationRecord> findConfirmationsOfOrder(String orderBusinessId);
+
+    /** 订单工作区：变更事实。 */
+    List<ChangeRecord> findChangesOfOrder(String orderBusinessId);
+
+    /** 订单工作区：完成事实。 */
+    List<CompletionRecord> findCompletionsOfOrder(String orderBusinessId);
+
     /** 报表变化：按 {@code (updated_at, order_business_id)} 键集分页。 */
     List<OrderRecord> findOrdersChangedAfter(
             Instant updatedAfter, String afterOrderBusinessId, int limit);
@@ -176,6 +197,32 @@ public interface OrderRepository {
             String factBusinessId, String orderBusinessId, String financeCashFactBusinessId,
             String linkType, BigDecimal linkedAmount, String reversesFactBusinessId,
             String correctsFactBusinessId, Instant occurredAt, String operatorId) {
+    }
+
+    /** 订单工作区发货头。 */
+    record ShipmentOfOrderRecord(
+            String shipmentBusinessId, String shipmentNo, Instant shippedAt,
+            String trackingNo, boolean valid) {
+    }
+
+    /** 订单工作区发货明细。 */
+    record ShipmentItemOfOrderRecord(
+            String shipmentItemBusinessId, String shipmentBusinessId, String orderItemBusinessId,
+            String productionSourceBusinessId, int quantity, int effectiveQuantity) {
+    }
+
+    /** 订单工作区发货更正。 */
+    record CorrectionOfOrderRecord(
+            String factBusinessId, String shipmentBusinessId, String shipmentItemBusinessId,
+            String correctionType, int quantityDelta, String reasonText, Instant occurredAt,
+            boolean valid) {
+    }
+
+    /** 订单工作区支付关联。 */
+    record PaymentLinkOfOrderRecord(
+            String factBusinessId, String financeCashFactBusinessId, String linkType,
+            BigDecimal linkedAmount, String reversesFactBusinessId, boolean valid,
+            Instant occurredAt) {
     }
 
     /** 退款义务投影。 */

@@ -45,6 +45,10 @@ public record OrderView(
             int quantity,
             int fulfilledQuantity,
             String productionBasisFingerprint,
+            String glueSource,
+            String colorPasteSource,
+            String bagSource,
+            String decorationSource,
             RecipientInfo recipient) {
     }
 
