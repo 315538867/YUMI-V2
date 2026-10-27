@@ -1,21 +1,24 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useListQuery } from '@/platform/composables/useListQuery'
 import type { CustomerStatus, CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPager from '@/shared/components/ListPager.vue'
+import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const router = useRouter()
 const rows = ref<CustomerView[]>([])
 const loading = ref(false)
 const errorText = ref('')
-const filters = reactive<{ keyword: string; status: CustomerStatus | '' }>({
-  keyword: '',
-  status: '',
-})
+const { filters, page, size, sizes, search, reset, goPage, changeSize } = useListQuery(
+  { keyword: '', status: '' as CustomerStatus | '' },
+  { onSearch: () => void load() },
+)
 const createVisible = ref(false)
 const creating = ref(false)
 const createError = ref('')
@@ -25,7 +28,7 @@ async function load(): Promise<void> {
   loading.value = true
   errorText.value = ''
   try {
-    rows.value = await customerService.list(filters.keyword, filters.status)
+    rows.value = await customerService.list(filters.keyword, filters.status, page.value, size.value)
   } catch (error) {
     errorText.value = userMessageOf(error, '客户列表加载失败')
   } finally {
@@ -62,8 +65,7 @@ async function create(): Promise<void> {
     creating.value = false
   }
 }
-
-onMounted(load)
+void load()
 </script>
 
 <template>
@@ -75,7 +77,7 @@ onMounted(load)
         placeholder="名称、编号、联系人或电话"
         clearable
         class="keyword"
-        @keyup.enter="load"
+        @keyup.enter="search"
       />
       <el-select
         v-model="filters.status"
@@ -87,42 +89,51 @@ onMounted(load)
         <el-option label="启用" value="ACTIVE" />
         <el-option label="停用" value="INACTIVE" />
       </el-select>
-      <el-button type="primary" @click="load">查询</el-button>
+      <el-button type="primary" @click="search">查询</el-button>
+      <el-button @click="reset">重置</el-button>
       <PermissionButton permission="customer.manage" @click="openCreate">
         新增客户
       </PermissionButton>
     </div>
 
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-
-    <el-table v-loading="loading" :data="rows" empty-text="暂无客户" border>
-      <el-table-column prop="customerNo" label="客户编号" width="140" />
-      <el-table-column prop="name" label="客户名称" min-width="160" />
-      <el-table-column prop="contactName" label="联系人" width="120" />
-      <el-table-column prop="phone" label="电话" width="150" />
-      <el-table-column
-        prop="defaultAddress"
-        label="默认地址"
-        min-width="220"
-        show-overflow-tooltip
+    <PageState :loading="loading" :error="errorText" @retry="load">
+      <el-table :data="rows" empty-text="没有匹配的客户" border>
+        <el-table-column prop="customerNo" label="客户编号" width="140" />
+        <el-table-column prop="name" label="客户名称" min-width="160" />
+        <el-table-column prop="contactName" label="联系人" width="120" />
+        <el-table-column prop="phone" label="电话" width="150" />
+        <el-table-column
+          prop="defaultAddress"
+          label="默认地址"
+          min-width="220"
+          show-overflow-tooltip
+        />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <CodeTag category="common.status" :code="row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="90" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              link
+              type="primary"
+              @click="router.push(`/customers/${row.customerBusinessId}`)"
+            >
+              查看
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <ListPager
+        :page="page"
+        :size="size"
+        :count="rows.length"
+        :sizes="sizes"
+        @update:page="goPage"
+        @update:size="changeSize"
       />
-      <el-table-column label="状态" width="90">
-        <template #default="{ row }">
-          <CodeTag category="common.status" :code="row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
-        <template #default="{ row }">
-          <el-button
-            link
-            type="primary"
-            @click="router.push(`/customers/${row.customerBusinessId}`)"
-          >
-            查看
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    </PageState>
 
     <el-dialog v-model="createVisible" title="新增客户" width="480px">
       <el-alert

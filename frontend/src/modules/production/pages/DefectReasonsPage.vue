@@ -6,20 +6,26 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { DefectReasonView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
 const reasons = ref<DefectReasonView[]>([])
+const loading = ref(false)
 const errorText = ref('')
 const dialogVisible = ref(false)
 const form = reactive({ defectReasonCode: '', name: '', other: false })
 const canManage = auth.hasPermission('production.defect-reason.manage')
 
 async function load(): Promise<void> {
+  loading.value = true
+  errorText.value = ''
   try {
     reasons.value = await productionService.defectReasons()
   } catch (error) {
     errorText.value = userMessageOf(error, '缺陷原因加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -66,26 +72,27 @@ onMounted(load)
         >新增原因</PermissionButton
       >
     </div>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-table :data="reasons" border>
-      <el-table-column prop="defectReasonCode" label="代码" width="180" />
-      <el-table-column prop="name" label="名称" min-width="160" />
-      <el-table-column label="其他" width="80">
-        <template #default="{ row }">{{ row.other ? '是' : '否' }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <CodeTag category="common.status" :code="row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column v-if="canManage" label="操作" width="110">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="toggle(row)">
-            {{ row.status === 'ACTIVE' ? '停用' : '启用' }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <PageState :loading="loading" :error="errorText" @retry="load">
+      <el-table :data="reasons" empty-text="暂无缺陷原因" border>
+        <el-table-column prop="defectReasonCode" label="代码" width="180" />
+        <el-table-column prop="name" label="名称" min-width="160" />
+        <el-table-column label="其他" width="80">
+          <template #default="{ row }">{{ row.other ? '是' : '否' }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <CodeTag category="common.status" :code="row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="canManage" label="操作" width="110">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="toggle(row)">
+              {{ row.status === 'ACTIVE' ? '停用' : '启用' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PageState>
 
     <el-dialog v-model="dialogVisible" title="新增缺陷原因" width="420px">
       <el-form label-width="92px">

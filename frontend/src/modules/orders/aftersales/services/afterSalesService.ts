@@ -31,8 +31,8 @@ export const afterSalesService = {
     })
   },
 
-  listCases(keyword: string, status: string): Promise<AfterSalesCaseView[]> {
-    const search = new URLSearchParams({ page: '0', size: '50' })
+  listCases(keyword: string, status: string, page = 1, size = 20): Promise<AfterSalesCaseView[]> {
+    const search = new URLSearchParams({ page: String(page), size: String(size) })
     if (keyword.trim() !== '') {
       search.set('keyword', keyword.trim())
     }

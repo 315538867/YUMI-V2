@@ -16,7 +16,7 @@ describe('商品 service', () => {
     query.mockResolvedValue([])
     await productService.list('标准', 'ACTIVE')
     expect(query).toHaveBeenCalledWith(
-      '/api/products?keyword=%E6%A0%87%E5%87%86&status=ACTIVE&page=1&size=100',
+      '/api/products?keyword=%E6%A0%87%E5%87%86&status=ACTIVE&page=1&size=20',
     )
   })
 

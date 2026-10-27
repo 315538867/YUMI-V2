@@ -8,6 +8,7 @@ import type { ProductView, SchemeView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const route = useRoute()
@@ -69,127 +70,128 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="product-detail">
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" />
-    <template v-if="product">
-      <header class="head">
-        <div>
-          <h1>{{ product.name }}</h1>
-          <span class="meta">
-            {{ product.productNo }} · 日产能 {{ product.dailyCapacity }} · 内容版本
-            {{ product.contentVersion }}
-          </span>
-        </div>
-        <div class="actions">
-          <PermissionButton
-            permission="product.update"
-            @click="router.push(`/products/${productId}/edit`)"
-          >
-            编辑商品
-          </PermissionButton>
-          <PermissionButton
-            permission="product.deactivate"
-            :type="product.status === 'ACTIVE' ? 'warning' : 'success'"
-            @click="toggleStatus"
-          >
-            {{ product.status === 'ACTIVE' ? '停用商品' : '启用商品' }}
-          </PermissionButton>
-        </div>
-      </header>
-
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="标准售价">
-          <MoneyText :value="product.standardSalePrice" />
-        </el-descriptions-item>
-        <el-descriptions-item label="标准重量"
-          >{{ product.standardWeightGrams }} g</el-descriptions-item
-        >
-        <el-descriptions-item label="星级">{{ product.makingStarName }}</el-descriptions-item>
-        <el-descriptions-item label="胶水损耗率">{{ product.glueLossRate }}</el-descriptions-item>
-        <el-descriptions-item label="胶水单价">
-          <MoneyText :value="product.glueUnitPrice" />
-        </el-descriptions-item>
-        <el-descriptions-item label="色浆单价">
-          <MoneyText :value="product.colorPasteUnitPrice" />
-        </el-descriptions-item>
-        <el-descriptions-item label="制作分钟">
-          {{ product.makingStandardMinutes }}
-        </el-descriptions-item>
-        <el-descriptions-item label="制作提成">
-          <MoneyText :value="product.makingCommission" />
-        </el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <CodeTag category="common.status" :code="product.status" />
-        </el-descriptions-item>
-      </el-descriptions>
-
-      <div class="section-head">
-        <h2>方案与预算</h2>
-        <PermissionButton
-          permission="product.scheme.manage"
-          size="small"
-          @click="router.push(`/products/${productId}/schemes/new`)"
-        >
-          新建自定义方案
-        </PermissionButton>
-      </div>
-      <el-table :data="schemes" border>
-        <el-table-column prop="name" label="方案" min-width="150" />
-        <el-table-column label="类型" width="110">
-          <template #default="{ row }">
-            <CodeTag category="product.schemeType" :code="row.schemeType" />
-          </template>
-        </el-table-column>
-        <el-table-column label="目标工序" width="120">
-          <template #default="{ row }"
-            ><CodeTag category="product.targetProcess" :code="row.targetProcess"
-          /></template>
-        </el-table-column>
-        <el-table-column label="售价" width="130">
-          <template #default="{ row }"><MoneyText :value="row.salePrice" /></template>
-        </el-table-column>
-        <el-table-column label="全资源成本" width="130">
-          <template #default="{ row }">
-            <MoneyText :value="row.latestBudget?.fullResourceUnitCost" />
-          </template>
-        </el-table-column>
-        <el-table-column label="工作室成本" width="130">
-          <template #default="{ row }">
-            <MoneyText :value="row.latestBudget?.studioBorneUnitCost" />
-          </template>
-        </el-table-column>
-        <el-table-column label="预计利润" width="130">
-          <template #default="{ row }">
-            <MoneyText :value="row.latestBudget?.expectedUnitProfit" />
-          </template>
-        </el-table-column>
-        <el-table-column label="利润率" width="100">
-          <template #default="{ row }">
-            {{ percent(row.latestBudget?.expectedProfitRate ?? null) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.schemeType === 'CUSTOM' && canManage"
-              link
-              type="primary"
-              @click="router.push(`/products/${productId}/schemes/${row.schemeBusinessId}`)"
+  <section class="product-detail">
+    <PageState :loading="loading" :error="errorText" @retry="load">
+      <template v-if="product">
+        <header class="head">
+          <div>
+            <h1>{{ product.name }}</h1>
+            <span class="meta">
+              {{ product.productNo }} · 日产能 {{ product.dailyCapacity }} · 内容版本
+              {{ product.contentVersion }}
+            </span>
+          </div>
+          <div class="actions">
+            <PermissionButton
+              permission="product.update"
+              @click="router.push(`/products/${productId}/edit`)"
             >
-              编辑
-            </el-button>
-            <el-button
-              v-if="row.schemeType === 'CUSTOM'"
-              link
-              type="danger"
-              @click="deactivateScheme(row)"
+              编辑商品
+            </PermissionButton>
+            <PermissionButton
+              permission="product.deactivate"
+              :type="product.status === 'ACTIVE' ? 'warning' : 'success'"
+              @click="toggleStatus"
             >
-              停用
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </template>
+              {{ product.status === 'ACTIVE' ? '停用商品' : '启用商品' }}
+            </PermissionButton>
+          </div>
+        </header>
+
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="标准售价">
+            <MoneyText :value="product.standardSalePrice" />
+          </el-descriptions-item>
+          <el-descriptions-item label="标准重量"
+            >{{ product.standardWeightGrams }} g</el-descriptions-item
+          >
+          <el-descriptions-item label="星级">{{ product.makingStarName }}</el-descriptions-item>
+          <el-descriptions-item label="胶水损耗率">{{ product.glueLossRate }}</el-descriptions-item>
+          <el-descriptions-item label="胶水单价">
+            <MoneyText :value="product.glueUnitPrice" />
+          </el-descriptions-item>
+          <el-descriptions-item label="色浆单价">
+            <MoneyText :value="product.colorPasteUnitPrice" />
+          </el-descriptions-item>
+          <el-descriptions-item label="制作分钟">
+            {{ product.makingStandardMinutes }}
+          </el-descriptions-item>
+          <el-descriptions-item label="制作提成">
+            <MoneyText :value="product.makingCommission" />
+          </el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <CodeTag category="common.status" :code="product.status" />
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <div class="section-head">
+          <h2>方案与预算</h2>
+          <PermissionButton
+            permission="product.scheme.manage"
+            size="small"
+            @click="router.push(`/products/${productId}/schemes/new`)"
+          >
+            新建自定义方案
+          </PermissionButton>
+        </div>
+        <el-table :data="schemes" border>
+          <el-table-column prop="name" label="方案" min-width="150" />
+          <el-table-column label="类型" width="110">
+            <template #default="{ row }">
+              <CodeTag category="product.schemeType" :code="row.schemeType" />
+            </template>
+          </el-table-column>
+          <el-table-column label="目标工序" width="120">
+            <template #default="{ row }"
+              ><CodeTag category="product.targetProcess" :code="row.targetProcess"
+            /></template>
+          </el-table-column>
+          <el-table-column label="售价" width="130">
+            <template #default="{ row }"><MoneyText :value="row.salePrice" /></template>
+          </el-table-column>
+          <el-table-column label="全资源成本" width="130">
+            <template #default="{ row }">
+              <MoneyText :value="row.latestBudget?.fullResourceUnitCost" />
+            </template>
+          </el-table-column>
+          <el-table-column label="工作室成本" width="130">
+            <template #default="{ row }">
+              <MoneyText :value="row.latestBudget?.studioBorneUnitCost" />
+            </template>
+          </el-table-column>
+          <el-table-column label="预计利润" width="130">
+            <template #default="{ row }">
+              <MoneyText :value="row.latestBudget?.expectedUnitProfit" />
+            </template>
+          </el-table-column>
+          <el-table-column label="利润率" width="100">
+            <template #default="{ row }">
+              {{ percent(row.latestBudget?.expectedProfitRate ?? null) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="row.schemeType === 'CUSTOM' && canManage"
+                link
+                type="primary"
+                @click="router.push(`/products/${productId}/schemes/${row.schemeBusinessId}`)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="row.schemeType === 'CUSTOM'"
+                link
+                type="danger"
+                @click="deactivateScheme(row)"
+              >
+                停用
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+    </PageState>
   </section>
 </template>
 

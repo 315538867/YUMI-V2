@@ -12,11 +12,11 @@ vi.mock('@/platform/services/api', () => ({
 }))
 
 describe('订单 service', () => {
-  it('列表分页从 0 开始，与订单查询契约一致', async () => {
+  it('列表分页从 1 开始，与统一分页契约一致', async () => {
     query.mockResolvedValue([])
     await orderService.list('SO000001', 'CONFIRMED')
     expect(query).toHaveBeenCalledWith(
-      '/api/orders?page=0&size=50&keyword=SO000001&status=CONFIRMED',
+      '/api/orders?page=1&size=20&keyword=SO000001&status=CONFIRMED',
     )
   })
 

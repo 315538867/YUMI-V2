@@ -2,36 +2,49 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
+import { useListQuery } from '@/platform/composables/useListQuery'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { GlueMonthReferenceView, GluePolicyView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PageState from '@/shared/components/PageState.vue'
 
-const month = ref(new Date().toISOString().slice(0, 7))
 const policy = ref<GluePolicyView | null>(null)
 const employees = ref<EmployeeView[]>([])
-const employeeId = ref('')
 const reference = ref<GlueMonthReferenceView | null>(null)
 const policyMissing = ref(false)
+const loading = ref(true)
 const errorText = ref('')
+const { filters, sync, search } = useListQuery(
+  { month: new Date().toISOString().slice(0, 7), employeeId: '' },
+  { paged: false, onSearch: () => void query() },
+)
 const successText = ref('')
 const form = reactive({ exemptWeightGrams: '300.0000', reasonText: '', expectedGuardVersion: 0 })
 
 async function load(): Promise<void> {
+  loading.value = true
   try {
     employees.value = await workforceService.employees()
-    employeeId.value = employees.value[0]?.employeeBusinessId ?? ''
+    if (!employees.value.some((item) => item.employeeBusinessId === filters.employeeId)) {
+      filters.employeeId = employees.value[0]?.employeeBusinessId ?? ''
+    }
+    await sync()
   } catch (error) {
     errorText.value = userMessageOf(error, '人员加载失败')
   }
   await loadPolicy()
+  if (filters.employeeId !== '') {
+    await query()
+  }
+  loading.value = false
 }
 
 async function loadPolicy(): Promise<void> {
   policyMissing.value = false
   try {
-    policy.value = await payrollService.gluePolicy(month.value)
+    policy.value = await payrollService.gluePolicy(filters.month)
     form.exemptWeightGrams = policy.value.exemptWeightGrams
   } catch (error) {
     policy.value = null
@@ -46,7 +59,7 @@ async function loadPolicy(): Promise<void> {
 async function publish(): Promise<void> {
   try {
     policy.value = await payrollService.publishGluePolicy({
-      effectiveMonth: `${month.value}-01`,
+      effectiveMonth: `${filters.month}-01`,
       exemptWeightGrams: form.exemptWeightGrams,
       reasonText: form.reasonText,
       expectedGuardVersion: Number(form.expectedGuardVersion),
@@ -60,31 +73,50 @@ async function publish(): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  if (employeeId.value === '') {
+  if (filters.employeeId === '') {
     errorText.value = '请选择员工'
     return
   }
+  loading.value = true
   try {
     reference.value = await payrollService.runGlueMonthReference(
-      employeeId.value,
-      `${month.value}-01`,
+      filters.employeeId,
+      `${filters.month}-01`,
     )
     successText.value = '自然月胶水参考已生成'
     ElMessage.success(successText.value)
   } catch (error) {
     errorText.value = userMessageOf(error, '胶水月参考生成失败')
+  } finally {
+    loading.value = false
   }
 }
 
 async function query(): Promise<void> {
-  if (employeeId.value === '') {
+  if (filters.employeeId === '') {
+    reference.value = null
     return
   }
+  loading.value = true
   try {
-    reference.value = await payrollService.glueMonthReference(employeeId.value, month.value)
+    reference.value = await payrollService.glueMonthReference(filters.employeeId, filters.month)
   } catch (error) {
     errorText.value = userMessageOf(error, '胶水月参考读取失败')
+  } finally {
+    loading.value = false
   }
+}
+
+async function applyMonth(): Promise<void> {
+  await sync()
+  await loadPolicy()
+  if (filters.employeeId !== '') {
+    await query()
+  }
+}
+
+async function applyEmployee(): Promise<void> {
+  await search()
 }
 
 onMounted(load)
@@ -103,7 +135,13 @@ onMounted(load)
     />
     <el-form inline>
       <el-form-item label="月份">
-        <el-input v-model="month" type="month" class="month" @change="loadPolicy" />
+        <el-input
+          v-model="filters.month"
+          type="month"
+          class="month"
+          aria-label="月份"
+          @change="applyMonth"
+        />
       </el-form-item>
       <el-form-item label="每人免扣重量">
         <el-input v-model="form.exemptWeightGrams" class="weight" />
@@ -127,7 +165,13 @@ onMounted(load)
 
     <el-form inline class="employee-row">
       <el-form-item label="员工">
-        <el-select v-model="employeeId" filterable class="employee" aria-label="员工">
+        <el-select
+          v-model="filters.employeeId"
+          filterable
+          class="employee"
+          aria-label="员工"
+          @change="applyEmployee"
+        >
           <el-option
             v-for="employee in employees"
             :key="employee.employeeBusinessId"
@@ -140,32 +184,40 @@ onMounted(load)
       <el-button type="primary" @click="run">生成当月参考</el-button>
     </el-form>
 
-    <template v-if="reference">
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="状态"
-          ><CodeTag category="finance.glueReferenceStatus" :code="reference.status"
-        /></el-descriptions-item>
-        <el-descriptions-item label="分配重量">{{
-          reference.allocatedWeight
-        }}</el-descriptions-item>
-        <el-descriptions-item label="免扣重量">{{ reference.exemptWeight }}</el-descriptions-item>
-        <el-descriptions-item label="不完整原因" :span="2">{{
-          reference.incompleteReason ?? '无'
-        }}</el-descriptions-item>
-        <el-descriptions-item label="是否过期">{{
-          reference.stale ? '是' : '否'
-        }}</el-descriptions-item>
-      </el-descriptions>
-      <el-table :data="reference.lines" border size="small" class="lines">
-        <el-table-column prop="businessDate" label="日期" width="120" />
-        <el-table-column prop="allocatedWeight" label="分配重量" width="120" />
-        <el-table-column prop="exemptWeight" label="免扣" width="100" />
-        <el-table-column prop="chargeableWeight" label="应扣" width="100" />
-        <el-table-column prop="glueUnitPrice" label="单价" width="100" />
-        <el-table-column prop="preAmount" label="调整前" width="110" />
-        <el-table-column prop="postAmount" label="调整后" width="110" />
-      </el-table>
-    </template>
+    <PageState
+      :loading="loading"
+      :error="errorText"
+      :empty="!loading && errorText === '' && reference === null"
+      empty-text="选择员工后查询胶水月参考"
+      @retry="query"
+    >
+      <template v-if="reference">
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="状态"
+            ><CodeTag category="finance.glueReferenceStatus" :code="reference.status"
+          /></el-descriptions-item>
+          <el-descriptions-item label="分配重量">{{
+            reference.allocatedWeight
+          }}</el-descriptions-item>
+          <el-descriptions-item label="免扣重量">{{ reference.exemptWeight }}</el-descriptions-item>
+          <el-descriptions-item label="不完整原因" :span="2">{{
+            reference.incompleteReason ?? '无'
+          }}</el-descriptions-item>
+          <el-descriptions-item label="是否过期">{{
+            reference.stale ? '是' : '否'
+          }}</el-descriptions-item>
+        </el-descriptions>
+        <el-table :data="reference.lines" border size="small" class="lines">
+          <el-table-column prop="businessDate" label="日期" width="120" />
+          <el-table-column prop="allocatedWeight" label="分配重量" width="120" />
+          <el-table-column prop="exemptWeight" label="免扣" width="100" />
+          <el-table-column prop="chargeableWeight" label="应扣" width="100" />
+          <el-table-column prop="glueUnitPrice" label="单价" width="100" />
+          <el-table-column prop="preAmount" label="调整前" width="110" />
+          <el-table-column prop="postAmount" label="调整后" width="110" />
+        </el-table>
+      </template>
+    </PageState>
   </section>
 </template>
 

@@ -80,8 +80,8 @@ async function load(): Promise<void> {
   loading.value = true
   try {
     ;[customers.value, products.value] = await Promise.all([
-      customerService.list('', 'ACTIVE'),
-      productService.list('', 'ACTIVE'),
+      customerService.list('', 'ACTIVE', 1, 100),
+      productService.list('', 'ACTIVE', 1, 100),
     ])
     form.customerBusinessId = customers.value[0]?.customerBusinessId ?? ''
     applyCustomer()

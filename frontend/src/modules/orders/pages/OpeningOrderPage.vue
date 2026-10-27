@@ -35,8 +35,8 @@ const form = reactive({
 async function load(): Promise<void> {
   try {
     ;[customers.value, products.value] = await Promise.all([
-      customerService.list('', 'ACTIVE'),
-      productService.list('', 'ACTIVE'),
+      customerService.list('', 'ACTIVE', 1, 100),
+      productService.list('', 'ACTIVE', 1, 100),
     ])
     form.customerBusinessId = customers.value[0]?.customerBusinessId ?? ''
     form.productBusinessId = products.value[0]?.productBusinessId ?? ''

@@ -1,38 +1,47 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useListQuery } from '@/platform/composables/useListQuery'
 import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import PageState from '@/shared/components/PageState.vue'
 
-const route = useRoute()
 const periods = ref<PayrollPeriodRef[]>([])
-const selected = ref(typeof route.query.period === 'string' ? route.query.period : '')
 const results = ref<EmployeePayrollView[]>([])
+const loading = ref(false)
 const selectedRows = ref<EmployeePayrollView[]>([])
 const amounts = reactive<Record<string, string>>({})
 const businessDate = ref(new Date().toISOString().slice(0, 10))
 const errorText = ref('')
 const successText = ref('')
+const { filters, sync, search } = useListQuery(
+  { period: '' },
+  { paged: false, onSearch: () => void load() },
+)
 
 async function load(): Promise<void> {
+  loading.value = true
+  errorText.value = ''
   try {
     periods.value = await payrollService.periods()
-    if (selected.value === '' && periods.value.length > 0) {
-      selected.value = periods.value[periods.value.length - 1]!.periodBusinessId
+    if (!periods.value.some((item) => item.periodBusinessId === filters.period)) {
+      filters.period = periods.value[periods.value.length - 1]?.periodBusinessId ?? ''
     }
-    if (selected.value !== '') {
-      results.value = await payrollService.results(selected.value)
+    await sync()
+    if (filters.period !== '') {
+      results.value = await payrollService.results(filters.period)
       for (const row of results.value) {
         amounts[row.resultBusinessId] = row.payableAmount?.amount ?? ''
       }
     }
   } catch (error) {
     errorText.value = userMessageOf(error, '工资付款数据加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -69,7 +78,7 @@ onMounted(load)
   <section class="payment-page">
     <h1>工资付款</h1>
     <div class="toolbar">
-      <el-select v-model="selected" class="period" aria-label="工资期间" @change="load">
+      <el-select v-model="filters.period" class="period" aria-label="工资期间" @change="search">
         <el-option
           v-for="period in periods"
           :key="period.periodBusinessId"
@@ -77,7 +86,12 @@ onMounted(load)
           :value="period.periodBusinessId"
         />
       </el-select>
-      <el-date-picker v-model="businessDate" type="date" value-format="YYYY-MM-DD" />
+      <el-date-picker
+        v-model="businessDate"
+        type="date"
+        value-format="YYYY-MM-DD"
+        aria-label="付款日期"
+      />
       <el-button type="primary" @click="pay">按选中员工付款</el-button>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
@@ -88,26 +102,29 @@ onMounted(load)
       :title="successText"
       class="alert"
     />
-    <el-table :data="results" border @selection-change="selectionChanged">
-      <el-table-column type="selection" width="50" />
-      <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
-      <el-table-column label="状态" width="130">
-        <template #default="{ row }"
-          ><CodeTag category="finance.payrollResultStatus" :code="row.status"
-        /></template>
-      </el-table-column>
-      <el-table-column label="应付" width="130">
-        <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
-      </el-table-column>
-      <el-table-column label="本次付款" width="160">
-        <template #default="{ row }">
-          <el-input
-            v-model="amounts[row.resultBusinessId]"
-            :disabled="row.status !== 'CONFIRMED'"
-          />
-        </template>
-      </el-table-column>
-    </el-table>
+    <PageState :loading="loading" :error="errorText" @retry="load">
+      <el-table :data="results" border @selection-change="selectionChanged">
+        <el-table-column type="selection" width="50" />
+        <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
+        <el-table-column label="状态" width="130">
+          <template #default="{ row }"
+            ><CodeTag category="finance.payrollResultStatus" :code="row.status"
+          /></template>
+        </el-table-column>
+        <el-table-column label="应付" width="130">
+          <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
+        </el-table-column>
+        <el-table-column label="本次付款" width="160">
+          <template #default="{ row }">
+            <el-input
+              v-model="amounts[row.resultBusinessId]"
+              :disabled="row.status !== 'CONFIRMED'"
+              :aria-label="`${row.employeeBusinessId} 本次付款`"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+    </PageState>
     <p class="hint">只能选择已核定员工付款；部分付款与多人付款由 cash 在同一事务校验上限。</p>
   </section>
 </template>

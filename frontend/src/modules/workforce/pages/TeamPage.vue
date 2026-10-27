@@ -6,6 +6,7 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
@@ -85,32 +86,33 @@ onMounted(load)
         >新增小组</PermissionButton
       >
     </div>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-table v-loading="loading" :data="teams" empty-text="暂无小组" border>
-      <el-table-column prop="teamNo" label="小组编号" width="130" />
-      <el-table-column prop="name" label="名称" width="160" />
-      <el-table-column label="状态" width="90">
-        <template #default="{ row }">
-          <CodeTag category="common.status" :code="row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column label="成员" min-width="240">
-        <template #default="{ row }">
-          <el-tag v-for="member in row.members" :key="member.employeeBusinessId" class="tag">
-            {{ member.name }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="efficiencyFactor" label="效率因子" width="110" />
-      <el-table-column v-if="canManage" label="操作" width="150" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="open(row)">编辑</el-button>
-          <el-button v-if="row.status === 'ACTIVE'" link type="warning" @click="deactivate(row)">
-            停用
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <PageState :loading="loading" :error="errorText" @retry="load">
+      <el-table :data="teams" empty-text="暂无小组" border>
+        <el-table-column prop="teamNo" label="小组编号" width="130" />
+        <el-table-column prop="name" label="名称" width="160" />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <CodeTag category="common.status" :code="row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column label="成员" min-width="240">
+          <template #default="{ row }">
+            <el-tag v-for="member in row.members" :key="member.employeeBusinessId" class="tag">
+              {{ member.name }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="efficiencyFactor" label="效率因子" width="110" />
+        <el-table-column v-if="canManage" label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="open(row)">编辑</el-button>
+            <el-button v-if="row.status === 'ACTIVE'" link type="warning" @click="deactivate(row)">
+              停用
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PageState>
 
     <el-dialog
       v-model="dialogVisible"

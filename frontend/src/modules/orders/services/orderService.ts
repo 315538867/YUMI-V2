@@ -20,8 +20,13 @@ export interface ShipmentRequest {
 }
 
 export const orderService = {
-  list(keyword: string, status: OrderStatus | ''): Promise<OrderSummaryView[]> {
-    const search = new URLSearchParams({ page: '0', size: '50' })
+  list(
+    keyword: string,
+    status: OrderStatus | '',
+    page = 1,
+    size = 20,
+  ): Promise<OrderSummaryView[]> {
+    const search = new URLSearchParams({ page: String(page), size: String(size) })
     if (keyword.trim() !== '') {
       search.set('keyword', keyword.trim())
     }

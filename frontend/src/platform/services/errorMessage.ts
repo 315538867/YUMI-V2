@@ -9,3 +9,8 @@ export function userMessageOf(error: unknown, fallback = '操作失败，请稍�
 export function isErrorCode(error: unknown, code: string): boolean {
   return error instanceof ApiClientError && error.code === code
 }
+
+/** 按错误类型判断冲突、超时等通用情况，页面不直接导入 apiClient。 */
+export function isErrorType(error: unknown, type: string): boolean {
+  return error instanceof ApiClientError && error.type === type
+}

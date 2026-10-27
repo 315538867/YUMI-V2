@@ -44,10 +44,13 @@ test('客户列表、编辑、启停与历史引用使用真实接口', async ({
   await expect(page.getByRole('heading', { name })).toBeVisible()
 
   await page.getByRole('button', { name: '编辑资料' }).click()
+  await expect(page).toHaveURL(new RegExp(`/customers/${customer.customerBusinessId}/edit$`))
+  await expect(page.getByRole('heading', { name: '编辑客户' })).toBeVisible()
   const renamed = `${name}-已改`
   const nameInput = page.locator('.el-form-item').filter({ hasText: '客户名称' }).locator('input')
   await nameInput.fill(renamed)
   await page.getByRole('button', { name: '保存' }).click()
+  await expect(page).toHaveURL(new RegExp(`/customers/${customer.customerBusinessId}$`))
   await expect(page.getByRole('heading', { name: renamed })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('heading', { name: renamed })).toBeVisible()
@@ -70,6 +73,7 @@ test('版本冲突保留输入并提示刷新，不静默覆盖', async ({ page,
   await login(page)
   await page.goto(`/customers/${customer.customerBusinessId}`)
   await page.getByRole('button', { name: '编辑资料' }).click()
+  await expect(page).toHaveURL(new RegExp(`/customers/${customer.customerBusinessId}/edit$`))
 
   const concurrent = await request.put(`/api/customers/${customer.customerBusinessId}`, {
     headers: authHeaders(token, `e2e-concurrent-${Date.now()}`),

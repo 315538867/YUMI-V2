@@ -67,3 +67,25 @@ test('已有订单接管只记录当前阶段并可回查', async ({ page }) => 
   await expect(page).toHaveURL(/\/orders\/ORD-/)
   await expect(page.getByText('已有订单接管')).toBeVisible()
 })
+
+test('列表筛选与每页条数写入 URL 并在刷新后恢复', async ({ page }) => {
+  await login(page)
+  await page.goto('/orders?keyword=不存在的订单&status=COMPLETED')
+
+  const keyword = page.getByPlaceholder('订单号或客户')
+  await expect(keyword).toHaveValue('不存在的订单')
+  await expect(page.getByText('没有匹配的订单')).toBeVisible()
+
+  await page.locator('.list-pager .el-select').click()
+  await page.getByRole('option', { name: '每页 50 条' }).click()
+  await expect(page).toHaveURL(/size=50/)
+
+  await page.reload()
+  await expect(keyword).toHaveValue('不存在的订单')
+  await expect(page.locator('.list-pager .el-select')).toContainText('每页 50 条')
+
+  await page.getByRole('button', { name: '重置' }).click()
+  await expect(page).not.toHaveURL(/keyword=/)
+  await expect(keyword).toHaveValue('')
+  await expect(page.locator('.list-pager .el-select')).toContainText('每页 20 条')
+})

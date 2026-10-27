@@ -1,17 +1,26 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useListQuery } from '@/platform/composables/useListQuery'
 import type { CashFactView, CashPeriodSummary } from '@/modules/finance/cash/contracts'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import MoneyText from '@/shared/components/MoneyText.vue'
+import PageState from '@/shared/components/PageState.vue'
 
-const startDate = ref(new Date().toISOString().slice(0, 8) + '01')
-const endDate = ref(new Date().toISOString().slice(0, 10))
-const cashType = ref('')
 const facts = ref<CashFactView[]>([])
 const summary = ref<CashPeriodSummary | null>(null)
+const loading = ref(false)
 const errorText = ref('')
+const { filters, search, reset } = useListQuery(
+  {
+    startDate: new Date().toISOString().slice(0, 8) + '01',
+    endDate: new Date().toISOString().slice(0, 10),
+    cashType: '',
+  },
+  { paged: false, onSearch: () => void load() },
+)
 const successText = ref('')
 const dialogVisible = ref(false)
 const action = ref<'reverse' | 'return'>('reverse')
@@ -24,13 +33,17 @@ const form = reactive({
 })
 
 async function load(): Promise<void> {
+  loading.value = true
+  errorText.value = ''
   try {
     ;[facts.value, summary.value] = await Promise.all([
-      cashService.facts(startDate.value, endDate.value, cashType.value),
-      cashService.periodSummary(startDate.value, endDate.value),
+      cashService.facts(filters.startDate, filters.endDate, filters.cashType),
+      cashService.periodSummary(filters.startDate, filters.endDate),
     ])
   } catch (error) {
     errorText.value = userMessageOf(error, '现金流水加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -67,19 +80,34 @@ async function submit(): Promise<void> {
   }
 }
 
-onMounted(load)
+void load()
 </script>
 
 <template>
   <section class="history-page">
     <h1>现金流水</h1>
     <div class="toolbar">
-      <el-date-picker v-model="startDate" type="date" value-format="YYYY-MM-DD" />
-      <el-date-picker v-model="endDate" type="date" value-format="YYYY-MM-DD" />
-      <el-input v-model="cashType" placeholder="业务类型（可选）" class="type" />
-      <el-button type="primary" @click="load">查询</el-button>
+      <el-date-picker
+        v-model="filters.startDate"
+        type="date"
+        value-format="YYYY-MM-DD"
+        aria-label="开始日期"
+      />
+      <el-date-picker
+        v-model="filters.endDate"
+        type="date"
+        value-format="YYYY-MM-DD"
+        aria-label="结束日期"
+      />
+      <el-input
+        v-model="filters.cashType"
+        placeholder="业务类型（可选）"
+        class="type"
+        aria-label="业务类型"
+      />
+      <el-button type="primary" @click="search">查询</el-button>
+      <el-button @click="reset">重置</el-button>
     </div>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert
       v-if="successText"
       type="success"
@@ -87,45 +115,55 @@ onMounted(load)
       :title="successText"
       class="alert"
     />
-    <el-descriptions v-if="summary" :column="3" border class="summary">
-      <el-descriptions-item label="有效流入">{{ summary.income }}</el-descriptions-item>
-      <el-descriptions-item label="有效流出">{{ summary.outflow }}</el-descriptions-item>
-      <el-descriptions-item label="现金净额">{{ summary.netAmount }}</el-descriptions-item>
-    </el-descriptions>
-    <el-table :data="facts" border empty-text="期间内无现金流水">
-      <el-table-column prop="cashNo" label="现金单号" width="140" />
-      <el-table-column prop="businessDate" label="业务日期" width="120" />
-      <el-table-column label="类型" width="180">
-        <template #default="{ row }"
-          ><CodeTag category="finance.cashType" :code="row.cashType"
-        /></template>
-      </el-table-column>
-      <el-table-column label="方向" width="80">
-        <template #default="{ row }"
-          ><CodeTag category="finance.cashDirection" :code="row.direction"
-        /></template>
-      </el-table-column>
-      <el-table-column prop="amount" label="金额" width="130" />
-      <el-table-column label="有效" width="80">
-        <template #default="{ row }">{{ row.valid ? '是' : '否' }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="190">
-        <template #default="{ row }">
-          <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)"
-            >整笔冲销</el-button
-          >
-          <el-button
-            v-if="row.cashType === 'PAYROLL_PAYMENT'"
-            link
-            type="primary"
-            :disabled="!row.valid"
-            @click="open('return', row)"
-          >
-            工资退回
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <PageState
+      :loading="loading"
+      :error="errorText"
+      :empty="!loading && errorText === '' && facts.length === 0"
+      empty-text="期间内无现金流水"
+      @retry="load"
+    >
+      <el-descriptions v-if="summary" :column="3" border class="summary">
+        <el-descriptions-item label="有效流入">{{ summary.income }}</el-descriptions-item>
+        <el-descriptions-item label="有效流出">{{ summary.outflow }}</el-descriptions-item>
+        <el-descriptions-item label="现金净额">{{ summary.netAmount }}</el-descriptions-item>
+      </el-descriptions>
+      <el-table :data="facts" border empty-text="期间内无现金流水">
+        <el-table-column prop="cashNo" label="现金单号" width="140" />
+        <el-table-column prop="businessDate" label="业务日期" width="120" />
+        <el-table-column label="类型" width="180">
+          <template #default="{ row }"
+            ><CodeTag category="finance.cashType" :code="row.cashType"
+          /></template>
+        </el-table-column>
+        <el-table-column label="方向" width="80">
+          <template #default="{ row }"
+            ><CodeTag category="finance.cashDirection" :code="row.direction"
+          /></template>
+        </el-table-column>
+        <el-table-column label="金额" width="130">
+          <template #default="{ row }"><MoneyText :value="row.amount" /></template>
+        </el-table-column>
+        <el-table-column label="有效" width="80">
+          <template #default="{ row }">{{ row.valid ? '是' : '否' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="190">
+          <template #default="{ row }">
+            <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)"
+              >整笔冲销</el-button
+            >
+            <el-button
+              v-if="row.cashType === 'PAYROLL_PAYMENT'"
+              link
+              type="primary"
+              :disabled="!row.valid"
+              @click="open('return', row)"
+            >
+              工资退回
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PageState>
     <p class="hint">现金净额不是利润；工资退回不充当经营收入。</p>
 
     <el-dialog

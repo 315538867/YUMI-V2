@@ -74,6 +74,16 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'customers/:customerBusinessId/edit',
+        name: 'customer-edit',
+        component: () => import('@/modules/customer/pages/CustomerEditorPage.vue'),
+        meta: {
+          requiresAuth: true,
+          title: '编辑客户',
+          permission: 'customer.manage',
+        },
+      },
+      {
         path: 'products',
         name: 'products',
         component: () => import('@/modules/product/pages/ProductListPage.vue'),

@@ -21,10 +21,8 @@ function query(params: Record<string, string | number | undefined>): string {
 }
 
 export const productService = {
-  list(keyword: string, status: ProductStatus | ''): Promise<ProductView[]> {
-    return api.query<ProductView[]>(
-      `/api/products${query({ keyword, status, page: 1, size: 100 })}`,
-    )
+  list(keyword: string, status: ProductStatus | '', page = 1, size = 20): Promise<ProductView[]> {
+    return api.query<ProductView[]>(`/api/products${query({ keyword, status, page, size })}`)
   },
 
   get(productBusinessId: string): Promise<ProductView> {

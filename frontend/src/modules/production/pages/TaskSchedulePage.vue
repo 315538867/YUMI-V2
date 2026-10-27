@@ -3,21 +3,26 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useListQuery } from '@/platform/composables/useListQuery'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { TargetProcess, TaskType, TaskView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const router = useRouter()
-const workDate = ref(new Date().toISOString().slice(0, 10))
 const tasks = ref<TaskView[]>([])
 const employees = ref<EmployeeView[]>([])
 const loading = ref(false)
 const errorText = ref('')
 const dialogVisible = ref(false)
 const saving = ref(false)
+const { filters, search, reset } = useListQuery(
+  { workDate: new Date().toISOString().slice(0, 10) },
+  { paged: false, onSearch: () => void load() },
+)
 
 const form = reactive({
   taskType: 'OTHER_TASK' as TaskType,
@@ -35,7 +40,7 @@ async function load(): Promise<void> {
   errorText.value = ''
   try {
     ;[tasks.value, employees.value] = await Promise.all([
-      productionService.tasks(workDate.value),
+      productionService.tasks(filters.workDate),
       workforceService.employees(),
     ])
   } catch (error) {
@@ -84,7 +89,7 @@ async function arrange(): Promise<void> {
       await productionService.arrange({
         taskType: 'OTHER_TASK',
         subject: { subjectType: 'EMPLOYEE', subjectBusinessId: form.employeeBusinessId },
-        workDate: workDate.value,
+        workDate: filters.workDate,
         processCode: null,
         items: [],
         enteredStandardMinutes: Number(form.enteredStandardMinutes),
@@ -99,7 +104,7 @@ async function arrange(): Promise<void> {
       await productionService.arrange({
         taskType: 'NORMAL_PRODUCTION',
         subject: { subjectType: 'EMPLOYEE', subjectBusinessId: form.employeeBusinessId },
-        workDate: workDate.value,
+        workDate: filters.workDate,
         processCode: form.processCode,
         items: [
           {
@@ -129,65 +134,68 @@ onMounted(load)
   <section class="schedule-page">
     <div class="toolbar">
       <el-date-picker
-        v-model="workDate"
+        v-model="filters.workDate"
         type="date"
         value-format="YYYY-MM-DD"
         placeholder="工作日期"
-        @change="load"
+        aria-label="工作日期"
+        @change="search"
       />
-      <el-button type="primary" @click="load">查询</el-button>
+      <el-button type="primary" @click="search">查询</el-button>
+      <el-button @click="reset">重置</el-button>
       <PermissionButton permission="production.schedule" @click="open">安排任务</PermissionButton>
     </div>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-table v-loading="loading" :data="tasks" empty-text="当日暂无任务" border>
-      <el-table-column prop="taskNo" label="任务编号" width="140" />
-      <el-table-column label="类型" width="150">
-        <template #default="{ row }"
-          ><CodeTag category="production.taskType" :code="row.taskType"
-        /></template>
-      </el-table-column>
-      <el-table-column label="执行主体" min-width="150">
-        <template #default="{ row }">{{ row.subject.subjectBusinessId }}</template>
-      </el-table-column>
-      <el-table-column label="工序" width="120">
-        <template #default="{ row }"
-          ><CodeTag category="production.targetProcess" :code="row.processCode"
-        /></template>
-      </el-table-column>
-      <el-table-column prop="plannedWorkQuantity" label="计划量" width="90" />
-      <el-table-column prop="taskStandardSeconds" label="标准秒数" width="110" />
-      <el-table-column label="状态" width="150">
-        <template #default="{ row }"
-          ><CodeTag category="production.taskStatus" :code="row.status"
-        /></template>
-      </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
-        <template #default="{ row }">
-          <el-button
-            link
-            type="primary"
-            @click="router.push(`/production/tasks/${row.taskBusinessId}`)"
-          >
-            详情
-          </el-button>
-          <el-button
-            link
-            type="primary"
-            @click="router.push(`/production/verify?task=${row.taskBusinessId}`)"
-          >
-            核验
-          </el-button>
-          <el-button
-            v-if="row.status === 'ARRANGED' || row.status === 'PARTIALLY_VERIFIED'"
-            link
-            type="danger"
-            @click="cancelTask(row)"
-          >
-            取消
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <PageState :loading="loading" :error="errorText" @retry="load">
+      <el-table :data="tasks" empty-text="当日暂无任务" border>
+        <el-table-column prop="taskNo" label="任务编号" width="140" />
+        <el-table-column label="类型" width="150">
+          <template #default="{ row }"
+            ><CodeTag category="production.taskType" :code="row.taskType"
+          /></template>
+        </el-table-column>
+        <el-table-column label="执行主体" min-width="150">
+          <template #default="{ row }">{{ row.subject.subjectBusinessId }}</template>
+        </el-table-column>
+        <el-table-column label="工序" width="120">
+          <template #default="{ row }"
+            ><CodeTag category="production.targetProcess" :code="row.processCode"
+          /></template>
+        </el-table-column>
+        <el-table-column prop="plannedWorkQuantity" label="计划量" width="90" />
+        <el-table-column prop="taskStandardSeconds" label="标准秒数" width="110" />
+        <el-table-column label="状态" width="150">
+          <template #default="{ row }"
+            ><CodeTag category="production.taskStatus" :code="row.status"
+          /></template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              link
+              type="primary"
+              @click="router.push(`/production/tasks/${row.taskBusinessId}`)"
+            >
+              详情
+            </el-button>
+            <el-button
+              link
+              type="primary"
+              @click="router.push(`/production/verify?task=${row.taskBusinessId}`)"
+            >
+              核验
+            </el-button>
+            <el-button
+              v-if="row.status === 'ARRANGED' || row.status === 'PARTIALLY_VERIFIED'"
+              link
+              type="danger"
+              @click="cancelTask(row)"
+            >
+              取消
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PageState>
 
     <el-dialog v-model="dialogVisible" title="安排任务" width="520px">
       <el-form label-width="112px">
@@ -208,7 +216,7 @@ onMounted(load)
           </el-select>
         </el-form-item>
         <el-form-item label="工作日期">
-          <el-input :model-value="workDate" disabled />
+          <el-input :model-value="filters.workDate" disabled />
         </el-form-item>
         <template v-if="form.taskType === 'OTHER_TASK'">
           <el-form-item label="工作内容" required>

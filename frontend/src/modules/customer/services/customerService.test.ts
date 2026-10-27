@@ -15,7 +15,7 @@ describe('客户 service', () => {
   it('列表查询只拼接非空筛选条件', async () => {
     query.mockResolvedValue([])
     await customerService.list('张', '')
-    expect(query).toHaveBeenCalledWith('/api/customers?keyword=%E5%BC%A0&page=1&size=50')
+    expect(query).toHaveBeenCalledWith('/api/customers?keyword=%E5%BC%A0&page=1&size=20')
   })
 
   it('修改携带期望行版本与幂等键', async () => {

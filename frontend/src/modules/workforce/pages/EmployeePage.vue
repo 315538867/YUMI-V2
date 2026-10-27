@@ -6,6 +6,7 @@ import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const auth = useAuthStore()
@@ -117,44 +118,45 @@ onMounted(load)
         >新增员工</PermissionButton
       >
     </div>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-table v-loading="loading" :data="employees" empty-text="暂无员工" border>
-      <el-table-column prop="employeeNo" label="员工编号" width="130" />
-      <el-table-column prop="name" label="姓名" width="130" />
-      <el-table-column prop="phone" label="电话" width="150" />
-      <el-table-column label="状态" width="90">
-        <template #default="{ row }">
-          <CodeTag category="workforce.employmentStatus" :code="row.employmentStatus" />
-        </template>
-      </el-table-column>
-      <el-table-column label="资格" min-width="200">
-        <template #default="{ row }">
-          <CodeTag
-            v-for="item in row.qualifications"
-            :key="item.workTypeCode"
-            category="workforce.workType"
-            :code="item.workTypeCode"
-            class="tag"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column prop="latestEffectiveDate" label="最近生效日" width="130" />
-      <el-table-column v-if="canManage" label="操作" width="250" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="open('edit', row)">编辑</el-button>
-          <el-button link type="primary" @click="open('qualification', row)">资格</el-button>
-          <el-button
-            v-if="row.employmentStatus === 'EMPLOYED'"
-            link
-            type="warning"
-            @click="leave(row)"
-          >
-            离职
-          </el-button>
-          <el-button v-else link type="success" @click="open('rehire', row)">返聘</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <PageState :loading="loading" :error="errorText" @retry="load">
+      <el-table :data="employees" empty-text="暂无员工" border>
+        <el-table-column prop="employeeNo" label="员工编号" width="130" />
+        <el-table-column prop="name" label="姓名" width="130" />
+        <el-table-column prop="phone" label="电话" width="150" />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <CodeTag category="workforce.employmentStatus" :code="row.employmentStatus" />
+          </template>
+        </el-table-column>
+        <el-table-column label="资格" min-width="200">
+          <template #default="{ row }">
+            <CodeTag
+              v-for="item in row.qualifications"
+              :key="item.workTypeCode"
+              category="workforce.workType"
+              :code="item.workTypeCode"
+              class="tag"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="latestEffectiveDate" label="最近生效日" width="130" />
+        <el-table-column v-if="canManage" label="操作" width="250" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="open('edit', row)">编辑</el-button>
+            <el-button link type="primary" @click="open('qualification', row)">资格</el-button>
+            <el-button
+              v-if="row.employmentStatus === 'EMPLOYED'"
+              link
+              type="warning"
+              @click="leave(row)"
+            >
+              离职
+            </el-button>
+            <el-button v-else link type="success" @click="open('rehire', row)">返聘</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PageState>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="460px">
       <el-form label-width="92px">

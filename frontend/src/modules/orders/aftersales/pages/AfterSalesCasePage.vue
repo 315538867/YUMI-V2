@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useListQuery } from '@/platform/composables/useListQuery'
 import { codesOf, codeLabel } from '@/platform/display/codeCatalog'
 import type { CodeOf } from '@/platform/display/codeCatalog'
 import type {
@@ -18,14 +19,20 @@ import { afterSalesService } from '@/modules/orders/aftersales/services/afterSal
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import PageState from '@/shared/components/PageState.vue'
 
-const caseId = ref('')
 const current = ref<AfterSalesCaseView | null>(null)
 const received = ref<ReceivedReturn[]>([])
 const errorText = ref('')
-const keyword = ref('')
-const statusFilter = ref('')
+const listLoading = ref(false)
+const listError = ref('')
+const detailLoading = ref(false)
+const detailError = ref('')
 const cases = ref<AfterSalesCaseView[]>([])
+const { filters, sync } = useListQuery(
+  { case: '', keyword: '', status: '' },
+  { paged: false, onSearch: () => {} },
+)
 const costs = ref<
   Array<{
     sourceBusinessId: string
@@ -68,6 +75,15 @@ const form = reactive({
   offlineInventoryName: '',
 })
 
+onMounted(() => {
+  if (filters.case !== '') {
+    void load()
+  }
+  if (filters.keyword !== '' || filters.status !== '') {
+    void searchCases()
+  }
+})
+
 function openAction(kind: string, obligationId = '', receiptItemId = ''): void {
   action.value = kind
   form.obligationId = obligationId
@@ -87,30 +103,56 @@ function openAction(kind: string, obligationId = '', receiptItemId = ''): void {
 }
 
 async function searchCases(): Promise<void> {
+  listLoading.value = true
+  listError.value = ''
   try {
-    cases.value = await afterSalesService.listCases(keyword.value, statusFilter.value)
+    cases.value = await afterSalesService.listCases(filters.keyword, filters.status)
   } catch (error) {
-    errorText.value = userMessageOf(error, '售后案例列表加载失败')
+    listError.value = userMessageOf(error, '售后案例列表加载失败')
+  } finally {
+    listLoading.value = false
   }
 }
 
+async function applyListQuery(): Promise<void> {
+  await sync()
+  await searchCases()
+}
+
+async function resetList(): Promise<void> {
+  filters.keyword = ''
+  filters.status = ''
+  await applyListQuery()
+}
+
 async function viewCase(caseBusinessId: string): Promise<void> {
-  caseId.value = caseBusinessId
+  filters.case = caseBusinessId
+  await applyCaseQuery()
+}
+
+async function applyCaseQuery(): Promise<void> {
+  filters.case = filters.case.trim()
+  await sync()
   await load()
 }
 
 async function load(): Promise<void> {
-  if (caseId.value.trim() === '') {
-    errorText.value = '请输入售后案例标识'
+  if (filters.case === '') {
+    current.value = null
+    costs.value = []
+    detailError.value = ''
     return
   }
-  errorText.value = ''
+  detailLoading.value = true
+  detailError.value = ''
   try {
-    current.value = await afterSalesService.getCase(caseId.value.trim())
-    costs.value = await afterSalesService.listCosts(caseId.value.trim())
+    current.value = await afterSalesService.getCase(filters.case)
+    costs.value = await afterSalesService.listCosts(filters.case)
   } catch (error) {
     current.value = null
-    errorText.value = userMessageOf(error, '售后案例加载失败')
+    detailError.value = userMessageOf(error, '售后案例加载失败')
+  } finally {
+    detailLoading.value = false
   }
 }
 
@@ -142,8 +184,9 @@ async function submit(): Promise<void> {
         routeType: form.routeType,
         obligations: [obligation],
       })
-      caseId.value = created.caseBusinessId
+      filters.case = created.caseBusinessId
       successText.value = `售后案例已受理：${created.caseBusinessId}`
+      await sync()
       await load()
     } else if (action.value === 'return') {
       const result = await afterSalesService.receiveReturn({
@@ -244,7 +287,7 @@ async function submit(): Promise<void> {
       successText.value = '赔付/退款已登记到现金'
     } else if (action.value === 'cost') {
       const cost = await afterSalesService.confirmCost({
-        caseBusinessId: caseId.value,
+        caseBusinessId: filters.case,
         costCategory: form.costCategory,
         amount: form.amount,
         businessDate: form.businessDate,
@@ -255,7 +298,7 @@ async function submit(): Promise<void> {
       await load()
     } else if (action.value === 'cost-correct') {
       await afterSalesService.correctCost({
-        caseBusinessId: caseId.value,
+        caseBusinessId: filters.case,
         sourceBusinessId: form.costSourceId,
         amount: form.amount,
         businessDate: form.businessDate,
@@ -264,7 +307,7 @@ async function submit(): Promise<void> {
       successText.value = '售后费用已更正'
       await load()
     } else if (action.value === 'complete') {
-      await afterSalesService.complete(caseId.value)
+      await afterSalesService.complete(filters.case)
       successText.value = '售后案例已结案'
       await load()
     }
@@ -279,8 +322,14 @@ async function submit(): Promise<void> {
 <template>
   <section class="aftersales-page">
     <div class="toolbar">
-      <el-input v-model="caseId" placeholder="售后案例标识" class="input" @keyup.enter="load" />
-      <el-button type="primary" @click="load">查询</el-button>
+      <el-input
+        v-model="filters.case"
+        placeholder="售后案例标识"
+        class="input"
+        aria-label="售后案例标识"
+        @keyup.enter="applyCaseQuery"
+      />
+      <el-button type="primary" @click="applyCaseQuery">查询</el-button>
       <el-button @click="openAction('open')">受理售后</el-button>
       <el-button v-if="current" type="success" @click="openAction('complete')">结案</el-button>
       <el-button v-if="current" @click="openAction('cost')">确认费用</el-button>
@@ -288,13 +337,14 @@ async function submit(): Promise<void> {
     </div>
     <div class="toolbar">
       <el-input
-        v-model="keyword"
+        v-model="filters.keyword"
         placeholder="案例号或订单标识"
         class="input"
-        @keyup.enter="searchCases"
+        aria-label="案例号或订单标识"
+        @keyup.enter="applyListQuery"
       />
       <el-select
-        v-model="statusFilter"
+        v-model="filters.status"
         placeholder="全部状态"
         class="status"
         clearable
@@ -304,23 +354,26 @@ async function submit(): Promise<void> {
         <el-option label="处理中" value="PROCESSING" />
         <el-option label="已结案" value="COMPLETED" />
       </el-select>
-      <el-button @click="searchCases">查询案例</el-button>
+      <el-button @click="applyListQuery">查询案例</el-button>
+      <el-button @click="resetList">重置</el-button>
     </div>
-    <el-table v-if="cases.length > 0" :data="cases" border size="small" class="case-list">
-      <el-table-column prop="caseNo" label="案例号" width="150" />
-      <el-table-column prop="orderBusinessId" label="订单" min-width="200" />
-      <el-table-column prop="issueSummary" label="问题" min-width="180" />
-      <el-table-column label="状态" width="120">
-        <template #default="{ row }"
-          ><CodeTag category="afterSales.caseStatus" :code="row.status"
-        /></template>
-      </el-table-column>
-      <el-table-column label="操作" width="90">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="viewCase(row.caseBusinessId)">查看</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <PageState :loading="listLoading" :error="listError" @retry="searchCases">
+      <el-table :data="cases" empty-text="没有匹配的售后案例" border size="small" class="case-list">
+        <el-table-column prop="caseNo" label="案例号" width="150" />
+        <el-table-column prop="orderBusinessId" label="订单" min-width="200" />
+        <el-table-column prop="issueSummary" label="问题" min-width="180" />
+        <el-table-column label="状态" width="120">
+          <template #default="{ row }"
+            ><CodeTag category="afterSales.caseStatus" :code="row.status"
+          /></template>
+        </el-table-column>
+        <el-table-column label="操作" width="90">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="viewCase(row.caseBusinessId)">查看</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PageState>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert
       v-if="successText"
@@ -330,116 +383,118 @@ async function submit(): Promise<void> {
       class="alert"
     />
 
-    <template v-if="current">
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="案例号">{{ current.caseNo }}</el-descriptions-item>
-        <el-descriptions-item label="订单">{{ current.orderBusinessId }}</el-descriptions-item>
-        <el-descriptions-item label="状态"
-          ><CodeTag category="afterSales.caseStatus" :code="current.status"
-        /></el-descriptions-item>
-        <el-descriptions-item label="路线"
-          ><CodeTag category="afterSales.routeType" :code="current.routeType"
-        /></el-descriptions-item>
-        <el-descriptions-item label="问题" :span="2">{{
-          current.issueSummary
-        }}</el-descriptions-item>
-      </el-descriptions>
+    <PageState :loading="detailLoading" :error="detailError" @retry="load">
+      <template v-if="current">
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="案例号">{{ current.caseNo }}</el-descriptions-item>
+          <el-descriptions-item label="订单">{{ current.orderBusinessId }}</el-descriptions-item>
+          <el-descriptions-item label="状态"
+            ><CodeTag category="afterSales.caseStatus" :code="current.status"
+          /></el-descriptions-item>
+          <el-descriptions-item label="路线"
+            ><CodeTag category="afterSales.routeType" :code="current.routeType"
+          /></el-descriptions-item>
+          <el-descriptions-item label="问题" :span="2">{{
+            current.issueSummary
+          }}</el-descriptions-item>
+        </el-descriptions>
 
-      <h2>义务</h2>
-      <el-table :data="current.obligations" border>
-        <el-table-column prop="obligationBusinessId" label="义务标识" min-width="200" />
-        <el-table-column label="类型" width="170">
-          <template #default="{ row }"
-            ><CodeTag category="afterSales.obligationType" :code="row.obligationType"
-          /></template>
-        </el-table-column>
-        <el-table-column label="目标" width="120">
-          <template #default="{ row }">
-            <span v-if="row.targetQuantity !== null">{{ row.targetQuantity }}</span
-            ><MoneyText v-else :value="row.targetAmount" />
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="150">
-          <template #default="{ row }"
-            ><CodeTag category="afterSales.obligationStatus" :code="row.status"
-          /></template>
-        </el-table-column>
-        <el-table-column label="操作" width="330" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="openAction('pay', row.obligationBusinessId)"
-              >赔付/退款</el-button
-            >
-            <el-button link type="primary" @click="openAction('return', row.obligationBusinessId)"
-              >接收退回</el-button
-            >
-            <el-button link type="primary" @click="openAction('change', row.obligationBusinessId)"
-              >变更路线</el-button
-            >
-            <el-button link type="danger" @click="openAction('cancel', row.obligationBusinessId)"
-              >取消</el-button
-            >
-          </template>
-        </el-table-column>
-      </el-table>
+        <h2>义务</h2>
+        <el-table :data="current.obligations" border>
+          <el-table-column prop="obligationBusinessId" label="义务标识" min-width="200" />
+          <el-table-column label="类型" width="170">
+            <template #default="{ row }"
+              ><CodeTag category="afterSales.obligationType" :code="row.obligationType"
+            /></template>
+          </el-table-column>
+          <el-table-column label="目标" width="120">
+            <template #default="{ row }">
+              <span v-if="row.targetQuantity !== null">{{ row.targetQuantity }}</span
+              ><MoneyText v-else :value="row.targetAmount" />
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="150">
+            <template #default="{ row }"
+              ><CodeTag category="afterSales.obligationStatus" :code="row.status"
+            /></template>
+          </el-table-column>
+          <el-table-column label="操作" width="330" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openAction('pay', row.obligationBusinessId)"
+                >赔付/退款</el-button
+              >
+              <el-button link type="primary" @click="openAction('return', row.obligationBusinessId)"
+                >接收退回</el-button
+              >
+              <el-button link type="primary" @click="openAction('change', row.obligationBusinessId)"
+                >变更路线</el-button
+              >
+              <el-button link type="danger" @click="openAction('cancel', row.obligationBusinessId)"
+                >取消</el-button
+              >
+            </template>
+          </el-table-column>
+        </el-table>
 
-      <h2>售后费用（不属于现金）</h2>
-      <el-table :data="costs" empty-text="暂无售后费用" border size="small" class="case-list">
-        <el-table-column prop="sourceBusinessId" label="费用来源" min-width="200" />
-        <el-table-column label="分类" width="150">
-          <template #default="{ row }"
-            ><CodeTag category="finance.costCategory" :code="row.costCategory"
-          /></template>
-        </el-table-column>
-        <el-table-column label="金额" width="130">
-          <template #default="{ row }"><MoneyText :value="row.amount" /></template>
-        </el-table-column>
-        <el-table-column prop="businessDate" label="业务日期" width="120" />
-        <el-table-column label="操作" width="110">
-          <template #default="{ row }"
-            ><CodeTag category="finance.costOperation" :code="row.operationType"
-          /></template>
-        </el-table-column>
-        <el-table-column prop="reasonText" label="原因" min-width="160" />
-      </el-table>
+        <h2>售后费用（不属于现金）</h2>
+        <el-table :data="costs" empty-text="暂无售后费用" border size="small" class="case-list">
+          <el-table-column prop="sourceBusinessId" label="费用来源" min-width="200" />
+          <el-table-column label="分类" width="150">
+            <template #default="{ row }"
+              ><CodeTag category="finance.costCategory" :code="row.costCategory"
+            /></template>
+          </el-table-column>
+          <el-table-column label="金额" width="130">
+            <template #default="{ row }"><MoneyText :value="row.amount" /></template>
+          </el-table-column>
+          <el-table-column prop="businessDate" label="业务日期" width="120" />
+          <el-table-column label="操作" width="110">
+            <template #default="{ row }"
+              ><CodeTag category="finance.costOperation" :code="row.operationType"
+            /></template>
+          </el-table-column>
+          <el-table-column prop="reasonText" label="原因" min-width="160" />
+        </el-table>
 
-      <h2>本次已接收退回</h2>
-      <el-table :data="received" empty-text="尚未通过本页接收退回" border size="small">
-        <el-table-column prop="receiptItemBusinessId" label="接收明细" min-width="200" />
-        <el-table-column prop="quantity" label="数量" width="80" />
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }"
-            ><CodeTag category="afterSales.conditionCode" :code="row.conditionCode"
-          /></template>
-        </el-table-column>
-        <el-table-column label="操作" width="240">
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="openAction('dispose', row.obligationBusinessId, row.receiptItemBusinessId)"
-            >
-              池内处置
-            </el-button>
-            <el-button
-              link
-              type="primary"
-              @click="
-                openAction('return-customer', row.obligationBusinessId, row.receiptItemBusinessId)
-              "
-            >
-              原样退还
-            </el-button>
-            <el-button
-              link
-              type="primary"
-              @click="openAction('repair', row.obligationBusinessId, row.receiptItemBusinessId)"
-            >
-              返修
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </template>
+        <h2>本次已接收退回</h2>
+        <el-table :data="received" empty-text="尚未通过本页接收退回" border size="small">
+          <el-table-column prop="receiptItemBusinessId" label="接收明细" min-width="200" />
+          <el-table-column prop="quantity" label="数量" width="80" />
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }"
+              ><CodeTag category="afterSales.conditionCode" :code="row.conditionCode"
+            /></template>
+          </el-table-column>
+          <el-table-column label="操作" width="240">
+            <template #default="{ row }">
+              <el-button
+                link
+                type="primary"
+                @click="openAction('dispose', row.obligationBusinessId, row.receiptItemBusinessId)"
+              >
+                池内处置
+              </el-button>
+              <el-button
+                link
+                type="primary"
+                @click="
+                  openAction('return-customer', row.obligationBusinessId, row.receiptItemBusinessId)
+                "
+              >
+                原样退还
+              </el-button>
+              <el-button
+                link
+                type="primary"
+                @click="openAction('repair', row.obligationBusinessId, row.receiptItemBusinessId)"
+              >
+                返修
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+    </PageState>
 
     <el-dialog v-model="dialogVisible" :title="action" width="520px">
       <el-form label-width="110px">

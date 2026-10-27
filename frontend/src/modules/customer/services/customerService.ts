@@ -20,10 +20,8 @@ function query(params: Record<string, string | number | undefined>): string {
 }
 
 export const customerService = {
-  list(keyword: string, status: CustomerStatus | ''): Promise<CustomerView[]> {
-    return api.query<CustomerView[]>(
-      `/api/customers${query({ keyword, status, page: 1, size: 50 })}`,
-    )
+  list(keyword: string, status: CustomerStatus | '', page = 1, size = 20): Promise<CustomerView[]> {
+    return api.query<CustomerView[]>(`/api/customers${query({ keyword, status, page, size })}`)
   },
 
   get(customerBusinessId: string): Promise<CustomerView> {
