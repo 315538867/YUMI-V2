@@ -7,8 +7,7 @@ import type { AfterCommitTask } from '@/modules/platform-admin/services/administ
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
-import PageState from '@/shared/components/PageState.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 
 const tasks = ref<AfterCommitTask[]>([])
 const loading = ref(false)
@@ -71,9 +70,16 @@ void load()
 </script>
 
 <template>
-  <WorkspacePage class="tasks-page">
-    <h1>提交后任务</h1>
-    <div class="toolbar">
+  <ListPage
+    class="tasks-page"
+    title="提交后任务"
+    :loading="loading"
+    :error="errorText"
+    :empty="!loading && errorText === '' && tasks.length === 0"
+    empty-text="该状态下没有任务"
+    @retry="load"
+  >
+    <template #filters>
       <el-select v-model="filters.status" class="status" aria-label="任务状态" @change="search">
         <el-option label="待执行" value="PENDING" />
         <el-option label="等待重试" value="RETRY_WAIT" />
@@ -82,78 +88,54 @@ void load()
       </el-select>
       <el-button @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
-    </div>
-    <el-alert
-      v-if="successText"
-      type="success"
-      :closable="false"
-      :title="successText"
-      class="alert"
-    />
-    <PageState
-      :loading="loading"
-      :error="errorText"
-      :empty="!loading && errorText === '' && tasks.length === 0"
-      empty-text="该状态下没有任务"
-      @retry="load"
-    >
-      <el-table :data="tasks" border empty-text="暂无任务">
-        <el-table-column label="任务类型" width="170">
-          <template #default="{ row }"
-            ><CodeLabel
-              category="platform.afterCommitTaskType"
-              :code="row.taskType"
-              fallback="其他任务"
-          /></template>
-        </el-table-column>
-        <el-table-column prop="deduplicationKey" label="去重键" min-width="220" />
-        <el-table-column label="状态" width="120">
-          <template #default="{ row }"
-            ><CodeTag category="platform.afterCommitTaskStatus" :code="row.status"
-          /></template>
-        </el-table-column>
-        <el-table-column prop="attempts" label="尝试" width="80" />
-        <el-table-column prop="lastError" label="失败原因" min-width="240" />
-        <el-table-column label="来源" min-width="220">
-          <template #default="{ row }">{{ JSON.stringify(row.payload) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="160">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="retry(row)">重试</el-button>
-            <el-button link type="danger" @click="openAbandon(row)">放弃</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </PageState>
+    </template>
+    <template #notice>
+      <el-alert v-if="successText" type="success" :closable="false" :title="successText" />
+    </template>
+    <el-table :data="tasks" border empty-text="暂无任务">
+      <el-table-column label="任务类型" width="170">
+        <template #default="{ row }"
+          ><CodeLabel
+            category="platform.afterCommitTaskType"
+            :code="row.taskType"
+            fallback="其他任务"
+        /></template>
+      </el-table-column>
+      <el-table-column prop="deduplicationKey" label="去重键" min-width="220" />
+      <el-table-column label="状态" width="120">
+        <template #default="{ row }"
+          ><CodeTag category="platform.afterCommitTaskStatus" :code="row.status"
+        /></template>
+      </el-table-column>
+      <el-table-column prop="attempts" label="尝试" width="80" />
+      <el-table-column prop="lastError" label="失败原因" min-width="240" />
+      <el-table-column label="来源" min-width="220">
+        <template #default="{ row }">{{ JSON.stringify(row.payload) }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="160">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="retry(row)">重试</el-button>
+          <el-button link type="danger" @click="openAbandon(row)">放弃</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+  </ListPage>
 
-    <el-dialog v-model="abandonVisible" title="放弃任务" width="420px">
-      <el-form label-width="92px">
-        <el-form-item label="原因"
-          ><el-input v-model="form.reason" type="textarea" :rows="2"
-        /></el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="abandonVisible = false">取消</el-button>
-        <el-button type="danger" @click="abandon">确认放弃</el-button>
-      </template>
-    </el-dialog>
-  </WorkspacePage>
+  <el-dialog v-model="abandonVisible" title="放弃任务" width="420px">
+    <el-form label-width="92px">
+      <el-form-item label="原因"
+        ><el-input v-model="form.reason" type="textarea" :rows="2"
+      /></el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="abandonVisible = false">取消</el-button>
+      <el-button type="danger" @click="abandon">确认放弃</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-.toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
 .status {
   width: 160px;
-}
-.alert {
-  margin-bottom: 12px;
 }
 </style>

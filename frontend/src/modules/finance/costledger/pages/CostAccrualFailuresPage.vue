@@ -5,9 +5,10 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import type { CostFailureView } from '@/modules/finance/costledger/contracts'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 
 const failures = ref<CostFailureView[]>([])
+const loading = ref(false)
 const errorText = ref('')
 const successText = ref('')
 const dates = reactive({
@@ -16,10 +17,14 @@ const dates = reactive({
 })
 
 async function load(): Promise<void> {
+  loading.value = true
+  errorText.value = ''
   try {
     failures.value = await costLedgerService.failures()
   } catch (error) {
     errorText.value = userMessageOf(error, '归集失败加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -42,20 +47,20 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage class="failures-page">
-    <h1>成本归集失败</h1>
-    <div class="toolbar">
+  <ListPage
+    class="failures-page"
+    title="成本归集失败"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
+    <template #filters>
       <el-date-picker v-model="dates.startDate" type="date" value-format="YYYY-MM-DD" />
       <el-date-picker v-model="dates.endDate" type="date" value-format="YYYY-MM-DD" />
-    </div>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert
-      v-if="successText"
-      type="success"
-      :closable="false"
-      :title="successText"
-      class="alert"
-    />
+    </template>
+    <template #notice>
+      <el-alert v-if="successText" type="success" :closable="false" :title="successText" />
+    </template>
     <el-table :data="failures" border empty-text="暂无待恢复的归集失败">
       <el-table-column label="来源模块" width="140">
         <template #default="{ row }"
@@ -76,25 +81,16 @@ onMounted(load)
         </template>
       </el-table-column>
     </el-table>
-    <p class="hint">失败不推进来源水位；重试沿用原命令，不重复归集。</p>
-  </WorkspacePage>
+    <template #footer>
+      <p class="hint">失败不推进来源水位；重试沿用原命令，不重复归集。</p>
+    </template>
+  </ListPage>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-.toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
 .hint {
+  margin: 0;
   color: var(--el-text-color-secondary);
   font-size: 12px;
-}
-.alert {
-  margin-bottom: 12px;
 }
 </style>

@@ -7,9 +7,8 @@ import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/pa
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
-import PageState from '@/shared/components/PageState.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const periods = ref<PayrollPeriodRef[]>([])
 const results = ref<EmployeePayrollView[]>([])
@@ -76,9 +75,14 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage class="payment-page">
-    <h1>工资付款</h1>
-    <div class="toolbar">
+  <ListPage
+    class="payment-page"
+    title="工资付款"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
+    <template #filters>
       <el-select v-model="filters.period" class="period" aria-label="工资期间" @change="search">
         <el-option
           v-for="period in periods"
@@ -93,62 +97,47 @@ onMounted(load)
         value-format="YYYY-MM-DD"
         aria-label="付款日期"
       />
+    </template>
+    <template #actions>
       <el-button type="primary" @click="pay">按选中员工付款</el-button>
-    </div>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert
-      v-if="successText"
-      type="success"
-      :closable="false"
-      :title="successText"
-      class="alert"
-    />
-    <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-table :data="results" border @selection-change="selectionChanged">
-        <el-table-column type="selection" width="50" />
-        <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
-        <el-table-column label="状态" width="130">
-          <template #default="{ row }"
-            ><CodeTag category="finance.payrollResultStatus" :code="row.status"
-          /></template>
-        </el-table-column>
-        <el-table-column label="应付" width="130">
-          <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
-        </el-table-column>
-        <el-table-column label="本次付款" width="160">
-          <template #default="{ row }">
-            <el-input
-              v-model="amounts[row.resultBusinessId]"
-              :disabled="row.status !== 'CONFIRMED'"
-              :aria-label="`${row.employeeBusinessId} 本次付款`"
-            />
-          </template>
-        </el-table-column>
-      </el-table>
-    </PageState>
-    <p class="hint">只能选择已核定员工付款；部分付款与多人付款由 cash 在同一事务校验上限。</p>
-  </WorkspacePage>
+    </template>
+    <template #notice>
+      <el-alert v-if="successText" type="success" :closable="false" :title="successText" />
+    </template>
+    <el-table :data="results" border @selection-change="selectionChanged">
+      <el-table-column type="selection" width="50" />
+      <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
+      <el-table-column label="状态" width="130">
+        <template #default="{ row }"
+          ><CodeTag category="finance.payrollResultStatus" :code="row.status"
+        /></template>
+      </el-table-column>
+      <el-table-column label="应付" width="130">
+        <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
+      </el-table-column>
+      <el-table-column label="本次付款" width="160">
+        <template #default="{ row }">
+          <el-input
+            v-model="amounts[row.resultBusinessId]"
+            :disabled="row.status !== 'CONFIRMED'"
+            :aria-label="`${row.employeeBusinessId} 本次付款`"
+          />
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #footer>
+      <p class="hint">只能选择已核定员工付款；部分付款与多人付款由 cash 在同一事务校验上限。</p>
+    </template>
+  </ListPage>
 </template>
 
 <style scoped>
-.payment-page h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-
-.toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
 .period {
   width: 240px;
 }
 .hint {
+  margin: 0;
   color: var(--el-text-color-secondary);
   font-size: 12px;
-}
-.alert {
-  margin-bottom: 12px;
 }
 </style>

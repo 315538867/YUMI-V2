@@ -39,6 +39,9 @@
 | `MoneyText` | 金额对象/字符串统一展示 |
 | `DateTimeText` | 时间统一格式化 |
 | `WorkspacePage` | 工作区白底卡片外壳：边框、圆角、默认 16px 内边距 |
+| `EditorPage` | 单记录编辑页外壳：标题/操作、PageState、表单与预览两栏 |
+| `ListPage` | 列表页外壳：标题/数量、统一工具条、PageState 与分页插槽 |
+| `FormErrorAlert` | 表单内不可映射字段错误/冲突提示，标题下统一展示 |
 | `PermissionButton` | 按权限显隐的按钮 |
 | `BusinessFileUpload` | 附件上传与授权读取 |
 
@@ -47,6 +50,9 @@
   - 禁止模板内 `toLocaleString`、`toISOString`、`new Date(...)`；
   - 契约测试第二组规则扫描。
 - 页面不再自写 `status === 'ACTIVE' ? '启用' : '停用'` 这类零散映射；新增编码先加码表，再在页面使用组件。
+- 单记录新建/编辑页统一使用 `EditorPage`：标题与操作放 `actions` 插槽，表单放默认插槽，右侧预览放 `preview` 插槽；加载失败与重试由外壳统一处理，页面不再重复写标题栏、两栏网格和预览卡片样式。
+- 多明细或表格型编辑页（如订单建单、已有订单接管）布局差异较大，可继续使用 `WorkspacePage`，不强行套 `EditorPage`。
+- 列表页统一使用 `ListPage`：筛选控件放 `filters` 插槽，新增/接管等主操作放 `actions` 插槽并排在筛选之后；表格放默认插槽，分页放 `pager` 插槽。页面不再自写标题栏、工具条和间距样式。
 
 ## 4. 权限与操作可见性
 
@@ -63,7 +69,26 @@
 
 ## 5. 错误处理
 
-- 新写的写操作统一使用 `useAsyncAction`，页面不重复写 `try/catch`；存量页面沿用 `userMessageOf` 归一化，迁移时保持同一策略：
+- 单记录编辑页统一使用 `useEditorForm`，它组合 `useAsyncAction`，提供页面校验、冲突提示和汇总错误；页面不再自行维护 `validationErrors`/`conflictError`：
+
+  ```ts
+  const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
+    ['name', 'phone'],
+    '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖',
+  )
+
+  async function save(): Promise<void> {
+    if (!validate([{ field: 'name', invalid: form.name.trim() === '', message: '请填写名称' }])) {
+      return
+    }
+    await submit(() => service.update(id, { ...form, expectedRowVersion: version }), {
+      success: '资料已保存',
+      fallback: '保存失败',
+    })
+  }
+  ```
+
+- 非编辑表单的写操作使用 `useAsyncAction`，页面不重复写 `try/catch`；存量页面沿用 `userMessageOf` 归一化，迁移时保持同一策略：
 
   ```ts
   const { loading, fieldErrors, run } = useAsyncAction()
@@ -75,10 +100,10 @@
 
 - 错误表现按类型区分：
   - 字段校验错误（`ApiClientError.fieldIssues`）写入 `fieldErrors`，用 `fieldError('name')` 绑定到 `el-form-item :error`；
-  - 页面自己的必填校验写入独立 `validationErrors`，与接口字段错误一起内联，不弹 toast；
-  - 无法映射到具体字段的接口字段错误通过 `otherFieldErrors(...)` 在表单内汇总，不能静默；
+  - 页面自己的必填校验写入 `validationErrors`，与接口字段错误一起内联，不弹 toast；
+  - 无法映射到具体字段的接口字段错误通过 `otherFieldErrors(...)` 在表单内汇总，不能静默；`useEditorForm` 已通过 `formAlert` 和 `FormErrorAlert` 统一渲染；
   - 其他接口错误统一 `ElMessage.error`，文案取后端中文消息，网络失败用兜底文案；
-  - 版本冲突等需要保留输入的错误可用 `handled` 抑制 toast，在表单内展示；
+  - 版本冲突由 `useEditorForm` 捕获并写入 `formAlert`，保留输入且不弹 toast；
   - 代码不得直接展示英文异常原文或 HTTP 状态码。
 - 页面按稳定错误码判断空态，使用 `isErrorCode`，不直接比较 HTTP 状态。
 - 同一操作只提示一次；`run` 内部已弹 toast 时，`onError` 只做状态恢复。

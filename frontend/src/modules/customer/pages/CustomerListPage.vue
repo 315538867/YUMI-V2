@@ -6,10 +6,9 @@ import { useListQuery } from '@/platform/composables/useListQuery'
 import type { CustomerStatus, CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
-import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const rows = ref<CustomerView[]>([])
@@ -42,12 +41,15 @@ void load()
 </script>
 
 <template>
-  <WorkspacePage class="customer-list">
-    <div class="head">
-      <h1>客户</h1>
-      <span class="meta">启用客户 {{ activeCount ?? '—' }}</span>
-    </div>
-    <div class="toolbar">
+  <ListPage
+    class="customer-list"
+    title="客户"
+    :meta="`启用客户 ${activeCount ?? '—'}`"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
+    <template #filters>
       <el-input
         v-model="filters.keyword"
         placeholder="名称、编号、联系人或电话"
@@ -67,40 +69,41 @@ void load()
       </el-select>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
+    </template>
+    <template #actions>
       <PermissionButton permission="customer.manage" @click="router.push('/customers/new')">
         新增客户
       </PermissionButton>
-    </div>
-
-    <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-table :data="rows" empty-text="没有匹配的客户" border>
-        <el-table-column prop="customerNo" label="客户编号" width="140" />
-        <el-table-column prop="name" label="客户名称" min-width="160" />
-        <el-table-column prop="contactName" label="联系人" width="120" />
-        <el-table-column prop="phone" label="电话" width="150" />
-        <el-table-column
-          prop="defaultAddress"
-          label="默认地址"
-          min-width="220"
-          show-overflow-tooltip
-        />
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <CodeTag category="common.status" :code="row.status" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="router.push(`/customers/${row.customerBusinessId}`)"
-            >
-              查看
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    </template>
+    <el-table :data="rows" empty-text="没有匹配的客户" border>
+      <el-table-column prop="customerNo" label="客户编号" width="140" />
+      <el-table-column prop="name" label="客户名称" min-width="160" />
+      <el-table-column prop="contactName" label="联系人" width="120" />
+      <el-table-column prop="phone" label="电话" width="150" />
+      <el-table-column
+        prop="defaultAddress"
+        label="默认地址"
+        min-width="220"
+        show-overflow-tooltip
+      />
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <CodeTag category="common.status" :code="row.status" />
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            link
+            type="primary"
+            @click="router.push(`/customers/${row.customerBusinessId}`)"
+          >
+            查看
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #pager>
       <ListPager
         :page="page"
         :size="size"
@@ -109,44 +112,16 @@ void load()
         @update:page="goPage"
         @update:size="changeSize"
       />
-    </PageState>
-  </WorkspacePage>
+    </template>
+  </ListPage>
 </template>
 
 <style scoped>
-.customer-list h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
 .keyword {
   width: 280px;
 }
 
 .status {
   width: 130px;
-}
-
-.head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.meta {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.alert {
-  margin-bottom: 12px;
 }
 </style>

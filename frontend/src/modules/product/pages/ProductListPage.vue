@@ -6,11 +6,10 @@ import { useListQuery } from '@/platform/composables/useListQuery'
 import type { ProductStatus, ProductView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
-import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const rows = ref<ProductView[]>([])
@@ -37,9 +36,8 @@ void load()
 </script>
 
 <template>
-  <WorkspacePage class="product-list">
-    <h1>商品</h1>
-    <div class="toolbar">
+  <ListPage class="product-list" title="商品" :loading="loading" :error="errorText" @retry="load">
+    <template #filters>
       <el-input
         v-model="filters.keyword"
         placeholder="商品名称或编号"
@@ -59,40 +57,37 @@ void load()
       </el-select>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
+    </template>
+    <template #actions>
       <PermissionButton permission="product.create" @click="router.push('/products/new')">
         新增商品
       </PermissionButton>
       <el-button @click="router.push('/products/entry-settings')">录入设置</el-button>
-    </div>
-
-    <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-table :data="rows" empty-text="没有匹配的商品" border>
-        <el-table-column prop="productNo" label="商品编号" width="140" />
-        <el-table-column prop="name" label="商品名称" min-width="160" />
-        <el-table-column prop="makingStarName" label="制作星级" width="110" />
-        <el-table-column label="标准售价" width="140">
-          <template #default="{ row }">
-            <MoneyText :value="row.standardSalePrice" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="dailyCapacity" label="日产能" width="90" />
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <CodeTag category="common.status" :code="row.status" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="router.push(`/products/${row.productBusinessId}`)"
-            >
-              查看
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    </template>
+    <el-table :data="rows" empty-text="没有匹配的商品" border>
+      <el-table-column prop="productNo" label="商品编号" width="140" />
+      <el-table-column prop="name" label="商品名称" min-width="160" />
+      <el-table-column prop="makingStarName" label="制作星级" width="110" />
+      <el-table-column label="标准售价" width="140">
+        <template #default="{ row }">
+          <MoneyText :value="row.standardSalePrice" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="dailyCapacity" label="日产能" width="90" />
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <CodeTag category="common.status" :code="row.status" />
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="120" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="router.push(`/products/${row.productBusinessId}`)">
+            查看
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #pager>
       <ListPager
         :page="page"
         :size="size"
@@ -101,32 +96,16 @@ void load()
         @update:page="goPage"
         @update:size="changeSize"
       />
-    </PageState>
-  </WorkspacePage>
+    </template>
+  </ListPage>
 </template>
 
 <style scoped>
-.product-list h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
 .keyword {
   width: 240px;
 }
 
 .status {
   width: 130px;
-}
-
-.alert {
-  margin-bottom: 12px;
 }
 </style>

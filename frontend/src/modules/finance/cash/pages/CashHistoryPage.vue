@@ -6,9 +6,8 @@ import { useListQuery } from '@/platform/composables/useListQuery'
 import type { CashFactView, CashPeriodSummary } from '@/modules/finance/cash/contracts'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
-import PageState from '@/shared/components/PageState.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const facts = ref<CashFactView[]>([])
 const summary = ref<CashPeriodSummary | null>(null)
@@ -85,9 +84,16 @@ void load()
 </script>
 
 <template>
-  <WorkspacePage class="history-page">
-    <h1>现金流水</h1>
-    <div class="toolbar">
+  <ListPage
+    class="history-page"
+    title="现金流水"
+    :loading="loading"
+    :error="errorText"
+    :empty="!loading && errorText === '' && facts.length === 0"
+    empty-text="期间内无现金流水"
+    @retry="load"
+  >
+    <template #filters>
       <el-date-picker
         v-model="filters.startDate"
         type="date"
@@ -108,103 +114,83 @@ void load()
       />
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
-    </div>
-    <el-alert
-      v-if="successText"
-      type="success"
-      :closable="false"
-      :title="successText"
-      class="alert"
-    />
-    <PageState
-      :loading="loading"
-      :error="errorText"
-      :empty="!loading && errorText === '' && facts.length === 0"
-      empty-text="期间内无现金流水"
-      @retry="load"
-    >
-      <el-descriptions v-if="summary" :column="3" border class="summary">
-        <el-descriptions-item label="有效流入">{{ summary.income }}</el-descriptions-item>
-        <el-descriptions-item label="有效流出">{{ summary.outflow }}</el-descriptions-item>
-        <el-descriptions-item label="现金净额">{{ summary.netAmount }}</el-descriptions-item>
-      </el-descriptions>
-      <el-table :data="facts" border empty-text="期间内无现金流水">
-        <el-table-column prop="cashNo" label="现金单号" width="140" />
-        <el-table-column prop="businessDate" label="业务日期" width="120" />
-        <el-table-column label="类型" width="180">
-          <template #default="{ row }"
-            ><CodeTag category="finance.cashType" :code="row.cashType"
-          /></template>
-        </el-table-column>
-        <el-table-column label="方向" width="80">
-          <template #default="{ row }"
-            ><CodeTag category="finance.cashDirection" :code="row.direction"
-          /></template>
-        </el-table-column>
-        <el-table-column label="金额" width="130">
-          <template #default="{ row }"><MoneyText :value="row.amount" /></template>
-        </el-table-column>
-        <el-table-column label="有效" width="80">
-          <template #default="{ row }">{{ row.valid ? '是' : '否' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="190">
-          <template #default="{ row }">
-            <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)"
-              >整笔冲销</el-button
-            >
-            <el-button
-              v-if="row.cashType === 'PAYROLL_PAYMENT'"
-              link
-              type="primary"
-              :disabled="!row.valid"
-              @click="open('return', row)"
-            >
-              工资退回
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </PageState>
-    <p class="hint">现金净额不是利润；工资退回不充当经营收入。</p>
+    </template>
+    <template #notice>
+      <el-alert v-if="successText" type="success" :closable="false" :title="successText" />
+    </template>
+    <el-descriptions v-if="summary" :column="3" border class="summary">
+      <el-descriptions-item label="有效流入">{{ summary.income }}</el-descriptions-item>
+      <el-descriptions-item label="有效流出">{{ summary.outflow }}</el-descriptions-item>
+      <el-descriptions-item label="现金净额">{{ summary.netAmount }}</el-descriptions-item>
+    </el-descriptions>
+    <el-table :data="facts" border empty-text="期间内无现金流水">
+      <el-table-column prop="cashNo" label="现金单号" width="140" />
+      <el-table-column prop="businessDate" label="业务日期" width="120" />
+      <el-table-column label="类型" width="180">
+        <template #default="{ row }"
+          ><CodeTag category="finance.cashType" :code="row.cashType"
+        /></template>
+      </el-table-column>
+      <el-table-column label="方向" width="80">
+        <template #default="{ row }"
+          ><CodeTag category="finance.cashDirection" :code="row.direction"
+        /></template>
+      </el-table-column>
+      <el-table-column label="金额" width="130">
+        <template #default="{ row }"><MoneyText :value="row.amount" /></template>
+      </el-table-column>
+      <el-table-column label="有效" width="80">
+        <template #default="{ row }">{{ row.valid ? '是' : '否' }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="190">
+        <template #default="{ row }">
+          <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)"
+            >整笔冲销</el-button
+          >
+          <el-button
+            v-if="row.cashType === 'PAYROLL_PAYMENT'"
+            link
+            type="primary"
+            :disabled="!row.valid"
+            @click="open('return', row)"
+          >
+            工资退回
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #footer>
+      <p class="hint">现金净额不是利润；工资退回不充当经营收入。</p>
+    </template>
+  </ListPage>
 
-    <el-dialog
-      v-model="dialogVisible"
-      :title="action === 'reverse' ? '整笔冲销' : '真实工资退回'"
-      width="460px"
-    >
-      <el-form label-width="110px">
-        <el-form-item v-if="action === 'return'" label="工资结果"
-          ><el-input v-model="form.resultBusinessId"
-        /></el-form-item>
-        <el-form-item label="金额"
-          ><el-input v-model="form.amount" :disabled="action === 'reverse'"
-        /></el-form-item>
-        <el-form-item label="业务日期">
-          <el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="原因"
-          ><el-input v-model="form.reasonText" type="textarea" :rows="2"
-        /></el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submit">确认</el-button>
-      </template>
-    </el-dialog>
-  </WorkspacePage>
+  <el-dialog
+    v-model="dialogVisible"
+    :title="action === 'reverse' ? '整笔冲销' : '真实工资退回'"
+    width="460px"
+  >
+    <el-form label-width="110px">
+      <el-form-item v-if="action === 'return'" label="工资结果"
+        ><el-input v-model="form.resultBusinessId"
+      /></el-form-item>
+      <el-form-item label="金额"
+        ><el-input v-model="form.amount" :disabled="action === 'reverse'"
+      /></el-form-item>
+      <el-form-item label="业务日期">
+        <el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" />
+      </el-form-item>
+      <el-form-item label="原因"
+        ><el-input v-model="form.reasonText" type="textarea" :rows="2"
+      /></el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="dialogVisible = false">取消</el-button>
+      <el-button type="primary" @click="submit">确认</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-.toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
 .type {
   width: 220px;
 }
@@ -212,10 +198,8 @@ h1 {
   margin-bottom: 12px;
 }
 .hint {
+  margin: 0;
   color: var(--el-text-color-secondary);
   font-size: 12px;
-}
-.alert {
-  margin-bottom: 12px;
 }
 </style>

@@ -7,10 +7,9 @@ import { codeLabel, codesOf } from '@/platform/display/codeCatalog'
 import type { EmployeeView, EmploymentStatus } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
-import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const employees = ref<EmployeeView[]>([])
@@ -44,18 +43,14 @@ void load()
 </script>
 
 <template>
-  <WorkspacePage class="employee-page">
-    <div class="head">
-      <h1>员工与资格</h1>
-      <PermissionButton
-        permission="workforce.employee.manage"
-        type="primary"
-        @click="router.push('/workforce/employees/new')"
-      >
-        新增员工
-      </PermissionButton>
-    </div>
-    <div class="toolbar">
+  <ListPage
+    class="employee-page"
+    title="员工与资格"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
+    <template #filters>
       <el-input
         v-model="filters.keyword"
         placeholder="姓名、编号或电话"
@@ -78,41 +73,50 @@ void load()
       </el-select>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
-    </div>
-    <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-table :data="employees" empty-text="没有匹配的员工" border>
-        <el-table-column prop="employeeNo" label="员工编号" width="130" />
-        <el-table-column prop="name" label="姓名" width="130" />
-        <el-table-column prop="phone" label="电话" width="150" />
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <CodeTag category="workforce.employmentStatus" :code="row.employmentStatus" />
-          </template>
-        </el-table-column>
-        <el-table-column label="资格" min-width="200">
-          <template #default="{ row }">
-            <CodeTag
-              v-for="item in row.qualifications"
-              :key="item.workTypeCode"
-              category="workforce.workType"
-              :code="item.workTypeCode"
-              class="tag"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column prop="latestEffectiveDate" label="最近生效日" width="130" />
-        <el-table-column label="操作" width="90" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="router.push(`/workforce/employees/${row.employeeBusinessId}`)"
-            >
-              查看
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    </template>
+    <template #actions>
+      <PermissionButton
+        permission="workforce.employee.manage"
+        type="primary"
+        @click="router.push('/workforce/employees/new')"
+      >
+        新增员工
+      </PermissionButton>
+    </template>
+    <el-table :data="employees" empty-text="没有匹配的员工" border>
+      <el-table-column prop="employeeNo" label="员工编号" width="130" />
+      <el-table-column prop="name" label="姓名" width="130" />
+      <el-table-column prop="phone" label="电话" width="150" />
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <CodeTag category="workforce.employmentStatus" :code="row.employmentStatus" />
+        </template>
+      </el-table-column>
+      <el-table-column label="资格" min-width="200">
+        <template #default="{ row }">
+          <CodeTag
+            v-for="item in row.qualifications"
+            :key="item.workTypeCode"
+            category="workforce.workType"
+            :code="item.workTypeCode"
+            class="tag"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column prop="latestEffectiveDate" label="最近生效日" width="130" />
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            link
+            type="primary"
+            @click="router.push(`/workforce/employees/${row.employeeBusinessId}`)"
+          >
+            查看
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #pager>
       <ListPager
         :page="page"
         :size="size"
@@ -121,40 +125,16 @@ void load()
         @update:page="goPage"
         @update:size="changeSize"
       />
-    </PageState>
-  </WorkspacePage>
+    </template>
+  </ListPage>
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
 .keyword {
   width: 220px;
 }
 
-h1 {
-  margin: 0;
-  font-size: 18px;
-}
-
 .tag {
   margin-right: 4px;
-}
-
-.alert {
-  margin-bottom: 12px;
 }
 </style>

@@ -6,10 +6,9 @@ import { useListQuery } from '@/platform/composables/useListQuery'
 import type { TeamStatus, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
-import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const router = useRouter()
 const teams = ref<TeamView[]>([])
@@ -41,18 +40,8 @@ void load()
 </script>
 
 <template>
-  <WorkspacePage class="team-page">
-    <div class="head">
-      <h1>小组</h1>
-      <PermissionButton
-        permission="workforce.team.manage"
-        type="primary"
-        @click="router.push('/workforce/teams/new')"
-      >
-        新增小组
-      </PermissionButton>
-    </div>
-    <div class="toolbar">
+  <ListPage class="team-page" title="小组" :loading="loading" :error="errorText" @retry="load">
+    <template #filters>
       <el-input
         v-model="filters.keyword"
         placeholder="小组名称或编号"
@@ -67,36 +56,45 @@ void load()
       </el-select>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
-    </div>
-    <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-table :data="teams" empty-text="没有匹配的小组" border>
-        <el-table-column prop="teamNo" label="小组编号" width="130" />
-        <el-table-column prop="name" label="名称" width="160" />
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <CodeTag category="workforce.teamStatus" :code="row.status" />
-          </template>
-        </el-table-column>
-        <el-table-column label="成员" min-width="240">
-          <template #default="{ row }">
-            <el-tag v-for="member in row.members" :key="member.employeeBusinessId" class="tag">
-              {{ member.name }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="efficiencyFactor" label="效率因子" width="110" />
-        <el-table-column label="操作" width="90" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="router.push(`/workforce/teams/${row.teamBusinessId}`)"
-            >
-              查看
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    </template>
+    <template #actions>
+      <PermissionButton
+        permission="workforce.team.manage"
+        type="primary"
+        @click="router.push('/workforce/teams/new')"
+      >
+        新增小组
+      </PermissionButton>
+    </template>
+    <el-table :data="teams" empty-text="没有匹配的小组" border>
+      <el-table-column prop="teamNo" label="小组编号" width="130" />
+      <el-table-column prop="name" label="名称" width="160" />
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <CodeTag category="workforce.teamStatus" :code="row.status" />
+        </template>
+      </el-table-column>
+      <el-table-column label="成员" min-width="240">
+        <template #default="{ row }">
+          <el-tag v-for="member in row.members" :key="member.employeeBusinessId" class="tag">
+            {{ member.name }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="efficiencyFactor" label="效率因子" width="110" />
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            link
+            type="primary"
+            @click="router.push(`/workforce/teams/${row.teamBusinessId}`)"
+          >
+            查看
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #pager>
       <ListPager
         :page="page"
         :size="size"
@@ -105,44 +103,16 @@ void load()
         @update:page="goPage"
         @update:size="changeSize"
       />
-    </PageState>
-  </WorkspacePage>
+    </template>
+  </ListPage>
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
 .keyword {
   width: 220px;
 }
 
-h1 {
-  margin: 0;
-  font-size: 18px;
-}
-
 .tag {
   margin-right: 4px;
-}
-
-.members {
-  width: 100%;
-}
-
-.alert {
-  margin-bottom: 12px;
 }
 </style>
