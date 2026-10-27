@@ -74,8 +74,11 @@
   ```
 
 - 错误表现按类型区分：
-  - 字段校验错误（`ApiClientError.fieldIssues`）写入 `fieldErrors`，由表单内联展示；
+  - 字段校验错误（`ApiClientError.fieldIssues`）写入 `fieldErrors`，用 `fieldError('name')` 绑定到 `el-form-item :error`；
+  - 页面自己的必填校验写入独立 `validationErrors`，与接口字段错误一起内联，不弹 toast；
+  - 无法映射到具体字段的接口字段错误通过 `otherFieldErrors(...)` 在表单内汇总，不能静默；
   - 其他接口错误统一 `ElMessage.error`，文案取后端中文消息，网络失败用兜底文案；
+  - 版本冲突等需要保留输入的错误可用 `handled` 抑制 toast，在表单内展示；
   - 代码不得直接展示英文异常原文或 HTTP 状态码。
 - 页面按稳定错误码判断空态，使用 `isErrorCode`，不直接比较 HTTP 状态。
 - 同一操作只提示一次；`run` 内部已弹 toast 时，`onError` 只做状态恢复。

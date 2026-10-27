@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -16,9 +16,10 @@ const employeeId =
 const editing = employeeId !== ''
 const employee = ref<EmployeeView | null>(null)
 const loading = ref(editing)
-const saving = ref(false)
 const errorText = ref('')
-const formError = ref('')
+const conflictError = ref('')
+const validationErrors = reactive<Record<string, string>>({})
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
 
 const form = reactive({
   name: '',
@@ -28,6 +29,9 @@ const form = reactive({
 const initialSnapshot = ref(JSON.stringify(form))
 const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value)
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const formAlert = computed(
+  () => conflictError.value || otherFieldErrors('name', 'phone', 'effectiveDate').join('；'),
+)
 
 function previewStatus(): string {
   return editing ? (employee.value?.employmentStatus ?? 'EMPLOYED') : 'EMPLOYED'
@@ -53,36 +57,52 @@ async function load(): Promise<void> {
   }
 }
 
+function validate(): boolean {
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
+  }
+  if (form.name.trim() === '') {
+    validationErrors.name = '请填写姓名'
+  }
+  if (form.phone.trim() === '') {
+    validationErrors.phone = '请填写电话'
+  }
+  return Object.keys(validationErrors).length === 0
+}
+
 async function save(): Promise<void> {
-  if (form.name.trim() === '' || form.phone.trim() === '') {
-    formError.value = '请填写姓名和电话'
+  conflictError.value = ''
+  if (!validate()) {
     return
   }
-  saving.value = true
-  formError.value = ''
-  try {
-    if (editing && employee.value !== null) {
-      await workforceService.updateEmployee(employeeId, {
-        name: form.name,
-        phone: form.phone,
-        expectedRowVersion: employee.value.rowVersion,
-      })
-      ElMessage.success('员工资料已保存')
+  const action =
+    editing && employee.value !== null
+      ? () =>
+          workforceService.updateEmployee(employeeId, {
+            name: form.name,
+            phone: form.phone,
+            expectedRowVersion: employee.value!.rowVersion,
+          })
+      : () => workforceService.hire({ ...form })
+  await run(action, {
+    success: editing ? '员工资料已保存' : '员工已入职',
+    fallback: '保存失败',
+    handled: (error) => {
+      if (isErrorType(error, 'CONCURRENT_CONFLICT')) {
+        conflictError.value = '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖'
+        return true
+      }
+      return false
+    },
+    onSuccess: async (saved) => {
       allowLeave()
-      await router.push(`/workforce/employees/${employeeId}`)
-    } else {
-      const created = await workforceService.hire({ ...form })
-      ElMessage.success('员工已入职')
-      allowLeave()
-      await router.push(`/workforce/employees/${created.employeeBusinessId}`)
-    }
-  } catch (error) {
-    formError.value = isErrorType(error, 'CONCURRENT_CONFLICT')
-      ? '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖'
-      : userMessageOf(error, '保存失败')
-  } finally {
-    saving.value = false
-  }
+      await router.push(
+        editing
+          ? `/workforce/employees/${employeeId}`
+          : `/workforce/employees/${saved.employeeBusinessId}`,
+      )
+    },
+  })
 }
 
 function cancel(): void {
@@ -105,19 +125,26 @@ onMounted(load)
       <div class="editor-grid">
         <el-form v-if="!loading" label-width="96px" class="form" @submit.prevent>
           <el-alert
-            v-if="formError"
+            v-if="formAlert"
             type="error"
             :closable="false"
-            :title="formError"
+            :title="formAlert"
             class="alert"
           />
-          <el-form-item label="姓名" required>
+          <el-form-item label="姓名" required :error="validationErrors.name || fieldError('name')">
             <el-input v-model="form.name" aria-label="姓名" />
           </el-form-item>
-          <el-form-item label="电话" required>
+          <el-form-item
+            label="电话"
+            required
+            :error="validationErrors.phone || fieldError('phone')"
+          >
             <el-input v-model="form.phone" aria-label="电话" />
           </el-form-item>
-          <el-form-item label="生效日期">
+          <el-form-item
+            label="生效日期"
+            :error="validationErrors.effectiveDate || fieldError('effectiveDate')"
+          >
             <el-date-picker
               v-model="form.effectiveDate"
               type="date"

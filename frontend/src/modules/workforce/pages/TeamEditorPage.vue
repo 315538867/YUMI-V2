@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -16,9 +16,10 @@ const editing = teamId !== ''
 const team = ref<TeamView | null>(null)
 const employees = ref<EmployeeView[]>([])
 const loading = ref(true)
-const saving = ref(false)
 const errorText = ref('')
-const formError = ref('')
+const conflictError = ref('')
+const validationErrors = reactive<Record<string, string>>({})
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
 
 const form = reactive({
   name: '',
@@ -27,6 +28,9 @@ const form = reactive({
 const initialSnapshot = ref(JSON.stringify(form))
 const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value)
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const formAlert = computed(
+  () => conflictError.value || otherFieldErrors('name', 'memberEmployeeBusinessIds').join('；'),
+)
 
 const memberNames = computed(() =>
   form.memberEmployeeBusinessIds
@@ -58,40 +62,50 @@ async function load(): Promise<void> {
   }
 }
 
-async function save(): Promise<void> {
+function validate(): boolean {
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
+  }
   if (form.name.trim() === '') {
-    formError.value = '请填写小组名称'
-    return
+    validationErrors.name = '请填写小组名称'
   }
   if (form.memberEmployeeBusinessIds.length === 0) {
-    formError.value = '请至少选择一名成员'
+    validationErrors.memberEmployeeBusinessIds = '请至少选择一名成员'
+  }
+  return Object.keys(validationErrors).length === 0
+}
+
+async function save(): Promise<void> {
+  conflictError.value = ''
+  if (!validate()) {
     return
   }
-  saving.value = true
-  formError.value = ''
-  try {
-    if (editing && team.value !== null) {
-      await workforceService.updateTeam(teamId, {
-        name: form.name,
-        memberEmployeeBusinessIds: form.memberEmployeeBusinessIds,
-        expectedRowVersion: team.value.rowVersion,
-      })
-      ElMessage.success('小组已保存')
+  const action =
+    editing && team.value !== null
+      ? () =>
+          workforceService.updateTeam(teamId, {
+            name: form.name,
+            memberEmployeeBusinessIds: form.memberEmployeeBusinessIds,
+            expectedRowVersion: team.value!.rowVersion,
+          })
+      : () => workforceService.createTeam({ ...form })
+  await run(action, {
+    success: editing ? '小组已保存' : '小组已创建',
+    fallback: '保存失败',
+    handled: (error) => {
+      if (isErrorType(error, 'CONCURRENT_CONFLICT')) {
+        conflictError.value = '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖'
+        return true
+      }
+      return false
+    },
+    onSuccess: async (saved) => {
       allowLeave()
-      await router.push(`/workforce/teams/${teamId}`)
-    } else {
-      const created = await workforceService.createTeam({ ...form })
-      ElMessage.success('小组已创建')
-      allowLeave()
-      await router.push(`/workforce/teams/${created.teamBusinessId}`)
-    }
-  } catch (error) {
-    formError.value = isErrorType(error, 'CONCURRENT_CONFLICT')
-      ? '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖'
-      : userMessageOf(error, '保存失败')
-  } finally {
-    saving.value = false
-  }
+      await router.push(
+        editing ? `/workforce/teams/${teamId}` : `/workforce/teams/${saved.teamBusinessId}`,
+      )
+    },
+  })
 }
 
 function cancel(): void {
@@ -114,16 +128,26 @@ onMounted(load)
       <div class="editor-grid">
         <el-form v-if="!loading" label-width="96px" class="form" @submit.prevent>
           <el-alert
-            v-if="formError"
+            v-if="formAlert"
             type="error"
             :closable="false"
-            :title="formError"
+            :title="formAlert"
             class="alert"
           />
-          <el-form-item label="小组名称" required>
+          <el-form-item
+            label="小组名称"
+            required
+            :error="validationErrors.name || fieldError('name')"
+          >
             <el-input v-model="form.name" aria-label="小组名称" />
           </el-form-item>
-          <el-form-item label="成员" required>
+          <el-form-item
+            label="成员"
+            required
+            :error="
+              validationErrors.memberEmployeeBusinessIds || fieldError('memberEmployeeBusinessIds')
+            "
+          >
             <el-select
               v-model="form.memberEmployeeBusinessIds"
               multiple

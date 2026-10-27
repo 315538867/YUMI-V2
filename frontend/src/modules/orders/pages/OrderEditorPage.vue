@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type { CustomerView } from '@/modules/customer/contracts'
@@ -37,8 +37,10 @@ const customers = ref<CustomerView[]>([])
 const products = ref<ProductView[]>([])
 const items = ref<DraftItem[]>([])
 const loading = ref(true)
-const saving = ref(false)
 const errorText = ref('')
+const conflictError = ref('')
+const validationErrors = reactive<Record<string, string>>({})
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
 const previewVisible = ref(false)
 const recipient = reactive({ name: '', phone: '', address: '' })
 const note = ref('')
@@ -50,6 +52,21 @@ const isDirty = computed(
       initialSnapshot.value,
 )
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const formAlert = computed(
+  () =>
+    conflictError.value ||
+    validationErrors.items ||
+    otherFieldErrors(
+      'customerBusinessId',
+      'orderDate',
+      'expectedDeliveryDate',
+      'name',
+      'phone',
+      'address',
+      'quantity',
+      'unitPrice',
+    ).join('；'),
+)
 const form = reactive({
   customerBusinessId: '',
   orderDate: new Date().toISOString().slice(0, 10),
@@ -166,45 +183,57 @@ function removeItem(index: number): void {
   items.value.splice(index, 1)
 }
 
+function itemError(index: number, field: string): string {
+  return validationErrors[`item-${index}-${field}`] || fieldError(field)
+}
+
 function validate(): boolean {
+  conflictError.value = ''
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
+  }
   if (form.customerBusinessId === '') {
-    errorText.value = '请选择客户'
-    return false
+    validationErrors.customerBusinessId = '请选择客户'
+  }
+  if (form.orderDate === '') {
+    validationErrors.orderDate = '请选择订单日期'
+  }
+  if (form.expectedDeliveryDate === '') {
+    validationErrors.expectedDeliveryDate = '请选择预计交付日期'
   }
   if (items.value.length === 0) {
-    errorText.value = '请至少录入一条商品明细'
-    return false
+    validationErrors.items = '请至少录入一条商品明细'
   }
-  for (const item of items.value) {
-    if (item.productBusinessId === '' || item.schemeBusinessId === '') {
-      errorText.value = '每条明细都必须选择商品与方案'
-      return false
+  items.value.forEach((item, index) => {
+    if (item.productBusinessId === '') {
+      validationErrors[`item-${index}-product`] = '请选择商品'
+    }
+    if (item.schemeBusinessId === '') {
+      validationErrors[`item-${index}-scheme`] = '请选择方案'
     }
     if (!Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0) {
-      errorText.value = '订购数量必须大于 0'
-      return false
+      validationErrors[`item-${index}-quantity`] = '订购数量必须大于 0'
     }
     if (!/^\d+(\.\d{1,2})?$/.test(item.unitPrice) || Number(item.unitPrice) <= 0) {
-      errorText.value = '单件成交价必须大于 0 且最多两位小数'
-      return false
+      validationErrors[`item-${index}-unitPrice`] = '单件成交价必须大于 0 且最多两位小数'
     }
+  })
+  if (recipient.name.trim() === '') {
+    validationErrors.recName = '请填写收货人'
   }
-  if (
-    recipient.name.trim() === '' ||
-    recipient.phone.trim() === '' ||
-    recipient.address.trim() === ''
-  ) {
-    errorText.value = '请填写收货人、电话和地址'
-    return false
+  if (recipient.phone.trim() === '') {
+    validationErrors.recPhone = '请填写电话'
   }
-  return true
+  if (recipient.address.trim() === '') {
+    validationErrors.recAddress = '请填写地址'
+  }
+  return Object.keys(validationErrors).length === 0
 }
 
 function requestPreview(): void {
   if (!validate()) {
     return
   }
-  errorText.value = ''
   previewVisible.value = true
 }
 
@@ -213,7 +242,6 @@ async function confirmCreate(): Promise<void> {
     previewVisible.value = false
     return
   }
-  saving.value = true
   try {
     const orderItems = await Promise.all(
       items.value.map(async (item) => {
@@ -246,16 +274,20 @@ async function confirmCreate(): Promise<void> {
       note: note.value.trim() === '' ? null : note.value.trim(),
       items: orderItems,
     }
-    const created = await orderService.create(input)
-    ElMessage.success('订单已确认')
+    await run(() => orderService.create(input), {
+      success: '订单已确认',
+      fallback: '订单保存失败',
+      onError: () => {
+        previewVisible.value = false
+      },
+      onSuccess: async (created) => {
+        previewVisible.value = false
+        allowLeave()
+        await router.replace(`/orders/${created.orderBusinessId}`)
+      },
+    })
+  } catch {
     previewVisible.value = false
-    allowLeave()
-    await router.replace(`/orders/${created.orderBusinessId}`)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '订单保存失败')
-    previewVisible.value = false
-  } finally {
-    saving.value = false
   }
 }
 
@@ -285,8 +317,12 @@ onMounted(load)
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
 
     <el-form v-if="!loading" label-width="110px" class="form">
+      <el-alert v-if="formAlert" type="error" :closable="false" :title="formAlert" class="alert" />
       <h2>1. 客户与交付</h2>
-      <el-form-item label="客户">
+      <el-form-item
+        label="客户"
+        :error="validationErrors.customerBusinessId || fieldError('customerBusinessId')"
+      >
         <el-select v-model="form.customerBusinessId" filterable @change="applyCustomer">
           <el-option
             v-for="customer in customers"
@@ -296,15 +332,22 @@ onMounted(load)
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="订单日期">
+      <el-form-item label="订单日期" :error="validationErrors.orderDate || fieldError('orderDate')">
         <el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD" />
       </el-form-item>
-      <el-form-item label="预计交付">
+      <el-form-item
+        label="预计交付"
+        :error="validationErrors.expectedDeliveryDate || fieldError('expectedDeliveryDate')"
+      >
         <el-date-picker v-model="form.expectedDeliveryDate" type="date" value-format="YYYY-MM-DD" />
       </el-form-item>
-      <el-form-item label="收货人"><el-input v-model="recipient.name" /></el-form-item>
-      <el-form-item label="电话"><el-input v-model="recipient.phone" /></el-form-item>
-      <el-form-item label="地址">
+      <el-form-item label="收货人" :error="validationErrors.recName">
+        <el-input v-model="recipient.name" />
+      </el-form-item>
+      <el-form-item label="电话" :error="validationErrors.recPhone">
+        <el-input v-model="recipient.phone" />
+      </el-form-item>
+      <el-form-item label="地址" :error="validationErrors.recAddress">
         <el-input v-model="recipient.address" type="textarea" :rows="2" />
       </el-form-item>
       <el-form-item label="订单说明">
@@ -332,7 +375,7 @@ onMounted(load)
           </el-button>
         </div>
         <el-form label-width="110px">
-          <el-form-item label="商品">
+          <el-form-item label="商品" :error="itemError(index, 'product')">
             <el-select v-model="item.productBusinessId" filterable @change="loadSchemes(item)">
               <el-option
                 v-for="product in products"
@@ -342,7 +385,7 @@ onMounted(load)
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="方案">
+          <el-form-item label="方案" :error="itemError(index, 'scheme')">
             <el-select v-model="item.schemeBusinessId" filterable @change="applyScheme(item)">
               <el-option
                 v-for="scheme in item.schemes"
@@ -359,10 +402,10 @@ onMounted(load)
               <el-option label="缝边剪袋" value="SEAM_CUTTING" />
             </el-select>
           </el-form-item>
-          <el-form-item label="订购数量">
+          <el-form-item label="订购数量" :error="itemError(index, 'quantity')">
             <el-input v-model.number="item.quantity" type="number" />
           </el-form-item>
-          <el-form-item label="单件成交价">
+          <el-form-item label="单件成交价" :error="itemError(index, 'unitPrice')">
             <el-input v-model="item.unitPrice" />
           </el-form-item>
           <el-form-item label="胶水来源">

@@ -132,3 +132,12 @@ test('编辑页未保存离开需要确认', async ({ page, request }) => {
   await box.getByRole('button', { name: '离开' }).click()
   await expect(page).toHaveURL(new RegExp(`/customers/${customer.customerBusinessId}$`))
 })
+
+test('新建客户字段校验内联展示且不离开页面', async ({ page }) => {
+  await login(page)
+  await page.goto('/customers/new')
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page.getByText('请填写客户名称')).toBeVisible()
+  await expect(page.getByText('请填写联系人')).toBeVisible()
+  await expect(page).toHaveURL(/\/customers\/new$/)
+})

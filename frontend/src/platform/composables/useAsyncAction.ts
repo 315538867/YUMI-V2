@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ApiClientError } from '@/platform/services/apiClient'
 import { userMessageOf } from '@/platform/services/errorMessage'
@@ -8,6 +8,8 @@ interface RunOptions<T> {
   fallback?: string
   onSuccess?: (value: T) => void
   onError?: (error: unknown) => void
+  /** 返回 true 表示页面已内联处理，不再弹 toast。 */
+  handled?: (error: unknown) => boolean
 }
 
 /**
@@ -16,6 +18,23 @@ interface RunOptions<T> {
 export function useAsyncAction() {
   const loading = ref(false)
   const fieldErrors = ref<Record<string, string>>({})
+  const fieldErrorSummary = computed(() => Object.values(fieldErrors.value).join('；'))
+
+  /** 兼容后端路径型字段名（如 definition.name、items[0].quantity）。 */
+  function fieldError(...keys: string[]): string {
+    for (const key of keys) {
+      if (fieldErrors.value[key]) {
+        return fieldErrors.value[key]
+      }
+      const match = Object.entries(fieldErrors.value).find(
+        ([field]) => field.endsWith(`.${key}`) || field.includes(`[${key}]`),
+      )
+      if (match) {
+        return match[1]
+      }
+    }
+    return ''
+  }
 
   async function run<T>(
     action: () => Promise<T>,
@@ -35,7 +54,7 @@ export function useAsyncAction() {
         fieldErrors.value = Object.fromEntries(
           error.fieldIssues.map((issue) => [issue.field, issue.reason]),
         )
-      } else {
+      } else if (!options.handled?.(error)) {
         ElMessage.error(userMessageOf(error, options.fallback ?? '操作失败，请稍后重试'))
       }
       options.onError?.(error)
@@ -45,5 +64,17 @@ export function useAsyncAction() {
     }
   }
 
-  return { loading, fieldErrors, run }
+  /** 未被指定字段消费的错误，用表单内汇总展示，避免静默。 */
+  function otherFieldErrors(...keys: string[]): string[] {
+    return Object.entries(fieldErrors.value)
+      .filter(
+        ([field]) =>
+          !keys.some(
+            (key) => field === key || field.endsWith(`.${key}`) || field.includes(`[${key}]`),
+          ),
+      )
+      .map(([, reason]) => reason)
+  }
+
+  return { loading, fieldErrors, fieldErrorSummary, fieldError, otherFieldErrors, run }
 }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import type { CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -15,10 +15,11 @@ const customerId =
   typeof route.params.customerBusinessId === 'string' ? route.params.customerBusinessId : ''
 const editing = customerId !== ''
 const loading = ref(editing)
-const saving = ref(false)
 const errorText = ref('')
-const formError = ref('')
+const conflictError = ref('')
 const customer = ref<CustomerView | null>(null)
+const validationErrors = reactive<Record<string, string>>({})
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
 
 const form = reactive({
   name: '',
@@ -29,6 +30,11 @@ const form = reactive({
 const initialSnapshot = ref(JSON.stringify(form))
 const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value)
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const formAlert = computed(
+  () =>
+    conflictError.value ||
+    otherFieldErrors('name', 'contactName', 'phone', 'defaultAddress').join('；'),
+)
 
 function previewStatus(): string {
   return editing ? (customer.value?.status ?? 'ACTIVE') : 'ACTIVE'
@@ -57,40 +63,55 @@ async function load(): Promise<void> {
   }
 }
 
+function validate(): boolean {
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
+  }
+  if (form.name.trim() === '') {
+    validationErrors.name = '请填写客户名称'
+  }
+  if (form.contactName.trim() === '') {
+    validationErrors.contactName = '请填写联系人'
+  }
+  if (form.phone.trim() === '') {
+    validationErrors.phone = '请填写电话'
+  }
+  if (form.defaultAddress.trim() === '') {
+    validationErrors.defaultAddress = '请填写默认收货地址'
+  }
+  return Object.keys(validationErrors).length === 0
+}
+
 async function save(): Promise<void> {
-  if (
-    form.name.trim() === '' ||
-    form.contactName.trim() === '' ||
-    form.phone.trim() === '' ||
-    form.defaultAddress.trim() === ''
-  ) {
-    formError.value = '请填写客户名称、联系人、电话和默认收货地址'
+  conflictError.value = ''
+  if (!validate()) {
     return
   }
-  saving.value = true
-  formError.value = ''
-  try {
-    if (editing && customer.value !== null) {
-      await customerService.update(customerId, {
-        ...form,
-        expectedRowVersion: customer.value.rowVersion,
-      })
-      ElMessage.success('客户资料已保存')
+  const action =
+    editing && customer.value !== null
+      ? () =>
+          customerService.update(customerId, {
+            ...form,
+            expectedRowVersion: customer.value!.rowVersion,
+          })
+      : () => customerService.create({ ...form })
+  await run(action, {
+    success: editing ? '客户资料已保存' : '客户已创建',
+    fallback: '保存失败',
+    handled: (error) => {
+      if (isErrorType(error, 'CONCURRENT_CONFLICT')) {
+        conflictError.value = '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖'
+        return true
+      }
+      return false
+    },
+    onSuccess: async (saved) => {
       allowLeave()
-      await router.push(`/customers/${customerId}`)
-    } else {
-      const created = await customerService.create({ ...form })
-      ElMessage.success('客户已创建')
-      allowLeave()
-      await router.push(`/customers/${created.customerBusinessId}`)
-    }
-  } catch (error) {
-    formError.value = isErrorType(error, 'CONCURRENT_CONFLICT')
-      ? '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖'
-      : userMessageOf(error, '保存失败')
-  } finally {
-    saving.value = false
-  }
+      await router.push(
+        editing ? `/customers/${customerId}` : `/customers/${saved.customerBusinessId}`,
+      )
+    },
+  })
 }
 
 function cancel(): void {
@@ -113,24 +134,40 @@ onMounted(load)
       <div class="editor-grid">
         <el-form v-if="!loading" label-width="96px" class="form" @submit.prevent>
           <el-alert
-            v-if="formError"
+            v-if="formAlert"
             type="error"
             :closable="false"
-            :title="formError"
+            :title="formAlert"
             class="alert"
           />
           <h2>基本资料</h2>
-          <el-form-item label="客户名称" required>
+          <el-form-item
+            label="客户名称"
+            required
+            :error="validationErrors.name || fieldError('name')"
+          >
             <el-input v-model="form.name" aria-label="客户名称" />
           </el-form-item>
-          <el-form-item label="联系人" required>
+          <el-form-item
+            label="联系人"
+            required
+            :error="validationErrors.contactName || fieldError('contactName')"
+          >
             <el-input v-model="form.contactName" aria-label="联系人" />
           </el-form-item>
-          <el-form-item label="电话" required>
+          <el-form-item
+            label="电话"
+            required
+            :error="validationErrors.phone || fieldError('phone')"
+          >
             <el-input v-model="form.phone" aria-label="电话" />
           </el-form-item>
           <h2>默认收货信息</h2>
-          <el-form-item label="默认地址" required>
+          <el-form-item
+            label="默认地址"
+            required
+            :error="validationErrors.defaultAddress || fieldError('defaultAddress')"
+          >
             <el-input
               v-model="form.defaultAddress"
               type="textarea"

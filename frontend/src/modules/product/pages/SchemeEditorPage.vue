@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type {
@@ -25,8 +25,10 @@ const editing = schemeId !== ''
 const product = ref<ProductView | null>(null)
 const scheme = ref<SchemeView | null>(null)
 const loading = ref(true)
-const saving = ref(false)
 const errorText = ref('')
+const conflictError = ref('')
+const validationErrors = reactive<Record<string, string>>({})
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
 const budgetPreview = ref<SchemeBudgetView | null>(null)
 const previewLoading = ref(false)
 const previewError = ref('')
@@ -36,6 +38,7 @@ const isDirty = computed(
   () => loading.value === false && JSON.stringify(form) !== initialSnapshot.value,
 )
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const formAlert = computed(() => conflictError.value || otherFieldErrors('name').join('；'))
 
 const form = reactive({
   name: '',
@@ -141,27 +144,39 @@ async function save(): Promise<void> {
   if (product.value === null) {
     return
   }
-  saving.value = true
-  errorText.value = ''
-  try {
-    if (editing && scheme.value !== null) {
-      await productService.updateScheme(
-        schemeId,
-        input(),
-        product.value.contentVersion,
-        scheme.value.rowVersion,
-      )
-    } else {
-      await productService.createScheme(productId, input(), product.value.contentVersion)
-    }
-    ElMessage.success('方案已保存，预算由服务端重新计算')
-    allowLeave()
-    await router.replace(`/products/${productId}`)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '方案保存失败')
-  } finally {
-    saving.value = false
+  conflictError.value = ''
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
   }
+  if (form.name.trim() === '') {
+    validationErrors.name = '请填写方案名称'
+    return
+  }
+  const action: () => Promise<unknown> =
+    editing && scheme.value !== null
+      ? () =>
+          productService.updateScheme(
+            schemeId,
+            input(),
+            product.value!.contentVersion,
+            scheme.value!.rowVersion,
+          )
+      : () => productService.createScheme(productId, input(), product.value!.contentVersion)
+  await run<unknown>(action, {
+    success: '方案已保存，预算由服务端重新计算',
+    fallback: '方案保存失败',
+    handled: (error) => {
+      if (isErrorType(error, 'CONCURRENT_CONFLICT')) {
+        conflictError.value = '方案已被其他操作修改，请重新打开后再保存'
+        return true
+      }
+      return false
+    },
+    onSuccess: async () => {
+      allowLeave()
+      await router.replace(`/products/${productId}`)
+    },
+  })
 }
 
 onMounted(load)
@@ -185,7 +200,18 @@ onMounted(load)
     />
     <div class="editor-grid">
       <el-form label-width="150px" class="form">
-        <el-form-item label="方案名称" required>
+        <el-alert
+          v-if="formAlert"
+          type="error"
+          :closable="false"
+          :title="formAlert"
+          class="alert"
+        />
+        <el-form-item
+          label="方案名称"
+          required
+          :error="validationErrors.name || fieldError('name')"
+        >
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="目标工序">

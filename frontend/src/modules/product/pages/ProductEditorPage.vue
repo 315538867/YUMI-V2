@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type {
@@ -71,8 +71,10 @@ const productId =
   typeof route.params.productBusinessId === 'string' ? route.params.productBusinessId : ''
 const editing = productId !== ''
 const loading = ref(true)
-const saving = ref(false)
 const errorText = ref('')
+const conflictError = ref('')
+const validationErrors = reactive<Record<string, string>>({})
+const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
 const configuration = ref<EntryConfiguration | null>(null)
 const original = ref<ProductView | null>(null)
 const budgetPreview = ref<SchemeBudgetView | null>(null)
@@ -84,6 +86,7 @@ const isDirty = computed(
   () => loading.value === false && JSON.stringify(form) !== initialSnapshot.value,
 )
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const formAlert = computed(() => conflictError.value || otherFieldErrors('name').join('；'))
 
 const form = reactive<EditorForm>({
   name: '',
@@ -253,25 +256,33 @@ onBeforeUnmount(() => {
 })
 
 async function save(): Promise<void> {
+  conflictError.value = ''
+  for (const key of Object.keys(validationErrors)) {
+    delete validationErrors[key]
+  }
   if (form.name.trim() === '') {
-    errorText.value = '请填写商品名称'
+    validationErrors.name = '请填写商品名称'
     return
   }
-  saving.value = true
-  errorText.value = ''
-  try {
-    const saved =
-      editing && original.value !== null
-        ? await productService.update(productId, definition(), original.value.rowVersion)
-        : await productService.create(definition())
-    ElMessage.success('商品已保存')
-    allowLeave()
-    await router.replace(`/products/${saved.productBusinessId}`)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '商品保存失败')
-  } finally {
-    saving.value = false
-  }
+  const action =
+    editing && original.value !== null
+      ? () => productService.update(productId, definition(), original.value!.rowVersion)
+      : () => productService.create(definition())
+  await run(action, {
+    success: '商品已保存',
+    fallback: '商品保存失败',
+    handled: (error) => {
+      if (isErrorType(error, 'CONCURRENT_CONFLICT')) {
+        conflictError.value = '商品已被其他操作修改，请重新打开后再保存'
+        return true
+      }
+      return false
+    },
+    onSuccess: async (saved) => {
+      allowLeave()
+      await router.replace(`/products/${saved.productBusinessId}`)
+    },
+  })
 }
 
 onMounted(load)
@@ -290,8 +301,19 @@ onMounted(load)
 
     <div class="editor-grid">
       <el-form v-if="!loading" label-width="128px" class="form">
+        <el-alert
+          v-if="formAlert"
+          type="error"
+          :closable="false"
+          :title="formAlert"
+          class="alert"
+        />
         <h2>1. 基本信息</h2>
-        <el-form-item label="商品名称" required>
+        <el-form-item
+          label="商品名称"
+          required
+          :error="validationErrors.name || fieldError('name')"
+        >
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="描述">
