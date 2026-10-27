@@ -59,7 +59,12 @@ onMounted(load)
   <section class="reasons-page">
     <div class="toolbar">
       <h1>缺陷原因</h1>
-      <PermissionButton permission="production.defect-reason.manage" type="primary" @click="dialogVisible = true">新增原因</PermissionButton>
+      <PermissionButton
+        permission="production.defect-reason.manage"
+        type="primary"
+        @click="dialogVisible = true"
+        >新增原因</PermissionButton
+      >
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table :data="reasons" border>

@@ -38,8 +38,7 @@ async function load(): Promise<void> {
 function open(team: TeamView | null): void {
   editing.value = team
   form.name = team?.name ?? ''
-  form.memberEmployeeBusinessIds =
-    team?.members.map((member) => member.employeeBusinessId) ?? []
+  form.memberEmployeeBusinessIds = team?.members.map((member) => member.employeeBusinessId) ?? []
   dialogVisible.value = true
 }
 
@@ -64,10 +63,7 @@ async function submit(): Promise<void> {
 
 async function deactivate(team: TeamView): Promise<void> {
   try {
-    await ElMessageBox.confirm(
-      `停用小组「${team.name}」？活动引用未释放时后端会拒绝。`,
-      '停用小组',
-    )
+    await ElMessageBox.confirm(`停用小组「${team.name}」？活动引用未释放时后端会拒绝。`, '停用小组')
     await workforceService.deactivateTeam(team.teamBusinessId, team.rowVersion)
     ElMessage.success('小组已停用')
     await load()
@@ -85,7 +81,9 @@ onMounted(load)
   <section class="team-page">
     <div class="toolbar">
       <h1>小组</h1>
-      <PermissionButton permission="workforce.team.manage" type="primary" @click="open(null)">新增小组</PermissionButton>
+      <PermissionButton permission="workforce.team.manage" type="primary" @click="open(null)"
+        >新增小组</PermissionButton
+      >
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="teams" empty-text="暂无小组" border>
@@ -114,7 +112,11 @@ onMounted(load)
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editing === null ? '新增小组' : '编辑小组'" width="520px">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editing === null ? '新增小组' : '编辑小组'"
+      width="520px"
+    >
       <el-form label-width="92px">
         <el-form-item label="小组名称" required>
           <el-input v-model="form.name" />

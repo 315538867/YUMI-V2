@@ -55,9 +55,9 @@ export const reportingService = {
     return api.query('/api/reporting/administration/versions')
   },
 
-  differences(versionBusinessId: string): Promise<
-    Array<{ differenceBusinessId: string; feedCode: string; detailText: string }>
-  > {
+  differences(
+    versionBusinessId: string,
+  ): Promise<Array<{ differenceBusinessId: string; feedCode: string; detailText: string }>> {
     return api.query(
       `/api/reporting/administration/versions/${encodeURIComponent(versionBusinessId)}/differences`,
     )

@@ -145,14 +145,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const requestIdFactory =
     options.requestIdFactory ??
     (() =>
-      globalThis.crypto?.randomUUID?.() ?? `req-${Date.now()}-${Math.random().toString(16).slice(2)}`)
+      globalThis.crypto?.randomUUID?.() ??
+      `req-${Date.now()}-${Math.random().toString(16).slice(2)}`)
   const tokenProvider = options.tokenProvider
 
-  async function send<T>(
-    path: string,
-    init: RequestInit,
-    requestId: string,
-  ): Promise<T> {
+  async function send<T>(path: string, init: RequestInit, requestId: string): Promise<T> {
     let response: Response
     try {
       const token = tokenProvider?.() ?? null
@@ -166,7 +163,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           ...(init.headers as Record<string, string> | undefined),
         },
       })
-    } catch (cause) {
+    } catch {
       throw new ApiClientError({
         type: ApiErrorTypes.NETWORK_FAILURE,
         code: 'NETWORK_FAILURE',
@@ -315,7 +312,9 @@ async function toApiClientError(response: Response, requestId: string): Promise<
 
   const body = payload as Record<string, unknown>
   const rawType = typeof body.type === 'string' ? body.type : ApiErrorTypes.SYSTEM_FAILURE
-  const type = (SERVER_ERROR_TYPES.has(rawType) ? rawType : ApiErrorTypes.SYSTEM_FAILURE) as ApiErrorType
+  const type = (
+    SERVER_ERROR_TYPES.has(rawType) ? rawType : ApiErrorTypes.SYSTEM_FAILURE
+  ) as ApiErrorType
   const issues = Array.isArray(body.fieldIssues)
     ? (body.fieldIssues as ApiFieldIssue[]).filter(
         (issue) => typeof issue?.field === 'string' && typeof issue?.reason === 'string',

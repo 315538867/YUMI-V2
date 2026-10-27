@@ -6,7 +6,10 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { TargetProcess, TaskView } from '@/modules/production/contracts'
-import { productionService, type AdjustTaskInput } from '@/modules/production/services/productionService'
+import {
+  productionService,
+  type AdjustTaskInput,
+} from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 
 const route = useRoute()
@@ -41,11 +44,9 @@ const verifiedItems = computed(
 )
 const processLocked = computed(() => verifiedItems.value.length > 0)
 const canAddItem = computed(() => task.value?.taskType !== 'REPAIR')
-const canRemoveItem = computed(
-  () => task.value?.taskType !== 'REPAIR' || form.items.length > 1,
-)
-const activeEmployees = computed(
-  () => employees.value.filter((employee) => employee.employmentStatus === 'EMPLOYED'),
+const canRemoveItem = computed(() => task.value?.taskType !== 'REPAIR' || form.items.length > 1)
+const activeEmployees = computed(() =>
+  employees.value.filter((employee) => employee.employmentStatus === 'EMPLOYED'),
 )
 const activeTeams = computed(() => teams.value.filter((team) => team.status === 'ACTIVE'))
 
@@ -73,13 +74,9 @@ async function load(): Promise<void> {
         productionSourceBusinessId: item.productionSourceBusinessId ?? '',
         plannedQuantity: item.plannedQuantity,
       }))
-    form.enteredStandardMinutes = Math.max(
-      1,
-      Math.round(loadedTask.taskStandardSeconds / 60),
-    )
+    form.enteredStandardMinutes = Math.max(1, Math.round(loadedTask.taskStandardSeconds / 60))
     form.workContent = loadedTask.otherTask?.workContent ?? ''
-    form.relatedProductBusinessId =
-      loadedTask.otherTask?.relatedProductBusinessId ?? ''
+    form.relatedProductBusinessId = loadedTask.otherTask?.relatedProductBusinessId ?? ''
     form.plannedQuantity = loadedTask.otherTask?.plannedQuantity ?? null
     form.overrideReason = ''
   } catch (error) {
@@ -120,8 +117,8 @@ function validate(): string | null {
       return '请填写整体标准分钟'
     }
     if (
-      form.relatedProductBusinessId.trim() !== ''
-      && (!form.plannedQuantity || form.plannedQuantity <= 0)
+      form.relatedProductBusinessId.trim() !== '' &&
+      (!form.plannedQuantity || form.plannedQuantity <= 0)
     ) {
       return '关联商品时必须填写计划数量'
     }
@@ -170,9 +167,7 @@ async function save(): Promise<void> {
             productionSourceBusinessId: item.productionSourceBusinessId.trim(),
             plannedQuantity: Number(item.plannedQuantity),
           })),
-      enteredStandardMinutes: isOtherTask.value
-        ? Number(form.enteredStandardMinutes)
-        : null,
+      enteredStandardMinutes: isOtherTask.value ? Number(form.enteredStandardMinutes) : null,
       otherTask: isOtherTask.value
         ? {
             workContent: form.workContent.trim(),
@@ -181,13 +176,10 @@ async function save(): Promise<void> {
                 ? null
                 : form.relatedProductBusinessId.trim(),
             plannedQuantity:
-              form.relatedProductBusinessId.trim() === ''
-                ? null
-                : Number(form.plannedQuantity),
+              form.relatedProductBusinessId.trim() === '' ? null : Number(form.plannedQuantity),
           }
         : null,
-      overrideReason:
-        form.overrideReason.trim() === '' ? null : form.overrideReason.trim(),
+      overrideReason: form.overrideReason.trim() === '' ? null : form.overrideReason.trim(),
     }
     await productionService.adjustTask(task.value.taskBusinessId, input)
     ElMessage.success('任务已调整')
@@ -207,9 +199,7 @@ onMounted(load)
     <header class="head">
       <div>
         <h1>调整任务{{ task ? ` ${task.taskNo}` : '' }}</h1>
-        <span class="meta">
-          已核验部分保留原日期、主体与标准；未核验部分按本次提交重新占用
-        </span>
+        <span class="meta"> 已核验部分保留原日期、主体与标准；未核验部分按本次提交重新占用 </span>
       </div>
       <el-button @click="router.push(`/production/tasks/${task?.taskBusinessId ?? ''}`)">
         返回详情
@@ -239,12 +229,7 @@ onMounted(load)
               :value="employee.employeeBusinessId"
             />
           </el-select>
-          <el-select
-            v-else
-            v-model="form.subjectBusinessId"
-            filterable
-            placeholder="选择小组"
-          >
+          <el-select v-else v-model="form.subjectBusinessId" filterable placeholder="选择小组">
             <el-option
               v-for="team in activeTeams"
               :key="team.teamBusinessId"
@@ -266,7 +251,10 @@ onMounted(load)
       <template v-if="!isOtherTask">
         <h2>工序与明细</h2>
         <el-form-item label="执行工序">
-          <el-select v-model="form.processCode" :disabled="processLocked || task.taskType === 'EXTRA_PRODUCTION'">
+          <el-select
+            v-model="form.processCode"
+            :disabled="processLocked || task.taskType === 'EXTRA_PRODUCTION'"
+          >
             <el-option label="制作" value="MAKING" />
             <el-option label="捏毛装袋" value="BAGGING" />
             <el-option label="缝边剪袋" value="SEAM_CUTTING" />
@@ -287,12 +275,7 @@ onMounted(load)
           </el-table-column>
           <el-table-column label="操作" width="90">
             <template #default="{ $index }">
-              <el-button
-                v-if="canRemoveItem"
-                link
-                type="danger"
-                @click="removeItem($index)"
-              >
+              <el-button v-if="canRemoveItem" link type="danger" @click="removeItem($index)">
                 移除
               </el-button>
             </template>
@@ -338,11 +321,7 @@ onMounted(load)
           />
         </el-form-item>
         <el-form-item v-if="form.relatedProductBusinessId.trim() !== ''" label="计划数量">
-          <el-input-number
-            v-model="form.plannedQuantity"
-            :min="1"
-            controls-position="right"
-          />
+          <el-input-number v-model="form.plannedQuantity" :min="1" controls-position="right" />
         </el-form-item>
       </template>
 

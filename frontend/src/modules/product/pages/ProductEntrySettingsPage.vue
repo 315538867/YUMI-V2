@@ -99,25 +99,20 @@ async function addStar(): Promise<void> {
   }
 }
 
-async function saveOption(
-  option: EntryConfiguration['processTimeOptions'][number],
-): Promise<void> {
+async function saveOption(option: EntryConfiguration['processTimeOptions'][number]): Promise<void> {
   if (configuration.value === null) {
     return
   }
   try {
-    configuration.value = await productService.saveProcessTimeOption(
-      option.optionBusinessId,
-      {
-        processCode: option.processCode,
-        optionCode: option.optionCode,
-        name: option.name,
-        standardMinutes: Number(option.standardMinutes),
-        sortOrder: Number(option.sortOrder),
-        active: true,
-        expectedRowVersion: configuration.value.rowVersion,
-      },
-    )
+    configuration.value = await productService.saveProcessTimeOption(option.optionBusinessId, {
+      processCode: option.processCode,
+      optionCode: option.optionCode,
+      name: option.name,
+      standardMinutes: Number(option.standardMinutes),
+      sortOrder: Number(option.sortOrder),
+      active: true,
+      expectedRowVersion: configuration.value.rowVersion,
+    })
     ElMessage.success('工序标准时间已保存')
   } catch (error) {
     errorText.value = userMessageOf(error, '工序标准时间保存失败')
@@ -211,16 +206,28 @@ onMounted(load)
       <el-form inline class="add-row">
         <el-input v-model="newStar.starCode" placeholder="星级代码" class="short" />
         <el-input v-model="newStar.name" placeholder="名称" class="short" />
-        <el-input v-model.number="newStar.standardMinutes" type="number" placeholder="分钟" class="tiny" />
-        <el-input v-model.number="newStar.sortOrder" type="number" placeholder="排序" class="tiny" />
+        <el-input
+          v-model.number="newStar.standardMinutes"
+          type="number"
+          placeholder="分钟"
+          class="tiny"
+        />
+        <el-input
+          v-model.number="newStar.sortOrder"
+          type="number"
+          placeholder="排序"
+          class="tiny"
+        />
         <el-button @click="addStar">新增星级</el-button>
       </el-form>
 
       <h2>工序标准时间选项</h2>
       <el-table :data="configuration.processTimeOptions" border size="small">
         <el-table-column label="工序" width="130">
-        <template #default="{ row }"><CodeTag category="product.targetProcess" :code="row.processCode" /></template>
-      </el-table-column>
+          <template #default="{ row }"
+            ><CodeTag category="product.targetProcess" :code="row.processCode"
+          /></template>
+        </el-table-column>
         <el-table-column prop="optionCode" label="选项代码" width="150" />
         <el-table-column label="名称" min-width="140">
           <template #default="{ row }"><el-input v-model="row.name" /></template>
@@ -249,8 +256,18 @@ onMounted(load)
         </el-select>
         <el-input v-model="newOption.optionCode" placeholder="选项代码" class="short" />
         <el-input v-model="newOption.name" placeholder="名称" class="short" />
-        <el-input v-model.number="newOption.standardMinutes" type="number" placeholder="分钟" class="tiny" />
-        <el-input v-model.number="newOption.sortOrder" type="number" placeholder="排序" class="tiny" />
+        <el-input
+          v-model.number="newOption.standardMinutes"
+          type="number"
+          placeholder="分钟"
+          class="tiny"
+        />
+        <el-input
+          v-model.number="newOption.sortOrder"
+          type="number"
+          placeholder="排序"
+          class="tiny"
+        />
         <el-button @click="addOption">新增选项</el-button>
       </el-form>
     </template>

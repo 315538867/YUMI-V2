@@ -217,7 +217,12 @@ async function confirmPayment(): Promise<void> {
   try {
     const vouchers = voucherId.value === null ? [] : [voucherId.value]
     if (paymentKind.value === 'payment') {
-      await cashService.receiveOrder(orderId, paymentForm.amount, paymentForm.businessDate, vouchers)
+      await cashService.receiveOrder(
+        orderId,
+        paymentForm.amount,
+        paymentForm.businessDate,
+        vouchers,
+      )
       ElMessage.success('收款已登记')
     } else {
       await cashService.refundOrder(orderId, paymentForm.amount, paymentForm.businessDate, vouchers)
@@ -227,7 +232,10 @@ async function confirmPayment(): Promise<void> {
     paymentDialog.value = false
     await load()
   } catch (error) {
-    errorText.value = userMessageOf(error, paymentKind.value === 'payment' ? '收款失败' : '退款失败')
+    errorText.value = userMessageOf(
+      error,
+      paymentKind.value === 'payment' ? '收款失败' : '退款失败',
+    )
     paymentPreview.value = false
   } finally {
     paying.value = false
@@ -238,7 +246,8 @@ async function openShipment(itemId?: string): Promise<void> {
   if (order.value === null || order.value.items.length === 0) {
     return
   }
-  const item = order.value.items.find((row) => row.orderItemBusinessId === itemId) ?? order.value.items[0]!
+  const item =
+    order.value.items.find((row) => row.orderItemBusinessId === itemId) ?? order.value.items[0]!
   shipmentForm.itemId = item.orderItemBusinessId
   shipmentForm.groupId = item.agreement.agreementGroupBusinessId
   shipmentForm.quantity = item.activeQuantity - item.agreement.fulfilledQuantity
@@ -395,7 +404,8 @@ async function viewVouchers(payment: OrderWorkspacePayment): Promise<void> {
   }
 }
 
-onMounted(load)</script>
+onMounted(load)
+</script>
 
 <template>
   <section v-loading="loading" class="order-detail">
@@ -421,7 +431,9 @@ onMounted(load)</script>
           <PermissionButton permission="order.ship" @click="openShipment()">
             登记发货
           </PermissionButton>
-          <PermissionButton permission="order.change" @click="openChange">变更价格</PermissionButton>
+          <PermissionButton permission="order.change" @click="openChange"
+            >变更价格</PermissionButton
+          >
           <PermissionButton permission="order.complete" type="primary" @click="complete">
             完成订单
           </PermissionButton>
@@ -430,11 +442,21 @@ onMounted(load)</script>
 
       <el-descriptions :column="3" border>
         <el-descriptions-item label="客户">{{ customerName }}</el-descriptions-item>
-        <el-descriptions-item label="当前应收"><MoneyText :value="order.fulfillment.currentReceivable" /></el-descriptions-item>
-        <el-descriptions-item label="已收"><MoneyText :value="order.fulfillment.receivedAmount" /></el-descriptions-item>
-        <el-descriptions-item label="已退"><MoneyText :value="order.fulfillment.refundedAmount" /></el-descriptions-item>
-        <el-descriptions-item label="交付履约">{{ order.fulfillment.deliveryFulfilled ? '已满足' : '未满足' }}</el-descriptions-item>
-        <el-descriptions-item label="付款履约">{{ order.fulfillment.paymentFulfilled ? '已满足' : '未满足' }}</el-descriptions-item>
+        <el-descriptions-item label="当前应收"
+          ><MoneyText :value="order.fulfillment.currentReceivable"
+        /></el-descriptions-item>
+        <el-descriptions-item label="已收"
+          ><MoneyText :value="order.fulfillment.receivedAmount"
+        /></el-descriptions-item>
+        <el-descriptions-item label="已退"
+          ><MoneyText :value="order.fulfillment.refundedAmount"
+        /></el-descriptions-item>
+        <el-descriptions-item label="交付履约">{{
+          order.fulfillment.deliveryFulfilled ? '已满足' : '未满足'
+        }}</el-descriptions-item>
+        <el-descriptions-item label="付款履约">{{
+          order.fulfillment.paymentFulfilled ? '已满足' : '未满足'
+        }}</el-descriptions-item>
         <el-descriptions-item label="阻断原因" :span="3">
           {{ order.fulfillment.blockingReasons.join('；') || '无' }}
         </el-descriptions-item>
@@ -471,8 +493,7 @@ onMounted(load)</script>
             </el-table-column>
             <el-table-column label="收货信息" min-width="220">
               <template #default="{ row }">
-                {{ row.agreement.recipient.customerName }} ·
-                {{ row.agreement.recipient.phone }} ·
+                {{ row.agreement.recipient.customerName }} · {{ row.agreement.recipient.phone }} ·
                 {{ row.agreement.recipient.address }}
               </template>
             </el-table-column>
@@ -484,7 +505,9 @@ onMounted(load)</script>
             <el-table-column prop="productName" label="商品" min-width="160" />
             <el-table-column prop="demandBusinessId" label="需求" min-width="200" />
             <el-table-column label="目标工序" width="120">
-              <template #default="{ row }"><CodeTag category="production.targetProcess" :code="row.targetProcess" /></template>
+              <template #default="{ row }"
+                ><CodeTag category="production.targetProcess" :code="row.targetProcess"
+              /></template>
             </el-table-column>
             <el-table-column prop="required" label="需求数量" width="100" />
             <el-table-column prop="qualified" label="合格完成" width="100" />
@@ -499,11 +522,18 @@ onMounted(load)</script>
 
         <el-tab-pane label="发货记录" name="shipments">
           <el-empty v-if="shipments.length === 0" description="尚无发货记录" />
-          <el-card v-for="shipment in shipments" :key="shipment.shipmentBusinessId" class="record-card">
+          <el-card
+            v-for="shipment in shipments"
+            :key="shipment.shipmentBusinessId"
+            class="record-card"
+          >
             <template #header>
               <div class="record-head">
                 <strong>{{ shipment.shipmentNo }}</strong>
-                <span class="meta"><DateTimeText :value="shipment.shippedAt" /> · {{ shipment.trackingNo || '未填物流单号' }}</span>
+                <span class="meta"
+                  ><DateTimeText :value="shipment.shippedAt" /> ·
+                  {{ shipment.trackingNo || '未填物流单号' }}</span
+                >
                 <el-tag :type="shipment.valid ? 'success' : 'info'" size="small">
                   {{ shipment.valid ? '有效' : '已更正' }}
                 </el-tag>
@@ -527,9 +557,17 @@ onMounted(load)</script>
                 </template>
               </el-table-column>
             </el-table>
-            <el-table v-if="shipment.corrections.length" :data="shipment.corrections" border size="small" class="corrections">
+            <el-table
+              v-if="shipment.corrections.length"
+              :data="shipment.corrections"
+              border
+              size="small"
+              class="corrections"
+            >
               <el-table-column label="更正类型" width="130">
-                <template #default="{ row }"><CodeTag category="order.correctionType" :code="row.correctionType" /></template>
+                <template #default="{ row }"
+                  ><CodeTag category="order.correctionType" :code="row.correctionType"
+                /></template>
               </el-table-column>
               <el-table-column prop="quantityDelta" label="数量变化" width="100" />
               <el-table-column prop="reasonText" label="原因" min-width="220" />
@@ -591,29 +629,51 @@ onMounted(load)</script>
       <el-button class="back" @click="router.push('/orders')">返回列表</el-button>
     </template>
 
-    <el-dialog v-model="paymentDialog" :title="paymentKind === 'payment' ? '登记订单实际收款' : '登记订单实际退款'" width="480px">
+    <el-dialog
+      v-model="paymentDialog"
+      :title="paymentKind === 'payment' ? '登记订单实际收款' : '登记订单实际退款'"
+      width="480px"
+    >
       <el-form label-width="100px">
         <el-form-item label="本次金额"><el-input v-model="paymentForm.amount" /></el-form-item>
         <el-form-item label="业务日期">
-          <el-date-picker v-model="paymentForm.businessDate" type="date" value-format="YYYY-MM-DD" />
+          <el-date-picker
+            v-model="paymentForm.businessDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+          />
         </el-form-item>
         <el-form-item label="凭证">
-          <BusinessFileUpload v-model="voucherId" permission-code="finance.read" label="上传凭证（可选）" />
+          <BusinessFileUpload
+            v-model="voucherId"
+            permission-code="finance.read"
+            label="上传凭证（可选）"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="paymentDialog = false">取消</el-button>
-        <el-button type="primary" @click="requestPaymentPreview">核对本次{{ paymentKind === 'payment' ? '收款' : '退款' }}</el-button>
+        <el-button type="primary" @click="requestPaymentPreview"
+          >核对本次{{ paymentKind === 'payment' ? '收款' : '退款' }}</el-button
+        >
       </template>
     </el-dialog>
 
-    <el-dialog v-model="paymentPreview" :title="paymentKind === 'payment' ? '确认订单实际收款' : '确认订单实际退款'" width="440px">
+    <el-dialog
+      v-model="paymentPreview"
+      :title="paymentKind === 'payment' ? '确认订单实际收款' : '确认订单实际退款'"
+      width="440px"
+    >
       <el-descriptions :column="1" border>
         <el-descriptions-item label="订单">{{ order?.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="客户">{{ customerName }}</el-descriptions-item>
-        <el-descriptions-item label="本次金额"><MoneyText :value="{ amount: paymentForm.amount, currency: 'CNY' }" /></el-descriptions-item>
+        <el-descriptions-item label="本次金额"
+          ><MoneyText :value="{ amount: paymentForm.amount, currency: 'CNY' }"
+        /></el-descriptions-item>
         <el-descriptions-item label="业务日期">{{ paymentForm.businessDate }}</el-descriptions-item>
-        <el-descriptions-item label="凭证">{{ voucherId ? '已上传' : '未附凭证' }}</el-descriptions-item>
+        <el-descriptions-item label="凭证">{{
+          voucherId ? '已上传' : '未附凭证'
+        }}</el-descriptions-item>
       </el-descriptions>
       <template #footer>
         <el-button @click="paymentPreview = false">返回修改</el-button>
@@ -625,12 +685,20 @@ onMounted(load)</script>
 
     <el-dialog v-model="shipmentDialog" title="登记本次发货" width="480px">
       <el-form label-width="100px">
-        <el-form-item label="交付约定"><el-input v-model="shipmentForm.groupId" disabled /></el-form-item>
+        <el-form-item label="交付约定"
+          ><el-input v-model="shipmentForm.groupId" disabled
+        /></el-form-item>
         <el-form-item label="生产来源"><el-input v-model="shipmentForm.sourceId" /></el-form-item>
-        <el-form-item label="数量"><el-input v-model.number="shipmentForm.quantity" type="number" /></el-form-item>
+        <el-form-item label="数量"
+          ><el-input v-model.number="shipmentForm.quantity" type="number"
+        /></el-form-item>
         <el-form-item label="物流单号"><el-input v-model="shipmentForm.trackingNo" /></el-form-item>
         <el-form-item label="发货日期">
-          <el-date-picker v-model="shipmentForm.businessDate" type="date" value-format="YYYY-MM-DD" />
+          <el-date-picker
+            v-model="shipmentForm.businessDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -653,7 +721,9 @@ onMounted(load)</script>
       </el-form>
       <template #footer>
         <el-button @click="correctionDialog = false">取消</el-button>
-        <el-button type="primary" :loading="correcting" @click="submitCorrection">提交更正</el-button>
+        <el-button type="primary" :loading="correcting" @click="submitCorrection"
+          >提交更正</el-button
+        >
       </template>
     </el-dialog>
 
@@ -673,7 +743,9 @@ onMounted(load)</script>
     <el-dialog v-model="voucherDialog" title="收付凭证" width="520px">
       <el-empty v-if="voucherFiles.length === 0" description="该记录未附凭证" />
       <div v-else class="voucher-list">
-        <a v-for="file in voucherFiles" :key="file.url" :href="file.url" target="_blank">{{ file.label }}</a>
+        <a v-for="file in voucherFiles" :key="file.url" :href="file.url" target="_blank">{{
+          file.label
+        }}</a>
       </div>
     </el-dialog>
   </section>

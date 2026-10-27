@@ -16,9 +16,8 @@ import { productService } from '@/modules/product/services/productService'
 const route = useRoute()
 const router = useRouter()
 const productId = String(route.params.productBusinessId ?? '')
-const schemeId = typeof route.params.schemeBusinessId === 'string'
-  ? route.params.schemeBusinessId
-  : ''
+const schemeId =
+  typeof route.params.schemeBusinessId === 'string' ? route.params.schemeBusinessId : ''
 const editing = schemeId !== ''
 const product = ref<ProductView | null>(null)
 const scheme = ref<SchemeView | null>(null)

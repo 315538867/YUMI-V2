@@ -13,7 +13,9 @@ async function login(page: import('@playwright/test').Page): Promise<void> {
   await page.getByPlaceholder('登录名').fill(ADMIN_LOGIN)
   await page.getByPlaceholder('口令').fill(ADMIN_PASSWORD)
   await page.getByRole('button', { name: '登录' }).click()
-  await expect(page).toHaveURL(/\/(customers|products|workforce|production|orders|after-sales|payroll|finance|reporting|settings)?$/)
+  await expect(page).toHaveURL(
+    /\/(customers|products|workforce|production|orders|after-sales|payroll|finance|reporting|settings)?$/,
+  )
 }
 
 async function tokenOf(page: import('@playwright/test').Page): Promise<string> {
@@ -32,7 +34,17 @@ test('未登录访问业务路由被重定向到登录页', async ({ page }) => 
 test('登录后统一导航可进入业务模块', async ({ page }) => {
   await login(page)
 
-  for (const label of ['客户', '商品', '人员与小组', '生产', '订单', '售后', '工资', '现金与成本', '报表']) {
+  for (const label of [
+    '客户',
+    '商品',
+    '人员与小组',
+    '生产',
+    '订单',
+    '售后',
+    '工资',
+    '现金与成本',
+    '报表',
+  ]) {
     await expect(page.getByRole('menuitem', { name: label })).toBeVisible()
   }
 

@@ -64,9 +64,17 @@ onMounted(load)
         <el-select v-model="form.businessId" filterable class="wide">
           <el-option
             v-for="employee in form.subjectType === 'EMPLOYEE' ? employees : teams"
-            :key="'employeeBusinessId' in employee ? employee.employeeBusinessId : employee.teamBusinessId"
+            :key="
+              'employeeBusinessId' in employee
+                ? employee.employeeBusinessId
+                : employee.teamBusinessId
+            "
             :label="employee.name"
-            :value="'employeeBusinessId' in employee ? employee.employeeBusinessId : employee.teamBusinessId"
+            :value="
+              'employeeBusinessId' in employee
+                ? employee.employeeBusinessId
+                : employee.teamBusinessId
+            "
           />
         </el-select>
       </el-form-item>

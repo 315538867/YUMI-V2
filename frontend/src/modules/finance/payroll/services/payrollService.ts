@@ -31,7 +31,9 @@ export const payrollService = {
     })
   },
 
-  calculate(periodBusinessId: string): Promise<{ employeeCount: number; referenceLineCount: number }> {
+  calculate(
+    periodBusinessId: string,
+  ): Promise<{ employeeCount: number; referenceLineCount: number }> {
     return api.command('/api/payroll/calculations', {
       idempotencyKey: newIdempotencyKey('payroll-calculate'),
       body: { periodBusinessId },

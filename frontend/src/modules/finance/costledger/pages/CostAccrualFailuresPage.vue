@@ -48,13 +48,23 @@ onMounted(load)
       <el-date-picker v-model="dates.endDate" type="date" value-format="YYYY-MM-DD" />
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-table :data="failures" border empty-text="暂无待恢复的归集失败">
       <el-table-column label="来源模块" width="140">
-        <template #default="{ row }"><CodeTag category="finance.costSourceModule" :code="row.sourceModule" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.costSourceModule" :code="row.sourceModule"
+        /></template>
       </el-table-column>
       <el-table-column label="来源类型" width="170">
-        <template #default="{ row }"><CodeTag category="finance.costSourceType" :code="row.sourceType" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.costSourceType" :code="row.sourceType"
+        /></template>
       </el-table-column>
       <el-table-column prop="sourceBusinessId" label="来源标识" min-width="200" />
       <el-table-column prop="lastError" label="失败原因" min-width="220" />
@@ -70,9 +80,26 @@ onMounted(load)
 </template>
 
 <style scoped>
-.failures-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 16px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.hint { color: var(--el-text-color-secondary); font-size: 12px; }
-.alert { margin-bottom: 12px; }
+.failures-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 16px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

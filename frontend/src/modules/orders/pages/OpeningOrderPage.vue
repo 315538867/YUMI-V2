@@ -138,23 +138,46 @@ onMounted(load)
     <el-form label-width="120px" class="form">
       <el-form-item label="客户">
         <el-select v-model="form.customerBusinessId" filterable>
-          <el-option v-for="customer in customers" :key="customer.customerBusinessId" :label="customer.name" :value="customer.customerBusinessId" />
+          <el-option
+            v-for="customer in customers"
+            :key="customer.customerBusinessId"
+            :label="customer.name"
+            :value="customer.customerBusinessId"
+          />
         </el-select>
       </el-form-item>
-      <el-form-item label="原订单参考"><el-input v-model="form.originalOrderReference" /></el-form-item>
-      <el-form-item label="订单日期"><el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD" /></el-form-item>
-      <el-form-item label="预计交付"><el-date-picker v-model="form.expectedDeliveryDate" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+      <el-form-item label="原订单参考"
+        ><el-input v-model="form.originalOrderReference"
+      /></el-form-item>
+      <el-form-item label="订单日期"
+        ><el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD"
+      /></el-form-item>
+      <el-form-item label="预计交付"
+        ><el-date-picker v-model="form.expectedDeliveryDate" type="date" value-format="YYYY-MM-DD"
+      /></el-form-item>
       <el-form-item label="商品">
         <el-select v-model="form.productBusinessId" filterable @change="loadSchemes">
-          <el-option v-for="product in products" :key="product.productBusinessId" :label="product.name" :value="product.productBusinessId" />
+          <el-option
+            v-for="product in products"
+            :key="product.productBusinessId"
+            :label="product.name"
+            :value="product.productBusinessId"
+          />
         </el-select>
       </el-form-item>
       <el-form-item label="方案">
         <el-select v-model="form.schemeBusinessId" filterable>
-          <el-option v-for="scheme in schemes" :key="scheme.schemeBusinessId" :label="scheme.name" :value="scheme.schemeBusinessId" />
+          <el-option
+            v-for="scheme in schemes"
+            :key="scheme.schemeBusinessId"
+            :label="scheme.name"
+            :value="scheme.schemeBusinessId"
+          />
         </el-select>
       </el-form-item>
-      <el-form-item label="接管数量"><el-input v-model.number="form.quantity" type="number" /></el-form-item>
+      <el-form-item label="接管数量"
+        ><el-input v-model.number="form.quantity" type="number"
+      /></el-form-item>
       <el-form-item label="单件价格"><el-input v-model="form.unitPrice" /></el-form-item>
       <el-form-item label="当前阶段">
         <el-select v-model="form.stageCode">
@@ -166,16 +189,36 @@ onMounted(load)
       </el-form-item>
       <el-form-item label="收货人"><el-input v-model="form.recipientName" /></el-form-item>
       <el-form-item label="电话"><el-input v-model="form.recipientPhone" /></el-form-item>
-      <el-form-item label="地址"><el-input v-model="form.recipientAddress" type="textarea" :rows="2" /></el-form-item>
-      <el-form-item label="接管说明"><el-input v-model="form.note" type="textarea" :rows="2" /></el-form-item>
+      <el-form-item label="地址"
+        ><el-input v-model="form.recipientAddress" type="textarea" :rows="2"
+      /></el-form-item>
+      <el-form-item label="接管说明"
+        ><el-input v-model="form.note" type="textarea" :rows="2"
+      /></el-form-item>
     </el-form>
   </section>
 </template>
 
 <style scoped>
-.opening-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-.head { display: flex; justify-content: space-between; align-items: center; }
-h1 { margin: 0; font-size: 20px; }
-.form { max-width: 680px; }
-.alert { margin-top: 12px; }
+.opening-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+.form {
+  max-width: 680px;
+}
+.alert {
+  margin-top: 12px;
+}
 </style>

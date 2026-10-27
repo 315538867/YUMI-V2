@@ -21,7 +21,11 @@ export type CodeCategory = keyof RawCatalog['categories'] & string
 export type CodeOf<C extends CodeCategory> = keyof RawCatalog['categories'][C] & string
 
 /** 展示层唯一编码词典：后端只返回稳定 code，中文与标签样式集中在这里。 */
-export function codeLabel(category: string, code: string | null | undefined, fallback = '未知'): string {
+export function codeLabel(
+  category: string,
+  code: string | null | undefined,
+  fallback = '未知',
+): string {
   if (code === null || code === undefined || code === '') {
     return '—'
   }

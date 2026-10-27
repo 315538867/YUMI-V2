@@ -42,13 +42,7 @@ async function submit(): Promise<void> {
         title="登录已失效，请重新登录"
         class="alert"
       />
-      <el-alert
-        v-if="errorText"
-        type="error"
-        :closable="false"
-        :title="errorText"
-        class="alert"
-      />
+      <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
       <el-form label-position="top" @submit.prevent="submit">
         <el-form-item label="登录名">
           <el-input v-model="form.loginName" placeholder="登录名" autocomplete="username" />

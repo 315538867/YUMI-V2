@@ -7,11 +7,6 @@ function formInput(page: Page, label: string) {
 
 test('新订单确认、收款与刷新恢复使用真实接口', async ({ page }) => {
   await login(page)
-  page.on('request', (request) => {
-    if (request.url().endsWith('/api/orders') && request.method() === 'POST') {
-      console.log('ORDER BODY', request.postData())
-    }
-  })
   await page.goto('/orders/new')
   await expect(page.getByRole('heading', { name: '新增订单' })).toBeVisible()
 
@@ -25,9 +20,7 @@ test('新订单确认、收款与刷新恢复使用真实接口', async ({ page 
 
   await page.getByRole('button', { name: '登记收款' }).click()
   await page.getByRole('button', { name: '核对本次收款' }).click()
-  await expect(
-    page.getByRole('dialog').filter({ hasText: '确认订单实际收款' }),
-  ).toBeVisible()
+  await expect(page.getByRole('dialog').filter({ hasText: '确认订单实际收款' })).toBeVisible()
   await page.getByRole('button', { name: '确认已收到款项' }).click()
   await expect(page.getByText('收款已登记')).toBeVisible()
   await expect(page.getByRole('cell', { name: '已收', exact: true })).toBeVisible()

@@ -82,9 +82,7 @@ export const productService = {
   },
 
   schemes(productBusinessId: string): Promise<SchemeView[]> {
-    return api.query<SchemeView[]>(
-      `/api/products/${encodeURIComponent(productBusinessId)}/schemes`,
-    )
+    return api.query<SchemeView[]>(`/api/products/${encodeURIComponent(productBusinessId)}/schemes`)
   },
 
   createScheme(

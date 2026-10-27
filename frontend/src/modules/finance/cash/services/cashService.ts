@@ -21,13 +21,10 @@ export const cashService = {
     businessDate: string,
     voucherFileRefs: string[] = [],
   ): Promise<CashFactRef> {
-    return api.command<CashFactRef, Record<string, unknown>>(
-      '/api/finance/cash/order-receipts',
-      {
-        idempotencyKey: newIdempotencyKey('order-receipt'),
-        body: { orderBusinessId, amount: money(amount), businessDate, voucherFileRefs },
-      },
-    )
+    return api.command<CashFactRef, Record<string, unknown>>('/api/finance/cash/order-receipts', {
+      idempotencyKey: newIdempotencyKey('order-receipt'),
+      body: { orderBusinessId, amount: money(amount), businessDate, voucherFileRefs },
+    })
   },
 
   refundOrder(
@@ -36,13 +33,10 @@ export const cashService = {
     businessDate: string,
     voucherFileRefs: string[] = [],
   ): Promise<CashFactRef> {
-    return api.command<CashFactRef, Record<string, unknown>>(
-      '/api/finance/cash/order-refunds',
-      {
-        idempotencyKey: newIdempotencyKey('order-refund'),
-        body: { orderBusinessId, amount: money(amount), businessDate, voucherFileRefs },
-      },
-    )
+    return api.command<CashFactRef, Record<string, unknown>>('/api/finance/cash/order-refunds', {
+      idempotencyKey: newIdempotencyKey('order-refund'),
+      body: { orderBusinessId, amount: money(amount), businessDate, voucherFileRefs },
+    })
   },
 
   refundAfterSales(
@@ -120,19 +114,16 @@ export const cashService = {
     businessDate: string
     reasonText: string
   }): Promise<CashFactRef> {
-    return api.command<CashFactRef, Record<string, unknown>>(
-      '/api/finance/cash/payroll-returns',
-      {
-        idempotencyKey: newIdempotencyKey('payroll-return'),
-        body: {
-          originalCashFactBusinessId: input.originalCashFactBusinessId,
-          resultBusinessId: input.resultBusinessId,
-          amount: money(input.amount),
-          businessDate: input.businessDate,
-          reasonText: input.reasonText,
-        },
+    return api.command<CashFactRef, Record<string, unknown>>('/api/finance/cash/payroll-returns', {
+      idempotencyKey: newIdempotencyKey('payroll-return'),
+      body: {
+        originalCashFactBusinessId: input.originalCashFactBusinessId,
+        resultBusinessId: input.resultBusinessId,
+        amount: money(input.amount),
+        businessDate: input.businessDate,
+        reasonText: input.reasonText,
       },
-    )
+    })
   },
 
   reverse(
@@ -140,13 +131,13 @@ export const cashService = {
     businessDate: string,
     reasonText: string,
   ): Promise<CashFactRef> {
-    return api.command<CashFactRef, { cashFactBusinessId: string; businessDate: string; reasonText: string }>(
-      '/api/finance/cash/reversals',
-      {
-        idempotencyKey: newIdempotencyKey('cash-reversal'),
-        body: { cashFactBusinessId, businessDate, reasonText },
-      },
-    )
+    return api.command<
+      CashFactRef,
+      { cashFactBusinessId: string; businessDate: string; reasonText: string }
+    >('/api/finance/cash/reversals', {
+      idempotencyKey: newIdempotencyKey('cash-reversal'),
+      body: { cashFactBusinessId, businessDate, reasonText },
+    })
   },
 
   facts(startDate: string, endDate: string, cashType = ''): Promise<CashFactView[]> {

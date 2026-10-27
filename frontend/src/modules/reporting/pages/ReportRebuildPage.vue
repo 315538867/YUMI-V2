@@ -11,7 +11,9 @@ const auth = useAuthStore()
 const errorText = ref('')
 const successText = ref('')
 const rebuilding = ref(false)
-const versions = ref<Array<{ versionBusinessId: string; status: string; recordCount: number; differenceCount: number }>>([])
+const versions = ref<
+  Array<{ versionBusinessId: string; status: string; recordCount: number; differenceCount: number }>
+>([])
 const canManage = auth.hasPermission('reporting.admin')
 
 async function load(): Promise<void> {
@@ -55,18 +57,43 @@ onMounted(load)
 <template>
   <section class="rebuild-page">
     <h1>影子重建</h1>
-    <el-alert type="info" :closable="false" title="重建只影响报表投影，不修改业务事实；差异未清零时保留旧可用版本。" class="alert" />
+    <el-alert
+      type="info"
+      :closable="false"
+      title="重建只影响报表投影，不修改业务事实；差异未清零时保留旧可用版本。"
+      class="alert"
+    />
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
-    <el-alert v-if="!canManage" type="warning" :closable="false" title="当前账号没有报表管理权限，只能查看版本。" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
+    <el-alert
+      v-if="!canManage"
+      type="warning"
+      :closable="false"
+      title="当前账号没有报表管理权限，只能查看版本。"
+      class="alert"
+    />
     <div class="toolbar">
       <PermissionButton permission="reporting.admin" @click="ingest">归集来源</PermissionButton>
-      <PermissionButton permission="reporting.admin" type="primary" :loading="rebuilding" @click="rebuild">发起影子重建</PermissionButton>
+      <PermissionButton
+        permission="reporting.admin"
+        type="primary"
+        :loading="rebuilding"
+        @click="rebuild"
+        >发起影子重建</PermissionButton
+      >
     </div>
     <el-table :data="versions" border empty-text="暂无投影版本">
       <el-table-column prop="versionBusinessId" label="版本" min-width="240" />
       <el-table-column label="状态" width="120">
-        <template #default="{ row }"><CodeTag category="reporting.versionStatus" :code="row.status" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="reporting.versionStatus" :code="row.status"
+        /></template>
       </el-table-column>
       <el-table-column prop="recordCount" label="记录数" width="110" />
       <el-table-column prop="differenceCount" label="差异数" width="110" />
@@ -75,8 +102,22 @@ onMounted(load)
 </template>
 
 <style scoped>
-.rebuild-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.alert { margin-bottom: 12px; }
+.rebuild-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

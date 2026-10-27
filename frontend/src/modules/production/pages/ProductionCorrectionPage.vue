@@ -2,11 +2,11 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import type {
-  CorrectionFeedItem,
-  PhysicalDestination,
-} from '@/modules/production/contracts'
-import { productionService, type VerifyItemInput } from '@/modules/production/services/productionService'
+import type { CorrectionFeedItem, PhysicalDestination } from '@/modules/production/contracts'
+import {
+  productionService,
+  type VerifyItemInput,
+} from '@/modules/production/services/productionService'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 
 const feed = ref<CorrectionFeedItem[]>([])
@@ -132,10 +132,17 @@ onMounted(loadFeed)
       <el-table-column prop="correctionCommandBusinessId" label="命令批次" min-width="200" />
       <el-table-column prop="taskItemBusinessId" label="任务明细" min-width="200" />
       <el-table-column label="类型" width="120">
-        <template #default="{ row }"><CodeLabel category="production.correctionItemKind" :code="row.itemKind" fallback="其他" /></template>
+        <template #default="{ row }"
+          ><CodeLabel category="production.correctionItemKind" :code="row.itemKind" fallback="其他"
+        /></template>
       </el-table-column>
       <el-table-column label="效果" width="100">
-        <template #default="{ row }"><CodeLabel category="production.correctionEffectType" :code="row.effectType" fallback="其他" /></template>
+        <template #default="{ row }"
+          ><CodeLabel
+            category="production.correctionEffectType"
+            :code="row.effectType"
+            fallback="其他"
+        /></template>
       </el-table-column>
       <el-table-column prop="quantity" label="数量" width="80" />
       <el-table-column prop="businessDate" label="业务日期" width="120" />

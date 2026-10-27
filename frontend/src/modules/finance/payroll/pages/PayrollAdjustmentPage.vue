@@ -37,22 +37,51 @@ async function submit(): Promise<void> {
 <template>
   <section class="adjust-page">
     <h1>工资人工调整</h1>
-    <el-alert type="info" :closable="false" title="调整只改变应付与人工成本，不改原核定金额，也不产生现金。" class="alert" />
+    <el-alert
+      type="info"
+      :closable="false"
+      title="调整只改变应付与人工成本，不改原核定金额，也不产生现金。"
+      class="alert"
+    />
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-form label-width="120px" class="form">
       <el-form-item label="工资结果"><el-input v-model="form.resultBusinessId" /></el-form-item>
-      <el-form-item label="差额"><el-input v-model="form.amountDelta" placeholder="可带负号" /></el-form-item>
-      <el-form-item label="原因"><el-input v-model="form.reasonText" type="textarea" :rows="2" /></el-form-item>
-      <el-form-item label="复核运行（可选）"><el-input v-model="form.referenceRunBusinessId" /></el-form-item>
+      <el-form-item label="差额"
+        ><el-input v-model="form.amountDelta" placeholder="可带负号"
+      /></el-form-item>
+      <el-form-item label="原因"
+        ><el-input v-model="form.reasonText" type="textarea" :rows="2"
+      /></el-form-item>
+      <el-form-item label="复核运行（可选）"
+        ><el-input v-model="form.referenceRunBusinessId"
+      /></el-form-item>
       <el-button type="primary" @click="submit">提交调整</el-button>
     </el-form>
   </section>
 </template>
 
 <style scoped>
-.adjust-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.form { max-width: 560px; }
-.alert { margin-bottom: 12px; }
+.adjust-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.form {
+  max-width: 560px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

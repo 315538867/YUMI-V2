@@ -42,10 +42,10 @@ export const afterSalesService = {
     return api.query<AfterSalesCaseView[]>(`/api/after-sales/cases?${search.toString()}`)
   },
 
-  listCosts(caseBusinessId: string): Promise<import('@/modules/orders/aftersales/contracts').AfterSalesCostView[]> {
-    return api.query(
-      `/api/after-sales/costs?caseBusinessId=${encodeURIComponent(caseBusinessId)}`,
-    )
+  listCosts(
+    caseBusinessId: string,
+  ): Promise<import('@/modules/orders/aftersales/contracts').AfterSalesCostView[]> {
+    return api.query(`/api/after-sales/costs?caseBusinessId=${encodeURIComponent(caseBusinessId)}`)
   },
 
   getCase(caseBusinessId: string): Promise<AfterSalesCaseView> {
@@ -120,16 +120,16 @@ export const afterSalesService = {
       note: string
     },
   ): Promise<unknown> {
-    return api.command(`/api/after-sales/obligations/${encodeURIComponent(obligationBusinessId)}/changes`, {
-      idempotencyKey: newIdempotencyKey('aftersales-obligation-change'),
-      body: input,
-    })
+    return api.command(
+      `/api/after-sales/obligations/${encodeURIComponent(obligationBusinessId)}/changes`,
+      {
+        idempotencyKey: newIdempotencyKey('aftersales-obligation-change'),
+        body: input,
+      },
+    )
   },
 
-  cancelObligation(
-    obligationBusinessId: string,
-    input: Record<string, unknown>,
-  ): Promise<unknown> {
+  cancelObligation(obligationBusinessId: string, input: Record<string, unknown>): Promise<unknown> {
     return api.command(
       `/api/after-sales/obligations/${encodeURIComponent(obligationBusinessId)}/cancellations`,
       { idempotencyKey: newIdempotencyKey('aftersales-obligation-cancel'), body: input },

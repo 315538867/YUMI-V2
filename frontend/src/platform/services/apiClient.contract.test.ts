@@ -32,9 +32,7 @@ describe('前端接口消费边界', () => {
   it('业务页面不直接导入平台 api 对象', () => {
     const offenders = walk(join(SRC, 'modules'))
       .filter((file) => file.endsWith('.vue'))
-      .filter((file) =>
-        readFileSync(file, 'utf8').includes("from '@/platform/services/api'"),
-      )
+      .filter((file) => readFileSync(file, 'utf8').includes("from '@/platform/services/api'"))
 
     expect(offenders).toEqual([])
   })

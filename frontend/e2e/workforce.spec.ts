@@ -29,7 +29,11 @@ test('员工资格、资料、离职返聘与活动引用使用真实接口', as
   await expect(row).toBeVisible()
 
   await row.getByRole('button', { name: '资格' }).click()
-  await page.locator('.el-dialog .el-form-item').filter({ hasText: '工种' }).locator('.el-select').click()
+  await page
+    .locator('.el-dialog .el-form-item')
+    .filter({ hasText: '工种' })
+    .locator('.el-select')
+    .click()
   await page.getByRole('option', { name: '制作' }).click()
   await page.getByRole('button', { name: '确认' }).click()
   await expect(row.getByText('制作')).toBeVisible()
@@ -50,7 +54,12 @@ test('员工资格、资料、离职返聘与活动引用使用真实接口', as
   await expect(currentRow.getByText('在职', { exact: true })).toBeVisible()
 
   await page.getByRole('tab', { name: '活动引用' }).click()
-  await page.locator('.el-form-item').filter({ hasText: '主体' }).locator('.el-select').last().click()
+  await page
+    .locator('.el-form-item')
+    .filter({ hasText: '主体' })
+    .locator('.el-select')
+    .last()
+    .click()
   await page.getByRole('option', { name: `${name}-已改` }).click()
   await page.getByRole('button', { name: '查询' }).click()
   await expect(page.getByText(`${name}-已改`).last()).toBeVisible()
@@ -66,10 +75,18 @@ test('小组成员与人员标准可维护，且提供账号入口', async ({ pa
   await page.goto('/workforce/teams')
   await page.getByRole('button', { name: '新增小组' }).click()
   await formInput(page, '小组名称').fill(`验收小组-${Date.now()}`)
-  await page.locator('.el-dialog .el-form-item').filter({ hasText: '成员' }).locator('.el-select').click()
+  await page
+    .locator('.el-dialog .el-form-item')
+    .filter({ hasText: '成员' })
+    .locator('.el-select')
+    .click()
   await page.getByRole('option', { name: new RegExp(name) }).click()
   await page.keyboard.press('Escape')
-  await page.locator('.el-dialog .el-form-item').filter({ hasText: '成员' }).locator('.el-select').click()
+  await page
+    .locator('.el-dialog .el-form-item')
+    .filter({ hasText: '成员' })
+    .locator('.el-select')
+    .click()
   await page.getByRole('option').filter({ hasNotText: name }).first().click()
   await page.keyboard.press('Escape')
   await page.locator('.el-dialog').getByRole('button', { name: '保存' }).click()

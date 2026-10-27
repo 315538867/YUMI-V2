@@ -4,17 +4,29 @@ import { useAuthStore } from '@/platform/stores/auth'
 
 const moduleRoutes: RouteRecordRaw[] = navigationGroups.flatMap((group) =>
   group.items
-    .filter((item) => item.path !== '/customers' && item.path !== '/products' && item.path !== '/workforce' && item.path !== '/production' && item.path !== '/orders' && item.path !== '/after-sales' && item.path !== '/payroll' && item.path !== '/finance' && item.path !== '/reporting' && item.path !== '/settings')
+    .filter(
+      (item) =>
+        item.path !== '/customers' &&
+        item.path !== '/products' &&
+        item.path !== '/workforce' &&
+        item.path !== '/production' &&
+        item.path !== '/orders' &&
+        item.path !== '/after-sales' &&
+        item.path !== '/payroll' &&
+        item.path !== '/finance' &&
+        item.path !== '/reporting' &&
+        item.path !== '/settings',
+    )
     .map((item) => ({
-    path: item.path.slice(1),
-    name: item.path.slice(1).replaceAll('/', '-'),
-    component: () => import('@/app/pages/ModulePlaceholderPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: item.title,
-      permission: item.permission,
-    },
-  })),
+      path: item.path.slice(1),
+      name: item.path.slice(1).replaceAll('/', '-'),
+      component: () => import('@/app/pages/ModulePlaceholderPage.vue'),
+      meta: {
+        requiresAuth: true,
+        title: item.title,
+        permission: item.permission,
+      },
+    })),
 )
 
 export const routes: RouteRecordRaw[] = [
@@ -267,7 +279,11 @@ export const routes: RouteRecordRaw[] = [
             path: 'glue',
             name: 'payroll-glue',
             component: () => import('@/modules/finance/payroll/pages/GlueMonthReferencePage.vue'),
-            meta: { requiresAuth: true, title: '胶水月参考', permission: 'payroll.glue-allowance.read' },
+            meta: {
+              requiresAuth: true,
+              title: '胶水月参考',
+              permission: 'payroll.glue-allowance.read',
+            },
           },
         ],
       },
@@ -298,7 +314,8 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'cost-failures',
             name: 'cost-failures',
-            component: () => import('@/modules/finance/costledger/pages/CostAccrualFailuresPage.vue'),
+            component: () =>
+              import('@/modules/finance/costledger/pages/CostAccrualFailuresPage.vue'),
             meta: { requiresAuth: true, title: '归集失败', permission: 'cost.accrue' },
           },
           {
@@ -357,13 +374,21 @@ export const routes: RouteRecordRaw[] = [
             path: 'accounts',
             name: 'settings-accounts',
             component: () => import('@/modules/platform-admin/pages/AccountRolePage.vue'),
-            meta: { requiresAuth: true, title: '账号与角色', permission: 'platform.account.manage' },
+            meta: {
+              requiresAuth: true,
+              title: '账号与角色',
+              permission: 'platform.account.manage',
+            },
           },
           {
             path: 'glue',
             name: 'settings-glue',
             component: () => import('@/modules/platform-admin/pages/PayrollGluePolicyPage.vue'),
-            meta: { requiresAuth: true, title: '胶水配置', permission: 'payroll.glue-allowance.manage' },
+            meta: {
+              requiresAuth: true,
+              title: '胶水配置',
+              permission: 'payroll.glue-allowance.manage',
+            },
           },
           {
             path: 'audit',

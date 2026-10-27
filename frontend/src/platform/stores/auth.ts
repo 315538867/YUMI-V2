@@ -1,11 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { identityService, type CurrentAccount } from '@/platform/services/identityService'
-import {
-  clearSessionToken,
-  getSessionToken,
-  setSessionToken,
-} from '@/platform/services/session'
+import { clearSessionToken, getSessionToken, setSessionToken } from '@/platform/services/session'
 
 /**
  * 登录会话状态。

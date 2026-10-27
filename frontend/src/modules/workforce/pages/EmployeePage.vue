@@ -110,7 +110,12 @@ onMounted(load)
   <section class="employee-page">
     <div class="toolbar">
       <h1>员工与资格</h1>
-      <PermissionButton permission="workforce.employee.manage" type="primary" @click="open('create')">新增员工</PermissionButton>
+      <PermissionButton
+        permission="workforce.employee.manage"
+        type="primary"
+        @click="open('create')"
+        >新增员工</PermissionButton
+      >
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-table v-loading="loading" :data="employees" empty-text="暂无员工" border>
@@ -151,11 +156,7 @@ onMounted(load)
       </el-table-column>
     </el-table>
 
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="460px"
-    >
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="460px">
       <el-form label-width="92px">
         <template v-if="dialog === 'create' || dialog === 'edit'">
           <el-form-item label="姓名" required><el-input v-model="form.name" /></el-form-item>

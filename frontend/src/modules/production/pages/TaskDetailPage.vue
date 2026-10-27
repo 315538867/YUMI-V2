@@ -36,24 +36,37 @@ onMounted(load)
       <header class="head">
         <div>
           <h1>{{ task.taskNo }}</h1>
-          <span class="meta"><CodeTag category="production.taskType" :code="task.taskType" /> · <CodeTag category="production.taskStatus" :code="task.status" /> · {{ task.workDate }}</span>
+          <span class="meta"
+            ><CodeTag category="production.taskType" :code="task.taskType" /> ·
+            <CodeTag category="production.taskStatus" :code="task.status" /> ·
+            {{ task.workDate }}</span
+          >
         </div>
         <el-space>
           <el-button
-            v-if="canSchedule && (task.status === 'ARRANGED' || task.status === 'PARTIALLY_VERIFIED')"
+            v-if="
+              canSchedule && (task.status === 'ARRANGED' || task.status === 'PARTIALLY_VERIFIED')
+            "
             @click="router.push(`/production/tasks/${task.taskBusinessId}/adjust`)"
           >
             调整
           </el-button>
-          <el-button @click="router.push(`/production/verify?task=${task.taskBusinessId}`)">核验</el-button>
+          <el-button @click="router.push(`/production/verify?task=${task.taskBusinessId}`)"
+            >核验</el-button
+          >
         </el-space>
       </header>
       <el-descriptions :column="3" border>
         <el-descriptions-item label="执行主体">
-          <CodeTag category="production.subjectType" :code="task.subject.subjectType" /> / {{ task.subject.subjectBusinessId }}
+          <CodeTag category="production.subjectType" :code="task.subject.subjectType" /> /
+          {{ task.subject.subjectBusinessId }}
         </el-descriptions-item>
         <el-descriptions-item label="工序">
-          <CodeTag v-if="task.processCode" category="production.targetProcess" :code="task.processCode" />
+          <CodeTag
+            v-if="task.processCode"
+            category="production.targetProcess"
+            :code="task.processCode"
+          />
           <span v-else>其他任务</span>
         </el-descriptions-item>
         <el-descriptions-item label="计划量">{{ task.plannedWorkQuantity }}</el-descriptions-item>

@@ -116,14 +116,11 @@ export const workforceService = {
     effectiveMinutes: number
     expectedRowVersion: number
   }): Promise<WorkforceStandardView> {
-    return api.command<WorkforceStandardView, typeof input>(
-      '/api/workforce/standards/work-time',
-      {
-        method: 'PUT',
-        idempotencyKey: newIdempotencyKey('work-time-standard'),
-        body: input,
-      },
-    )
+    return api.command<WorkforceStandardView, typeof input>('/api/workforce/standards/work-time', {
+      method: 'PUT',
+      idempotencyKey: newIdempotencyKey('work-time-standard'),
+      body: input,
+    })
   },
 
   updateEfficiency(input: {
@@ -132,14 +129,11 @@ export const workforceService = {
     efficiencyFactor: string
     expectedRowVersion: number
   }): Promise<WorkforceStandardView> {
-    return api.command<WorkforceStandardView, typeof input>(
-      '/api/workforce/standards/efficiency',
-      {
-        method: 'PUT',
-        idempotencyKey: newIdempotencyKey('efficiency-standard'),
-        body: input,
-      },
-    )
+    return api.command<WorkforceStandardView, typeof input>('/api/workforce/standards/efficiency', {
+      method: 'PUT',
+      idempotencyKey: newIdempotencyKey('efficiency-standard'),
+      body: input,
+    })
   },
 
   subject(

@@ -9,10 +9,22 @@ test('六模块、售后、设置与报表真实页面链路可操作', async ({
   await page.getByRole('button', { name: '新增客户' }).click()
   const customerName = `闭环客户-${Date.now()}`
   const dialog = page.locator('.el-dialog')
-  await dialog.locator('.el-form-item').filter({ hasText: '客户名称' }).locator('input').fill(customerName)
+  await dialog
+    .locator('.el-form-item')
+    .filter({ hasText: '客户名称' })
+    .locator('input')
+    .fill(customerName)
   await dialog.locator('.el-form-item').filter({ hasText: '联系人' }).locator('input').fill('闭环')
-  await dialog.locator('.el-form-item').filter({ hasText: '电话' }).locator('input').fill('13900000003')
-  await dialog.locator('.el-form-item').filter({ hasText: '默认地址' }).locator('textarea').fill('闭环路 1 号')
+  await dialog
+    .locator('.el-form-item')
+    .filter({ hasText: '电话' })
+    .locator('input')
+    .fill('13900000003')
+  await dialog
+    .locator('.el-form-item')
+    .filter({ hasText: '默认地址' })
+    .locator('textarea')
+    .fill('闭环路 1 号')
   await dialog.getByRole('button', { name: '创建' }).click()
   await expect(page.getByRole('heading', { name: customerName })).toBeVisible()
 
@@ -37,9 +49,7 @@ test('六模块、售后、设置与报表真实页面链路可操作', async ({
   })
   await expect(page.getByText('附件已上传')).toBeVisible()
   await page.getByRole('button', { name: '核对本次收款' }).click()
-  await expect(
-    page.getByRole('dialog').filter({ hasText: '确认订单实际收款' }),
-  ).toBeVisible()
+  await expect(page.getByRole('dialog').filter({ hasText: '确认订单实际收款' })).toBeVisible()
   await page.getByRole('button', { name: '确认已收到款项' }).click()
   await expect(page.getByText('已收').first()).toBeVisible()
 

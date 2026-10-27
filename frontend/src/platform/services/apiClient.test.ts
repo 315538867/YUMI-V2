@@ -33,7 +33,10 @@ function errorResponse(
   status: number,
   extra: Record<string, unknown> = {},
 ): Response {
-  return jsonResponse({ type, code, message, requestId: 'req-server', fieldIssues: [], ...extra }, status)
+  return jsonResponse(
+    { type, code, message, requestId: 'req-server', fieldIssues: [], ...extra },
+    status,
+  )
 }
 
 describe('十进制字符串', () => {

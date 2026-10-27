@@ -4,7 +4,10 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type { PhysicalDestination, TaskView } from '@/modules/production/contracts'
-import { productionService, type VerifyItemInput } from '@/modules/production/services/productionService'
+import {
+  productionService,
+  type VerifyItemInput,
+} from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 
 interface ItemForm {
@@ -130,15 +133,30 @@ onMounted(load)
 <template>
   <section v-loading="loading" class="verify-page">
     <h1>任务核验</h1>
-    <el-alert v-if="taskId === ''" type="info" :closable="false" title="请从排班或任务详情进入核验" />
+    <el-alert
+      v-if="taskId === ''"
+      type="info"
+      :closable="false"
+      title="请从排班或任务详情进入核验"
+    />
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
 
     <template v-if="task">
       <el-descriptions :column="3" border class="summary">
         <el-descriptions-item label="任务">{{ task.taskNo }}</el-descriptions-item>
-        <el-descriptions-item label="类型"><CodeTag category="production.taskType" :code="task.taskType" /></el-descriptions-item>
-        <el-descriptions-item label="状态"><CodeTag category="production.taskStatus" :code="task.status" /></el-descriptions-item>
+        <el-descriptions-item label="类型"
+          ><CodeTag category="production.taskType" :code="task.taskType"
+        /></el-descriptions-item>
+        <el-descriptions-item label="状态"
+          ><CodeTag category="production.taskStatus" :code="task.status"
+        /></el-descriptions-item>
       </el-descriptions>
 
       <template v-if="task.taskType === 'OTHER_TASK'">
@@ -160,16 +178,24 @@ onMounted(load)
           <el-table-column prop="taskItemBusinessId" label="明细" min-width="180" />
           <el-table-column prop="plannedQuantity" label="计划" width="80" />
           <el-table-column label="未完成" width="110">
-            <template #default="{ row }"><el-input v-model.number="row.unfinishedQuantity" type="number" /></template>
+            <template #default="{ row }"
+              ><el-input v-model.number="row.unfinishedQuantity" type="number"
+            /></template>
           </el-table-column>
           <el-table-column label="合格" width="110">
-            <template #default="{ row }"><el-input v-model.number="row.qualifiedQuantity" type="number" /></template>
+            <template #default="{ row }"
+              ><el-input v-model.number="row.qualifiedQuantity" type="number"
+            /></template>
           </el-table-column>
           <el-table-column label="返工/修补" width="120">
-            <template #default="{ row }"><el-input v-model.number="row.reworkQuantity" type="number" /></template>
+            <template #default="{ row }"
+              ><el-input v-model.number="row.reworkQuantity" type="number"
+            /></template>
           </el-table-column>
           <el-table-column label="线上报废" width="120">
-            <template #default="{ row }"><el-input v-model.number="row.scrappedQuantity" type="number" /></template>
+            <template #default="{ row }"
+              ><el-input v-model.number="row.scrappedQuantity" type="number"
+            /></template>
           </el-table-column>
           <el-table-column label="报废去向" width="170">
             <template #default="{ row }">

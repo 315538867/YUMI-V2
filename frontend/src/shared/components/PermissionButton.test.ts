@@ -38,7 +38,11 @@ describe('权限显隐组件', () => {
   it('有权限时展示按钮，并把属性与点击事件传给 el-button', async () => {
     useAuthStore().account = accountWith(['order.ship'])
     const click = vi.fn()
-    const wrapper = mountWith(PermissionButton, { permission: 'order.ship', type: 'primary', onClick: click })
+    const wrapper = mountWith(PermissionButton, {
+      permission: 'order.ship',
+      type: 'primary',
+      onClick: click,
+    })
 
     expect(wrapper.find('.inner').exists()).toBe(true)
     expect(wrapper.classes()).toContain('el-button--primary')
@@ -48,7 +52,9 @@ describe('权限显隐组件', () => {
 
   it('无权限时按钮与片段都不渲染', () => {
     useAuthStore().account = accountWith([])
-    expect(mountWith(PermissionButton, { permission: 'order.ship' }).find('.inner').exists()).toBe(false)
+    expect(mountWith(PermissionButton, { permission: 'order.ship' }).find('.inner').exists()).toBe(
+      false,
+    )
     expect(mountWith(Can, { permission: 'order.ship' }).find('.inner').exists()).toBe(false)
   })
 

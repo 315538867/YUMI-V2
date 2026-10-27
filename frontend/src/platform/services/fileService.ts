@@ -9,8 +9,7 @@ export interface UploadedFile {
 
 function newIdempotencyKey(): string {
   return (
-    globalThis.crypto?.randomUUID?.() ??
-    `file-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    globalThis.crypto?.randomUUID?.() ?? `file-${Date.now()}-${Math.random().toString(16).slice(2)}`
   )
 }
 
@@ -27,17 +26,17 @@ async function toBase64(file: File): Promise<string> {
 /** 临时文件上传与授权读取；正式引用由业务命令在同一事务内建立。 */
 export const fileService = {
   async upload(file: File): Promise<UploadedFile> {
-    return api.command<UploadedFile, { originalName: string; mediaType: string; contentBase64: string }>(
-      '/api/platform/files',
-      {
-        idempotencyKey: newIdempotencyKey(),
-        body: {
-          originalName: file.name,
-          mediaType: file.type || 'application/octet-stream',
-          contentBase64: await toBase64(file),
-        },
+    return api.command<
+      UploadedFile,
+      { originalName: string; mediaType: string; contentBase64: string }
+    >('/api/platform/files', {
+      idempotencyKey: newIdempotencyKey(),
+      body: {
+        originalName: file.name,
+        mediaType: file.type || 'application/octet-stream',
+        contentBase64: await toBase64(file),
       },
-    )
+    })
   },
 
   async readContent(fileBusinessId: string, permissionCode: string): Promise<Blob> {

@@ -41,11 +41,7 @@ async function toggleStatus(): Promise<void> {
   }
   const target = product.value.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
   try {
-    product.value = await productService.changeStatus(
-      productId,
-      target,
-      product.value.rowVersion,
-    )
+    product.value = await productService.changeStatus(productId, target, product.value.rowVersion)
     ElMessage.success(target === 'ACTIVE' ? '商品已启用' : '商品已停用')
   } catch (error) {
     errorText.value = userMessageOf(error, '状态更新失败')
@@ -85,7 +81,10 @@ onMounted(load)
           </span>
         </div>
         <div class="actions">
-          <PermissionButton permission="product.update" @click="router.push(`/products/${productId}/edit`)">
+          <PermissionButton
+            permission="product.update"
+            @click="router.push(`/products/${productId}/edit`)"
+          >
             编辑商品
           </PermissionButton>
           <PermissionButton
@@ -102,7 +101,9 @@ onMounted(load)
         <el-descriptions-item label="标准售价">
           <MoneyText :value="product.standardSalePrice" />
         </el-descriptions-item>
-        <el-descriptions-item label="标准重量">{{ product.standardWeightGrams }} g</el-descriptions-item>
+        <el-descriptions-item label="标准重量"
+          >{{ product.standardWeightGrams }} g</el-descriptions-item
+        >
         <el-descriptions-item label="星级">{{ product.makingStarName }}</el-descriptions-item>
         <el-descriptions-item label="胶水损耗率">{{ product.glueLossRate }}</el-descriptions-item>
         <el-descriptions-item label="胶水单价">
@@ -140,7 +141,9 @@ onMounted(load)
           </template>
         </el-table-column>
         <el-table-column label="目标工序" width="120">
-          <template #default="{ row }"><CodeTag category="product.targetProcess" :code="row.targetProcess" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="product.targetProcess" :code="row.targetProcess"
+          /></template>
         </el-table-column>
         <el-table-column label="售价" width="130">
           <template #default="{ row }"><MoneyText :value="row.salePrice" /></template>

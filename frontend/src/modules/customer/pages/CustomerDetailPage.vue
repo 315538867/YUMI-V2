@@ -124,13 +124,7 @@ onMounted(load)
         </div>
       </header>
 
-      <el-alert
-        v-if="editError"
-        type="error"
-        :closable="false"
-        :title="editError"
-        class="alert"
-      />
+      <el-alert v-if="editError" type="error" :closable="false" :title="editError" class="alert" />
 
       <el-descriptions v-if="!editing" :column="2" border>
         <el-descriptions-item label="联系人">{{ customer.contactName }}</el-descriptions-item>
@@ -166,12 +160,19 @@ onMounted(load)
       <h2>资料变化历史</h2>
       <el-table :data="history" empty-text="暂无变化记录" border size="small">
         <el-table-column label="操作" width="120">
-          <template #default="{ row }"><CodeTag category="customer.changeOperation" :code="row.operationType" /></template>
+          <template #default="{ row }"
+            ><CodeTag category="customer.changeOperation" :code="row.operationType"
+          /></template>
         </el-table-column>
         <el-table-column label="版本" width="120">
           <template #default="{ row }">{{ row.versionBefore }} → {{ row.versionAfter }}</template>
         </el-table-column>
-        <el-table-column prop="changedFieldsJson" label="变更字段" min-width="240" show-overflow-tooltip />
+        <el-table-column
+          prop="changedFieldsJson"
+          label="变更字段"
+          min-width="240"
+          show-overflow-tooltip
+        />
         <el-table-column prop="reasonText" label="原因" min-width="160" />
         <el-table-column prop="occurredAt" label="时间" width="200" />
       </el-table>

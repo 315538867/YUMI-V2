@@ -36,7 +36,13 @@ async function submit(): Promise<void> {
   <section class="daily-page">
     <h1>日常经营收支</h1>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-form label-width="120px" class="form">
       <el-form-item label="方向">
         <el-radio-group v-model="form.direction">
@@ -55,7 +61,9 @@ async function submit(): Promise<void> {
         <el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" />
       </el-form-item>
       <el-form-item label="金额"><el-input v-model="form.amount" /></el-form-item>
-      <el-form-item label="说明"><el-input v-model="form.description" type="textarea" :rows="2" /></el-form-item>
+      <el-form-item label="说明"
+        ><el-input v-model="form.description" type="textarea" :rows="2"
+      /></el-form-item>
       <el-form-item label="计入经营费用">
         <el-switch v-model="form.countAsExpense" :disabled="form.direction === 'IN'" />
       </el-form-item>
@@ -66,9 +74,24 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-.daily-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.form { max-width: 560px; }
-.hint { color: var(--el-text-color-secondary); font-size: 12px; }
-.alert { margin-bottom: 12px; }
+.daily-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.form {
+  max-width: 560px;
+}
+.hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

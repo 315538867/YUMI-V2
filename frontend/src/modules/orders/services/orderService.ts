@@ -95,9 +95,9 @@ export const orderService = {
   },
 
   complete(orderBusinessId: string): Promise<unknown> {
-    return api.command(
-      `/api/orders/${encodeURIComponent(orderBusinessId)}/completion`,
-      { idempotencyKey: newIdempotencyKey('order-complete'), body: {} },
-    )
+    return api.command(`/api/orders/${encodeURIComponent(orderBusinessId)}/completion`, {
+      idempotencyKey: newIdempotencyKey('order-complete'),
+      body: {},
+    })
   },
 }

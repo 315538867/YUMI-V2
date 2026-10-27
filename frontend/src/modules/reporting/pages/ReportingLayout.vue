@@ -14,7 +14,11 @@ const tabs = [
 </script>
 
 <template>
-  <el-tabs :model-value="active" class="reporting-tabs" @tab-change="(path: string | number) => router.push(String(path))">
+  <el-tabs
+    :model-value="active"
+    class="reporting-tabs"
+    @tab-change="(path: string | number) => router.push(String(path))"
+  >
     <el-tab-pane v-for="tab in tabs" :key="tab.path" :label="tab.label" :name="tab.path" />
   </el-tabs>
   <RouterView />

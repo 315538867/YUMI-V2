@@ -26,9 +26,20 @@ async function review(): Promise<void> {
 <template>
   <section class="review-page">
     <h1>已核定工资只读复核</h1>
-    <el-alert type="info" :closable="false" title="复核运行只供查看迟到来源与配置变化，不能用于再次确认工资。" class="alert" />
+    <el-alert
+      type="info"
+      :closable="false"
+      title="复核运行只供查看迟到来源与配置变化，不能用于再次确认工资。"
+      class="alert"
+    />
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-form inline>
       <el-form-item label="工资结果">
         <el-input v-model="resultId" class="input" />
@@ -39,8 +50,20 @@ async function review(): Promise<void> {
 </template>
 
 <style scoped>
-.review-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.input { width: 300px; }
-.alert { margin-bottom: 12px; }
+.review-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.input {
+  width: 300px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

@@ -2,10 +2,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import type {
-  DispositionView,
-  ResponsibilityType,
-} from '@/modules/production/contracts'
+import type { DispositionView, ResponsibilityType } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 
@@ -65,11 +62,13 @@ async function correct(): Promise<void> {
 }
 
 function destinationText(value: string): string {
-  return {
-    DESTROYED: '实际销毁',
-    TRANSFERRED_OFFLINE_INVENTORY: '转线下库存',
-    IN_SYSTEM: '系统内',
-  }[value] ?? value
+  return (
+    {
+      DESTROYED: '实际销毁',
+      TRANSFERRED_OFFLINE_INVENTORY: '转线下库存',
+      IN_SYSTEM: '系统内',
+    }[value] ?? value
+  )
 }
 </script>
 
@@ -96,15 +95,19 @@ function destinationText(value: string): string {
         <el-table :data="defect.dispositions" border size="small">
           <el-table-column prop="dispositionFactBusinessId" label="处置标识" min-width="200" />
           <el-table-column label="处置" width="140">
-          <template #default="{ row }"><CodeTag category="production.defectDispositionType" :code="row.dispositionType" /></template>
-        </el-table-column>
+            <template #default="{ row }"
+              ><CodeTag category="production.defectDispositionType" :code="row.dispositionType"
+            /></template>
+          </el-table-column>
           <el-table-column label="去向" width="130">
             <template #default="{ row }">{{ destinationText(row.physicalDestination) }}</template>
           </el-table-column>
           <el-table-column prop="quantity" label="数量" width="80" />
           <el-table-column label="责任" width="120">
-          <template #default="{ row }"><CodeTag category="production.responsibilityType" :code="row.responsibilityType" /></template>
-        </el-table-column>
+            <template #default="{ row }"
+              ><CodeTag category="production.responsibilityType" :code="row.responsibilityType"
+            /></template>
+          </el-table-column>
           <el-table-column prop="responsibleSubjectBusinessId" label="责任主体" min-width="160" />
           <el-table-column prop="waivedReason" label="免除原因" min-width="160" />
           <el-table-column label="操作" width="100">

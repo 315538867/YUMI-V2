@@ -80,7 +80,13 @@ onMounted(load)
       <el-button type="primary" @click="load">查询</el-button>
     </div>
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-descriptions v-if="summary" :column="3" border class="summary">
       <el-descriptions-item label="有效流入">{{ summary.income }}</el-descriptions-item>
       <el-descriptions-item label="有效流出">{{ summary.outflow }}</el-descriptions-item>
@@ -90,10 +96,14 @@ onMounted(load)
       <el-table-column prop="cashNo" label="现金单号" width="140" />
       <el-table-column prop="businessDate" label="业务日期" width="120" />
       <el-table-column label="类型" width="180">
-        <template #default="{ row }"><CodeTag category="finance.cashType" :code="row.cashType" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.cashType" :code="row.cashType"
+        /></template>
       </el-table-column>
       <el-table-column label="方向" width="80">
-        <template #default="{ row }"><CodeTag category="finance.cashDirection" :code="row.direction" /></template>
+        <template #default="{ row }"
+          ><CodeTag category="finance.cashDirection" :code="row.direction"
+        /></template>
       </el-table-column>
       <el-table-column prop="amount" label="金额" width="130" />
       <el-table-column label="有效" width="80">
@@ -101,7 +111,9 @@ onMounted(load)
       </el-table-column>
       <el-table-column label="操作" width="190">
         <template #default="{ row }">
-          <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)">整笔冲销</el-button>
+          <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)"
+            >整笔冲销</el-button
+          >
           <el-button
             v-if="row.cashType === 'PAYROLL_PAYMENT'"
             link
@@ -116,14 +128,24 @@ onMounted(load)
     </el-table>
     <p class="hint">现金净额不是利润；工资退回不充当经营收入。</p>
 
-    <el-dialog v-model="dialogVisible" :title="action === 'reverse' ? '整笔冲销' : '真实工资退回'" width="460px">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="action === 'reverse' ? '整笔冲销' : '真实工资退回'"
+      width="460px"
+    >
       <el-form label-width="110px">
-        <el-form-item v-if="action === 'return'" label="工资结果"><el-input v-model="form.resultBusinessId" /></el-form-item>
-        <el-form-item label="金额"><el-input v-model="form.amount" :disabled="action === 'reverse'" /></el-form-item>
+        <el-form-item v-if="action === 'return'" label="工资结果"
+          ><el-input v-model="form.resultBusinessId"
+        /></el-form-item>
+        <el-form-item label="金额"
+          ><el-input v-model="form.amount" :disabled="action === 'reverse'"
+        /></el-form-item>
         <el-form-item label="业务日期">
           <el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" />
         </el-form-item>
-        <el-form-item label="原因"><el-input v-model="form.reasonText" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item label="原因"
+          ><el-input v-model="form.reasonText" type="textarea" :rows="2"
+        /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -134,11 +156,33 @@ onMounted(load)
 </template>
 
 <style scoped>
-.history-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 16px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.type { width: 220px; }
-.summary { margin-bottom: 12px; }
-.hint { color: var(--el-text-color-secondary); font-size: 12px; }
-.alert { margin-bottom: 12px; }
+.history-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 16px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.type {
+  width: 220px;
+}
+.summary {
+  margin-bottom: 12px;
+}
+.hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

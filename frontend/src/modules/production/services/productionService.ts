@@ -21,7 +21,11 @@ export interface ArrangeInput {
   processCode: TargetProcess | null
   items: Array<{ productionSourceBusinessId: string; plannedQuantity: number }>
   enteredStandardMinutes: number | null
-  otherTask: { workContent: string; relatedProductBusinessId: string | null; plannedQuantity: number | null } | null
+  otherTask: {
+    workContent: string
+    relatedProductBusinessId: string | null
+    plannedQuantity: number | null
+  } | null
   overrideReason: string | null
 }
 
@@ -35,7 +39,11 @@ export interface AdjustTaskInput {
     plannedQuantity: number
   }>
   enteredStandardMinutes: number | null
-  otherTask: { workContent: string; relatedProductBusinessId: string | null; plannedQuantity: number | null } | null
+  otherTask: {
+    workContent: string
+    relatedProductBusinessId: string | null
+    plannedQuantity: number | null
+  } | null
   overrideReason: string | null
 }
 
@@ -67,9 +75,7 @@ export const productionService = {
   },
 
   task(taskBusinessId: string): Promise<TaskView> {
-    return api.query<TaskView>(
-      `/api/production/tasks/${encodeURIComponent(taskBusinessId)}`,
-    )
+    return api.query<TaskView>(`/api/production/tasks/${encodeURIComponent(taskBusinessId)}`)
   },
 
   arrange(input: ArrangeInput): Promise<{ taskBusinessId: string }> {
@@ -93,14 +99,14 @@ export const productionService = {
     )
   },
 
-  cancelTask(taskBusinessId: string, reasonText: string): Promise<{ taskBusinessId: string; status: string }> {
-    return api.command(
-      `/api/production/tasks/${encodeURIComponent(taskBusinessId)}/cancellation`,
-      {
-        idempotencyKey: newIdempotencyKey('task-cancel'),
-        body: { reasonText },
-      },
-    )
+  cancelTask(
+    taskBusinessId: string,
+    reasonText: string,
+  ): Promise<{ taskBusinessId: string; status: string }> {
+    return api.command(`/api/production/tasks/${encodeURIComponent(taskBusinessId)}/cancellation`, {
+      idempotencyKey: newIdempotencyKey('task-cancel'),
+      body: { reasonText },
+    })
   },
 
   verifyOther(input: {
@@ -157,10 +163,10 @@ export const productionService = {
     other: boolean
     expectedRowVersion: number
   }): Promise<DefectReasonView> {
-    return api.command<DefectReasonView, typeof input>(
-      '/api/production/quality/defect-reasons',
-      { idempotencyKey: newIdempotencyKey('defect-reason'), body: input },
-    )
+    return api.command<DefectReasonView, typeof input>('/api/production/quality/defect-reasons', {
+      idempotencyKey: newIdempotencyKey('defect-reason'),
+      body: input,
+    })
   },
 
   changeDefectReasonStatus(
@@ -168,13 +174,13 @@ export const productionService = {
     status: DefectReasonStatus,
     expectedRowVersion: number,
   ): Promise<DefectReasonView> {
-    return api.command<DefectReasonView, { status: DefectReasonStatus; expectedRowVersion: number }>(
-      `/api/production/quality/defect-reasons/${encodeURIComponent(code)}/status`,
-      {
-        idempotencyKey: newIdempotencyKey('defect-reason-status'),
-        body: { status, expectedRowVersion },
-      },
-    )
+    return api.command<
+      DefectReasonView,
+      { status: DefectReasonStatus; expectedRowVersion: number }
+    >(`/api/production/quality/defect-reasons/${encodeURIComponent(code)}/status`, {
+      idempotencyKey: newIdempotencyKey('defect-reason-status'),
+      body: { status, expectedRowVersion },
+    })
   },
 
   correct(input: {

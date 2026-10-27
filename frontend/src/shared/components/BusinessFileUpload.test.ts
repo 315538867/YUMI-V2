@@ -73,18 +73,14 @@ describe('业务附件上传', () => {
     })
 
     await input.trigger('change')
-    await vi.waitFor(() =>
-      expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['FILE-1']),
-    )
+    await vi.waitFor(() => expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['FILE-1']))
   })
 
   it('预览携带引用方权限点读取内容', async () => {
     readContent.mockResolvedValue(new Blob(['content'], { type: 'application/pdf' }))
     const wrapper = mountComponent({ modelValue: 'FILE-1' })
 
-    const previewButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('预览'))
+    const previewButton = wrapper.findAll('button').find((button) => button.text().includes('预览'))
     expect(previewButton).toBeDefined()
     await previewButton?.trigger('click')
     await vi.waitFor(() => expect(readContent).toHaveBeenCalledWith('FILE-1', 'finance.read'))

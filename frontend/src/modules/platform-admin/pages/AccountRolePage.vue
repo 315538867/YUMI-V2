@@ -112,7 +112,13 @@ onMounted(load)
 <template>
   <section class="account-role-page">
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <h1>账号与角色</h1>
     <el-table :data="accounts" border>
       <el-table-column prop="loginName" label="登录名" width="160" />
@@ -124,13 +130,19 @@ onMounted(load)
       </el-table-column>
       <el-table-column label="角色" min-width="200">
         <template #default="{ row }">
-          <el-tag v-for="code in row.roleCodes" :key="code" class="tag">{{ roleName(code) }}</el-tag>
+          <el-tag v-for="code in row.roleCodes" :key="code" class="tag">{{
+            roleName(code)
+          }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="190">
         <template #default="{ row }">
           <el-button link type="primary" @click="openAssign(row)">授权角色</el-button>
-          <el-button link :type="row.status === 'ACTIVE' ? 'warning' : 'success'" @click="toggleStatus(row)">
+          <el-button
+            link
+            :type="row.status === 'ACTIVE' ? 'warning' : 'success'"
+            @click="toggleStatus(row)"
+          >
             {{ row.status === 'ACTIVE' ? '停用' : '启用' }}
           </el-button>
         </template>
@@ -146,7 +158,13 @@ onMounted(load)
       <el-table-column prop="name" label="名称" width="160" />
       <el-table-column label="权限" min-width="300">
         <template #default="{ row }">
-          <CodeTag v-for="code in row.permissionCodes" :key="code" category="platform.permission" :code="code" class="tag" />
+          <CodeTag
+            v-for="code in row.permissionCodes"
+            :key="code"
+            category="platform.permission"
+            :code="code"
+            class="tag"
+          />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="100">
@@ -161,7 +179,12 @@ onMounted(load)
         <el-form-item label="账号">{{ activeAccount?.loginName }}</el-form-item>
         <el-form-item label="角色">
           <el-select v-model="selectedRoles" multiple>
-            <el-option v-for="role in roles" :key="role.roleCode" :label="role.name" :value="role.roleCode" />
+            <el-option
+              v-for="role in roles"
+              :key="role.roleCode"
+              :label="role.name"
+              :value="role.roleCode"
+            />
           </el-select>
         </el-form-item>
       </el-form>
@@ -171,13 +194,24 @@ onMounted(load)
       </template>
     </el-dialog>
 
-    <el-dialog v-model="roleVisible" :title="activeRole === null ? '新增角色' : '编辑角色'" width="560px">
+    <el-dialog
+      v-model="roleVisible"
+      :title="activeRole === null ? '新增角色' : '编辑角色'"
+      width="560px"
+    >
       <el-form label-width="92px">
-        <el-form-item label="角色编码"><el-input v-model="roleForm.roleCode" :disabled="activeRole !== null" /></el-form-item>
+        <el-form-item label="角色编码"
+          ><el-input v-model="roleForm.roleCode" :disabled="activeRole !== null"
+        /></el-form-item>
         <el-form-item label="角色名称"><el-input v-model="roleForm.name" /></el-form-item>
         <el-form-item label="权限">
           <el-select v-model="roleForm.permissionCodes" multiple filterable>
-            <el-option v-for="code in permissions" :key="code" :label="codeLabel('platform.permission', code)" :value="code" />
+            <el-option
+              v-for="code in permissions"
+              :key="code"
+              :label="codeLabel('platform.permission', code)"
+              :value="code"
+            />
           </el-select>
         </el-form-item>
       </el-form>
@@ -190,10 +224,30 @@ onMounted(load)
 </template>
 
 <style scoped>
-.account-role-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-h2 { margin: 0; font-size: 16px; }
-.roles-head { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 10px; }
-.tag { margin-right: 4px; }
-.alert { margin-bottom: 12px; }
+.account-role-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.roles-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 0 10px;
+}
+.tag {
+  margin-right: 4px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>

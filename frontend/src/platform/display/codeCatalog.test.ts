@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { catalog, codeLabel, codeTagType, codesOf, categories } from '@/platform/display/codeCatalog'
+import {
+  catalog,
+  codeLabel,
+  codeTagType,
+  codesOf,
+  categories,
+} from '@/platform/display/codeCatalog'
 
 const allowedTags = new Set(['success', 'warning', 'info', 'danger', 'primary', ''])
 

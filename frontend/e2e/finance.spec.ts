@@ -11,7 +11,11 @@ test('日常收支按业务日期归月并与现金流水一致', async ({ page 
   await page.locator('.el-form-item').filter({ hasText: '分类' }).locator('.el-select').click()
   await page.getByRole('option', { name: '日常杂项' }).click()
   await formInput(page, '金额').fill('50.00')
-  await page.locator('.el-form-item').filter({ hasText: '说明' }).locator('textarea').fill('验收日常收入')
+  await page
+    .locator('.el-form-item')
+    .filter({ hasText: '说明' })
+    .locator('textarea')
+    .fill('验收日常收入')
   await page.getByRole('button', { name: '登记收支' }).click()
   await expect(page.getByText(/已入账/).first()).toBeVisible()
 

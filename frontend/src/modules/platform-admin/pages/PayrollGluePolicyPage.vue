@@ -50,9 +50,20 @@ onMounted(load)
 <template>
   <section class="glue-policy-page">
     <h1>胶水减免设置</h1>
-    <el-alert type="info" :closable="false" title="配置按生效月追加版本；修订不会重算已核定工资。" class="alert" />
+    <el-alert
+      type="info"
+      :closable="false"
+      title="配置按生效月追加版本；修订不会重算已核定工资。"
+      class="alert"
+    />
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="alert"
+    />
     <el-alert
       v-if="policyMissing"
       type="info"
@@ -75,17 +86,37 @@ onMounted(load)
     <el-descriptions v-if="policy" :column="3" border class="current">
       <el-descriptions-item label="当前版本">v{{ policy.version }}</el-descriptions-item>
       <el-descriptions-item label="生效月">{{ policy.effectiveMonth }}</el-descriptions-item>
-      <el-descriptions-item label="免扣重量">{{ policy.exemptWeightGrams }} 克/人/月</el-descriptions-item>
+      <el-descriptions-item label="免扣重量"
+        >{{ policy.exemptWeightGrams }} 克/人/月</el-descriptions-item
+      >
     </el-descriptions>
   </section>
 </template>
 
 <style scoped>
-.glue-policy-page { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 20px; }
-h1 { margin: 0 0 12px; font-size: 18px; }
-.month { width: 150px; }
-.weight { width: 140px; }
-.reason { width: 220px; }
-.current { margin-top: 16px; }
-.alert { margin-bottom: 12px; }
+.glue-policy-page {
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.month {
+  width: 150px;
+}
+.weight {
+  width: 140px;
+}
+.reason {
+  width: 220px;
+}
+.current {
+  margin-top: 16px;
+}
+.alert {
+  margin-bottom: 12px;
+}
 </style>
