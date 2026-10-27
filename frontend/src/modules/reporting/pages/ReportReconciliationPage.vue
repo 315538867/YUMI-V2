@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import { reportingService } from '@/modules/reporting/services/reportingService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+
+const { loading, errorText, run } = useAsyncLoad(true)
 
 interface VersionRow {
   versionBusinessId: string
@@ -21,8 +23,6 @@ const versions = ref<VersionRow[]>([])
 const differences = ref<
   Array<{ differenceBusinessId: string; feedCode: string; detailText: string }>
 >([])
-const loading = ref(true)
-const errorText = ref('')
 const { filters, search, sync } = useListQuery(
   { version: '' },
   { paged: false, onSearch: () => void loadDifferences() },
@@ -30,20 +30,14 @@ const { filters, search, sync } = useListQuery(
 const selected = computed(() => filters.version)
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     versions.value = await reportingService.versions()
     if (!versions.value.some((item) => item.versionBusinessId === filters.version)) {
       filters.version = versions.value[0]?.versionBusinessId ?? ''
     }
     await sync()
     await loadDifferences()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '投影版本加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '投影版本加载失败')
 }
 
 async function selectVersion(versionBusinessId: string): Promise<void> {

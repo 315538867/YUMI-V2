@@ -5,17 +5,22 @@ import com.yumi.platform.api.idempotency.CommandOutcome;
 import com.yumi.platform.api.idempotency.CommandRequest;
 import com.yumi.platform.api.http.RequestContextResolver;
 import com.yumi.platform.api.idempotency.CommandExecutionFacade;
+import com.yumi.workforce.api.AssignmentSubjectQuery;
+import com.yumi.workforce.api.AssignmentSubjectRef;
+import com.yumi.workforce.api.AssignmentSubjectType;
 import com.yumi.workforce.api.ChangeQualificationCommand;
 import com.yumi.workforce.api.CreateTeamCommand;
 import com.yumi.workforce.api.DeactivateTeamCommand;
 import com.yumi.workforce.api.EmployeeRef;
 import com.yumi.workforce.api.EmploymentStatus;
+import com.yumi.workforce.api.EmployeeHistoryView;
 import com.yumi.workforce.api.EmployeeView;
 import com.yumi.workforce.api.HireEmployeeCommand;
 import com.yumi.workforce.api.LeaveEmployeeCommand;
 import com.yumi.workforce.api.RehireEmployeeCommand;
 import com.yumi.workforce.api.TeamRef;
 import com.yumi.workforce.api.TeamStatus;
+import com.yumi.workforce.api.TeamHistoryView;
 import com.yumi.workforce.api.TeamView;
 import com.yumi.workforce.api.UpdateEmployeeCommand;
 import com.yumi.workforce.api.UpdateTeamCommand;
@@ -46,6 +51,8 @@ public class WorkforceController {
 
     private final WorkforceApplicationService workforce;
 
+    private final AssignmentSubjectQuery subjects;
+
     private final CommandExecutionFacade commands;
 
     private final ObjectMapper objectMapper;
@@ -54,10 +61,12 @@ public class WorkforceController {
 
     public WorkforceController(
             WorkforceApplicationService workforce,
+            AssignmentSubjectQuery subjects,
             CommandExecutionFacade commands,
             ObjectMapper objectMapper,
             RequestContextResolver contextResolver) {
         this.workforce = workforce;
+        this.subjects = subjects;
         this.commands = commands;
         this.objectMapper = objectMapper;
         this.contextResolver = contextResolver;
@@ -86,7 +95,7 @@ public class WorkforceController {
     }
 
     /** 停用小组请求体；小组标识来自路径。 */
-    public record DeactivateTeamRequest(long expectedRowVersion) {
+    public record DeactivateTeamRequest(long expectedRowVersion, String reason) {
     }
 
     @PostMapping("/employees")
@@ -205,6 +214,11 @@ public class WorkforceController {
         return workforce.getEmployee(employeeBusinessId);
     }
 
+    @GetMapping("/employees/{employeeBusinessId}/history")
+    public EmployeeHistoryView getEmployeeHistory(@PathVariable String employeeBusinessId) {
+        return workforce.getEmployeeHistory(employeeBusinessId);
+    }
+
     @PostMapping("/teams")
     public ResponseEntity<TeamView> createTeam(
             @RequestBody CreateTeamCommand request, HttpServletRequest servletRequest) {
@@ -250,7 +264,7 @@ public class WorkforceController {
             @RequestBody DeactivateTeamRequest request,
             HttpServletRequest servletRequest) {
         DeactivateTeamCommand command = new DeactivateTeamCommand(
-                teamBusinessId, request.expectedRowVersion());
+                teamBusinessId, request.expectedRowVersion(), request.reason());
         var context = contextResolver.resolveCommand(servletRequest);
         commands.execute(
                 new CommandRequest(
@@ -280,6 +294,18 @@ public class WorkforceController {
     @GetMapping("/teams/{teamBusinessId}")
     public TeamView getTeam(@PathVariable String teamBusinessId) {
         return workforce.getTeam(teamBusinessId);
+    }
+
+    @GetMapping("/teams/{teamBusinessId}/history")
+    public TeamHistoryView getTeamHistory(@PathVariable String teamBusinessId) {
+        return workforce.getTeamHistory(teamBusinessId);
+    }
+
+    @GetMapping("/subjects/{subjectType}/{subjectBusinessId}/references")
+    public java.util.List<com.yumi.workforce.api.WorkforceActivityReferenceView> getReferences(
+            @PathVariable AssignmentSubjectType subjectType,
+            @PathVariable String subjectBusinessId) {
+        return subjects.getActiveReferences(new AssignmentSubjectRef(subjectType, subjectBusinessId));
     }
 
     private EmployeeView changeQualification(

@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import type { ProductView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import type { ProductionProjectionRow } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import ListPage from '@/shared/components/ListPage.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad()
 
 const products = ref<ProductView[]>([])
 const rows = ref<ProductionProjectionRow[]>([])
-const loading = ref(false)
-const errorText = ref('')
 const { filters, search } = useListQuery(
   { productId: '' },
   { paged: false, onSearch: () => void load() },
 )
 
 async function loadProducts(): Promise<void> {
-  try {
+  await run(async () => {
     products.value = await productService.list('', 'ACTIVE', 1, 100)
     if (!products.value.some((item) => item.productBusinessId === filters.productId)) {
       filters.productId = products.value[0]?.productBusinessId ?? ''
@@ -26,9 +26,7 @@ async function loadProducts(): Promise<void> {
     if (filters.productId !== '') {
       await load()
     }
-  } catch (error) {
-    errorText.value = userMessageOf(error, '商品加载失败')
-  }
+  }, '商品加载失败')
 }
 
 async function load(): Promise<void> {
@@ -36,15 +34,9 @@ async function load(): Promise<void> {
     rows.value = []
     return
   }
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     rows.value = await productionService.demands(filters.productId)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '需求缺口加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '需求缺口加载失败')
 }
 
 onMounted(loadProducts)

@@ -16,6 +16,18 @@ export interface ProductionOverviewProcess {
   remainingQuantity: number
 }
 
+export interface AvailableProductionSourceView {
+  productionSourceBusinessId: string
+  demandBusinessId: string
+  demandType: string
+  productBusinessId: string
+  schemeBusinessId: string
+  targetProcess: string
+  initialQuantity: number
+  reservedQuantity: number
+  availableQuantity: number
+}
+
 export interface ProductionOverview {
   orderCount: number
   requiredQuantity: number

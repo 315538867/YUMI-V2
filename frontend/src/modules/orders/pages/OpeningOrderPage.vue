@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
@@ -13,14 +12,16 @@ import type { ProductView, SchemeView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import { orderService } from '@/modules/orders/services/orderService'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad(true)
 
 const router = useRouter()
-const loading = ref(true)
 const customers = ref<CustomerView[]>([])
 const products = ref<ProductView[]>([])
 const schemes = ref<SchemeView[]>([])
-const errorText = ref('')
 const initialSnapshot = ref('')
+const { run: runAction } = useAsyncAction()
 const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
   [
     'customerBusinessId',
@@ -58,8 +59,7 @@ const isDirty = computed(
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
 
 async function load(): Promise<void> {
-  loading.value = true
-  try {
+  await run(async () => {
     ;[customers.value, products.value] = await Promise.all([
       customerService.list('', 'ACTIVE', 1, 100),
       productService.list('', 'ACTIVE', 1, 100),
@@ -74,11 +74,7 @@ async function load(): Promise<void> {
     form.recipientPhone = customer?.phone ?? ''
     form.recipientAddress = customer?.defaultAddress ?? ''
     initialSnapshot.value = JSON.stringify(form)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '接管录入数据加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '接管录入数据加载失败')
 }
 
 async function loadSchemes(): Promise<void> {
@@ -138,60 +134,61 @@ async function save(): Promise<void> {
   if (!validateForm()) {
     return
   }
-  try {
-    const entry = await productService.orderEntry(form.schemeBusinessId)
-    await submit(
-      () =>
-        orderService.intake({
-          customerBusinessId: form.customerBusinessId,
-          originalOrderReference: form.originalOrderReference,
-          orderDate: form.orderDate,
-          expectedDeliveryDate: form.expectedDeliveryDate,
-          note: form.note,
-          items: [
-            {
-              agreement: {
-                productBusinessId: form.productBusinessId,
-                schemeSnapshotRef: entry.ref,
-                targetProcess: 'SEAM_CUTTING',
-                quantity: Number(form.quantity),
-                unitPrice: money(form.unitPrice),
-                materialSources: {
-                  glue: 'STUDIO',
-                  colorPaste: 'STUDIO',
-                  bag: 'STUDIO',
-                  decoration: 'STUDIO',
-                },
-                recipient: {
-                  customerName: form.recipientName,
-                  phone: form.recipientPhone,
-                  address: form.recipientAddress,
-                },
-              },
-              openingLines: [
-                {
-                  stageCode: form.stageCode,
-                  physicalDestination: null,
-                  reworkProcessCode: null,
-                  quantity: Number(form.quantity),
-                  reasonText: null,
-                },
-              ],
-            },
-          ],
-        }),
-      {
-        success: '已有订单已接管',
-        fallback: '订单接管失败',
-        onSuccess: async (created) => {
-          allowLeave()
-          await router.replace(`/orders/${created.orderBusinessId}`)
-        },
-      },
-    )
-  } catch (error) {
-    ElMessage.error(userMessageOf(error, '订单接管失败'))
+  const entry = await runAction(() => productService.orderEntry(form.schemeBusinessId), {
+    fallback: '订单接管失败',
+  })
+  if (entry === undefined) {
+    return
   }
+  await submit(
+    () =>
+      orderService.intake({
+        customerBusinessId: form.customerBusinessId,
+        originalOrderReference: form.originalOrderReference,
+        orderDate: form.orderDate,
+        expectedDeliveryDate: form.expectedDeliveryDate,
+        note: form.note,
+        items: [
+          {
+            agreement: {
+              productBusinessId: form.productBusinessId,
+              schemeSnapshotRef: entry.ref,
+              targetProcess: 'SEAM_CUTTING',
+              quantity: Number(form.quantity),
+              unitPrice: money(form.unitPrice),
+              materialSources: {
+                glue: 'STUDIO',
+                colorPaste: 'STUDIO',
+                bag: 'STUDIO',
+                decoration: 'STUDIO',
+              },
+              recipient: {
+                customerName: form.recipientName,
+                phone: form.recipientPhone,
+                address: form.recipientAddress,
+              },
+            },
+            openingLines: [
+              {
+                stageCode: form.stageCode,
+                physicalDestination: null,
+                reworkProcessCode: null,
+                quantity: Number(form.quantity),
+                reasonText: null,
+              },
+            ],
+          },
+        ],
+      }),
+    {
+      success: '已有订单已接管',
+      fallback: '订单接管失败',
+      onSuccess: async (created) => {
+        allowLeave()
+        await router.replace(`/orders/${created.orderBusinessId}`)
+      },
+    },
+  )
 }
 
 onMounted(load)

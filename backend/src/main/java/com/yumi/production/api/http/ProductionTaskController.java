@@ -214,6 +214,12 @@ public class ProductionTaskController {
         return commandResult(result.get(), execution.replayed(), HttpStatus.OK);
     }
 
+    @GetMapping("/available-sources")
+    public java.util.List<com.yumi.production.api.AvailableProductionSourceView> availableSources(
+            @RequestParam com.yumi.production.api.TargetProcess processCode) {
+        return tasks.availableSources(processCode);
+    }
+
     @GetMapping("/demands")
     public List<ProductionProjectionRow> demands(
             @RequestParam String productBusinessId,

@@ -1,6 +1,8 @@
 package com.yumi.production.application.port;
 
+import com.yumi.production.api.DemandType;
 import com.yumi.production.api.SourceKind;
+import com.yumi.production.api.TargetProcess;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +22,8 @@ public interface ProductionRepository {
     Optional<SourceRecord> findSource(String productionSourceBusinessId);
 
     List<SourceRecord> findSourcesOfDemand(String demandBusinessId);
+
+    List<AvailableSourceRecord> listAvailableSources();
 
     void insertSource(SourceRecord record);
 
@@ -55,6 +59,15 @@ public interface ProductionRepository {
             String dispositionCode, String physicalDestination, String reworkProcessCode,
             int quantity, String reasonCode, String reasonText,
             java.time.Instant occurredAt, String operatorId) {
+    }
+
+    /** 可安排来源读模型：来源、需求类型与数量投影合并。 */
+    record AvailableSourceRecord(
+            String productionSourceBusinessId, String demandBusinessId, DemandType demandType,
+            String productBusinessId, String schemeBusinessId, TargetProcess targetProcess,
+            int initialQuantity, String openingStatus, String status,
+            int pendingWorkQuantity, int inProcessQuantity, int fulfillmentGapQuantity,
+            int reservedQuantity) {
     }
 
     /** 阶段数量投影。 */

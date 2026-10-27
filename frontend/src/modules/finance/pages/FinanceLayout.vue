@@ -6,11 +6,13 @@ const route = useRoute()
 const router = useRouter()
 const active = computed(() => route.path)
 const tabs = [
-  { path: '/finance/daily-cash', label: '日常收支' },
+  { path: '/finance/monthly', label: '月度汇总' },
+  { path: '/finance/daily-cash', label: '资金收付' },
   { path: '/finance/cash-history', label: '现金流水' },
-  { path: '/finance/cost-entries', label: '成本明细' },
-  { path: '/finance/cost-failures', label: '归集失败' },
+  { path: '/finance/cost-entries', label: '成本台账' },
   { path: '/finance/cost-allocation', label: '成本分摊' },
+  { path: '/finance/cost-failures', label: '归集失败' },
+  { path: '/payroll/periods', label: '工资结算' },
 ]
 </script>
 

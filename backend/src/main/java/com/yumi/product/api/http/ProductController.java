@@ -311,6 +311,26 @@ public class ProductController {
         return ResponseEntity.ok(updated.get());
     }
 
+    @PostMapping("/schemes/{schemeBusinessId}/activate")
+    public ResponseEntity<Map<String, String>> activateScheme(
+            @PathVariable String schemeBusinessId,
+            @RequestBody(required = false) DeactivateSchemeRequest request,
+            HttpServletRequest servletRequest) {
+        long rowVersion = request == null || request.expectedRowVersion() == null
+                ? 0L : request.expectedRowVersion();
+        var context = contextResolver.resolveCommand(servletRequest);
+        commands.execute(
+                new CommandRequest(
+                        "product.scheme.activate",
+                        context.idempotencyKey(),
+                        CommandExecutionFacade.fingerprint(objectMapper, request)),
+                () -> {
+                    schemes.activateCustomScheme(schemeBusinessId, rowVersion);
+                    return new CommandOutcome("PRODUCT_SCHEME", schemeBusinessId);
+                });
+        return ResponseEntity.ok(Map.of("schemeBusinessId", schemeBusinessId));
+    }
+
     @PostMapping("/schemes/{schemeBusinessId}/deactivate")
     public ResponseEntity<Map<String, String>> deactivateScheme(
             @PathVariable String schemeBusinessId,

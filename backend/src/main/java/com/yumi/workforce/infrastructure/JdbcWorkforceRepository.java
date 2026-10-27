@@ -347,6 +347,7 @@ public class JdbcWorkforceRepository implements WorkforceRepository {
     @Override
     public void replaceTeamMembers(
             String teamBusinessId, List<String> employeeBusinessIds, Instant now, String operatorId) {
+        List<String> before = teamMemberIds(teamBusinessId);
         jdbc.sql("DELETE FROM workforce_team_members WHERE team_business_id = :businessId")
                 .param("businessId", teamBusinessId)
                 .update();
@@ -360,7 +361,9 @@ public class JdbcWorkforceRepository implements WorkforceRepository {
                     .param("employeeId", employeeBusinessId)
                     .param("now", JdbcTimes.toUtc(now))
                     .update();
-            insertTeamMemberFact(teamBusinessId, employeeBusinessId, "JOIN", now, operatorId);
+            if (!before.contains(employeeBusinessId)) {
+                insertTeamMemberFact(teamBusinessId, employeeBusinessId, "JOIN", now, operatorId);
+            }
         }
     }
 
@@ -430,6 +433,21 @@ public class JdbcWorkforceRepository implements WorkforceRepository {
     }
 
     @Override
+    public void insertEfficiencyStandard(EfficiencyStandardRecord record) {
+        jdbc.sql("""
+                        INSERT INTO workforce_team_efficiency_standards (
+                            standard_business_id, member_count, efficiency_factor,
+                            content_version, row_version, updated_at, updated_by)
+                        VALUES (:standardId, :memberCount, :factor, 1, 1, UTC_TIMESTAMP(6), :operatorId)
+                        """)
+                .param("standardId", record.standardBusinessId())
+                .param("memberCount", record.memberCount())
+                .param("factor", record.efficiencyFactor())
+                .param("operatorId", "SYSTEM")
+                .update();
+    }
+
+    @Override
     public boolean updateEfficiencyStandard(
             String standardBusinessId, int memberCount, BigDecimal factor, long expectedRowVersion,
             Instant now, String operatorId) {
@@ -479,6 +497,159 @@ public class JdbcWorkforceRepository implements WorkforceRepository {
                 .param("standardId", standardBusinessId)
                 .param("expectedRowVersion", expectedRowVersion)
                 .update() == 1;
+    }
+
+
+    @Override
+    public List<EmploymentFactRecord> listEmploymentFacts(String employeeBusinessId) {
+        return jdbc.sql("""
+                        SELECT fact_business_id, fact_type, effective_date, reason, occurred_at, operator_id
+                        FROM workforce_employment_facts
+                        WHERE employee_business_id = :businessId
+                        ORDER BY effective_date DESC, occurred_at DESC
+                        """)
+                .param("businessId", employeeBusinessId)
+                .query((resultSet, rowNumber) -> new EmploymentFactRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("fact_type"),
+                        resultSet.getObject("effective_date", LocalDate.class),
+                        resultSet.getString("reason"),
+                        JdbcTimes.toInstant(resultSet.getObject("occurred_at", LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public List<QualificationFactRecord> listQualificationFacts(String employeeBusinessId) {
+        return jdbc.sql("""
+                        SELECT fact_business_id, work_type_code, fact_type, effective_date,
+                               occurred_at, operator_id
+                        FROM workforce_qualification_facts
+                        WHERE employee_business_id = :businessId
+                        ORDER BY effective_date DESC, occurred_at DESC
+                        """)
+                .param("businessId", employeeBusinessId)
+                .query((resultSet, rowNumber) -> new QualificationFactRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("work_type_code"),
+                        resultSet.getString("fact_type"),
+                        resultSet.getObject("effective_date", LocalDate.class),
+                        JdbcTimes.toInstant(resultSet.getObject("occurred_at", LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public List<TeamMemberFactRecord> listTeamMemberFacts(String teamBusinessId) {
+        return jdbc.sql("""
+                        SELECT f.fact_business_id, f.employee_business_id, f.fact_type,
+                               f.occurred_at, f.operator_id, e.employee_no, e.name
+                        FROM workforce_team_member_facts f
+                        LEFT JOIN workforce_employees e
+                          ON e.employee_business_id = f.employee_business_id
+                        WHERE f.team_business_id = :teamId
+                        ORDER BY f.occurred_at DESC
+                        """)
+                .param("teamId", teamBusinessId)
+                .query((resultSet, rowNumber) -> new TeamMemberFactRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("employee_business_id"),
+                        resultSet.getString("employee_no"),
+                        resultSet.getString("name"),
+                        resultSet.getString("fact_type"),
+                        JdbcTimes.toInstant(resultSet.getObject("occurred_at", LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public List<TeamStatusFactRecord> listTeamStatusFacts(String teamBusinessId) {
+        return jdbc.sql("""
+                        SELECT fact_business_id, fact_type, status, reason, occurred_at, operator_id
+                        FROM workforce_team_status_facts
+                        WHERE team_business_id = :teamId
+                        ORDER BY occurred_at DESC
+                        """)
+                .param("teamId", teamBusinessId)
+                .query((resultSet, rowNumber) -> new TeamStatusFactRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("fact_type"),
+                        TeamStatus.valueOf(resultSet.getString("status")),
+                        resultSet.getString("reason"),
+                        JdbcTimes.toInstant(resultSet.getObject("occurred_at", LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public void insertTeamStatusFact(
+            String teamBusinessId, String factType, TeamStatus status, String reason,
+            Instant now, String operatorId) {
+        jdbc.sql("""
+                        INSERT INTO workforce_team_status_facts (
+                            fact_business_id, team_business_id, fact_type, status, reason,
+                            occurred_at, operator_id)
+                        VALUES (:factId, :teamId, :factType, :status, :reason, :now, :operatorId)
+                        """)
+                .param("factId", "WTSF-" + UUID.randomUUID())
+                .param("teamId", teamBusinessId)
+                .param("factType", factType)
+                .param("status", status.name())
+                .param("reason", reason)
+                .param("now", JdbcTimes.toUtc(now))
+                .param("operatorId", operatorId)
+                .update();
+    }
+
+    @Override
+    public List<StandardVersionRecord> listStandardVersions(
+            String standardType, String standardBusinessId) {
+        return jdbc.sql("""
+                        SELECT version_business_id, standard_type, standard_business_id,
+                               content_version, member_count, efficiency_factor, effective_minutes,
+                               reason, occurred_at, operator_id
+                        FROM workforce_standard_version_facts
+                        WHERE standard_type = :standardType AND standard_business_id = :standardId
+                        ORDER BY content_version DESC
+                        """)
+                .param("standardType", standardType)
+                .param("standardId", standardBusinessId)
+                .query((resultSet, rowNumber) -> new StandardVersionRecord(
+                        resultSet.getString("version_business_id"),
+                        resultSet.getString("standard_type"),
+                        resultSet.getString("standard_business_id"),
+                        resultSet.getLong("content_version"),
+                        resultSet.getObject("member_count", Integer.class),
+                        resultSet.getBigDecimal("efficiency_factor"),
+                        resultSet.getObject("effective_minutes", Integer.class),
+                        resultSet.getString("reason"),
+                        JdbcTimes.toInstant(resultSet.getObject("occurred_at", LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public void insertStandardVersion(StandardVersionRecord record) {
+        jdbc.sql("""
+                        INSERT INTO workforce_standard_version_facts (
+                            version_business_id, standard_type, standard_business_id, content_version,
+                            member_count, efficiency_factor, effective_minutes, reason,
+                            occurred_at, operator_id)
+                        VALUES (:versionId, :standardType, :standardId, :contentVersion,
+                                :memberCount, :efficiencyFactor, :effectiveMinutes, :reason,
+                                :occurredAt, :operatorId)
+                        """)
+                .param("versionId", record.versionBusinessId())
+                .param("standardType", record.standardType())
+                .param("standardId", record.standardBusinessId())
+                .param("contentVersion", record.contentVersion())
+                .param("memberCount", record.memberCount())
+                .param("efficiencyFactor", record.efficiencyFactor())
+                .param("effectiveMinutes", record.effectiveMinutes())
+                .param("reason", record.reason())
+                .param("occurredAt", JdbcTimes.toUtc(record.occurredAt()))
+                .param("operatorId", record.operatorId())
+                .update();
     }
 
     private static final String SELECT_EMPLOYEE = """

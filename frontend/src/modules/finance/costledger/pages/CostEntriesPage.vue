@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import type { CostEntryView, CostSubjectSummary } from '@/modules/finance/costledger/contracts'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
@@ -8,11 +7,14 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad()
 
 const entries = ref<CostEntryView[]>([])
 const summary = ref<CostSubjectSummary | null>(null)
-const loading = ref(false)
-const errorText = ref('')
+const detailVisible = ref(false)
+const detailEntry = ref<CostEntryView | null>(null)
 const { filters, search, reset } = useListQuery(
   {
     subjectType: 'ORDER',
@@ -30,9 +32,7 @@ async function load(): Promise<void> {
     errorText.value = ''
     return
   }
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     ;[entries.value, summary.value] = await Promise.all([
       costLedgerService.entries(
         filters.subjectType,
@@ -47,11 +47,12 @@ async function load(): Promise<void> {
         filters.endDate,
       ),
     ])
-  } catch (error) {
-    errorText.value = userMessageOf(error, '成本明细加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '成本明细加载失败')
+}
+
+function openDetail(row: CostEntryView): void {
+  detailEntry.value = row
+  detailVisible.value = true
 }
 
 void load()
@@ -126,11 +127,44 @@ void load()
       <el-table-column label="发生时间" width="230">
         <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
       </el-table-column>
+      <el-table-column label="操作" width="80" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+        </template>
+      </el-table-column>
     </el-table>
     <template #footer>
       <p class="hint">成本合计不是现金支出；参考工资与处理金额不自动成为成本。</p>
     </template>
   </ListPage>
+
+  <el-drawer v-model="detailVisible" title="成本记录详情" size="420px">
+    <el-descriptions v-if="detailEntry" :column="1" border>
+      <el-descriptions-item label="成本事实">
+        {{ detailEntry.costEntryBusinessId }}
+      </el-descriptions-item>
+      <el-descriptions-item label="分类">
+        <CodeTag category="finance.costCategory" :code="detailEntry.costCategory" />
+      </el-descriptions-item>
+      <el-descriptions-item label="主体">
+        <CodeTag category="finance.costSubjectType" :code="detailEntry.subjectType" />
+        · {{ detailEntry.subjectBusinessId }}
+      </el-descriptions-item>
+      <el-descriptions-item label="金额">
+        <MoneyText :value="detailEntry.amount" />
+      </el-descriptions-item>
+      <el-descriptions-item label="业务日期">{{ detailEntry.businessDate }}</el-descriptions-item>
+      <el-descriptions-item label="操作">
+        <CodeTag category="finance.costOperation" :code="detailEntry.operationType" />
+      </el-descriptions-item>
+      <el-descriptions-item label="已分摊">
+        {{ detailEntry.allocated ? '是' : '否' }}
+      </el-descriptions-item>
+      <el-descriptions-item label="发生时间">
+        <DateTimeText :value="detailEntry.occurredAt" />
+      </el-descriptions-item>
+    </el-descriptions>
+  </el-drawer>
 </template>
 
 <style scoped>

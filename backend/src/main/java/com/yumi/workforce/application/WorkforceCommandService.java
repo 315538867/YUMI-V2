@@ -16,8 +16,10 @@ import com.yumi.workforce.api.AssignmentSubjectQuery;
 import com.yumi.workforce.api.AssignmentSubjectRef;
 import com.yumi.workforce.api.AssignmentSubjectType;
 import com.yumi.workforce.api.ChangeQualificationCommand;
+import com.yumi.workforce.api.CreateEfficiencyStandardCommand;
 import com.yumi.workforce.api.CreateTeamCommand;
 import com.yumi.workforce.api.DeactivateTeamCommand;
+import com.yumi.workforce.api.EmployeeHistoryView;
 import com.yumi.workforce.api.EmployeeRef;
 import com.yumi.workforce.api.EmployeeView;
 import com.yumi.workforce.api.EmploymentStatus;
@@ -26,6 +28,7 @@ import com.yumi.workforce.api.LeaveEmployeeCommand;
 import com.yumi.workforce.api.QualificationStatus;
 import com.yumi.workforce.api.RehireEmployeeCommand;
 import com.yumi.workforce.api.ReservationScopeType;
+import com.yumi.workforce.api.TeamHistoryView;
 import com.yumi.workforce.api.TeamRef;
 import com.yumi.workforce.api.TeamStatus;
 import com.yumi.workforce.api.TeamView;
@@ -33,8 +36,10 @@ import com.yumi.workforce.api.UpdateEfficiencyStandardCommand;
 import com.yumi.workforce.api.UpdateEmployeeCommand;
 import com.yumi.workforce.api.UpdateTeamCommand;
 import com.yumi.workforce.api.UpdateWorkTimeStandardCommand;
+import com.yumi.workforce.api.WorkforceActivityReferenceView;
 import com.yumi.workforce.api.WorkforceApplicationService;
 import com.yumi.workforce.api.WorkforceStandardQuery;
+import com.yumi.workforce.api.WorkforceStandardVersionView;
 import com.yumi.workforce.api.WorkforceStandardView;
 import com.yumi.workforce.application.port.ActivityReservationRepository;
 import com.yumi.workforce.application.port.EmployeeRecord;
@@ -278,6 +283,8 @@ public class WorkforceCommandService
                     now,
                     now);
             repository.insertTeam(record, operatorId);
+            repository.insertTeamStatusFact(
+                    record.teamBusinessId(), "CREATE", TeamStatus.ACTIVE, null, now, operatorId);
             repository.replaceTeamMembers(record.teamBusinessId(), memberIds, now, operatorId);
             recordAudit("CREATE_TEAM", record.teamBusinessId(), Map.of(
                     "teamNo", record.teamNo(), "memberCount", String.valueOf(memberIds.size())));
@@ -349,7 +356,46 @@ public class WorkforceCommandService
                         ApiErrorType.CONCURRENT_CONFLICT, "WORKFORCE_VERSION_CONFLICT",
                         "小组已被其他操作修改，请重新打开后再操作");
             }
+            repository.insertTeamStatusFact(
+                    teamBusinessId, "DEACTIVATE", TeamStatus.INACTIVE, command.reason(),
+                    now, operatorId());
             recordAudit("DEACTIVATE_TEAM", teamBusinessId, Map.of());
+        });
+    }
+
+    @Override
+    public void createEfficiencyStandard(CreateEfficiencyStandardCommand command) {
+        authorization.require(PermissionCodes.WORKFORCE_STANDARD_MANAGE, ResourceScope.GLOBAL);
+        if (command == null) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_STANDARD", "标准不能为空");
+        }
+        if (command.efficiencyFactor() == null || command.efficiencyFactor().compareTo(BigDecimal.ONE) <= 0) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "WORKFORCE_STANDARD_INVALID", "效率因子必须大于 1");
+        }
+        if (command.memberCount() < 2) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "WORKFORCE_STANDARD_INVALID", "效率标准人数至少为 2");
+        }
+        transactionTemplate.executeWithoutResult(status -> {
+            if (repository.findEfficiencyStandardByMemberCount(command.memberCount()).isPresent()) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "WORKFORCE_STANDARD_EXISTS",
+                        "该人数已有当前效率标准，请直接修改");
+            }
+            Instant now = clock.instant();
+            String operatorId = operatorId();
+            var record = new WorkforceRepository.EfficiencyStandardRecord(
+                    "WFE-" + command.memberCount(), command.memberCount(),
+                    command.efficiencyFactor(), 1, 1);
+            repository.insertEfficiencyStandard(record);
+            repository.insertStandardVersion(new WorkforceRepository.StandardVersionRecord(
+                    "WSV-" + UUID.randomUUID(), "EFFICIENCY", record.standardBusinessId(),
+                    1, record.memberCount(), record.efficiencyFactor(), null,
+                    command.reason(), now, operatorId));
+            recordAudit("CREATE_EFFICIENCY_STANDARD", record.standardBusinessId(), Map.of(
+                    "memberCount", String.valueOf(command.memberCount()),
+                    "efficiencyFactor", command.efficiencyFactor().toPlainString()));
         });
     }
 
@@ -386,6 +432,13 @@ public class WorkforceCommandService
                         ApiErrorType.CONCURRENT_CONFLICT, "WORKFORCE_VERSION_CONFLICT",
                         "效率标准已被其他操作修改，请重新打开后再保存");
             }
+            var updated = repository.findEfficiencyStandard(standardBusinessId)
+                    .orElseThrow(() -> new ApiException(
+                            ApiErrorType.NOT_FOUND, "WORKFORCE_STANDARD_INVALID", "效率标准不存在"));
+            repository.insertStandardVersion(new WorkforceRepository.StandardVersionRecord(
+                    "WSV-" + UUID.randomUUID(), "EFFICIENCY", standardBusinessId,
+                    updated.contentVersion(), updated.memberCount(), updated.efficiencyFactor(),
+                    null, command.reason(), now, operatorId()));
             recordAudit("UPDATE_EFFICIENCY_STANDARD", standardBusinessId, Map.of(
                     "memberCount", String.valueOf(command.memberCount()),
                     "efficiencyFactor", command.efficiencyFactor().toPlainString()));
@@ -419,6 +472,13 @@ public class WorkforceCommandService
                         ApiErrorType.CONCURRENT_CONFLICT, "WORKFORCE_VERSION_CONFLICT",
                         "每日有效时间标准已被其他操作修改，请重新打开后再保存");
             }
+            var updated = repository.findDailyStandard()
+                    .orElseThrow(() -> new ApiException(
+                            ApiErrorType.NOT_FOUND, "WORKFORCE_STANDARD_INVALID", "每日有效时间标准不存在"));
+            repository.insertStandardVersion(new WorkforceRepository.StandardVersionRecord(
+                    "WSV-" + UUID.randomUUID(), "DAILY_WORK_TIME", daily.standardBusinessId(),
+                    updated.contentVersion(), null, null, updated.effectiveMinutes(),
+                    command.reason(), clock.instant(), operatorId()));
             recordAudit("UPDATE_DAILY_WORK_TIME_STANDARD", daily.standardBusinessId(),
                     Map.of("effectiveMinutes", String.valueOf(command.effectiveMinutes())));
         });
@@ -448,6 +508,23 @@ public class WorkforceCommandService
     }
 
     @Override
+    public EmployeeHistoryView getEmployeeHistory(String employeeBusinessId) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        requireEmployee(employeeBusinessId);
+        return new EmployeeHistoryView(
+                repository.listEmploymentFacts(employeeBusinessId).stream()
+                        .map(fact -> new EmployeeHistoryView.EmploymentFactView(
+                                fact.factBusinessId(), fact.factType(), fact.effectiveDate(),
+                                fact.reason(), fact.occurredAt(), fact.operatorId()))
+                        .toList(),
+                repository.listQualificationFacts(employeeBusinessId).stream()
+                        .map(fact -> new EmployeeHistoryView.QualificationFactView(
+                                fact.factBusinessId(), fact.workTypeCode(), fact.factType(),
+                                fact.effectiveDate(), fact.occurredAt(), fact.operatorId()))
+                        .toList());
+    }
+
+    @Override
     public List<TeamView> listTeams() {
         authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
         return repository.listTeams().stream().map(this::toView).toList();
@@ -470,6 +547,24 @@ public class WorkforceCommandService
     }
 
     @Override
+    public TeamHistoryView getTeamHistory(String teamBusinessId) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        requireTeam(teamBusinessId);
+        return new TeamHistoryView(
+                repository.listTeamMemberFacts(teamBusinessId).stream()
+                        .map(fact -> new TeamHistoryView.MemberFactView(
+                                fact.factBusinessId(), fact.employeeBusinessId(), fact.employeeNo(),
+                                fact.employeeName(), fact.factType(), fact.occurredAt(),
+                                fact.operatorId()))
+                        .toList(),
+                repository.listTeamStatusFacts(teamBusinessId).stream()
+                        .map(fact -> new TeamHistoryView.StatusFactView(
+                                fact.factBusinessId(), fact.factType(), fact.status(), fact.reason(),
+                                fact.occurredAt(), fact.operatorId()))
+                        .toList());
+    }
+
+    @Override
     public WorkforceStandardView getStandards() {
         authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
         var daily = repository.findDailyStandard()
@@ -480,11 +575,60 @@ public class WorkforceCommandService
                 daily.effectiveMinutes(),
                 daily.contentVersion(),
                 daily.rowVersion(),
+                reservations.activeReferenceCount(
+                        ReservationScopeType.DAILY_WORK_TIME_STANDARD, daily.standardBusinessId()),
                 repository.listEfficiencyStandards().stream()
                         .map(standard -> new WorkforceStandardView.EfficiencyStandardView(
                                 standard.standardBusinessId(), standard.memberCount(),
-                                standard.efficiencyFactor(), standard.contentVersion(), standard.rowVersion()))
+                                standard.efficiencyFactor(), standard.contentVersion(),
+                                standard.rowVersion(),
+                                reservations.activeReferenceCount(
+                                        ReservationScopeType.EFFICIENCY_STANDARD,
+                                        standard.standardBusinessId())))
                         .toList());
+    }
+
+    @Override
+    public WorkforceStandardVersionView getStandardHistory(
+            String standardType, String standardBusinessId) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        if (!"EFFICIENCY".equals(standardType) && !"DAILY_WORK_TIME".equals(standardType)) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "WORKFORCE_STANDARD_INVALID", "标准类型不正确");
+        }
+        if ("EFFICIENCY".equals(standardType)) {
+            repository.findEfficiencyStandard(standardBusinessId)
+                    .orElseThrow(() -> new ApiException(
+                            ApiErrorType.NOT_FOUND, "WORKFORCE_STANDARD_INVALID", "效率标准不存在"));
+        } else {
+            repository.findDailyStandard()
+                    .orElseThrow(() -> new ApiException(
+                            ApiErrorType.NOT_FOUND, "WORKFORCE_STANDARD_INVALID", "每日有效时间标准不存在"));
+        }
+        return new WorkforceStandardVersionView(
+                standardType,
+                standardBusinessId,
+                repository.listStandardVersions(standardType, standardBusinessId).stream()
+                        .map(version -> new WorkforceStandardVersionView.Version(
+                                version.versionBusinessId(), version.contentVersion(),
+                                version.memberCount(), version.efficiencyFactor(),
+                                version.effectiveMinutes(), version.reason(),
+                                version.occurredAt(), version.operatorId()))
+                        .toList());
+    }
+
+    @Override
+    public List<WorkforceActivityReferenceView> getActiveReferences(AssignmentSubjectRef subject) {
+        authorization.require(PermissionCodes.WORKFORCE_READ, ResourceScope.GLOBAL);
+        ReservationScopeType scope = subject.subjectType() == AssignmentSubjectType.EMPLOYEE
+                ? ReservationScopeType.EMPLOYEE
+                : ReservationScopeType.TEAM;
+        return reservations.findActiveByReserved(scope, subject.businessId()).stream()
+                .map(record -> new WorkforceActivityReferenceView(
+                        record.reservationBusinessId(), record.sourceModule(), record.sourceType(),
+                        record.sourceBusinessId(), record.workTypeCode(), record.workDate(),
+                        record.status()))
+                .toList();
     }
 
     @Override

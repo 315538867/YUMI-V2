@@ -1,23 +1,24 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorCode } from '@/platform/services/errorMessage'
 import type { EmployeePayrollView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad(true)
+const { loading: saving, run: runAction } = useAsyncAction()
 
 const route = useRoute()
 const router = useRouter()
 const periodId = String(route.query.period ?? '')
 const employeeId = String(route.query.employee ?? '')
 const result = ref<EmployeePayrollView | null>(null)
-const loading = ref(true)
-const saving = ref(false)
-const errorText = ref('')
 const emptyText = ref('')
 const successText = ref('')
 const confirmedAmount = ref('')
@@ -27,7 +28,6 @@ const adjustVisible = ref(false)
 const adjustment = reactive({ delta: '', reason: '' })
 
 async function load(): Promise<void> {
-  errorText.value = ''
   emptyText.value = ''
   if (periodId.trim() === '' || employeeId.trim() === '') {
     result.value = null
@@ -35,23 +35,26 @@ async function load(): Promise<void> {
     loading.value = false
     return
   }
-  loading.value = true
-  try {
-    result.value = await payrollService.result(periodId, employeeId)
-    confirmedAmount.value = result.value.confirmedAmount?.amount ?? ''
-    for (const line of result.value.lines) {
-      manual[line.lineBusinessId] = { amount: '', note: '' }
-    }
-  } catch (error) {
-    if (isErrorCode(error, 'PAYROLL_RESULT_NOT_FOUND')) {
-      result.value = null
-      emptyText.value = '该员工在当前工资期间暂无工资结果；请先在期间页刷新参考'
-    } else {
-      errorText.value = userMessageOf(error, '工资结果加载失败')
-    }
-  } finally {
-    loading.value = false
-  }
+  await run(
+    async () => {
+      result.value = await payrollService.result(periodId, employeeId)
+      confirmedAmount.value = result.value.confirmedAmount?.amount ?? ''
+      for (const line of result.value.lines) {
+        manual[line.lineBusinessId] = { amount: '', note: '' }
+      }
+    },
+    '工资结果加载失败',
+    {
+      handled: (error) => {
+        if (isErrorCode(error, 'PAYROLL_RESULT_NOT_FOUND')) {
+          result.value = null
+          emptyText.value = '该员工在当前工资期间暂无工资结果；请先在期间页刷新参考'
+          return true
+        }
+        return false
+      },
+    },
+  )
 }
 
 async function confirm(): Promise<void> {
@@ -66,68 +69,72 @@ async function confirm(): Promise<void> {
     errorText.value = '请填写核定说明'
     return
   }
-  saving.value = true
-  errorText.value = ''
-  try {
-    await payrollService.confirm({
-      resultBusinessId: result.value.resultBusinessId,
-      expectedRowVersion: result.value.rowVersion,
-      referenceFingerprint: result.value.referenceFingerprint,
-      confirmedAmount: confirmedAmount.value,
-      note: note.value,
-      processingItems: result.value.lines.map((line) => ({
-        referenceLineBusinessId: line.lineBusinessId,
-        manualAmount:
-          manual[line.lineBusinessId]?.amount.trim() === ''
-            ? null
-            : manual[line.lineBusinessId]!.amount,
-        note:
-          manual[line.lineBusinessId]?.note.trim() === ''
-            ? null
-            : manual[line.lineBusinessId]!.note,
-      })),
-    })
-    successText.value = '工资已核定；处理金额未改变最终工资'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资核定失败')
-  } finally {
-    saving.value = false
-  }
+  await runAction(
+    () =>
+      payrollService.confirm({
+        resultBusinessId: result.value!.resultBusinessId,
+        expectedRowVersion: result.value!.rowVersion,
+        referenceFingerprint: result.value!.referenceFingerprint,
+        confirmedAmount: confirmedAmount.value,
+        note: note.value,
+        processingItems: result.value!.lines.map((line) => ({
+          referenceLineBusinessId: line.lineBusinessId,
+          manualAmount:
+            manual[line.lineBusinessId]?.amount.trim() === ''
+              ? null
+              : manual[line.lineBusinessId]!.amount,
+          note:
+            manual[line.lineBusinessId]?.note.trim() === ''
+              ? null
+              : manual[line.lineBusinessId]!.note,
+        })),
+      }),
+    {
+      success: '工资已核定；处理金额未改变最终工资',
+      fallback: '工资核定失败',
+      onSuccess: async () => {
+        successText.value = '工资已核定；处理金额未改变最终工资'
+        await load()
+      },
+    },
+  )
 }
 
 async function review(): Promise<void> {
   if (result.value === null) {
     return
   }
-  try {
-    await payrollService.review(result.value.resultBusinessId)
-    successText.value = '已生成只读复核运行，不改变原核定与应付'
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资复核失败')
-  }
+  await runAction(() => payrollService.review(result.value!.resultBusinessId), {
+    success: '已生成只读复核运行，不改变原核定与应付',
+    fallback: '工资复核失败',
+    onSuccess: () => {
+      successText.value = '已生成只读复核运行，不改变原核定与应付'
+    },
+  })
 }
 
 async function adjust(): Promise<void> {
   if (result.value === null) {
     return
   }
-  try {
-    await payrollService.adjust({
-      resultBusinessId: result.value.resultBusinessId,
-      amountDelta: adjustment.delta,
-      reasonText: adjustment.reason,
-      referenceRunBusinessId: result.value.referenceRunBusinessId,
-    })
-    adjustVisible.value = false
-    successText.value = '人工差额调整已追加，不产生现金'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资调整失败')
-  }
+  await runAction(
+    () =>
+      payrollService.adjust({
+        resultBusinessId: result.value!.resultBusinessId,
+        amountDelta: adjustment.delta,
+        reasonText: adjustment.reason,
+        referenceRunBusinessId: result.value!.referenceRunBusinessId,
+      }),
+    {
+      success: '人工差额调整已追加，不产生现金',
+      fallback: '工资调整失败',
+      onSuccess: async () => {
+        adjustVisible.value = false
+        successText.value = '人工差额调整已追加，不产生现金'
+        await load()
+      },
+    },
+  )
 }
 
 function goPay(): void {

@@ -6,6 +6,7 @@ import com.yumi.platform.api.idempotency.CommandRequest;
 import com.yumi.platform.api.http.RequestContextResolver;
 import com.yumi.platform.api.idempotency.CommandExecutionFacade;
 import com.yumi.workforce.api.AssignmentEligibility;
+import com.yumi.workforce.api.CreateEfficiencyStandardCommand;
 import com.yumi.workforce.api.AssignmentSubjectCurrentView;
 import com.yumi.workforce.api.AssignmentSubjectQuery;
 import com.yumi.workforce.api.AssignmentSubjectRef;
@@ -14,6 +15,7 @@ import com.yumi.workforce.api.UpdateEfficiencyStandardCommand;
 import com.yumi.workforce.api.UpdateWorkTimeStandardCommand;
 import com.yumi.workforce.api.WorkforceApplicationService;
 import com.yumi.workforce.api.WorkforceStandardQuery;
+import com.yumi.workforce.api.WorkforceStandardVersionView;
 import com.yumi.workforce.api.WorkforceStandardView;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
@@ -74,6 +76,31 @@ public class WorkforceStandardsController {
     @GetMapping
     public WorkforceStandardView getStandards() {
         return standards.getStandards();
+    }
+
+    @GetMapping("/{standardType}/{standardBusinessId}/versions")
+    public WorkforceStandardVersionView getStandardHistory(
+            @PathVariable String standardType,
+            @PathVariable String standardBusinessId) {
+        return standards.getStandardHistory(standardType, standardBusinessId);
+    }
+
+    @PostMapping("/efficiency")
+    public ResponseEntity<WorkforceStandardView> createEfficiency(
+            @RequestBody CreateEfficiencyStandardCommand request,
+            HttpServletRequest servletRequest) {
+        var context = contextResolver.resolveCommand(servletRequest);
+        commands.execute(
+                new CommandRequest(
+                        "workforce.createEfficiencyStandard",
+                        context.idempotencyKey(),
+                        CommandExecutionFacade.fingerprint(objectMapper, request)),
+                () -> {
+                    workforce.createEfficiencyStandard(request);
+                    return new CommandOutcome(
+                            "EFFICIENCY_STANDARD", "WFE-" + request.memberCount());
+                });
+        return ResponseEntity.ok(standards.getStandards());
     }
 
     @PutMapping("/efficiency")

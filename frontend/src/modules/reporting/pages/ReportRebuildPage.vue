@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAuthStore } from '@/platform/stores/auth'
 import { reportingService } from '@/modules/reporting/services/reportingService'
@@ -9,10 +8,11 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText: loadError, run: runLoad } = useAsyncLoad()
 
 const auth = useAuthStore()
-const loadError = ref('')
-const loading = ref(false)
 const successText = ref('')
 const { loading: acting, run } = useAsyncAction()
 const versions = ref<
@@ -21,15 +21,9 @@ const versions = ref<
 const canManage = auth.hasPermission('reporting.admin')
 
 async function load(): Promise<void> {
-  loading.value = true
-  loadError.value = ''
-  try {
+  await runLoad(async () => {
     versions.value = await reportingService.versions()
-  } catch (error) {
-    loadError.value = userMessageOf(error, '版本列表加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '版本列表加载失败')
 }
 
 async function ingest(): Promise<void> {

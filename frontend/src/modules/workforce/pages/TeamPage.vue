@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { TeamStatus, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -10,30 +10,24 @@ import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+
 const router = useRouter()
 const teams = ref<TeamView[]>([])
-const loading = ref(false)
-const errorText = ref('')
 const { filters, page, size, sizes, search, reset, goPage, changeSize } = useListQuery(
   { keyword: '', status: '' as TeamStatus | '' },
   { onSearch: () => void load() },
 )
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     teams.value = await workforceService.searchTeams(
       filters.keyword,
       filters.status,
       page.value,
       size.value,
     )
-  } catch (error) {
-    errorText.value = userMessageOf(error, '小组列表加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '小组列表加载失败')
 }
 
 void load()

@@ -1,48 +1,61 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorCode } from '@/platform/services/errorMessage'
 import type { GluePolicyView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { errorText, run } = useAsyncLoad()
+const { loading: saving, run: runAction } = useAsyncAction()
 
 const month = ref(new Date().toISOString().slice(0, 7))
 const policy = ref<GluePolicyView | null>(null)
 const policyMissing = ref(false)
-const errorText = ref('')
 const successText = ref('')
 const form = reactive({ exemptWeightGrams: '300.0000', reasonText: '', expectedGuardVersion: 0 })
 
 async function load(): Promise<void> {
   policyMissing.value = false
-  errorText.value = ''
-  try {
-    policy.value = await payrollService.gluePolicy(month.value)
-    form.exemptWeightGrams = policy.value.exemptWeightGrams
-  } catch (error) {
-    policy.value = null
-    if (isErrorCode(error, 'PAYROLL_GLUE_POLICY_MISSING')) {
-      policyMissing.value = true
-    } else {
-      errorText.value = userMessageOf(error, '胶水配置加载失败')
-    }
-  }
+  await run(
+    async () => {
+      policy.value = await payrollService.gluePolicy(month.value)
+      form.exemptWeightGrams = policy.value.exemptWeightGrams
+    },
+    '胶水配置加载失败',
+    {
+      handled: (error) => {
+        if (isErrorCode(error, 'PAYROLL_GLUE_POLICY_MISSING')) {
+          policy.value = null
+          policyMissing.value = true
+          return true
+        }
+        return false
+      },
+    },
+  )
 }
 
 async function publish(): Promise<void> {
-  try {
-    policy.value = await payrollService.publishGluePolicy({
-      effectiveMonth: `${month.value}-01`,
-      exemptWeightGrams: form.exemptWeightGrams,
-      reasonText: form.reasonText,
-      expectedGuardVersion: Number(form.expectedGuardVersion),
-    })
-    policyMissing.value = false
-    successText.value = `已发布 v${policy.value.version}；历史核定不变`
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '胶水配置发布失败')
-  }
+  await runAction(
+    () =>
+      payrollService.publishGluePolicy({
+        effectiveMonth: `${month.value}-01`,
+        exemptWeightGrams: form.exemptWeightGrams,
+        reasonText: form.reasonText,
+        expectedGuardVersion: Number(form.expectedGuardVersion),
+      }),
+    {
+      success: '胶水配置已发布',
+      fallback: '胶水配置发布失败',
+      onSuccess: (published) => {
+        policy.value = published
+        policyMissing.value = false
+        successText.value = `已发布 v${published.version}；历史核定不变`
+      },
+    },
+  )
 }
 
 onMounted(load)
@@ -82,7 +95,7 @@ onMounted(load)
       <el-form-item label="原因">
         <el-input v-model="form.reasonText" class="reason" />
       </el-form-item>
-      <el-button type="primary" @click="publish">发布版本</el-button>
+      <el-button type="primary" :loading="saving" @click="publish">发布版本</el-button>
     </el-form>
     <el-descriptions v-if="policy" :column="3" border class="current">
       <el-descriptions-item label="当前版本">v{{ policy.version }}</el-descriptions-item>

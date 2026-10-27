@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import type { PhysicalDestination, TaskView } from '@/modules/production/contracts'
 import {
   productionService,
@@ -10,6 +8,11 @@ import {
 } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad(true)
+const { loading: saving, run: runAction } = useAsyncAction()
 
 interface ItemForm {
   taskItemBusinessId: string
@@ -28,9 +31,6 @@ const items = ref<ItemForm[]>([])
 const otherCompleted = ref(0)
 const otherUnfinished = ref(0)
 const resultNote = ref('')
-const loading = ref(true)
-const saving = ref(false)
-const errorText = ref('')
 const successText = ref('')
 
 function defaults(item: { taskItemBusinessId: string; plannedQuantity: number }): ItemForm {
@@ -46,19 +46,14 @@ function defaults(item: { taskItemBusinessId: string; plannedQuantity: number })
 }
 
 async function load(): Promise<void> {
-  loading.value = true
-  try {
+  await run(async () => {
     if (taskId !== '') {
       task.value = await productionService.task(taskId)
       items.value = task.value.items.map(defaults)
       otherCompleted.value = task.value.plannedWorkQuantity
       otherUnfinished.value = 0
     }
-  } catch (error) {
-    errorText.value = userMessageOf(error, '任务加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '任务加载失败')
 }
 
 function toVerifyInput(item: ItemForm): VerifyItemInput {
@@ -101,31 +96,32 @@ async function submit(): Promise<void> {
   if (task.value === null) {
     return
   }
-  saving.value = true
-  errorText.value = ''
   successText.value = ''
-  try {
-    if (task.value.taskType === 'OTHER_TASK') {
-      await productionService.verifyOther({
-        taskBusinessId: task.value.taskBusinessId,
-        completedQuantity:
-          task.value.otherTask?.plannedQuantity == null ? null : Number(otherCompleted.value),
-        unfinishedQuantity:
-          task.value.otherTask?.plannedQuantity == null ? null : Number(otherUnfinished.value),
-        resultNote: resultNote.value === '' ? null : resultNote.value,
-      })
-    } else {
-      await productionService.verify(items.value.map(toVerifyInput))
-    }
-    successText.value = '核验已提交；数量与事实以服务端结果为准'
-    ElMessage.success(successText.value)
-    task.value = await productionService.task(task.value.taskBusinessId)
-    items.value = task.value.items.map(defaults)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '核验失败')
-  } finally {
-    saving.value = false
-  }
+  await runAction(
+    async () => {
+      if (task.value!.taskType === 'OTHER_TASK') {
+        await productionService.verifyOther({
+          taskBusinessId: task.value!.taskBusinessId,
+          completedQuantity:
+            task.value!.otherTask?.plannedQuantity == null ? null : Number(otherCompleted.value),
+          unfinishedQuantity:
+            task.value!.otherTask?.plannedQuantity == null ? null : Number(otherUnfinished.value),
+          resultNote: resultNote.value === '' ? null : resultNote.value,
+        })
+      } else {
+        await productionService.verify(items.value.map(toVerifyInput))
+      }
+      task.value = await productionService.task(task.value!.taskBusinessId)
+      items.value = task.value.items.map(defaults)
+    },
+    {
+      success: '核验已提交；数量与事实以服务端结果为准',
+      fallback: '核验失败',
+      onSuccess: () => {
+        successText.value = '核验已提交；数量与事实以服务端结果为准'
+      },
+    },
+  )
 }
 
 onMounted(load)

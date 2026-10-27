@@ -121,6 +121,41 @@ public class JdbcProductionRepository implements ProductionRepository {
     }
 
     @Override
+    public List<AvailableSourceRecord> listAvailableSources() {
+        return jdbc.sql("""
+                        SELECT s.production_source_business_id, s.demand_business_id, d.demand_type,
+                               s.product_business_id, s.scheme_business_id, s.target_process,
+                               s.initial_quantity, s.opening_status, s.status,
+                               p.pending_work_quantity, p.in_process_quantity,
+                               p.fulfillment_gap_quantity,
+                               COALESCE(r.reserved_quantity, 0) AS reserved_quantity
+                        FROM production_sources s
+                        JOIN production_demands d ON d.demand_business_id = s.demand_business_id
+                        JOIN production_demand_quantity_projections p
+                          ON p.demand_business_id = s.demand_business_id
+                        LEFT JOIN production_source_reservations r
+                          ON r.production_source_business_id = s.production_source_business_id
+                        WHERE s.status = 'ACTIVE'
+                        ORDER BY s.created_at, s.production_source_business_id
+                        """)
+                .query((resultSet, rowNumber) -> new AvailableSourceRecord(
+                        resultSet.getString("production_source_business_id"),
+                        resultSet.getString("demand_business_id"),
+                        DemandType.valueOf(resultSet.getString("demand_type")),
+                        resultSet.getString("product_business_id"),
+                        resultSet.getString("scheme_business_id"),
+                        TargetProcess.valueOf(resultSet.getString("target_process")),
+                        resultSet.getInt("initial_quantity"),
+                        resultSet.getString("opening_status"),
+                        resultSet.getString("status"),
+                        resultSet.getInt("pending_work_quantity"),
+                        resultSet.getInt("in_process_quantity"),
+                        resultSet.getInt("fulfillment_gap_quantity"),
+                        resultSet.getInt("reserved_quantity")))
+                .list();
+    }
+
+    @Override
     public void insertSource(SourceRecord record) {
         jdbc.sql("""
                         INSERT INTO production_sources (

@@ -134,6 +134,16 @@ export const productService = {
     })
   },
 
+  activateScheme(schemeBusinessId: string, expectedRowVersion: number): Promise<void> {
+    return api.command<void, { expectedRowVersion: number }>(
+      `/api/products/schemes/${encodeURIComponent(schemeBusinessId)}/activate`,
+      {
+        idempotencyKey: newIdempotencyKey('scheme-activate'),
+        body: { expectedRowVersion },
+      },
+    )
+  },
+
   deactivateScheme(schemeBusinessId: string, expectedRowVersion: number): Promise<void> {
     return api.command<void, { expectedRowVersion: number }>(
       `/api/products/schemes/${encodeURIComponent(schemeBusinessId)}/deactivate`,

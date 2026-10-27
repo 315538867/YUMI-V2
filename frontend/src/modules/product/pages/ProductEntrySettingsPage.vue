@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { newIdempotencyKey } from '@/platform/services/idempotency'
 import { money } from '@/platform/services/money'
 import type { EntryConfiguration } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad(true)
+const { run: runAction } = useAsyncAction()
 
 const router = useRouter()
 const configuration = ref<EntryConfiguration | null>(null)
-const loading = ref(true)
-const errorText = ref('')
 const defaults = reactive({
   glueLossRate: '',
   glueUnitPrice: '',
@@ -29,52 +30,57 @@ const newOption = reactive({
 })
 
 async function load(): Promise<void> {
-  loading.value = true
-  try {
+  await run(async () => {
     configuration.value = await productService.entryConfiguration()
     defaults.glueLossRate = configuration.value.glueLossRate
     defaults.glueUnitPrice = configuration.value.glueUnitPrice.amount
     defaults.colorPasteUnitPrice = configuration.value.colorPasteUnitPrice.amount
-  } catch (error) {
-    errorText.value = userMessageOf(error, '录入设置加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '录入设置加载失败')
 }
 
 async function saveDefaults(): Promise<void> {
   if (configuration.value === null) {
     return
   }
-  try {
-    configuration.value = await productService.saveEntryDefaults({
-      glueLossRate: defaults.glueLossRate,
-      glueUnitPrice: money(defaults.glueUnitPrice),
-      colorPasteUnitPrice: money(defaults.colorPasteUnitPrice),
-      expectedRowVersion: configuration.value.rowVersion,
-    })
-    ElMessage.success('录入默认值已保存')
-  } catch (error) {
-    errorText.value = userMessageOf(error, '录入默认值保存失败')
-  }
+  await runAction(
+    () =>
+      productService.saveEntryDefaults({
+        glueLossRate: defaults.glueLossRate,
+        glueUnitPrice: money(defaults.glueUnitPrice),
+        colorPasteUnitPrice: money(defaults.colorPasteUnitPrice),
+        expectedRowVersion: configuration.value!.rowVersion,
+      }),
+    {
+      success: '录入默认值已保存',
+      fallback: '录入默认值保存失败',
+      onSuccess: (saved) => {
+        configuration.value = saved
+      },
+    },
+  )
 }
 
 async function saveStar(star: EntryConfiguration['makingStars'][number]): Promise<void> {
   if (configuration.value === null) {
     return
   }
-  try {
-    configuration.value = await productService.saveMakingStar(star.starCode, {
-      name: star.name,
-      standardMinutes: Number(star.standardMinutes),
-      sortOrder: Number(star.sortOrder),
-      active: true,
-      expectedRowVersion: configuration.value.rowVersion,
-    })
-    ElMessage.success('星级已保存')
-  } catch (error) {
-    errorText.value = userMessageOf(error, '星级保存失败')
-  }
+  await runAction(
+    () =>
+      productService.saveMakingStar(star.starCode, {
+        name: star.name,
+        standardMinutes: Number(star.standardMinutes),
+        sortOrder: Number(star.sortOrder),
+        active: true,
+        expectedRowVersion: configuration.value!.rowVersion,
+      }),
+    {
+      success: '星级已保存',
+      fallback: '星级保存失败',
+      onSuccess: (saved) => {
+        configuration.value = saved
+      },
+    },
+  )
 }
 
 async function addStar(): Promise<void> {
@@ -85,39 +91,49 @@ async function addStar(): Promise<void> {
     errorText.value = '请填写星级代码与名称'
     return
   }
-  try {
-    configuration.value = await productService.saveMakingStar(newStar.starCode.trim(), {
-      name: newStar.name.trim(),
-      standardMinutes: Number(newStar.standardMinutes),
-      sortOrder: Number(newStar.sortOrder),
-      active: true,
-      expectedRowVersion: configuration.value.rowVersion,
-    })
-    Object.assign(newStar, { starCode: '', name: '', standardMinutes: 0, sortOrder: 0 })
-    ElMessage.success('星级已新增')
-  } catch (error) {
-    errorText.value = userMessageOf(error, '星级新增失败')
-  }
+  await runAction(
+    () =>
+      productService.saveMakingStar(newStar.starCode.trim(), {
+        name: newStar.name.trim(),
+        standardMinutes: Number(newStar.standardMinutes),
+        sortOrder: Number(newStar.sortOrder),
+        active: true,
+        expectedRowVersion: configuration.value!.rowVersion,
+      }),
+    {
+      success: '星级已新增',
+      fallback: '星级新增失败',
+      onSuccess: (saved) => {
+        configuration.value = saved
+        Object.assign(newStar, { starCode: '', name: '', standardMinutes: 0, sortOrder: 0 })
+      },
+    },
+  )
 }
 
 async function saveOption(option: EntryConfiguration['processTimeOptions'][number]): Promise<void> {
   if (configuration.value === null) {
     return
   }
-  try {
-    configuration.value = await productService.saveProcessTimeOption(option.optionBusinessId, {
-      processCode: option.processCode,
-      optionCode: option.optionCode,
-      name: option.name,
-      standardMinutes: Number(option.standardMinutes),
-      sortOrder: Number(option.sortOrder),
-      active: true,
-      expectedRowVersion: configuration.value.rowVersion,
-    })
-    ElMessage.success('工序标准时间已保存')
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工序标准时间保存失败')
-  }
+  await runAction(
+    () =>
+      productService.saveProcessTimeOption(option.optionBusinessId, {
+        processCode: option.processCode,
+        optionCode: option.optionCode,
+        name: option.name,
+        standardMinutes: Number(option.standardMinutes),
+        sortOrder: Number(option.sortOrder),
+        active: true,
+        expectedRowVersion: configuration.value!.rowVersion,
+      }),
+    {
+      success: '工序标准时间已保存',
+      fallback: '工序标准时间保存失败',
+      onSuccess: (saved) => {
+        configuration.value = saved
+      },
+    },
+  )
 }
 
 async function addOption(): Promise<void> {
@@ -128,30 +144,32 @@ async function addOption(): Promise<void> {
     errorText.value = '请填写选项代码与名称'
     return
   }
-  try {
-    configuration.value = await productService.saveProcessTimeOption(
-      `PTO-${newIdempotencyKey('option')}`,
-      {
+  await runAction(
+    () =>
+      productService.saveProcessTimeOption(`PTO-${newIdempotencyKey('option')}`, {
         processCode: newOption.processCode,
         optionCode: newOption.optionCode.trim(),
         name: newOption.name.trim(),
         standardMinutes: Number(newOption.standardMinutes),
         sortOrder: Number(newOption.sortOrder),
         active: true,
-        expectedRowVersion: configuration.value.rowVersion,
+        expectedRowVersion: configuration.value!.rowVersion,
+      }),
+    {
+      success: '工序标准时间已新增',
+      fallback: '工序标准时间新增失败',
+      onSuccess: (saved) => {
+        configuration.value = saved
+        Object.assign(newOption, {
+          processCode: 'MAKING',
+          optionCode: '',
+          name: '',
+          standardMinutes: 0,
+          sortOrder: 0,
+        })
       },
-    )
-    Object.assign(newOption, {
-      processCode: 'MAKING',
-      optionCode: '',
-      name: '',
-      standardMinutes: 0,
-      sortOrder: 0,
-    })
-    ElMessage.success('工序标准时间已新增')
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工序标准时间新增失败')
-  }
+    },
+  )
 }
 
 onMounted(load)

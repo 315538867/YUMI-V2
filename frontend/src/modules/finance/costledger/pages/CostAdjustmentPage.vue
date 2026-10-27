@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
+const { loading: saving, run: runAction } = useAsyncAction()
 const errorText = ref('')
 const successText = ref('')
 const form = reactive({ entryId: '', newAmount: '', reasonText: '' })
@@ -14,13 +14,16 @@ async function submit(): Promise<void> {
     errorText.value = '请填写成本事实与更正原因'
     return
   }
-  try {
-    await costLedgerService.adjust(form.entryId.trim(), form.newAmount, form.reasonText)
-    successText.value = '已追加反向事实与替代成本，原金额保留可追溯'
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '成本更正失败')
-  }
+  await runAction(
+    () => costLedgerService.adjust(form.entryId.trim(), form.newAmount, form.reasonText),
+    {
+      success: '已追加反向事实与替代成本，原金额保留可追溯',
+      fallback: '成本更正失败',
+      onSuccess: () => {
+        successText.value = '已追加反向事实与替代成本，原金额保留可追溯'
+      },
+    },
+  )
 }
 </script>
 
@@ -47,7 +50,7 @@ async function submit(): Promise<void> {
       <el-form-item label="更正原因"
         ><el-input v-model="form.reasonText" type="textarea" :rows="2"
       /></el-form-item>
-      <el-button type="primary" @click="submit">提交更正</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">提交更正</el-button>
     </el-form>
   </WorkspacePage>
 </template>

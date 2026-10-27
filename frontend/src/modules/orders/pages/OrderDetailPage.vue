@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type {
   OrderView,
@@ -23,7 +22,16 @@ import PageState from '@/shared/components/PageState.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 import { formatDateTime } from '@/platform/display/dateTime'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+
+const { loading, errorText, run } = useAsyncLoad(true)
+const { loading: paying, run: runPayment } = useAsyncAction()
+const { loading: shipping, run: runShipping } = useAsyncAction()
+const { loading: correcting, run: runCorrecting } = useAsyncAction()
+const { loading: changing, run: runChanging } = useAsyncAction()
+const { run: runComplete } = useAsyncAction()
 
 interface TraceLedger {
   requiredQuantity?: number
@@ -53,15 +61,12 @@ const productNames = ref<Record<string, string>>({})
 const progressByItem = ref<Record<string, ProgressRow[]>>({})
 const orderContentVersion = ref(0)
 const activeTab = ref('agreements')
-const loading = ref(true)
-const errorText = ref('')
 
 const paymentDialog = ref(false)
 const paymentPreview = ref(false)
 const paymentKind = ref<'payment' | 'refund'>('payment')
 const paymentForm = reactive({ amount: '', businessDate: today() })
 const voucherId = ref<string | null>(null)
-const paying = ref(false)
 
 const shipmentDialog = ref(false)
 const shipmentForm = reactive({
@@ -72,7 +77,6 @@ const shipmentForm = reactive({
   trackingNo: '',
   businessDate: today(),
 })
-const shipping = ref(false)
 
 const correctionDialog = ref(false)
 const correctionForm = reactive({
@@ -81,11 +85,9 @@ const correctionForm = reactive({
   quantityDecrease: 0,
   reasonText: '',
 })
-const correcting = ref(false)
 
 const changeDialog = ref(false)
 const changeForm = reactive({ unitPrice: '', reason: '' })
-const changing = ref(false)
 
 const voucherDialog = ref(false)
 const voucherFiles = ref<Array<{ label: string; url: string }>>([])
@@ -119,9 +121,7 @@ function paymentLabel(payment: OrderWorkspacePayment): string {
 }
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     const current = await orderService.workspace(orderId)
     workspace.value = current
     order.value = current.order
@@ -178,11 +178,7 @@ async function load(): Promise<void> {
     const summaries = await orderService.list(current.order.orderNo, '')
     orderContentVersion.value =
       summaries.find((row) => row.orderBusinessId === orderId)?.contentVersion ?? 0
-  } catch (error) {
-    errorText.value = userMessageOf(error, '订单详情加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '订单详情加载失败')
 }
 
 function openPayment(kind: 'payment' | 'refund'): void {
@@ -215,33 +211,39 @@ async function confirmPayment(): Promise<void> {
   if (order.value === null) {
     return
   }
-  paying.value = true
-  try {
-    const vouchers = voucherId.value === null ? [] : [voucherId.value]
-    if (paymentKind.value === 'payment') {
-      await cashService.receiveOrder(
-        orderId,
-        paymentForm.amount,
-        paymentForm.businessDate,
-        vouchers,
-      )
-      ElMessage.success('收款已登记')
-    } else {
-      await cashService.refundOrder(orderId, paymentForm.amount, paymentForm.businessDate, vouchers)
-      ElMessage.success('退款已登记')
-    }
-    paymentPreview.value = false
-    paymentDialog.value = false
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(
-      error,
-      paymentKind.value === 'payment' ? '收款失败' : '退款失败',
-    )
-    paymentPreview.value = false
-  } finally {
-    paying.value = false
-  }
+  const message = paymentKind.value === 'payment' ? '收款已登记' : '退款已登记'
+  await runPayment(
+    async () => {
+      const vouchers = voucherId.value === null ? [] : [voucherId.value]
+      if (paymentKind.value === 'payment') {
+        await cashService.receiveOrder(
+          orderId,
+          paymentForm.amount,
+          paymentForm.businessDate,
+          vouchers,
+        )
+      } else {
+        await cashService.refundOrder(
+          orderId,
+          paymentForm.amount,
+          paymentForm.businessDate,
+          vouchers,
+        )
+      }
+    },
+    {
+      success: message,
+      fallback: paymentKind.value === 'payment' ? '收款失败' : '退款失败',
+      onSuccess: async () => {
+        paymentPreview.value = false
+        paymentDialog.value = false
+        await load()
+      },
+      onError: () => {
+        paymentPreview.value = false
+      },
+    },
+  )
 }
 
 async function openShipment(itemId?: string): Promise<void> {
@@ -273,29 +275,26 @@ async function submitShipment(): Promise<void> {
     errorText.value = '请填写生产来源和大于 0 的数量'
     return
   }
-  shipping.value = true
-  try {
-    const request: ShipmentRequest = {
-      orderBusinessId: orderId,
-      items: [
-        {
-          agreementGroupBusinessId: shipmentForm.groupId,
-          productionSourceBusinessId: shipmentForm.sourceId.trim(),
-          quantity: Number(shipmentForm.quantity),
-        },
-      ],
-      trackingNo: shipmentForm.trackingNo,
-      shippedAt: `${shipmentForm.businessDate}T10:00:00`,
-    }
-    await orderService.ship(request)
-    ElMessage.success('发货已确认')
-    shipmentDialog.value = false
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '发货失败')
-  } finally {
-    shipping.value = false
+  const request: ShipmentRequest = {
+    orderBusinessId: orderId,
+    items: [
+      {
+        agreementGroupBusinessId: shipmentForm.groupId,
+        productionSourceBusinessId: shipmentForm.sourceId.trim(),
+        quantity: Number(shipmentForm.quantity),
+      },
+    ],
+    trackingNo: shipmentForm.trackingNo,
+    shippedAt: `${shipmentForm.businessDate}T10:00:00`,
   }
+  await runShipping(() => orderService.ship(request), {
+    success: '发货已确认',
+    fallback: '发货失败',
+    onSuccess: async () => {
+      shipmentDialog.value = false
+      await load()
+    },
+  })
 }
 
 function openCorrection(shipment: OrderWorkspaceShipment, item: OrderWorkspaceShipmentItem): void {
@@ -311,22 +310,23 @@ async function submitCorrection(): Promise<void> {
     errorText.value = '请填写大于 0 的更正数量和原因'
     return
   }
-  correcting.value = true
-  try {
-    await orderService.correctShipment({
-      shipmentBusinessId: correctionForm.shipmentBusinessId,
-      shipmentItemBusinessId: correctionForm.shipmentItemBusinessId,
-      quantityDecrease: Number(correctionForm.quantityDecrease),
-      reasonText: correctionForm.reasonText,
-    })
-    ElMessage.success('发货更正已提交')
-    correctionDialog.value = false
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '发货更正失败')
-  } finally {
-    correcting.value = false
-  }
+  await runCorrecting(
+    () =>
+      orderService.correctShipment({
+        shipmentBusinessId: correctionForm.shipmentBusinessId,
+        shipmentItemBusinessId: correctionForm.shipmentItemBusinessId,
+        quantityDecrease: Number(correctionForm.quantityDecrease),
+        reasonText: correctionForm.reasonText,
+      }),
+    {
+      success: '发货更正已提交',
+      fallback: '发货更正失败',
+      onSuccess: async () => {
+        correctionDialog.value = false
+        await load()
+      },
+    },
+  )
 }
 
 function openChange(): void {
@@ -346,44 +346,43 @@ async function submitChange(): Promise<void> {
     errorText.value = '请填写新单价和变更原因'
     return
   }
-  changing.value = true
-  try {
-    await orderService.change(
-      orderId,
-      orderContentVersion.value,
-      [
-        {
-          kind: 'PRICE_OR_RECIPIENT',
-          orderItemBusinessId: order.value.items[0]?.orderItemBusinessId,
-          newUnitPrice: { amount: changeForm.unitPrice, currency: 'CNY' },
-          newRecipient: null,
-          newQuantity: null,
-          newSchemeSnapshotRef: null,
-          newTargetProcess: null,
-          newMaterialSources: null,
-          migratedQuantity: null,
-        },
-      ],
-      changeForm.reason,
-    )
-    ElMessage.success('订单变更已提交')
-    changeDialog.value = false
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '订单变更失败')
-  } finally {
-    changing.value = false
-  }
+  await runChanging(
+    () =>
+      orderService.change(
+        orderId,
+        orderContentVersion.value,
+        [
+          {
+            kind: 'PRICE_OR_RECIPIENT',
+            orderItemBusinessId: order.value!.items[0]?.orderItemBusinessId,
+            newUnitPrice: { amount: changeForm.unitPrice, currency: 'CNY' },
+            newRecipient: null,
+            newQuantity: null,
+            newSchemeSnapshotRef: null,
+            newTargetProcess: null,
+            newMaterialSources: null,
+            migratedQuantity: null,
+          },
+        ],
+        changeForm.reason,
+      ),
+    {
+      success: '订单变更已提交',
+      fallback: '订单变更失败',
+      onSuccess: async () => {
+        changeDialog.value = false
+        await load()
+      },
+    },
+  )
 }
 
 async function complete(): Promise<void> {
-  try {
-    await orderService.complete(orderId)
-    ElMessage.success('订单已完成')
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '订单完成失败')
-  }
+  await runComplete(() => orderService.complete(orderId), {
+    success: '订单已完成',
+    fallback: '订单完成失败',
+    onSuccess: load,
+  })
 }
 
 async function viewVouchers(payment: OrderWorkspacePayment): Promise<void> {

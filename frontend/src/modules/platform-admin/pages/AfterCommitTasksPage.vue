@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { AfterCommitTask } from '@/modules/platform-admin/services/administrationService'
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 import ListPage from '@/shared/components/ListPage.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+const { loading: saving, run: runAction } = useAsyncAction()
+
 const tasks = ref<AfterCommitTask[]>([])
-const loading = ref(false)
-const errorText = ref('')
 const { filters, search, reset } = useListQuery(
   { status: 'DEAD' },
   { paged: false, onSearch: () => void load() },
@@ -22,26 +23,20 @@ const active = ref<AfterCommitTask | null>(null)
 const form = reactive({ reason: '' })
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     tasks.value = await administrationService.tasks(filters.status)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '提交后任务加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '提交后任务加载失败')
 }
 
 async function retry(task: AfterCommitTask): Promise<void> {
-  try {
-    await administrationService.retryTask(task.taskBusinessId)
-    successText.value = '已请求重试；沿用原任务身份与去重键'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '任务重试失败')
-  }
+  await runAction(() => administrationService.retryTask(task.taskBusinessId), {
+    success: '已请求重试；沿用原任务身份与去重键',
+    fallback: '任务重试失败',
+    onSuccess: async () => {
+      successText.value = '已请求重试；沿用原任务身份与去重键'
+      await load()
+    },
+  })
 }
 
 function openAbandon(task: AfterCommitTask): void {
@@ -55,15 +50,18 @@ async function abandon(): Promise<void> {
     errorText.value = '放弃任务必须填写原因'
     return
   }
-  try {
-    await administrationService.abandonTask(active.value.taskBusinessId, form.reason)
-    abandonVisible.value = false
-    successText.value = '任务已标记终止；原业务事实不变'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '任务放弃失败')
-  }
+  await runAction(
+    () => administrationService.abandonTask(active.value!.taskBusinessId, form.reason),
+    {
+      success: '任务已标记终止；原业务事实不变',
+      fallback: '任务放弃失败',
+      onSuccess: async () => {
+        abandonVisible.value = false
+        successText.value = '任务已标记终止；原业务事实不变'
+        await load()
+      },
+    },
+  )
 }
 
 void load()
@@ -129,7 +127,7 @@ void load()
     </el-form>
     <template #footer>
       <el-button @click="abandonVisible = false">取消</el-button>
-      <el-button type="danger" @click="abandon">确认放弃</el-button>
+      <el-button type="danger" :loading="saving" @click="abandon">确认放弃</el-button>
     </template>
   </el-dialog>
 </template>

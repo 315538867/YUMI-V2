@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad()
 
 const router = useRouter()
 const periods = ref<PayrollPeriodRef[]>([])
 const results = ref<EmployeePayrollView[]>([])
-const loading = ref(false)
-const errorText = ref('')
 const successText = ref('')
+const { loading: saving, run: runAction } = useAsyncAction()
 const dialogVisible = ref(false)
 const { filters, sync, search } = useListQuery(
   { period: '' },
@@ -28,8 +29,7 @@ const form = reactive({
 })
 
 async function load(): Promise<void> {
-  loading.value = true
-  try {
+  await run(async () => {
     periods.value = await payrollService.periods()
     if (!periods.value.some((item) => item.periodBusinessId === filters.period)) {
       filters.period = periods.value[periods.value.length - 1]?.periodBusinessId ?? ''
@@ -38,24 +38,20 @@ async function load(): Promise<void> {
     if (filters.period !== '') {
       results.value = await payrollService.results(filters.period)
     }
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资期间加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '工资期间加载失败')
 }
 
 async function createPeriod(): Promise<void> {
-  try {
-    const period = await payrollService.createPeriod({ ...form })
-    dialogVisible.value = false
-    filters.period = period.periodBusinessId
-    await sync()
-    ElMessage.success('工资期间已创建')
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资期间创建失败')
-  }
+  await runAction(() => payrollService.createPeriod({ ...form }), {
+    success: '工资期间已创建',
+    fallback: '工资期间创建失败',
+    onSuccess: async (period) => {
+      dialogVisible.value = false
+      filters.period = period.periodBusinessId
+      await sync()
+      await load()
+    },
+  })
 }
 
 async function ingestAndCalculate(): Promise<void> {
@@ -63,15 +59,20 @@ async function ingestAndCalculate(): Promise<void> {
     errorText.value = '请先选择工资期间'
     return
   }
-  try {
-    await payrollService.ingestSources()
-    const calculation = await payrollService.calculate(filters.period)
-    successText.value = `参考已刷新：${calculation.employeeCount} 人 / ${calculation.referenceLineCount} 行`
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资参考计算失败')
-  }
+  await runAction(
+    async () => {
+      await payrollService.ingestSources()
+      return payrollService.calculate(filters.period)
+    },
+    {
+      success: '参考已刷新',
+      fallback: '工资参考计算失败',
+      onSuccess: async (calculation) => {
+        successText.value = `参考已刷新：${calculation.employeeCount} 人 / ${calculation.referenceLineCount} 行`
+        await load()
+      },
+    },
+  )
 }
 
 function openEmployee(row: EmployeePayrollView): void {
@@ -107,7 +108,7 @@ onMounted(load)
     </template>
     <template #actions>
       <el-button @click="dialogVisible = true">新建期间</el-button>
-      <el-button type="primary" @click="ingestAndCalculate">刷新参考</el-button>
+      <el-button type="primary" :loading="saving" @click="ingestAndCalculate">刷新参考</el-button>
       <el-button @click="router.push(`/payroll/payments?period=${filters.period}`)">付款</el-button>
       <el-button @click="router.push('/payroll/glue')">胶水月参考</el-button>
     </template>
@@ -150,7 +151,7 @@ onMounted(load)
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="createPeriod">创建</el-button>
+      <el-button type="primary" :loading="saving" @click="createPeriod">创建</el-button>
     </template>
   </el-dialog>
 </template>

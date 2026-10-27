@@ -46,6 +46,7 @@ export interface EfficiencyStandardView {
   efficiencyFactor: string
   contentVersion: number
   rowVersion: number
+  activeReferenceCount: number
 }
 
 export interface WorkforceStandardView {
@@ -53,7 +54,82 @@ export interface WorkforceStandardView {
   effectiveMinutes: number
   dailyContentVersion: number
   dailyRowVersion: number
+  dailyActiveReferenceCount: number
   efficiencyStandards: EfficiencyStandardView[]
+}
+
+export interface EmploymentFactView {
+  factBusinessId: string
+  factType: 'HIRE' | 'LEAVE' | 'REHIRE'
+  effectiveDate: string
+  reason: string | null
+  occurredAt: string
+  operatorId: string
+}
+
+export interface QualificationFactView {
+  factBusinessId: string
+  workTypeCode: string
+  factType: 'GRANT' | 'REVOKE'
+  effectiveDate: string
+  occurredAt: string
+  operatorId: string
+}
+
+export interface EmployeeHistoryView {
+  employment: EmploymentFactView[]
+  qualifications: QualificationFactView[]
+}
+
+export interface TeamMemberFactView {
+  factBusinessId: string
+  employeeBusinessId: string
+  employeeNo: string | null
+  employeeName: string | null
+  factType: 'JOIN' | 'LEAVE'
+  occurredAt: string
+  operatorId: string
+}
+
+export interface TeamStatusFactView {
+  factBusinessId: string
+  factType: string
+  status: TeamStatus
+  reason: string | null
+  occurredAt: string
+  operatorId: string
+}
+
+export interface TeamHistoryView {
+  members: TeamMemberFactView[]
+  statuses: TeamStatusFactView[]
+}
+
+export interface StandardVersionView {
+  versionBusinessId: string
+  contentVersion: number
+  memberCount: number | null
+  efficiencyFactor: string | null
+  effectiveMinutes: number | null
+  reason: string | null
+  occurredAt: string
+  operatorId: string
+}
+
+export interface WorkforceStandardVersionView {
+  standardType: 'EFFICIENCY' | 'DAILY_WORK_TIME'
+  standardBusinessId: string
+  versions: StandardVersionView[]
+}
+
+export interface WorkforceActivityReferenceView {
+  reservationBusinessId: string
+  sourceModule: string
+  sourceType: string
+  sourceBusinessId: string
+  workTypeCode: string | null
+  workDate: string | null
+  status: string
 }
 
 export interface AssignmentSubjectCurrentView {

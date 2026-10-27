@@ -1,61 +1,59 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useAuthStore } from '@/platform/stores/auth'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { DefectReasonView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import ListPage from '@/shared/components/ListPage.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+const { loading: saving, run: runAction } = useAsyncAction()
+
 const auth = useAuthStore()
 const reasons = ref<DefectReasonView[]>([])
-const loading = ref(false)
-const errorText = ref('')
 const dialogVisible = ref(false)
 const form = reactive({ defectReasonCode: '', name: '', other: false })
 const canManage = auth.hasPermission('production.defect-reason.manage')
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     reasons.value = await productionService.defectReasons()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '缺陷原因加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '缺陷原因加载失败')
 }
 
 async function save(): Promise<void> {
-  try {
-    await productionService.saveDefectReason({
-      defectReasonCode: form.defectReasonCode.trim(),
-      name: form.name.trim(),
-      other: form.other,
-      expectedRowVersion: 0,
-    })
-    dialogVisible.value = false
-    ElMessage.success('缺陷原因已保存')
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '缺陷原因保存失败')
-  }
+  await runAction(
+    () =>
+      productionService.saveDefectReason({
+        defectReasonCode: form.defectReasonCode.trim(),
+        name: form.name.trim(),
+        other: form.other,
+        expectedRowVersion: 0,
+      }),
+    {
+      success: '缺陷原因已保存',
+      fallback: '缺陷原因保存失败',
+      onSuccess: async () => {
+        dialogVisible.value = false
+        await load()
+      },
+    },
+  )
 }
 
 async function toggle(reason: DefectReasonView): Promise<void> {
-  try {
-    await productionService.changeDefectReasonStatus(
-      reason.defectReasonCode,
-      reason.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
-      reason.rowVersion,
-    )
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '状态更新失败')
-  }
+  await runAction(
+    () =>
+      productionService.changeDefectReasonStatus(
+        reason.defectReasonCode,
+        reason.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+        reason.rowVersion,
+      ),
+    { fallback: '状态更新失败', onSuccess: load },
+  )
 }
 
 onMounted(load)
@@ -106,7 +104,7 @@ onMounted(load)
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="save">保存</el-button>
+      <el-button type="primary" :loading="saving" @click="save">保存</el-button>
     </template>
   </el-dialog>
 </template>

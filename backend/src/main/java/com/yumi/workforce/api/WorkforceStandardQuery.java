@@ -4,4 +4,6 @@ package com.yumi.workforce.api;
 public interface WorkforceStandardQuery {
 
     WorkforceStandardView getStandards();
+
+    WorkforceStandardVersionView getStandardHistory(String standardType, String standardBusinessId);
 }

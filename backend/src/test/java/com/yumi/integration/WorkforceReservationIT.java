@@ -77,9 +77,11 @@ class WorkforceReservationIT extends AbstractMySqlIntegrationTest {
     void setUp() {
         jdbc.sql("DELETE FROM workforce_activity_reservations").update();
         jdbc.sql("DELETE FROM workforce_activity_reference_guards").update();
+        jdbc.sql("DELETE FROM workforce_standard_version_facts").update();
         jdbc.sql("DELETE FROM workforce_standard_snapshots").update();
         jdbc.sql("DELETE FROM workforce_team_snapshots").update();
         jdbc.sql("DELETE FROM workforce_employee_snapshots").update();
+        jdbc.sql("DELETE FROM workforce_team_status_facts").update();
         jdbc.sql("DELETE FROM workforce_team_member_facts").update();
         jdbc.sql("DELETE FROM workforce_team_members").update();
         jdbc.sql("DELETE FROM workforce_teams").update();

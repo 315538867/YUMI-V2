@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const entryId = ref('')
+const { loading: saving, run: runAction } = useAsyncAction()
 const errorText = ref('')
 const successText = ref('')
 const allocations = reactive<
@@ -21,13 +21,13 @@ async function submit(): Promise<void> {
     errorText.value = '请输入成本事实标识'
     return
   }
-  try {
-    await costLedgerService.allocate(entryId.value.trim(), allocations)
-    successText.value = '显式分摊已保存；分摊合计必须等于成本金额'
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '成本分摊失败')
-  }
+  await runAction(() => costLedgerService.allocate(entryId.value.trim(), allocations), {
+    success: '显式分摊已保存；分摊合计必须等于成本金额',
+    fallback: '成本分摊失败',
+    onSuccess: () => {
+      successText.value = '显式分摊已保存；分摊合计必须等于成本金额'
+    },
+  })
 }
 </script>
 
@@ -62,7 +62,7 @@ async function submit(): Promise<void> {
         </div>
       </el-form-item>
       <el-button @click="add">增加分摊行</el-button>
-      <el-button type="primary" @click="submit">保存分摊</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">保存分摊</el-button>
     </el-form>
   </WorkspacePage>
 </template>

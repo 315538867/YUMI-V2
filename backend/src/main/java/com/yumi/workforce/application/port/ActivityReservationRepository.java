@@ -40,6 +40,9 @@ public interface ActivityReservationRepository {
 
     List<ReservationRecord> findAll(WorkforceActivitySourceRef source);
 
+    List<ReservationRecord> findActiveByReserved(
+            ReservationScopeType scopeType, String reservedBusinessId);
+
     /** 守卫行。 */
     record GuardRecord(
             ReservationScopeType guardType, String guardedBusinessId, int activeReferenceCount, long rowVersion) {

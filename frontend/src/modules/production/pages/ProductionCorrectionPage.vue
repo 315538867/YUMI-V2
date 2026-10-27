@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import type { CorrectionFeedItem, PhysicalDestination } from '@/modules/production/contracts'
 import {
   productionService,
@@ -9,9 +7,13 @@ import {
 } from '@/modules/production/services/productionService'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { errorText, run } = useAsyncLoad()
+const { loading: saving, run: runAction } = useAsyncAction()
 
 const feed = ref<CorrectionFeedItem[]>([])
-const errorText = ref('')
 const form = reactive({
   taskItemBusinessId: '',
   unfinishedQuantity: 0,
@@ -23,11 +25,9 @@ const form = reactive({
 })
 
 async function loadFeed(): Promise<void> {
-  try {
+  await run(async () => {
     feed.value = await productionService.corrections(0, 100)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '更正记录加载失败')
-  }
+  }, '更正记录加载失败')
 }
 
 function corrected(): VerifyItemInput {
@@ -70,18 +70,22 @@ async function submit(): Promise<void> {
     errorText.value = '请填写任务明细与更正原因'
     return
   }
-  try {
-    await productionService.correct({
-      taskItemBusinessId: form.taskItemBusinessId.trim(),
-      correctedResult: corrected(),
-      reason: form.reason.trim(),
-    })
-    ElMessage.success('更正已提交，历史事实保留')
-    form.reason = ''
-    await loadFeed()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '生产事实更正失败')
-  }
+  await runAction(
+    () =>
+      productionService.correct({
+        taskItemBusinessId: form.taskItemBusinessId.trim(),
+        correctedResult: corrected(),
+        reason: form.reason.trim(),
+      }),
+    {
+      success: '更正已提交，历史事实保留',
+      fallback: '生产事实更正失败',
+      onSuccess: async () => {
+        form.reason = ''
+        await loadFeed()
+      },
+    },
+  )
 }
 
 onMounted(loadFeed)
@@ -123,7 +127,7 @@ onMounted(loadFeed)
         <el-input v-model="form.reason" type="textarea" :rows="2" />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="submit">提交更正</el-button>
+        <el-button type="primary" :loading="saving" @click="submit">提交更正</el-button>
       </el-form-item>
     </el-form>
 

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
@@ -19,6 +18,9 @@ import type {
 import { orderService } from '@/modules/orders/services/orderService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad(true)
 
 interface DraftItem {
   key: string
@@ -38,8 +40,6 @@ const router = useRouter()
 const customers = ref<CustomerView[]>([])
 const products = ref<ProductView[]>([])
 const items = ref<DraftItem[]>([])
-const loading = ref(true)
-const errorText = ref('')
 const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
   [
     'customerBusinessId',
@@ -101,8 +101,7 @@ function emptyItem(productBusinessId = ''): DraftItem {
 }
 
 async function load(): Promise<void> {
-  loading.value = true
-  try {
+  await run(async () => {
     ;[customers.value, products.value] = await Promise.all([
       customerService.list('', 'ACTIVE', 1, 100),
       productService.list('', 'ACTIVE', 1, 100),
@@ -123,11 +122,7 @@ async function load(): Promise<void> {
       note: note.value,
       items: items.value,
     })
-  } catch (error) {
-    errorText.value = userMessageOf(error, '录入数据加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '录入数据加载失败')
 }
 
 function applyCustomer(): void {

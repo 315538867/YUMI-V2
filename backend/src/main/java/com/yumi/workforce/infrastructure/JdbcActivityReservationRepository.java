@@ -188,6 +188,20 @@ public class JdbcActivityReservationRepository implements ActivityReservationRep
                 .list();
     }
 
+    @Override
+    public List<ReservationRecord> findActiveByReserved(
+            ReservationScopeType scopeType, String reservedBusinessId) {
+        return jdbc.sql(SELECT + """
+                         WHERE reservation_scope_type = :scopeType
+                           AND reserved_business_id = :reservedBusinessId AND status = 'ACTIVE'
+                         ORDER BY work_date, reservation_business_id
+                        """)
+                .param("scopeType", scopeType.name())
+                .param("reservedBusinessId", reservedBusinessId)
+                .query(JdbcActivityReservationRepository::map)
+                .list();
+    }
+
     /** 生成预留稳定标识。 */
     public static String newReservationId() {
         return "WAR-" + UUID.randomUUID();

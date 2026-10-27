@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { useEditorForm } from '@/platform/composables/useEditorForm'
 import type { CustomerView } from '@/modules/customer/contracts'
@@ -9,14 +8,14 @@ import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import EditorPage from '@/shared/components/EditorPage.vue'
 import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 
 const route = useRoute()
 const router = useRouter()
 const customerId =
   typeof route.params.customerBusinessId === 'string' ? route.params.customerBusinessId : ''
 const editing = customerId !== ''
-const loading = ref(editing)
-const errorText = ref('')
+const { loading, errorText, run } = useAsyncLoad(editing)
 const customer = ref<CustomerView | null>(null)
 const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
   ['name', 'contactName', 'phone', 'defaultAddress'],
@@ -41,9 +40,7 @@ async function load(): Promise<void> {
   if (!editing) {
     return
   }
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     const current = await customerService.get(customerId)
     customer.value = current
     Object.assign(form, {
@@ -53,11 +50,7 @@ async function load(): Promise<void> {
       defaultAddress: current.defaultAddress,
     })
     initialSnapshot.value = JSON.stringify(form)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '客户资料加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '客户资料加载失败')
 }
 
 async function save(): Promise<void> {

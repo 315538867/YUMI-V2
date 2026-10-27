@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
-import type { CashFactView, CashPeriodSummary } from '@/modules/finance/cash/contracts'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+import type {
+  CashFactDetailView,
+  CashFactView,
+  CashPeriodSummary,
+} from '@/modules/finance/cash/contracts'
 import { cashService } from '@/modules/finance/cash/services/cashService'
+import { fileService } from '@/platform/services/fileService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+
 const facts = ref<CashFactView[]>([])
 const summary = ref<CashPeriodSummary | null>(null)
-const loading = ref(false)
-const errorText = ref('')
 const { filters, search, reset } = useListQuery(
   {
     startDate: new Date().toISOString().slice(0, 8) + '01',
@@ -22,6 +27,10 @@ const { filters, search, reset } = useListQuery(
   { paged: false, onSearch: () => void load() },
 )
 const successText = ref('')
+const { loading: saving, run: runAction } = useAsyncAction()
+const { loading: detailLoading, errorText: detailError, run: runDetail } = useAsyncLoad()
+const detailVisible = ref(false)
+const detail = ref<CashFactDetailView | null>(null)
 const dialogVisible = ref(false)
 const action = ref<'reverse' | 'return'>('reverse')
 const form = reactive({
@@ -33,18 +42,12 @@ const form = reactive({
 })
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     ;[facts.value, summary.value] = await Promise.all([
       cashService.facts(filters.startDate, filters.endDate, filters.cashType),
       cashService.periodSummary(filters.startDate, filters.endDate),
     ])
-  } catch (error) {
-    errorText.value = userMessageOf(error, '现金流水加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '现金流水加载失败')
 }
 
 function open(kind: 'reverse' | 'return', row: CashFactView): void {
@@ -57,27 +60,50 @@ function open(kind: 'reverse' | 'return', row: CashFactView): void {
   dialogVisible.value = true
 }
 
+async function openDetail(row: CashFactView): Promise<void> {
+  detailVisible.value = true
+  detail.value = null
+  await runDetail(async () => {
+    detail.value = await cashService.factDetail(row.cashFactBusinessId)
+  }, '现金详情加载失败')
+}
+
+async function openVoucher(fileId: string): Promise<void> {
+  await runAction(
+    async () => {
+      const blob = await fileService.readContent(fileId, 'finance.read')
+      window.open(URL.createObjectURL(blob), '_blank')
+    },
+    { fallback: '凭证读取失败' },
+  )
+}
+
 async function submit(): Promise<void> {
-  try {
-    if (action.value === 'reverse') {
-      await cashService.reverse(form.cashFactBusinessId, form.businessDate, form.reasonText)
-      successText.value = '现金已整笔冲销'
-    } else {
-      await cashService.returnPayroll({
-        originalCashFactBusinessId: form.cashFactBusinessId,
-        resultBusinessId: form.resultBusinessId,
-        amount: form.amount,
-        businessDate: form.businessDate,
-        reasonText: form.reasonText,
-      })
-      successText.value = '真实工资退回已登记；不改变原应付'
-    }
-    dialogVisible.value = false
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '现金更正失败')
-  }
+  const message = action.value === 'reverse' ? '现金已整笔冲销' : '真实工资退回已登记；不改变原应付'
+  await runAction(
+    async () => {
+      if (action.value === 'reverse') {
+        await cashService.reverse(form.cashFactBusinessId, form.businessDate, form.reasonText)
+      } else {
+        await cashService.returnPayroll({
+          originalCashFactBusinessId: form.cashFactBusinessId,
+          resultBusinessId: form.resultBusinessId,
+          amount: form.amount,
+          businessDate: form.businessDate,
+          reasonText: form.reasonText,
+        })
+      }
+    },
+    {
+      success: message,
+      fallback: '现金更正失败',
+      onSuccess: async () => {
+        successText.value = message
+        dialogVisible.value = false
+        await load()
+      },
+    },
+  )
 }
 
 void load()
@@ -142,8 +168,9 @@ void load()
       <el-table-column label="有效" width="80">
         <template #default="{ row }">{{ row.valid ? '是' : '否' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="190">
+      <el-table-column label="操作" width="230">
         <template #default="{ row }">
+          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
           <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)"
             >整笔冲销</el-button
           >
@@ -163,6 +190,49 @@ void load()
       <p class="hint">现金净额不是利润；工资退回不充当经营收入。</p>
     </template>
   </ListPage>
+
+  <el-drawer v-model="detailVisible" title="现金记录详情" size="440px">
+    <el-alert
+      v-if="detailError"
+      type="error"
+      :closable="false"
+      :title="detailError"
+      class="alert"
+    />
+    <div v-loading="detailLoading">
+      <el-descriptions v-if="detail" :column="1" border>
+        <el-descriptions-item label="现金单号">{{ detail.cashNo }}</el-descriptions-item>
+        <el-descriptions-item label="类型">
+          <CodeTag category="finance.cashType" :code="detail.cashType" />
+        </el-descriptions-item>
+        <el-descriptions-item label="方向">
+          <CodeTag category="finance.cashDirection" :code="detail.direction" />
+        </el-descriptions-item>
+        <el-descriptions-item label="金额">
+          <MoneyText :value="detail.amount" /> {{ detail.currencyCode }}
+        </el-descriptions-item>
+        <el-descriptions-item label="业务日期">{{ detail.businessDate }}</el-descriptions-item>
+        <el-descriptions-item label="有效">{{ detail.valid ? '是' : '否' }}</el-descriptions-item>
+        <el-descriptions-item label="冲销原事实">
+          {{ detail.reversesFactBusinessId || '—' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="凭证">
+          <template v-if="detail.voucherFileRefs.length > 0">
+            <el-button
+              v-for="(fileId, index) in detail.voucherFileRefs"
+              :key="fileId"
+              link
+              type="primary"
+              @click="openVoucher(fileId)"
+            >
+              凭证 {{ index + 1 }}
+            </el-button>
+          </template>
+          <span v-else>—</span>
+        </el-descriptions-item>
+      </el-descriptions>
+    </div>
+  </el-drawer>
 
   <el-dialog
     v-model="dialogVisible"
@@ -185,7 +255,7 @@ void load()
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="submit">确认</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">确认</el-button>
     </template>
   </el-dialog>
 </template>

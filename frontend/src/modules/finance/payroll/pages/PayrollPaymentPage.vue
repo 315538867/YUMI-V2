@@ -1,32 +1,31 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { EmployeePayrollView, PayrollPeriodRef } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+
 const periods = ref<PayrollPeriodRef[]>([])
 const results = ref<EmployeePayrollView[]>([])
-const loading = ref(false)
 const selectedRows = ref<EmployeePayrollView[]>([])
 const amounts = reactive<Record<string, string>>({})
 const businessDate = ref(new Date().toISOString().slice(0, 10))
-const errorText = ref('')
 const successText = ref('')
+const { loading: saving, run: runAction } = useAsyncAction()
 const { filters, sync, search } = useListQuery(
   { period: '' },
   { paged: false, onSearch: () => void load() },
 )
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     periods.value = await payrollService.periods()
     if (!periods.value.some((item) => item.periodBusinessId === filters.period)) {
       filters.period = periods.value[periods.value.length - 1]?.periodBusinessId ?? ''
@@ -38,11 +37,7 @@ async function load(): Promise<void> {
         amounts[row.resultBusinessId] = row.payableAmount?.amount ?? ''
       }
     }
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资付款数据加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '工资付款数据加载失败')
 }
 
 function selectionChanged(rows: EmployeePayrollView[]): void {
@@ -54,21 +49,24 @@ async function pay(): Promise<void> {
     errorText.value = '请选择已核定员工'
     return
   }
-  errorText.value = ''
-  try {
-    await cashService.payPayroll(
-      selectedRows.value.map((row) => ({
-        resultBusinessId: row.resultBusinessId,
-        amount: amounts[row.resultBusinessId] ?? '0.00',
-      })),
-      businessDate.value,
-    )
-    successText.value = '工资付款已登记到现金；未核定员工不会被支付'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '工资付款失败')
-  }
+  await runAction(
+    () =>
+      cashService.payPayroll(
+        selectedRows.value.map((row) => ({
+          resultBusinessId: row.resultBusinessId,
+          amount: amounts[row.resultBusinessId] ?? '0.00',
+        })),
+        businessDate.value,
+      ),
+    {
+      success: '工资付款已登记到现金；未核定员工不会被支付',
+      fallback: '工资付款失败',
+      onSuccess: async () => {
+        successText.value = '工资付款已登记到现金；未核定员工不会被支付'
+        await load()
+      },
+    },
+  )
 }
 
 onMounted(load)
@@ -99,7 +97,7 @@ onMounted(load)
       />
     </template>
     <template #actions>
-      <el-button type="primary" @click="pay">按选中员工付款</el-button>
+      <el-button type="primary" :loading="saving" @click="pay">按选中员工付款</el-button>
     </template>
     <template #notice>
       <el-alert v-if="successText" type="success" :closable="false" :title="successText" />

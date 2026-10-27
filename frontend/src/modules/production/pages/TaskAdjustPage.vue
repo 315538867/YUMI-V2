@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { TargetProcess, TaskView } from '@/modules/production/contracts'
@@ -13,14 +13,14 @@ import {
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
+const { loading, errorText, run } = useAsyncLoad(true)
+const { loading: saving, run: runAction } = useAsyncAction()
+
 const route = useRoute()
 const router = useRouter()
 const task = ref<TaskView | null>(null)
 const employees = ref<EmployeeView[]>([])
 const teams = ref<TeamView[]>([])
-const loading = ref(true)
-const saving = ref(false)
-const errorText = ref('')
 
 const form = reactive({
   subjectType: 'EMPLOYEE' as 'EMPLOYEE' | 'TEAM',
@@ -52,9 +52,7 @@ const activeEmployees = computed(() =>
 const activeTeams = computed(() => teams.value.filter((team) => team.status === 'ACTIVE'))
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     const taskBusinessId = String(route.params.taskBusinessId ?? '')
     const [loadedTask, employeeList, teamList] = await Promise.all([
       productionService.task(taskBusinessId),
@@ -80,11 +78,7 @@ async function load(): Promise<void> {
     form.relatedProductBusinessId = loadedTask.otherTask?.relatedProductBusinessId ?? ''
     form.plannedQuantity = loadedTask.otherTask?.plannedQuantity ?? null
     form.overrideReason = ''
-  } catch (error) {
-    errorText.value = userMessageOf(error, '任务调整加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '任务调整加载失败')
 }
 
 function changeSubjectType(): void {
@@ -151,45 +145,39 @@ async function save(): Promise<void> {
   if (!task.value) {
     return
   }
-  saving.value = true
-  errorText.value = ''
-  try {
-    const input: AdjustTaskInput = {
-      subject: {
-        subjectType: form.subjectType,
-        subjectBusinessId: form.subjectBusinessId,
-      },
-      workDate: form.workDate,
-      processCode: isOtherTask.value ? null : form.processCode,
-      items: isOtherTask.value
-        ? []
-        : form.items.map((item) => ({
-            taskItemBusinessId: item.taskItemBusinessId,
-            productionSourceBusinessId: item.productionSourceBusinessId.trim(),
-            plannedQuantity: Number(item.plannedQuantity),
-          })),
-      enteredStandardMinutes: isOtherTask.value ? Number(form.enteredStandardMinutes) : null,
-      otherTask: isOtherTask.value
-        ? {
-            workContent: form.workContent.trim(),
-            relatedProductBusinessId:
-              form.relatedProductBusinessId.trim() === ''
-                ? null
-                : form.relatedProductBusinessId.trim(),
-            plannedQuantity:
-              form.relatedProductBusinessId.trim() === '' ? null : Number(form.plannedQuantity),
-          }
-        : null,
-      overrideReason: form.overrideReason.trim() === '' ? null : form.overrideReason.trim(),
-    }
-    await productionService.adjustTask(task.value.taskBusinessId, input)
-    ElMessage.success('任务已调整')
-    await router.push(`/production/tasks/${task.value.taskBusinessId}`)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '任务调整失败')
-  } finally {
-    saving.value = false
+  const input: AdjustTaskInput = {
+    subject: {
+      subjectType: form.subjectType,
+      subjectBusinessId: form.subjectBusinessId,
+    },
+    workDate: form.workDate,
+    processCode: isOtherTask.value ? null : form.processCode,
+    items: isOtherTask.value
+      ? []
+      : form.items.map((item) => ({
+          taskItemBusinessId: item.taskItemBusinessId,
+          productionSourceBusinessId: item.productionSourceBusinessId.trim(),
+          plannedQuantity: Number(item.plannedQuantity),
+        })),
+    enteredStandardMinutes: isOtherTask.value ? Number(form.enteredStandardMinutes) : null,
+    otherTask: isOtherTask.value
+      ? {
+          workContent: form.workContent.trim(),
+          relatedProductBusinessId:
+            form.relatedProductBusinessId.trim() === ''
+              ? null
+              : form.relatedProductBusinessId.trim(),
+          plannedQuantity:
+            form.relatedProductBusinessId.trim() === '' ? null : Number(form.plannedQuantity),
+        }
+      : null,
+    overrideReason: form.overrideReason.trim() === '' ? null : form.overrideReason.trim(),
   }
+  await runAction(() => productionService.adjustTask(task.value!.taskBusinessId, input), {
+    success: '任务已调整',
+    fallback: '任务调整失败',
+    onSuccess: () => router.push(`/production/tasks/${task.value!.taskBusinessId}`),
+  })
 }
 
 onMounted(load)

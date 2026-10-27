@@ -2,10 +2,14 @@ import { api } from '@/platform/services/api'
 import { newIdempotencyKey } from '@/platform/services/idempotency'
 import type {
   AssignmentSubjectCurrentView,
+  EmployeeHistoryView,
   EmployeeView,
   EmploymentStatus,
   TeamStatus,
+  TeamHistoryView,
   TeamView,
+  WorkforceActivityReferenceView,
+  WorkforceStandardVersionView,
   WorkforceStandardView,
 } from '@/modules/workforce/contracts'
 
@@ -40,6 +44,12 @@ export const workforceService = {
     )
   },
 
+  employeeHistory(employeeBusinessId: string): Promise<EmployeeHistoryView> {
+    return api.query<EmployeeHistoryView>(
+      `/api/workforce/employees/${encodeURIComponent(employeeBusinessId)}/history`,
+    )
+  },
+
   teams(): Promise<TeamView[]> {
     return api.query<TeamView[]>('/api/workforce/teams')
   },
@@ -57,6 +67,12 @@ export const workforceService = {
 
   team(teamBusinessId: string): Promise<TeamView> {
     return api.query<TeamView>(`/api/workforce/teams/${encodeURIComponent(teamBusinessId)}`)
+  },
+
+  teamHistory(teamBusinessId: string): Promise<TeamHistoryView> {
+    return api.query<TeamHistoryView>(
+      `/api/workforce/teams/${encodeURIComponent(teamBusinessId)}/history`,
+    )
   },
 
   hire(input: { name: string; phone: string; effectiveDate: string }): Promise<EmployeeView> {
@@ -141,12 +157,16 @@ export const workforceService = {
     )
   },
 
-  deactivateTeam(teamBusinessId: string, expectedRowVersion: number): Promise<TeamView> {
-    return api.command<TeamView, { expectedRowVersion: number }>(
+  deactivateTeam(
+    teamBusinessId: string,
+    expectedRowVersion: number,
+    reason: string,
+  ): Promise<TeamView> {
+    return api.command<TeamView, { expectedRowVersion: number; reason: string }>(
       `/api/workforce/teams/${encodeURIComponent(teamBusinessId)}/deactivate`,
       {
         idempotencyKey: newIdempotencyKey('team-deactivate'),
-        body: { expectedRowVersion },
+        body: { expectedRowVersion, reason },
       },
     )
   },
@@ -158,10 +178,22 @@ export const workforceService = {
   updateWorkTime(input: {
     effectiveMinutes: number
     expectedRowVersion: number
+    reason: string
   }): Promise<WorkforceStandardView> {
     return api.command<WorkforceStandardView, typeof input>('/api/workforce/standards/work-time', {
       method: 'PUT',
       idempotencyKey: newIdempotencyKey('work-time-standard'),
+      body: input,
+    })
+  },
+
+  createEfficiency(input: {
+    memberCount: number
+    efficiencyFactor: string
+    reason: string
+  }): Promise<WorkforceStandardView> {
+    return api.command<WorkforceStandardView, typeof input>('/api/workforce/standards/efficiency', {
+      idempotencyKey: newIdempotencyKey('efficiency-standard-create'),
       body: input,
     })
   },
@@ -171,6 +203,7 @@ export const workforceService = {
     memberCount: number
     efficiencyFactor: string
     expectedRowVersion: number
+    reason: string
   }): Promise<WorkforceStandardView> {
     return api.command<WorkforceStandardView, typeof input>('/api/workforce/standards/efficiency', {
       method: 'PUT',
@@ -185,6 +218,24 @@ export const workforceService = {
   ): Promise<AssignmentSubjectCurrentView> {
     return api.query<AssignmentSubjectCurrentView>(
       `/api/workforce/standards/subjects/${subjectType}/${encodeURIComponent(businessId)}`,
+    )
+  },
+
+  subjectReferences(
+    subjectType: 'EMPLOYEE' | 'TEAM',
+    businessId: string,
+  ): Promise<WorkforceActivityReferenceView[]> {
+    return api.query<WorkforceActivityReferenceView[]>(
+      `/api/workforce/subjects/${subjectType}/${encodeURIComponent(businessId)}/references`,
+    )
+  },
+
+  standardHistory(
+    standardType: 'EFFICIENCY' | 'DAILY_WORK_TIME',
+    standardBusinessId: string,
+  ): Promise<WorkforceStandardVersionView> {
+    return api.query<WorkforceStandardVersionView>(
+      `/api/workforce/standards/${standardType}/${encodeURIComponent(standardBusinessId)}/versions`,
     )
   },
 }

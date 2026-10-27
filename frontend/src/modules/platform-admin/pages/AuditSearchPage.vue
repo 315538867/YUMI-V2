@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import type { AuditEntry } from '@/modules/platform-admin/services/administrationService'
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
@@ -8,10 +7,11 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import CodeLabel from '@/shared/components/CodeLabel.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import ListPage from '@/shared/components/ListPage.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading, errorText, run } = useAsyncLoad()
 
 const entries = ref<AuditEntry[]>([])
-const loading = ref(false)
-const errorText = ref('')
 const { filters, search, reset } = useListQuery(
   { targetType: 'ORDER', targetBusinessId: '' },
   { paged: false, onSearch: () => void load() },
@@ -23,18 +23,12 @@ async function load(): Promise<void> {
     errorText.value = ''
     return
   }
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     entries.value = await administrationService.auditByTarget(
       filters.targetType,
       filters.targetBusinessId.trim(),
     )
-  } catch (error) {
-    errorText.value = userMessageOf(error, '审计检索失败')
-  } finally {
-    loading.value = false
-  }
+  }, '审计检索失败')
 }
 </script>
 

@@ -1,6 +1,7 @@
 import { api } from '@/platform/services/api'
 import { newIdempotencyKey } from '@/platform/services/idempotency'
 import type {
+  AvailableProductionSourceView,
   CorrectionFeedItem,
   DefectReasonStatus,
   DefectReasonView,
@@ -100,6 +101,12 @@ export const productionService = {
 
   task(taskBusinessId: string): Promise<TaskView> {
     return api.query<TaskView>(`/api/production/tasks/${encodeURIComponent(taskBusinessId)}`)
+  },
+
+  availableSources(processCode: TargetProcess): Promise<AvailableProductionSourceView[]> {
+    return api.query<AvailableProductionSourceView[]>(
+      `/api/production/tasks/available-sources?processCode=${encodeURIComponent(processCode)}`,
+    )
   },
 
   arrange(input: ArrangeInput): Promise<{ taskBusinessId: string }> {

@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type {
   MaterialSource,
   ProcessCode,
@@ -18,6 +19,8 @@ import EditorPage from '@/shared/components/EditorPage.vue'
 import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 
+const { loading, errorText, run } = useAsyncLoad(true)
+
 const route = useRoute()
 const router = useRouter()
 const productId = String(route.params.productBusinessId ?? '')
@@ -26,8 +29,6 @@ const schemeId =
 const editing = schemeId !== ''
 const product = ref<ProductView | null>(null)
 const scheme = ref<SchemeView | null>(null)
-const loading = ref(true)
-const errorText = ref('')
 const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
   ['name'],
   '方案已被其他操作修改，请重新打开后再保存',
@@ -59,9 +60,7 @@ const form = reactive({
 })
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     product.value = await productService.get(productId)
     if (editing) {
       const schemes = await productService.schemes(productId)
@@ -89,11 +88,7 @@ async function load(): Promise<void> {
       form.name = '自定义方案'
     }
     initialSnapshot.value = JSON.stringify(form)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '方案加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '方案加载失败')
 }
 
 function input(): SchemeInput {

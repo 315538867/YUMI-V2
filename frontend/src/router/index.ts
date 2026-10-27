@@ -224,6 +224,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { requiresAuth: true, title: '生产排班', permission: 'production.read' },
           },
           {
+            path: 'tasks/new',
+            name: 'production-task-create',
+            component: () => import('@/modules/production/pages/TaskCreatePage.vue'),
+            meta: { requiresAuth: true, title: '新建任务', permission: 'production.schedule' },
+          },
+          {
             path: 'tasks/:taskBusinessId/adjust',
             name: 'production-task-adjust',
             component: () => import('@/modules/production/pages/TaskAdjustPage.vue'),
@@ -357,6 +363,12 @@ export const routes: RouteRecordRaw[] = [
         redirect: '/finance/daily-cash',
         meta: { requiresAuth: true, title: '现金与成本', permission: 'finance.read' },
         children: [
+          {
+            path: 'monthly',
+            name: 'finance-monthly',
+            component: () => import('@/modules/reporting/pages/MonthlySummaryPage.vue'),
+            meta: { requiresAuth: true, title: '月度汇总', permission: 'reporting.read' },
+          },
           {
             path: 'daily-cash',
             name: 'daily-cash',

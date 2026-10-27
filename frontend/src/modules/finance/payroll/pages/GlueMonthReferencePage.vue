@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorCode } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
@@ -15,8 +16,8 @@ const policy = ref<GluePolicyView | null>(null)
 const employees = ref<EmployeeView[]>([])
 const reference = ref<GlueMonthReferenceView | null>(null)
 const policyMissing = ref(false)
-const loading = ref(true)
-const errorText = ref('')
+const { loading, errorText, run } = useAsyncLoad(true)
+const { loading: saving, run: runAction } = useAsyncAction()
 const { filters, sync, search } = useListQuery(
   { month: new Date().toISOString().slice(0, 7), employeeId: '' },
   { paged: false, onSearch: () => void query() },
@@ -26,15 +27,13 @@ const form = reactive({ exemptWeightGrams: '300.0000', reasonText: '', expectedG
 
 async function load(): Promise<void> {
   loading.value = true
-  try {
+  await run(async () => {
     employees.value = await workforceService.employees()
     if (!employees.value.some((item) => item.employeeBusinessId === filters.employeeId)) {
       filters.employeeId = employees.value[0]?.employeeBusinessId ?? ''
     }
     await sync()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '人员加载失败')
-  }
+  }, '人员加载失败')
   await loadPolicy()
   if (filters.employeeId !== '') {
     await query()
@@ -44,53 +43,62 @@ async function load(): Promise<void> {
 
 async function loadPolicy(): Promise<void> {
   policyMissing.value = false
-  try {
-    policy.value = await payrollService.gluePolicy(filters.month)
-    form.exemptWeightGrams = policy.value.exemptWeightGrams
-  } catch (error) {
-    policy.value = null
-    if (isErrorCode(error, 'PAYROLL_GLUE_POLICY_MISSING')) {
-      policyMissing.value = true
-    } else {
-      errorText.value = userMessageOf(error, '胶水设置加载失败')
-    }
-  }
+  await run(
+    async () => {
+      policy.value = await payrollService.gluePolicy(filters.month)
+      form.exemptWeightGrams = policy.value.exemptWeightGrams
+    },
+    '胶水设置加载失败',
+    {
+      handled: (error) => {
+        if (isErrorCode(error, 'PAYROLL_GLUE_POLICY_MISSING')) {
+          policy.value = null
+          policyMissing.value = true
+          return true
+        }
+        return false
+      },
+    },
+  )
 }
 
 async function publish(): Promise<void> {
-  try {
-    policy.value = await payrollService.publishGluePolicy({
-      effectiveMonth: `${filters.month}-01`,
-      exemptWeightGrams: form.exemptWeightGrams,
-      reasonText: form.reasonText,
-      expectedGuardVersion: Number(form.expectedGuardVersion),
-    })
-    policyMissing.value = false
-    successText.value = '胶水设置已发布；历史核定不变'
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '胶水设置发布失败')
-  }
+  await runAction(
+    () =>
+      payrollService.publishGluePolicy({
+        effectiveMonth: `${filters.month}-01`,
+        exemptWeightGrams: form.exemptWeightGrams,
+        reasonText: form.reasonText,
+        expectedGuardVersion: Number(form.expectedGuardVersion),
+      }),
+    {
+      success: '胶水设置已发布；历史核定不变',
+      fallback: '胶水设置发布失败',
+      onSuccess: (published) => {
+        policy.value = published
+        policyMissing.value = false
+        successText.value = '胶水设置已发布；历史核定不变'
+      },
+    },
+  )
 }
 
-async function run(): Promise<void> {
+async function generate(): Promise<void> {
   if (filters.employeeId === '') {
     errorText.value = '请选择员工'
     return
   }
-  loading.value = true
-  try {
-    reference.value = await payrollService.runGlueMonthReference(
-      filters.employeeId,
-      `${filters.month}-01`,
-    )
-    successText.value = '自然月胶水参考已生成'
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '胶水月参考生成失败')
-  } finally {
-    loading.value = false
-  }
+  await runAction(
+    () => payrollService.runGlueMonthReference(filters.employeeId, `${filters.month}-01`),
+    {
+      success: '自然月胶水参考已生成',
+      fallback: '胶水月参考生成失败',
+      onSuccess: (generated) => {
+        reference.value = generated
+        successText.value = '自然月胶水参考已生成'
+      },
+    },
+  )
 }
 
 async function query(): Promise<void> {
@@ -98,14 +106,9 @@ async function query(): Promise<void> {
     reference.value = null
     return
   }
-  loading.value = true
-  try {
+  await run(async () => {
     reference.value = await payrollService.glueMonthReference(filters.employeeId, filters.month)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '胶水月参考读取失败')
-  } finally {
-    loading.value = false
-  }
+  }, '胶水月参考读取失败')
 }
 
 async function applyMonth(): Promise<void> {
@@ -150,7 +153,7 @@ onMounted(load)
       <el-form-item label="发布原因">
         <el-input v-model="form.reasonText" class="reason" />
       </el-form-item>
-      <el-button type="primary" @click="publish">发布设置</el-button>
+      <el-button type="primary" :loading="saving" @click="publish">发布设置</el-button>
     </el-form>
     <p v-if="policy" class="meta">
       当前版本 v{{ policy.version }}，生效月 {{ policy.effectiveMonth }}，免扣
@@ -182,7 +185,7 @@ onMounted(load)
         </el-select>
       </el-form-item>
       <el-button @click="query">查询参考</el-button>
-      <el-button type="primary" @click="run">生成当月参考</el-button>
+      <el-button type="primary" :loading="saving" @click="generate">生成当月参考</el-button>
     </el-form>
 
     <PageState

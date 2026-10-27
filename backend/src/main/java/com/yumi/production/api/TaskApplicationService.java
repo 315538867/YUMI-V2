@@ -29,4 +29,6 @@ public interface TaskApplicationService {
 
     /** 按可选日期区间读取任务；两端为空时返回全部任务。 */
     java.util.List<TaskView> listTasks(java.time.LocalDate startDate, java.time.LocalDate endDate);
+
+    java.util.List<AvailableProductionSourceView> availableSources(TargetProcess processCode);
 }

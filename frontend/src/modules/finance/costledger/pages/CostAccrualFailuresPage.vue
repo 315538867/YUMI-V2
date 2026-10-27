@@ -1,46 +1,40 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { CostFailureView } from '@/modules/finance/costledger/contracts'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import ListPage from '@/shared/components/ListPage.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+
 const failures = ref<CostFailureView[]>([])
-const loading = ref(false)
-const errorText = ref('')
 const successText = ref('')
+const { loading: retrying, run: runAction } = useAsyncAction()
 const dates = reactive({
   startDate: new Date().toISOString().slice(0, 8) + '01',
   endDate: new Date().toISOString().slice(0, 10),
 })
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     failures.value = await costLedgerService.failures()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '归集失败加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '归集失败加载失败')
 }
 
 async function retry(failure: CostFailureView): Promise<void> {
-  try {
-    const result = await costLedgerService.retryFailure(
-      failure.failureBusinessId,
-      dates.startDate,
-      dates.endDate,
-    )
-    successText.value = `重试完成：归集 ${result.accruedCount} 条；不重复入账`
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '归集重试失败')
-  }
+  await runAction(
+    () => costLedgerService.retryFailure(failure.failureBusinessId, dates.startDate, dates.endDate),
+    {
+      success: '归集重试完成；不重复入账',
+      fallback: '归集重试失败',
+      onSuccess: async (result) => {
+        successText.value = `重试完成：归集 ${result.accruedCount} 条；不重复入账`
+        await load()
+      },
+    },
+  )
 }
 
 onMounted(load)
@@ -77,7 +71,7 @@ onMounted(load)
       <el-table-column prop="attempts" label="尝试" width="80" />
       <el-table-column label="操作" width="100">
         <template #default="{ row }">
-          <el-button link type="primary" @click="retry(row)">重试</el-button>
+          <el-button link type="primary" :loading="retrying" @click="retry(row)">重试</el-button>
         </template>
       </el-table-column>
     </el-table>

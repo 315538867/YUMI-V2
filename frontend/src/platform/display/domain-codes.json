@@ -1536,6 +1536,18 @@
         "label": "消费",
         "tag": ""
       }
+    },
+    "workforce.activitySourceModule": {
+      "production": {
+        "label": "生产",
+        "tag": "info"
+      }
+    },
+    "workforce.activitySourceType": {
+      "TASK": {
+        "label": "生产任务",
+        "tag": "info"
+      }
     }
   }
 }

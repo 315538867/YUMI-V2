@@ -39,6 +39,7 @@
 | `MoneyText` | 金额对象/字符串统一展示 |
 | `DateTimeText` | 时间统一格式化 |
 | `WorkspacePage` | 工作区白底卡片外壳：边框、圆角、默认 16px 内边距 |
+| `DetailPage` | 只读详情页外壳：标题/元信息、动作区、PageState |
 | `EditorPage` | 单记录编辑页外壳：标题/操作、PageState、表单与预览两栏 |
 | `ListPage` | 列表页外壳：标题/数量、统一工具条、PageState 与分页插槽 |
 | `FormErrorAlert` | 表单内不可映射字段错误/冲突提示，标题下统一展示 |
@@ -53,6 +54,7 @@
 - 单记录新建/编辑页统一使用 `EditorPage`：标题与操作放 `actions` 插槽，表单放默认插槽，右侧预览放 `preview` 插槽；加载失败与重试由外壳统一处理，页面不再重复写标题栏、两栏网格和预览卡片样式。
 - 多明细或表格型编辑页（如订单建单、已有订单接管）布局差异较大，可继续使用 `WorkspacePage`，不强行套 `EditorPage`。
 - 列表页统一使用 `ListPage`：筛选控件放 `filters` 插槽，新增/接管等主操作放 `actions` 插槽并排在筛选之后；表格放默认插槽，分页放 `pager` 插槽。页面不再自写标题栏、工具条和间距样式。
+- 只读详情页统一使用 `DetailPage`：标题与 `meta` 插槽放页头，显式动作放 `actions` 插槽，`notice` 放操作提示，详情内容放默认插槽；页面不再自写页头、meta 与动作区样式。
 
 ## 4. 权限与操作可见性
 
@@ -88,7 +90,14 @@
   }
   ```
 
-- 非编辑表单的写操作使用 `useAsyncAction`，页面不重复写 `try/catch`；存量页面沿用 `userMessageOf` 归一化，迁移时保持同一策略：
+- 页面读操作统一使用 `useAsyncLoad`：由它维护 `loading`/`errorText`，配合 `PageState` 展示失败与重试；特殊错误码用 `handled` 转为局部空态，页面不重复写 `try/catch`：
+
+  ```ts
+  const { loading, errorText, run } = useAsyncLoad()
+  await run(() => customerService.get(id), '客户资料加载失败')
+  ```
+
+- 非编辑表单的写操作使用 `useAsyncAction`，页面不重复写 `try/catch`；失败统一 toast，页面自己的校验用本地错误串内联：
 
   ```ts
   const { loading, fieldErrors, run } = useAsyncAction()
@@ -107,6 +116,7 @@
   - 代码不得直接展示英文异常原文或 HTTP 状态码。
 - 页面按稳定错误码判断空态，使用 `isErrorCode`，不直接比较 HTTP 状态。
 - 同一操作只提示一次；`run` 内部已弹 toast 时，`onError` 只做状态恢复。
+- 例外只保留在分页/并发局部状态页面（生产追溯链路、预算预览、凭证加载）：局部错误用 `userMessageOf` 归一化，不扩散到页面级错误。
 
 ## 6. 请求规范
 

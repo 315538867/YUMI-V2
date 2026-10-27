@@ -17,6 +17,8 @@ test('日常收支按业务日期归月并与现金流水一致', async ({ page 
     .locator('textarea')
     .fill('验收日常收入')
   await page.getByRole('button', { name: '登记收支' }).click()
+  await expect(page.getByRole('dialog').filter({ hasText: '核对日常收支' })).toBeVisible()
+  await page.getByRole('button', { name: '确认入账' }).click()
   await expect(page.getByText(/已入账/).first()).toBeVisible()
 
   await page.goto('/finance/cash-history')

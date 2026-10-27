@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import type { AccountView, RoleView } from '@/modules/platform-admin/services/administrationService'
 import { administrationService } from '@/modules/platform-admin/services/administrationService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import { codeLabel } from '@/platform/display/codeCatalog'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { errorText, run } = useAsyncLoad()
+const { loading: saving, run: runAction } = useAsyncAction()
 
 const accounts = ref<AccountView[]>([])
 const roles = ref<RoleView[]>([])
 const permissions = ref<string[]>([])
-const errorText = ref('')
 const successText = ref('')
 const assignVisible = ref(false)
 const roleVisible = ref(false)
@@ -25,15 +27,13 @@ const roleForm = reactive({
 })
 
 async function load(): Promise<void> {
-  try {
+  await run(async () => {
     ;[accounts.value, roles.value, permissions.value] = await Promise.all([
       administrationService.accounts(),
       administrationService.roles(),
       administrationService.permissions(),
     ])
-  } catch (error) {
-    errorText.value = userMessageOf(error, '账号与角色加载失败')
-  }
+  }, '账号与角色加载失败')
 }
 
 function openAssign(account: AccountView): void {
@@ -46,35 +46,44 @@ async function assign(): Promise<void> {
   if (activeAccount.value === null) {
     return
   }
-  try {
-    await administrationService.assignRoles(
-      activeAccount.value.accountBusinessId,
-      selectedRoles.value,
-      activeAccount.value.rowVersion,
-    )
-    assignVisible.value = false
-    successText.value = '账号角色已更新'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '账号授权失败')
-  }
+  await runAction(
+    () =>
+      administrationService.assignRoles(
+        activeAccount.value!.accountBusinessId,
+        selectedRoles.value,
+        activeAccount.value!.rowVersion,
+      ),
+    {
+      success: '账号角色已更新',
+      fallback: '账号授权失败',
+      onSuccess: async () => {
+        assignVisible.value = false
+        successText.value = '账号角色已更新'
+        await load()
+      },
+    },
+  )
 }
 
 async function toggleStatus(account: AccountView): Promise<void> {
-  try {
-    const target = account.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
-    await administrationService.changeAccountStatus(
-      account.accountBusinessId,
-      target,
-      account.rowVersion,
-    )
-    successText.value = target === 'ACTIVE' ? '账号已启用' : '账号已停用，立即生效'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '账号状态更新失败')
-  }
+  const target = account.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
+  const message = target === 'ACTIVE' ? '账号已启用' : '账号已停用，立即生效'
+  await runAction(
+    () =>
+      administrationService.changeAccountStatus(
+        account.accountBusinessId,
+        target,
+        account.rowVersion,
+      ),
+    {
+      success: message,
+      fallback: '账号状态更新失败',
+      onSuccess: async () => {
+        successText.value = message
+        await load()
+      },
+    },
+  )
 }
 
 function openRole(role: RoleView | null): void {
@@ -86,21 +95,25 @@ function openRole(role: RoleView | null): void {
 }
 
 async function saveRole(): Promise<void> {
-  try {
-    await administrationService.saveRole({
-      roleBusinessId: activeRole.value?.roleBusinessId ?? null,
-      roleCode: roleForm.roleCode,
-      name: roleForm.name,
-      permissionCodes: roleForm.permissionCodes,
-      expectedRowVersion: activeRole.value?.rowVersion ?? 0,
-    })
-    roleVisible.value = false
-    successText.value = '角色已保存'
-    ElMessage.success(successText.value)
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '角色保存失败')
-  }
+  await runAction(
+    () =>
+      administrationService.saveRole({
+        roleBusinessId: activeRole.value?.roleBusinessId ?? null,
+        roleCode: roleForm.roleCode,
+        name: roleForm.name,
+        permissionCodes: roleForm.permissionCodes,
+        expectedRowVersion: activeRole.value?.rowVersion ?? 0,
+      }),
+    {
+      success: '角色已保存',
+      fallback: '角色保存失败',
+      onSuccess: async () => {
+        roleVisible.value = false
+        successText.value = '角色已保存'
+        await load()
+      },
+    },
+  )
 }
 
 function roleName(code: string): string {
@@ -191,7 +204,7 @@ onMounted(load)
       </el-form>
       <template #footer>
         <el-button @click="assignVisible = false">取消</el-button>
-        <el-button type="primary" @click="assign">保存授权</el-button>
+        <el-button type="primary" :loading="saving" @click="assign">保存授权</el-button>
       </template>
     </el-dialog>
 
@@ -218,7 +231,7 @@ onMounted(load)
       </el-form>
       <template #footer>
         <el-button @click="roleVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveRole">保存</el-button>
+        <el-button type="primary" :loading="saving" @click="saveRole">保存</el-button>
       </template>
     </el-dialog>
   </WorkspacePage>

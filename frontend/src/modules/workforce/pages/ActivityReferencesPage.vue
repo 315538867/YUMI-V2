@@ -1,33 +1,35 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import type {
   AssignmentSubjectCurrentView,
   EmployeeView,
   TeamView,
+  WorkforceActivityReferenceView,
 } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
+import CodeLabel from '@/shared/components/CodeLabel.vue'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { errorText, run } = useAsyncLoad()
 
 const employees = ref<EmployeeView[]>([])
 const teams = ref<TeamView[]>([])
 const current = ref<AssignmentSubjectCurrentView | null>(null)
-const errorText = ref('')
+const references = ref<WorkforceActivityReferenceView[]>([])
 const form = reactive<{ subjectType: 'EMPLOYEE' | 'TEAM'; businessId: string }>({
   subjectType: 'EMPLOYEE',
   businessId: '',
 })
 
 async function load(): Promise<void> {
-  try {
+  await run(async () => {
     ;[employees.value, teams.value] = await Promise.all([
       workforceService.employees(),
       workforceService.teams(),
     ])
-  } catch (error) {
-    errorText.value = userMessageOf(error, '主体列表加载失败')
-  }
+  }, '主体列表加载失败')
 }
 
 async function query(): Promise<void> {
@@ -35,13 +37,16 @@ async function query(): Promise<void> {
     errorText.value = '请选择执行主体'
     return
   }
-  errorText.value = ''
-  try {
-    current.value = await workforceService.subject(form.subjectType, form.businessId)
-  } catch (error) {
-    current.value = null
-    errorText.value = userMessageOf(error, '执行主体查询失败')
-  }
+  current.value = null
+  references.value = []
+  await run(async () => {
+    const [subject, activeReferences] = await Promise.all([
+      workforceService.subject(form.subjectType, form.businessId),
+      workforceService.subjectReferences(form.subjectType, form.businessId),
+    ])
+    current.value = subject
+    references.value = activeReferences
+  }, '执行主体查询失败')
 }
 
 onMounted(load)
@@ -97,6 +102,43 @@ onMounted(load)
         </el-tag>
       </el-descriptions-item>
     </el-descriptions>
+
+    <h2>活动任务引用（{{ references.length }}）</h2>
+    <el-table :data="references" border empty-text="当前没有活动引用" size="small">
+      <el-table-column label="来源模块" width="130">
+        <template #default="{ row }">
+          <CodeLabel
+            category="workforce.activitySourceModule"
+            :code="row.sourceModule"
+            fallback="其他模块"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="来源类型" width="150">
+        <template #default="{ row }">
+          <CodeLabel
+            category="workforce.activitySourceType"
+            :code="row.sourceType"
+            fallback="其他来源"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column prop="sourceBusinessId" label="来源标识" min-width="220" />
+      <el-table-column label="工作日期" width="120">
+        <template #default="{ row }">{{ row.workDate || '—' }}</template>
+      </el-table-column>
+      <el-table-column label="工种" width="130">
+        <template #default="{ row }">
+          <CodeTag v-if="row.workTypeCode" category="workforce.workType" :code="row.workTypeCode" />
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" width="100">
+        <template #default="{ row }">
+          <CodeTag category="workforce.reservationStatus" :code="row.status" />
+        </template>
+      </el-table-column>
+    </el-table>
   </WorkspacePage>
 </template>
 
@@ -126,6 +168,11 @@ h1 {
 
 .result {
   margin-top: 16px;
+}
+
+h2 {
+  margin: 20px 0 10px;
+  font-size: 16px;
 }
 
 .alert {

@@ -10,6 +10,7 @@ import com.yumi.support.RecordingAuthorization;
 import com.yumi.support.RecordingIdentity;
 import com.yumi.support.RecordingNumbering;
 import com.yumi.workforce.api.ChangeQualificationCommand;
+import com.yumi.workforce.api.CreateEfficiencyStandardCommand;
 import com.yumi.workforce.api.CreateTeamCommand;
 import com.yumi.workforce.api.DeactivateTeamCommand;
 import com.yumi.workforce.api.EmployeeRef;
@@ -58,9 +59,11 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
     void setUp() {
         jdbc.sql("DELETE FROM workforce_activity_reservations").update();
         jdbc.sql("DELETE FROM workforce_activity_reference_guards").update();
+        jdbc.sql("DELETE FROM workforce_standard_version_facts").update();
         jdbc.sql("DELETE FROM workforce_standard_snapshots").update();
         jdbc.sql("DELETE FROM workforce_team_snapshots").update();
         jdbc.sql("DELETE FROM workforce_employee_snapshots").update();
+        jdbc.sql("DELETE FROM workforce_team_status_facts").update();
         jdbc.sql("DELETE FROM workforce_team_member_facts").update();
         jdbc.sql("DELETE FROM workforce_team_members").update();
         jdbc.sql("DELETE FROM workforce_teams").update();
@@ -68,6 +71,7 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
         jdbc.sql("DELETE FROM workforce_qualifications").update();
         jdbc.sql("DELETE FROM workforce_employment_facts").update();
         jdbc.sql("DELETE FROM workforce_employees").update();
+        jdbc.sql("DELETE FROM workforce_team_efficiency_standards WHERE standard_business_id NOT IN ('WFE-2','WFE-3','WFE-4')").update();
         jdbc.sql("UPDATE workforce_team_efficiency_standards SET member_count = 2,"
                 + " efficiency_factor = 1.2, content_version = 1, row_version = 1"
                 + " WHERE standard_business_id = 'WFE-2'").update();
@@ -137,6 +141,10 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
                         WHERE employee_business_id = :id ORDER BY occurred_at, id
                         """).param("id", hired.employeeBusinessId()).query(String.class).list();
         assertThat(facts).containsExactly("HIRE", "LEAVE", "REHIRE");
+        var history = workforce.getEmployeeHistory(hired.employeeBusinessId());
+        assertThat(history.employment())
+                .extracting(com.yumi.workforce.api.EmployeeHistoryView.EmploymentFactView::factType)
+                .containsExactly("REHIRE", "HIRE", "LEAVE");
         assertThat(hired.employeeNo())
                 .as("员工编号不可复用")
                 .isEqualTo(rehired.employeeNo());
@@ -244,6 +252,10 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
                         WHERE employee_business_id = :id ORDER BY occurred_at, id
                         """).param("id", hired.employeeBusinessId()).query(String.class).list();
         assertThat(facts).containsExactly("GRANT", "REVOKE");
+        var history = workforce.getEmployeeHistory(hired.employeeBusinessId());
+        assertThat(history.qualifications())
+                .extracting(com.yumi.workforce.api.EmployeeHistoryView.QualificationFactView::factType)
+                .containsExactly("REVOKE", "GRANT");
     }
 
     @Test
@@ -261,12 +273,12 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
     @DisplayName("效率因子必须大于 1，人数至少为 2；修改递增内容版本")
     void efficiencyStandardValidation() {
         assertThatThrownBy(() -> workforce.updateEfficiencyStandard(
-                new UpdateEfficiencyStandardCommand("WFE-2", 2, new BigDecimal("0.9"), 1L)))
+                new UpdateEfficiencyStandardCommand("WFE-2", 2, new BigDecimal("0.9"), 1L, null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("大于 1");
 
         workforce.updateEfficiencyStandard(
-                new UpdateEfficiencyStandardCommand("WFE-2", 2, new BigDecimal("1.25"), 1L));
+                new UpdateEfficiencyStandardCommand("WFE-2", 2, new BigDecimal("1.25"), 1L, "调整说明"));
 
         var standards = workforce.getStandards();
         assertThat(standards.efficiencyStandards())
@@ -276,21 +288,56 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
                     assertThat(standard.efficiencyFactor()).isEqualByComparingTo("1.25");
                     assertThat(standard.contentVersion()).isEqualTo(2);
                 });
+        var versions = workforce.getStandardHistory("EFFICIENCY", "WFE-2");
+        assertThat(versions.versions()).first().satisfies(version -> {
+            assertThat(version.contentVersion()).isEqualTo(2);
+            assertThat(version.efficiencyFactor()).isEqualByComparingTo("1.25");
+            assertThat(version.reason()).isEqualTo("调整说明");
+        });
+    }
+
+    @Test
+    @DisplayName("新增人数效率标准写入首版，重复人数被拒绝")
+    void createEfficiencyStandardIsVersioned() {
+        workforce.createEfficiencyStandard(
+                new CreateEfficiencyStandardCommand(5, new BigDecimal("1.5"), "新增五人大组标准"));
+
+        var standard = workforce.getStandards().efficiencyStandards().stream()
+                .filter(row -> row.memberCount() == 5)
+                .findFirst()
+                .orElseThrow();
+        assertThat(standard.efficiencyFactor()).isEqualByComparingTo("1.5");
+        var version = workforce.getStandardHistory("EFFICIENCY", standard.standardBusinessId())
+                .versions().getFirst();
+        assertThat(version.contentVersion()).isEqualTo(1);
+        assertThat(version.reason()).isEqualTo("新增五人大组标准");
+
+        assertThatThrownBy(() -> workforce.createEfficiencyStandard(
+                new CreateEfficiencyStandardCommand(5, new BigDecimal("1.6"), null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("已有当前效率标准");
     }
 
     @Test
     @DisplayName("每日有效时间标准可维护，内容版本递增，历史不变")
     void dailyWorkTimeStandardIsVersioned() {
-        workforce.updateWorkTimeStandard(new UpdateWorkTimeStandardCommand(420, 1L));
+        workforce.updateWorkTimeStandard(new UpdateWorkTimeStandardCommand(420, 1L, "调整说明"));
 
         var standards = workforce.getStandards();
         assertThat(standards.effectiveMinutes()).isEqualTo(420);
         assertThat(standards.dailyContentVersion()).isEqualTo(2);
 
         assertThatThrownBy(() -> workforce.updateWorkTimeStandard(
-                new UpdateWorkTimeStandardCommand(0, 2L)))
+                new UpdateWorkTimeStandardCommand(0, 2L, null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("必须大于 0");
+
+        var versions = workforce.getStandardHistory("DAILY_WORK_TIME", standards.dailyStandardBusinessId());
+        assertThat(versions.versions()).first().satisfies(version -> {
+            assertThat(version.contentVersion()).isEqualTo(2);
+            assertThat(version.effectiveMinutes()).isEqualTo(420);
+            assertThat(version.reason()).isEqualTo("调整说明");
+        });
     }
 
     @Test
@@ -315,13 +362,23 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
         TeamRef team = workforce.createTeam(new CreateTeamCommand(
                 "二人组", Set.of(first.employeeBusinessId(), second.employeeBusinessId())));
 
-        workforce.deactivateTeam(new DeactivateTeamCommand(team.teamBusinessId(), 1L));
+        workforce.deactivateTeam(new DeactivateTeamCommand(team.teamBusinessId(), 1L, "停用说明"));
 
         TeamView view = workforce.listTeams().stream()
                 .filter(candidate -> candidate.teamBusinessId().equals(team.teamBusinessId()))
                 .findFirst()
                 .orElseThrow();
         assertThat(view.status()).isEqualTo(TeamStatus.INACTIVE);
+
+        var history = workforce.getTeamHistory(team.teamBusinessId());
+        assertThat(history.statuses())
+                .extracting(com.yumi.workforce.api.TeamHistoryView.StatusFactView::factType)
+                .containsExactly("DEACTIVATE", "CREATE");
+        assertThat(history.statuses()).first()
+                .satisfies(status -> assertThat(status.reason()).isEqualTo("停用说明"));
+        assertThat(history.members())
+                .extracting(com.yumi.workforce.api.TeamHistoryView.MemberFactView::factType)
+                .containsOnly("JOIN");
     }
 
     private EmployeeRef hire(String name) {

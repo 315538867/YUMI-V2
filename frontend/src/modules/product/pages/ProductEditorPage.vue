@@ -5,6 +5,7 @@ import { userMessageOf } from '@/platform/services/errorMessage'
 import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type {
   EntryConfiguration,
   SchemeBudgetView,
@@ -15,6 +16,8 @@ import { productService } from '@/modules/product/services/productService'
 import EditorPage from '@/shared/components/EditorPage.vue'
 import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+
+const { loading, errorText, run } = useAsyncLoad(true)
 
 type MoneyKey =
   | 'standardSalePrice'
@@ -72,8 +75,6 @@ const router = useRouter()
 const productId =
   typeof route.params.productBusinessId === 'string' ? route.params.productBusinessId : ''
 const editing = productId !== ''
-const loading = ref(true)
-const errorText = ref('')
 const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
   ['name'],
   '商品已被其他操作修改，请重新打开后再保存',
@@ -146,9 +147,7 @@ const extraFields: Array<{ key: MoneyKey; label: string }> = [
 ]
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     configuration.value = await productService.entryConfiguration()
     form.makingStarCode = configuration.value.makingStars[0]?.starCode ?? form.makingStarCode
     form.glueLossRate = configuration.value.glueLossRate
@@ -189,11 +188,7 @@ async function load(): Promise<void> {
       })
     }
     initialSnapshot.value = JSON.stringify(form)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '商品录入数据加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '商品录入数据加载失败')
 }
 
 function definition(): ProductDefinition {

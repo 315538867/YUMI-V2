@@ -27,6 +27,8 @@ public interface WorkforceApplicationService {
 
     void deactivateTeam(DeactivateTeamCommand command);
 
+    void createEfficiencyStandard(CreateEfficiencyStandardCommand command);
+
     void updateEfficiencyStandard(UpdateEfficiencyStandardCommand command);
 
     void updateWorkTimeStandard(UpdateWorkTimeStandardCommand command);
@@ -39,10 +41,14 @@ public interface WorkforceApplicationService {
 
     EmployeeView getEmployee(String employeeBusinessId);
 
+    EmployeeHistoryView getEmployeeHistory(String employeeBusinessId);
+
     List<TeamView> listTeams();
 
     List<TeamView> searchTeams(
             String keyword, com.yumi.workforce.api.TeamStatus status, int page, int size);
 
     TeamView getTeam(String teamBusinessId);
+
+    TeamHistoryView getTeamHistory(String teamBusinessId);
 }

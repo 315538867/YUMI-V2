@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { MonthlyOperatingSummary } from '@/modules/reporting/contracts'
 import { reportingService } from '@/modules/reporting/services/reportingService'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+
 const summary = ref<MonthlyOperatingSummary | null>(null)
-const loading = ref(false)
-const errorText = ref('')
 const { filters, search } = useListQuery(
   { month: new Date().toISOString().slice(0, 7), theme: 'ORDER' },
   { paged: false, onSearch: () => void load() },
@@ -24,15 +24,9 @@ const themes = [
 ]
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     summary.value = await reportingService.monthlySummary(filters.month)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '主题报表加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '主题报表加载失败')
 }
 
 void load()

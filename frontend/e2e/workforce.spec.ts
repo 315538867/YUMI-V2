@@ -41,7 +41,9 @@ test('员工详情、资格、整页编辑与离职返聘使用真实接口', as
     .click()
   await page.getByRole('option', { name: '制作' }).click()
   await page.locator('.el-dialog').getByRole('button', { name: '确认' }).click()
-  await expect(page.locator('.el-table__row').filter({ hasText: '制作' })).toBeVisible()
+  await expect(
+    page.locator('.qualification-table .el-table__row').filter({ hasText: '制作' }),
+  ).toBeVisible()
 
   await page.getByRole('button', { name: '编辑资料' }).click()
   await expect(page).toHaveURL(
@@ -66,7 +68,12 @@ test('员工详情、资格、整页编辑与离职返聘使用真实接口', as
   await page.locator('.el-dialog').getByRole('button', { name: '确认' }).click()
   await expect(page.locator('.el-descriptions').getByText('在职', { exact: true })).toBeVisible()
 
-  await page.getByRole('tab', { name: '活动引用' }).click()
+  await page.locator('.history-tabs').getByRole('tab', { name: '就业记录' }).click()
+  await expect(page.locator('.el-table__row').filter({ hasText: '返聘' }).first()).toBeVisible()
+  await page.locator('.history-tabs').getByRole('tab', { name: '资格变更' }).click()
+  await expect(page.locator('.el-table__row').filter({ hasText: '授予资格' }).first()).toBeVisible()
+
+  await page.locator('.workforce-tabs').getByRole('tab', { name: '活动引用' }).click()
   await page
     .locator('.el-form-item')
     .filter({ hasText: '主体' })
@@ -100,7 +107,7 @@ test('小组详情、整页编辑与人员标准', async ({ page, request }) => 
   await page.getByRole('button', { name: '保存' }).click()
   await expect(page).toHaveURL(/\/workforce\/teams\/TEAM-/)
   await expect(page.getByRole('heading', { name: teamName })).toBeVisible()
-  await expect(page.locator('.el-table__row').filter({ hasText: name })).toBeVisible()
+  await expect(page.locator('.member-table .el-table__row').filter({ hasText: name })).toBeVisible()
 
   await page.getByRole('button', { name: '编辑小组' }).click()
   await expect(page).toHaveURL(/\/workforce\/teams\/[^/]+\/edit$/)
@@ -113,10 +120,34 @@ test('小组详情、整页编辑与人员标准', async ({ page, request }) => 
   await expect(page).toHaveURL(/\/workforce\/teams\/[^/]+$/)
   await expect(page.getByRole('heading', { name: renamed })).toBeVisible()
 
-  await page.getByRole('tab', { name: '人员标准' }).click()
-  await formInput(page, '有效分钟').fill('470')
-  await page.locator('.standards-page .el-form').getByRole('button', { name: '保存' }).click()
-  await expect(page.getByText(/仍被活动任务引用/)).toBeVisible()
+  await page.locator('.history-tabs').getByRole('tab', { name: '成员变更' }).click()
+  await expect(page.locator('.el-table__row').filter({ hasText: name }).first()).toBeVisible()
+  await page.locator('.history-tabs').getByRole('tab', { name: '状态记录' }).click()
+  await expect(page.getByText('创建').first()).toBeVisible()
+
+  await page.locator('.workforce-tabs').getByRole('tab', { name: '人员标准' }).click()
+  const memberCount = 10 + (Date.now() % 80)
+  await page.getByRole('button', { name: '新增人数标准' }).click()
+  const standardDialog = page.locator('.el-dialog')
+  await standardDialog
+    .locator('.el-form-item')
+    .filter({ hasText: '人数' })
+    .locator('input')
+    .fill(String(memberCount))
+  await standardDialog
+    .locator('.el-form-item')
+    .filter({ hasText: '效率因子' })
+    .locator('input')
+    .fill('1.70')
+  await standardDialog.getByRole('button', { name: '创建' }).click()
+  const standardRow = page
+    .locator('.efficiency-table .el-table__row')
+    .filter({ hasText: String(memberCount) })
+  await expect(standardRow).toBeVisible()
+  await standardRow.getByRole('button', { name: '版本记录' }).click()
+  await expect(page.getByRole('dialog').getByRole('heading', { name: /版本记录/ })).toBeVisible()
+  await expect(page.locator('.el-dialog .el-table__row').first()).toBeVisible()
+  await expect(page.locator('.el-dialog').getByText('V1')).toBeVisible()
 
   await expect(page.getByText('绑定账号')).toHaveCount(0)
   await expect(page.getByPlaceholder('登录名')).toHaveCount(0)

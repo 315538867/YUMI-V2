@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { DispositionView, ResponsibilityType } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
+const { errorText, run } = useAsyncLoad()
+const { loading: saving, run: runAction } = useAsyncAction()
+
 const taskItemId = ref('')
 const dispositions = ref<DispositionView[]>([])
-const errorText = ref('')
 const dialogVisible = ref(false)
 const form = reactive({
   dispositionFactBusinessId: '',
@@ -25,12 +27,9 @@ async function load(): Promise<void> {
     errorText.value = '请输入任务明细标识'
     return
   }
-  errorText.value = ''
-  try {
+  await run(async () => {
     dispositions.value = await productionService.dispositions(taskItemId.value.trim())
-  } catch (error) {
-    errorText.value = userMessageOf(error, '处置记录加载失败')
-  }
+  }, '处置记录加载失败')
 }
 
 function openCorrection(dispositionFactBusinessId: string): void {
@@ -44,22 +43,26 @@ function openCorrection(dispositionFactBusinessId: string): void {
 }
 
 async function correct(): Promise<void> {
-  try {
-    await productionService.correctResponsibility({
-      dispositionFactBusinessId: form.dispositionFactBusinessId,
-      responsibilityType: form.responsibilityType,
-      responsibleSubjectBusinessId:
-        form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
-      waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
-      reasonText: form.reasonText,
-      expectedRowVersion: Number(form.expectedRowVersion),
-    })
-    dialogVisible.value = false
-    ElMessage.success('责任已更正')
-    await load()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '责任更正失败')
-  }
+  await runAction(
+    () =>
+      productionService.correctResponsibility({
+        dispositionFactBusinessId: form.dispositionFactBusinessId,
+        responsibilityType: form.responsibilityType,
+        responsibleSubjectBusinessId:
+          form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
+        waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
+        reasonText: form.reasonText,
+        expectedRowVersion: Number(form.expectedRowVersion),
+      }),
+    {
+      success: '责任已更正',
+      fallback: '责任更正失败',
+      onSuccess: async () => {
+        dialogVisible.value = false
+        await load()
+      },
+    },
+  )
 }
 
 function destinationText(value: string): string {
@@ -148,7 +151,7 @@ function destinationText(value: string): string {
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="correct">提交更正</el-button>
+        <el-button type="primary" :loading="saving" @click="correct">提交更正</el-button>
       </template>
     </el-dialog>
   </WorkspacePage>

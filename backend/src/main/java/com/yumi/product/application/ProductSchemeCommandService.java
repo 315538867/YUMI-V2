@@ -246,6 +246,29 @@ public class ProductSchemeCommandService implements ProductSchemeApplicationServ
     }
 
     @Override
+    public void activateCustomScheme(String schemeBusinessId, long expectedRowVersion) {
+        authorization.require(PermissionCodes.PRODUCT_SCHEME_MANAGE, ResourceScope.GLOBAL);
+        SchemeRecord existing = schemes.findByBusinessId(
+                        ProductCommandService.requireText(schemeBusinessId, "方案标识", 64))
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCT_SCHEME_INVALID", "方案不存在"));
+        if (existing.schemeType() == SchemeType.SYSTEM_STANDARD) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCT_SCHEME_SYSTEM_MANAGED",
+                    "内置标准方案随商品状态，不能单独启用");
+        }
+        transactionTemplate.executeWithoutResult(status -> {
+            if (!schemes.updateStatus(
+                    schemeBusinessId, ProductStatus.ACTIVE.name(), expectedRowVersion, clock.instant())) {
+                throw new ApiException(
+                        ApiErrorType.CONCURRENT_CONFLICT, "PRODUCT_VERSION_CONFLICT",
+                        "方案已被其他操作修改，请重新打开后再操作");
+            }
+            recordAudit("ACTIVATE_CUSTOM_SCHEME", schemeBusinessId, Map.of());
+        });
+    }
+
+    @Override
     public List<SchemeView> listSchemes(String productBusinessId) {
         authorization.require(PermissionCodes.PRODUCT_READ, ResourceScope.GLOBAL);
         return schemes.findAllOfProduct(

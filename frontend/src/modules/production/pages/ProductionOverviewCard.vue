@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { ProductionOverview } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 
+const { loading, errorText, run } = useAsyncLoad(true)
+
 const overview = ref<ProductionOverview | null>(null)
-const loading = ref(true)
-const errorText = ref('')
 
 const scheduledRate = computed(() =>
   rate(overview.value?.scheduledQuantity, overview.value?.requiredQuantity),
@@ -32,15 +32,9 @@ function processRate(required: number, completed: number): number {
 }
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     overview.value = await productionService.overview()
-  } catch (error) {
-    errorText.value = userMessageOf(error, '整体进度加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '整体进度加载失败')
 }
 
 onMounted(load)

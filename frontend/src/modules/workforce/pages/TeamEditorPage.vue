@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { useEditorForm } from '@/platform/composables/useEditorForm'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import EditorPage from '@/shared/components/EditorPage.vue'
 import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
+
+const { loading, errorText, run } = useAsyncLoad(true)
 
 const route = useRoute()
 const router = useRouter()
@@ -16,8 +18,6 @@ const teamId = typeof route.params.teamBusinessId === 'string' ? route.params.te
 const editing = teamId !== ''
 const team = ref<TeamView | null>(null)
 const employees = ref<EmployeeView[]>([])
-const loading = ref(true)
-const errorText = ref('')
 const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
   ['name', 'memberEmployeeBusinessIds'],
   '资料已被其他人修改，请刷新后重新核对；当前输入未被覆盖',
@@ -41,9 +41,7 @@ function previewStatus(): string {
 }
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     const people = await workforceService.employees()
     employees.value = people
     if (editing) {
@@ -53,11 +51,7 @@ async function load(): Promise<void> {
       form.memberEmployeeBusinessIds = current.members.map((member) => member.employeeBusinessId)
     }
     initialSnapshot.value = JSON.stringify(form)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '小组资料加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '小组资料加载失败')
 }
 
 async function save(): Promise<void> {

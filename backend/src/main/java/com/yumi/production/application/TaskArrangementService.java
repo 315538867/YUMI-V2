@@ -14,6 +14,7 @@ import com.yumi.platform.api.numbering.BusinessNumberService;
 import com.yumi.product.api.ProductSnapshotRef;
 import com.yumi.product.api.ProductSnapshotService;
 import com.yumi.production.api.AdjustTaskCommand;
+import com.yumi.production.api.AvailableProductionSourceView;
 import com.yumi.production.api.ArrangeTaskCommand;
 import com.yumi.production.api.CancelTaskCommand;
 import com.yumi.production.api.DemandType;
@@ -407,6 +408,30 @@ public class TaskArrangementService implements TaskApplicationService {
                 task, command.workDate(), oldParticipants, newParticipants, false);
         workforce.commitChange(change);
         return viewOf(tasks.findTask(task.taskBusinessId()).orElseThrow());
+    }
+
+    @Override
+    public java.util.List<AvailableProductionSourceView> availableSources(TargetProcess processCode) {
+        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
+        if (processCode == null) {
+            return java.util.List.of();
+        }
+        return production.listAvailableSources().stream()
+                .filter(source -> !OPENING_PENDING.equals(source.openingStatus()))
+                .map(source -> {
+                    int available = source.demandType() == DemandType.RETURNED_PRODUCT_REPAIR
+                            ? source.pendingWorkQuantity() + source.inProcessQuantity()
+                            : processCode == TargetProcess.MAKING
+                                    ? source.pendingWorkQuantity() + source.fulfillmentGapQuantity()
+                                    : source.inProcessQuantity();
+                    return new AvailableProductionSourceView(
+                            source.productionSourceBusinessId(), source.demandBusinessId(),
+                            source.demandType(), source.productBusinessId(), source.schemeBusinessId(),
+                            source.targetProcess(), source.initialQuantity(),
+                            source.reservedQuantity(), Math.max(0, available - source.reservedQuantity()));
+                })
+                .filter(source -> source.availableQuantity() > 0)
+                .toList();
     }
 
     @Override

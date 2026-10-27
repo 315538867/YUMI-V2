@@ -43,6 +43,10 @@ class TaskAdjustmentIT extends AbstractOrderFixtureTest {
         String sourceId = orderSourceId(order);
         EmployeeRef first = hireEmployee("调整甲-" + java.util.UUID.randomUUID(), "MAKING");
         EmployeeRef second = hireEmployee("调整乙-" + java.util.UUID.randomUUID(), "MAKING");
+        assertThat(asAdmin(() -> orderTaskService.availableSources(TargetProcess.MAKING)))
+                .filteredOn(source -> source.productionSourceBusinessId().equals(sourceId))
+                .singleElement()
+                .satisfies(source -> assertThat(source.availableQuantity()).isEqualTo(3));
         TaskRef task = arrangeNormal(first, FIRST_DAY, sourceId, 3);
         String itemId = onlyItemId(task.taskBusinessId());
 

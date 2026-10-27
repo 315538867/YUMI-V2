@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import { codesOf, codeLabel } from '@/platform/display/codeCatalog'
 import type { CodeOf } from '@/platform/display/codeCatalog'
@@ -21,14 +20,16 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+
+const { loading: detailLoading, errorText: detailError, run } = useAsyncLoad()
+const { loading: listLoading, errorText: listError, run: runList } = useAsyncLoad()
+const { loading: submitting, run: runAction } = useAsyncAction()
 
 const current = ref<AfterSalesCaseView | null>(null)
 const received = ref<ReceivedReturn[]>([])
 const errorText = ref('')
-const listLoading = ref(false)
-const listError = ref('')
-const detailLoading = ref(false)
-const detailError = ref('')
 const cases = ref<AfterSalesCaseView[]>([])
 const { filters, sync } = useListQuery(
   { case: '', keyword: '', status: '' },
@@ -104,15 +105,9 @@ function openAction(kind: string, obligationId = '', receiptItemId = ''): void {
 }
 
 async function searchCases(): Promise<void> {
-  listLoading.value = true
-  listError.value = ''
-  try {
+  await runList(async () => {
     cases.value = await afterSalesService.listCases(filters.keyword, filters.status)
-  } catch (error) {
-    listError.value = userMessageOf(error, '售后案例列表加载失败')
-  } finally {
-    listLoading.value = false
-  }
+  }, '售后案例列表加载失败')
 }
 
 async function applyListQuery(): Promise<void> {
@@ -144,179 +139,177 @@ async function load(): Promise<void> {
     detailError.value = ''
     return
   }
-  detailLoading.value = true
-  detailError.value = ''
-  try {
+  await run(async () => {
     current.value = await afterSalesService.getCase(filters.case)
     costs.value = await afterSalesService.listCosts(filters.case)
-  } catch (error) {
-    current.value = null
-    detailError.value = userMessageOf(error, '售后案例加载失败')
-  } finally {
-    detailLoading.value = false
-  }
+  }, '售后案例加载失败')
 }
 
 async function submit(): Promise<void> {
   errorText.value = ''
   successText.value = ''
-  try {
-    if (action.value === 'open') {
-      const obligation =
-        form.obligationType === 'REFUND' || form.obligationType === 'COMPENSATION'
-          ? {
-              obligationType: form.obligationType,
-              targetQuantity: null,
-              targetAmount: { amount: form.amount, currency: 'CNY' },
-              dueDate: form.dueDate,
-              note: form.issueSummary,
-            }
-          : {
-              obligationType: form.obligationType,
-              targetQuantity: Number(form.quantity),
-              targetAmount: null,
-              dueDate: form.dueDate,
-              note: form.issueSummary,
-              orderItemBusinessId: null,
-            }
-      const created = await afterSalesService.openCase({
-        orderBusinessId: form.orderBusinessId.trim(),
-        issueSummary: form.issueSummary,
-        routeType: form.routeType,
-        obligations: [obligation],
-      })
-      filters.case = created.caseBusinessId
-      successText.value = `售后案例已受理：${created.caseBusinessId}`
-      await sync()
-      await load()
-    } else if (action.value === 'return') {
-      const result = await afterSalesService.receiveReturn({
-        obligationBusinessId: form.obligationId,
-        quantity: Number(form.quantity),
-        conditionCode: form.conditionCode,
-      })
-      received.value.push({
-        receiptItemBusinessId: result.receiptItemBusinessId,
-        obligationBusinessId: form.obligationId,
-        quantity: Number(form.quantity),
-        conditionCode: form.conditionCode,
-      })
-      successText.value = '退回已接收'
-      await load()
-    } else if (action.value === 'dispose') {
-      await afterSalesService.disposeReturnedProduct({
-        receiptItemBusinessId: form.receiptItemId,
-        quantity: Number(form.quantity),
-        dispositionType: form.dispositionType,
-        physicalDestination: form.destination,
-        businessDate: form.businessDate,
-        reasonText: form.reason,
-        responsibilityType: form.responsibilityType,
-        responsibleSubjectBusinessId:
-          form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
-        waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
-        offlineInventoryName:
-          form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.offlineInventoryName : null,
-        offlineInventoryNote: null,
-        handedOverBy: null,
-        receivedBy: null,
-        transferredAt:
-          form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'
-            ? `${form.businessDate}T10:00:00`
-            : null,
-      })
-      successText.value = '池内制品已处置；生产与售后指向同一次处置'
-    } else if (action.value === 'return-customer') {
-      await afterSalesService.returnToCustomer({
-        receiptItemBusinessId: form.receiptItemId,
-        quantity: Number(form.quantity),
-        deliveredAt: `${form.businessDate}T10:00:00`,
-        recipient: {
-          customerName: form.recipientName,
-          phone: form.recipientPhone,
-          address: form.recipientAddress,
-        },
-        trackingNo: form.trackingNo,
-      })
-      successText.value = '原样退还已登记'
-    } else if (action.value === 'repair') {
-      await afterSalesService.requestRepair({
-        obligationBusinessId: form.obligationId,
-        receiptItemBusinessId: form.receiptItemId,
-        quantity: Number(form.quantity),
-      })
-      successText.value = '返修路线已建立'
-    } else if (action.value === 'change') {
-      await afterSalesService.changeObligation(form.obligationId, {
-        quantity: Number(form.quantity),
-        route: form.changeRoute,
-        amount:
-          form.changeRoute === 'REFUND' || form.changeRoute === 'COMPENSATION'
-            ? { amount: form.amount, currency: 'CNY' }
-            : null,
-        note: form.reason,
-      })
-      successText.value = '义务路线已变更'
-      await load()
-    } else if (action.value === 'cancel') {
-      await afterSalesService.cancelObligation(form.obligationId, {
-        poolDispositionType: form.dispositionType,
-        poolPhysicalDestination: form.destination,
-        responsibilityType: form.responsibilityType,
-        responsibleSubjectBusinessId:
-          form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
-        waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
-        offlineInventoryName: null,
-        offlineInventoryNote: null,
-        handedOverBy: null,
-        receivedBy: null,
-        transferredAt: null,
-        businessDate: form.businessDate,
-        reasonText: form.reason,
-      })
-      successText.value = '义务已取消'
-      await load()
-    } else if (action.value === 'pay') {
-      const obligation = current.value?.obligations.find(
-        (row) => row.obligationBusinessId === form.obligationId,
-      )
-      await cashService.refundAfterSales(
-        form.obligationId,
-        form.amount || obligation?.targetAmount?.amount || '0.00',
-        form.businessDate,
-      )
-      successText.value = '赔付/退款已登记到现金'
-    } else if (action.value === 'cost') {
-      const cost = await afterSalesService.confirmCost({
-        caseBusinessId: filters.case,
-        costCategory: form.costCategory,
-        amount: form.amount,
-        businessDate: form.businessDate,
-        reasonText: form.reason,
-      })
-      form.costSourceId = cost.sourceBusinessId
-      successText.value = '售后费用已确认（不产生现金）'
-      await load()
-    } else if (action.value === 'cost-correct') {
-      await afterSalesService.correctCost({
-        caseBusinessId: filters.case,
-        sourceBusinessId: form.costSourceId,
-        amount: form.amount,
-        businessDate: form.businessDate,
-        reasonText: form.reason,
-      })
-      successText.value = '售后费用已更正'
-      await load()
-    } else if (action.value === 'complete') {
-      await afterSalesService.complete(filters.case)
-      successText.value = '售后案例已结案'
-      await load()
-    }
-    dialogVisible.value = false
-    ElMessage.success(successText.value)
-  } catch (error) {
-    errorText.value = userMessageOf(error, '售后操作失败')
-  }
+  await runAction(
+    async () => {
+      if (action.value === 'open') {
+        const obligation =
+          form.obligationType === 'REFUND' || form.obligationType === 'COMPENSATION'
+            ? {
+                obligationType: form.obligationType,
+                targetQuantity: null,
+                targetAmount: { amount: form.amount, currency: 'CNY' },
+                dueDate: form.dueDate,
+                note: form.issueSummary,
+              }
+            : {
+                obligationType: form.obligationType,
+                targetQuantity: Number(form.quantity),
+                targetAmount: null,
+                dueDate: form.dueDate,
+                note: form.issueSummary,
+                orderItemBusinessId: null,
+              }
+        const created = await afterSalesService.openCase({
+          orderBusinessId: form.orderBusinessId.trim(),
+          issueSummary: form.issueSummary,
+          routeType: form.routeType,
+          obligations: [obligation],
+        })
+        filters.case = created.caseBusinessId
+        successText.value = `售后案例已受理：${created.caseBusinessId}`
+        await sync()
+        await load()
+      } else if (action.value === 'return') {
+        const result = await afterSalesService.receiveReturn({
+          obligationBusinessId: form.obligationId,
+          quantity: Number(form.quantity),
+          conditionCode: form.conditionCode,
+        })
+        received.value.push({
+          receiptItemBusinessId: result.receiptItemBusinessId,
+          obligationBusinessId: form.obligationId,
+          quantity: Number(form.quantity),
+          conditionCode: form.conditionCode,
+        })
+        successText.value = '退回已接收'
+        await load()
+      } else if (action.value === 'dispose') {
+        await afterSalesService.disposeReturnedProduct({
+          receiptItemBusinessId: form.receiptItemId,
+          quantity: Number(form.quantity),
+          dispositionType: form.dispositionType,
+          physicalDestination: form.destination,
+          businessDate: form.businessDate,
+          reasonText: form.reason,
+          responsibilityType: form.responsibilityType,
+          responsibleSubjectBusinessId:
+            form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
+          waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
+          offlineInventoryName:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.offlineInventoryName : null,
+          offlineInventoryNote: null,
+          handedOverBy: null,
+          receivedBy: null,
+          transferredAt:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'
+              ? `${form.businessDate}T10:00:00`
+              : null,
+        })
+        successText.value = '池内制品已处置；生产与售后指向同一次处置'
+      } else if (action.value === 'return-customer') {
+        await afterSalesService.returnToCustomer({
+          receiptItemBusinessId: form.receiptItemId,
+          quantity: Number(form.quantity),
+          deliveredAt: `${form.businessDate}T10:00:00`,
+          recipient: {
+            customerName: form.recipientName,
+            phone: form.recipientPhone,
+            address: form.recipientAddress,
+          },
+          trackingNo: form.trackingNo,
+        })
+        successText.value = '原样退还已登记'
+      } else if (action.value === 'repair') {
+        await afterSalesService.requestRepair({
+          obligationBusinessId: form.obligationId,
+          receiptItemBusinessId: form.receiptItemId,
+          quantity: Number(form.quantity),
+        })
+        successText.value = '返修路线已建立'
+      } else if (action.value === 'change') {
+        await afterSalesService.changeObligation(form.obligationId, {
+          quantity: Number(form.quantity),
+          route: form.changeRoute,
+          amount:
+            form.changeRoute === 'REFUND' || form.changeRoute === 'COMPENSATION'
+              ? { amount: form.amount, currency: 'CNY' }
+              : null,
+          note: form.reason,
+        })
+        successText.value = '义务路线已变更'
+        await load()
+      } else if (action.value === 'cancel') {
+        await afterSalesService.cancelObligation(form.obligationId, {
+          poolDispositionType: form.dispositionType,
+          poolPhysicalDestination: form.destination,
+          responsibilityType: form.responsibilityType,
+          responsibleSubjectBusinessId:
+            form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
+          waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
+          offlineInventoryName: null,
+          offlineInventoryNote: null,
+          handedOverBy: null,
+          receivedBy: null,
+          transferredAt: null,
+          businessDate: form.businessDate,
+          reasonText: form.reason,
+        })
+        successText.value = '义务已取消'
+        await load()
+      } else if (action.value === 'pay') {
+        const obligation = current.value?.obligations.find(
+          (row) => row.obligationBusinessId === form.obligationId,
+        )
+        await cashService.refundAfterSales(
+          form.obligationId,
+          form.amount || obligation?.targetAmount?.amount || '0.00',
+          form.businessDate,
+        )
+        successText.value = '赔付/退款已登记到现金'
+      } else if (action.value === 'cost') {
+        const cost = await afterSalesService.confirmCost({
+          caseBusinessId: filters.case,
+          costCategory: form.costCategory,
+          amount: form.amount,
+          businessDate: form.businessDate,
+          reasonText: form.reason,
+        })
+        form.costSourceId = cost.sourceBusinessId
+        successText.value = '售后费用已确认（不产生现金）'
+        await load()
+      } else if (action.value === 'cost-correct') {
+        await afterSalesService.correctCost({
+          caseBusinessId: filters.case,
+          sourceBusinessId: form.costSourceId,
+          amount: form.amount,
+          businessDate: form.businessDate,
+          reasonText: form.reason,
+        })
+        successText.value = '售后费用已更正'
+        await load()
+      } else if (action.value === 'complete') {
+        await afterSalesService.complete(filters.case)
+        successText.value = '售后案例已结案'
+        await load()
+      }
+    },
+    {
+      fallback: '售后操作失败',
+      onSuccess: () => {
+        dialogVisible.value = false
+        ElMessage.success(successText.value)
+      },
+    },
+  )
 }
 </script>
 
@@ -664,7 +657,7 @@ async function submit(): Promise<void> {
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submit">确认</el-button>
+        <el-button type="primary" :loading="submitting" @click="submit">确认</el-button>
       </template>
     </el-dialog>
   </WorkspacePage>

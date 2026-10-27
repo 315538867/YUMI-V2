@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { userMessageOf } from '@/platform/services/errorMessage'
 import { useListQuery } from '@/platform/composables/useListQuery'
+import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type {
   AfterSalesMonthlySummary,
   FreshnessView,
@@ -12,30 +12,24 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
+const { loading, errorText, run } = useAsyncLoad()
+
 const summary = ref<MonthlyOperatingSummary | null>(null)
 const freshness = ref<FreshnessView | null>(null)
 const afterSales = ref<AfterSalesMonthlySummary | null>(null)
-const loading = ref(false)
-const errorText = ref('')
 const { filters, search } = useListQuery(
   { month: new Date().toISOString().slice(0, 7) },
   { paged: false, onSearch: () => void load() },
 )
 
 async function load(): Promise<void> {
-  loading.value = true
-  errorText.value = ''
-  try {
+  await run(async () => {
     ;[summary.value, freshness.value, afterSales.value] = await Promise.all([
       reportingService.monthlySummary(filters.month),
       reportingService.freshness(),
       reportingService.afterSalesSummary(filters.month),
     ])
-  } catch (error) {
-    errorText.value = userMessageOf(error, '月度报表加载失败')
-  } finally {
-    loading.value = false
-  }
+  }, '月度报表加载失败')
 }
 
 void load()

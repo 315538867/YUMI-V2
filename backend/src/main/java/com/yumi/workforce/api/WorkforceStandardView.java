@@ -8,6 +8,7 @@ public record WorkforceStandardView(
         int effectiveMinutes,
         long dailyContentVersion,
         long dailyRowVersion,
+        int dailyActiveReferenceCount,
         java.util.List<EfficiencyStandardView> efficiencyStandards) {
 
     public WorkforceStandardView {
@@ -17,6 +18,6 @@ public record WorkforceStandardView(
     /** 人数效率标准。 */
     public record EfficiencyStandardView(
             String standardBusinessId, int memberCount, BigDecimal efficiencyFactor,
-            long contentVersion, long rowVersion) {
+            long contentVersion, long rowVersion, int activeReferenceCount) {
     }
 }
