@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeePayrollView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 
@@ -14,6 +14,7 @@ const result = ref<EmployeePayrollView | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 const errorText = ref('')
+const emptyText = ref('')
 const successText = ref('')
 const confirmedAmount = ref('')
 const note = ref('')
@@ -22,6 +23,14 @@ const adjustVisible = ref(false)
 const adjustment = reactive({ delta: '', reason: '' })
 
 async function load(): Promise<void> {
+  errorText.value = ''
+  emptyText.value = ''
+  if (periodId.trim() === '' || employeeId.trim() === '') {
+    result.value = null
+    emptyText.value = '请从工资期间页选择员工后再查看工资结果'
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     result.value = await payrollService.result(periodId, employeeId)
@@ -30,7 +39,12 @@ async function load(): Promise<void> {
       manual[line.lineBusinessId] = { amount: '', note: '' }
     }
   } catch (error) {
-    errorText.value = userMessageOf(error, '工资结果加载失败')
+    if (isErrorCode(error, 'PAYROLL_RESULT_NOT_FOUND')) {
+      result.value = null
+      emptyText.value = '该员工在当前工资期间暂无工资结果；请先在期间页刷新参考'
+    } else {
+      errorText.value = userMessageOf(error, '工资结果加载失败')
+    }
   } finally {
     loading.value = false
   }
@@ -120,6 +134,9 @@ onMounted(load)
   <section v-loading="loading" class="employee-payroll">
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-empty v-if="emptyText" :description="emptyText" class="empty">
+      <el-button type="primary" @click="router.push('/payroll/periods')">返回工资期间</el-button>
+    </el-empty>
     <template v-if="result">
       <header class="head">
         <div>

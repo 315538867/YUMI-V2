@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
 import type { EmployeeView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type { GlueMonthReferenceView, GluePolicyView } from '@/modules/finance/payroll/contracts'
@@ -12,6 +12,7 @@ const policy = ref<GluePolicyView | null>(null)
 const employees = ref<EmployeeView[]>([])
 const employeeId = ref('')
 const reference = ref<GlueMonthReferenceView | null>(null)
+const policyMissing = ref(false)
 const errorText = ref('')
 const successText = ref('')
 const form = reactive({ exemptWeightGrams: '300.0000', reasonText: '', expectedGuardVersion: 0 })
@@ -27,11 +28,17 @@ async function load(): Promise<void> {
 }
 
 async function loadPolicy(): Promise<void> {
+  policyMissing.value = false
   try {
     policy.value = await payrollService.gluePolicy(month.value)
     form.exemptWeightGrams = policy.value.exemptWeightGrams
-  } catch {
+  } catch (error) {
     policy.value = null
+    if (isErrorCode(error, 'PAYROLL_GLUE_POLICY_MISSING')) {
+      policyMissing.value = true
+    } else {
+      errorText.value = userMessageOf(error, '胶水设置加载失败')
+    }
   }
 }
 
@@ -43,6 +50,7 @@ async function publish(): Promise<void> {
       reasonText: form.reasonText,
       expectedGuardVersion: Number(form.expectedGuardVersion),
     })
+    policyMissing.value = false
     successText.value = '胶水设置已发布；历史核定不变'
     ElMessage.success(successText.value)
   } catch (error) {
@@ -101,7 +109,13 @@ onMounted(load)
     <p v-if="policy" class="meta">
       当前版本 v{{ policy.version }}，生效月 {{ policy.effectiveMonth }}，免扣 {{ policy.exemptWeightGrams }} 克
     </p>
-    <p v-else class="meta">该月尚无胶水设置。</p>
+    <el-alert
+      v-if="policyMissing"
+      type="info"
+      :closable="false"
+      title="该月尚未配置胶水减免；填写上方表单并发布即可。"
+      class="alert"
+    />
 
     <el-form inline class="employee-row">
       <el-form-item label="员工">

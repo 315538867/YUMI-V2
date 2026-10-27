@@ -1,22 +1,30 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { userMessageOf } from '@/platform/services/errorMessage'
+import { isErrorCode, userMessageOf } from '@/platform/services/errorMessage'
 import type { GluePolicyView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 
 const month = ref(new Date().toISOString().slice(0, 7))
 const policy = ref<GluePolicyView | null>(null)
+const policyMissing = ref(false)
 const errorText = ref('')
 const successText = ref('')
 const form = reactive({ exemptWeightGrams: '300.0000', reasonText: '', expectedGuardVersion: 0 })
 
 async function load(): Promise<void> {
+  policyMissing.value = false
+  errorText.value = ''
   try {
     policy.value = await payrollService.gluePolicy(month.value)
     form.exemptWeightGrams = policy.value.exemptWeightGrams
-  } catch {
+  } catch (error) {
     policy.value = null
+    if (isErrorCode(error, 'PAYROLL_GLUE_POLICY_MISSING')) {
+      policyMissing.value = true
+    } else {
+      errorText.value = userMessageOf(error, '胶水配置加载失败')
+    }
   }
 }
 
@@ -28,6 +36,7 @@ async function publish(): Promise<void> {
       reasonText: form.reasonText,
       expectedGuardVersion: Number(form.expectedGuardVersion),
     })
+    policyMissing.value = false
     successText.value = `已发布 v${policy.value.version}；历史核定不变`
     ElMessage.success(successText.value)
   } catch (error) {
@@ -44,6 +53,13 @@ onMounted(load)
     <el-alert type="info" :closable="false" title="配置按生效月追加版本；修订不会重算已核定工资。" class="alert" />
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
     <el-alert v-if="successText" type="success" :closable="false" :title="successText" class="alert" />
+    <el-alert
+      v-if="policyMissing"
+      type="info"
+      :closable="false"
+      title="该月尚未配置胶水减免；填写下方表单并发布首个版本。"
+      class="alert"
+    />
     <el-form inline>
       <el-form-item label="生效月">
         <el-input v-model="month" type="month" class="month" @change="load" />
