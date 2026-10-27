@@ -2,8 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
+import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
 import { money } from '@/platform/services/money'
 import type { CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
@@ -39,9 +40,19 @@ const products = ref<ProductView[]>([])
 const items = ref<DraftItem[]>([])
 const loading = ref(true)
 const errorText = ref('')
-const conflictError = ref('')
-const validationErrors = reactive<Record<string, string>>({})
-const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
+const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
+  [
+    'customerBusinessId',
+    'orderDate',
+    'expectedDeliveryDate',
+    'name',
+    'phone',
+    'address',
+    'quantity',
+    'unitPrice',
+  ],
+  '订单已被其他操作修改，请重新打开后再提交',
+)
 const previewVisible = ref(false)
 const recipient = reactive({ name: '', phone: '', address: '' })
 const note = ref('')
@@ -53,21 +64,6 @@ const isDirty = computed(
       initialSnapshot.value,
 )
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
-const formAlert = computed(
-  () =>
-    conflictError.value ||
-    validationErrors.items ||
-    otherFieldErrors(
-      'customerBusinessId',
-      'orderDate',
-      'expectedDeliveryDate',
-      'name',
-      'phone',
-      'address',
-      'quantity',
-      'unitPrice',
-    ).join('；'),
-)
 const form = reactive({
   customerBusinessId: '',
   orderDate: new Date().toISOString().slice(0, 10),
@@ -188,58 +184,62 @@ function itemError(index: number, field: string): string {
   return validationErrors[`item-${index}-${field}`] || fieldError(field)
 }
 
-function validate(): boolean {
-  conflictError.value = ''
-  for (const key of Object.keys(validationErrors)) {
-    delete validationErrors[key]
-  }
-  if (form.customerBusinessId === '') {
-    validationErrors.customerBusinessId = '请选择客户'
-  }
-  if (form.orderDate === '') {
-    validationErrors.orderDate = '请选择订单日期'
-  }
-  if (form.expectedDeliveryDate === '') {
-    validationErrors.expectedDeliveryDate = '请选择预计交付日期'
-  }
-  if (items.value.length === 0) {
-    validationErrors.items = '请至少录入一条商品明细'
-  }
-  items.value.forEach((item, index) => {
-    if (item.productBusinessId === '') {
-      validationErrors[`item-${index}-product`] = '请选择商品'
-    }
-    if (item.schemeBusinessId === '') {
-      validationErrors[`item-${index}-scheme`] = '请选择方案'
-    }
-    if (!Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0) {
-      validationErrors[`item-${index}-quantity`] = '订购数量必须大于 0'
-    }
-    if (!/^\d+(\.\d{1,2})?$/.test(item.unitPrice) || Number(item.unitPrice) <= 0) {
-      validationErrors[`item-${index}-unitPrice`] = '单件成交价必须大于 0 且最多两位小数'
-    }
-  })
-  if (recipient.name.trim() === '') {
-    validationErrors.recName = '请填写收货人'
-  }
-  if (recipient.phone.trim() === '') {
-    validationErrors.recPhone = '请填写电话'
-  }
-  if (recipient.address.trim() === '') {
-    validationErrors.recAddress = '请填写地址'
-  }
-  return Object.keys(validationErrors).length === 0
+function validateForm(): boolean {
+  const rules = [
+    {
+      field: 'customerBusinessId',
+      invalid: form.customerBusinessId === '',
+      message: '请选择客户',
+    },
+    { field: 'orderDate', invalid: form.orderDate === '', message: '请选择订单日期' },
+    {
+      field: 'expectedDeliveryDate',
+      invalid: form.expectedDeliveryDate === '',
+      message: '请选择预计交付日期',
+    },
+    {
+      field: '_form',
+      invalid: items.value.length === 0,
+      message: '请至少录入一条商品明细',
+    },
+    ...items.value.flatMap((item, index) => [
+      {
+        field: `item-${index}-product`,
+        invalid: item.productBusinessId === '',
+        message: '请选择商品',
+      },
+      {
+        field: `item-${index}-scheme`,
+        invalid: item.schemeBusinessId === '',
+        message: '请选择方案',
+      },
+      {
+        field: `item-${index}-quantity`,
+        invalid: !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0,
+        message: '订购数量必须大于 0',
+      },
+      {
+        field: `item-${index}-unitPrice`,
+        invalid: !/^\d+(\.\d{1,2})?$/.test(item.unitPrice) || Number(item.unitPrice) <= 0,
+        message: '单件成交价必须大于 0 且最多两位小数',
+      },
+    ]),
+    { field: 'recName', invalid: recipient.name.trim() === '', message: '请填写收货人' },
+    { field: 'recPhone', invalid: recipient.phone.trim() === '', message: '请填写电话' },
+    { field: 'recAddress', invalid: recipient.address.trim() === '', message: '请填写地址' },
+  ]
+  return validate(rules)
 }
 
 function requestPreview(): void {
-  if (!validate()) {
+  if (!validateForm()) {
     return
   }
   previewVisible.value = true
 }
 
 async function confirmCreate(): Promise<void> {
-  if (!validate()) {
+  if (!validateForm()) {
     previewVisible.value = false
     return
   }
@@ -275,12 +275,9 @@ async function confirmCreate(): Promise<void> {
       note: note.value.trim() === '' ? null : note.value.trim(),
       items: orderItems,
     }
-    await run(() => orderService.create(input), {
+    await submit(() => orderService.create(input), {
       success: '订单已确认',
       fallback: '订单保存失败',
-      onError: () => {
-        previewVisible.value = false
-      },
       onSuccess: async (created) => {
         previewVisible.value = false
         allowLeave()
@@ -318,7 +315,7 @@ onMounted(load)
     <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
 
     <el-form v-if="!loading" label-width="110px" class="form">
-      <el-alert v-if="formAlert" type="error" :closable="false" :title="formAlert" class="alert" />
+      <FormErrorAlert :error="formAlert" class="alert" />
       <h2>1. 客户与交付</h2>
       <el-form-item
         label="客户"

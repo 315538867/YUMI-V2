@@ -130,7 +130,7 @@ test('员工新增使用整页表单并展示资料预览', async ({ page }) => 
   await page.getByLabel('姓名').fill(name)
   await page.getByLabel('电话').fill('13600000009')
   await expect(page.getByText('员工资料预览')).toBeVisible()
-  await expect(page.locator('.preview').getByText(name)).toBeVisible()
+  await expect(page.locator('.editor-page__preview').getByText(name)).toBeVisible()
   await page.getByRole('button', { name: '保存' }).click()
   await expect(page).toHaveURL(/\/workforce\/employees\/EMP-/)
   await expect(page.getByRole('heading', { name })).toBeVisible()

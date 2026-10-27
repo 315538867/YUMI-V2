@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
-import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { userMessageOf } from '@/platform/services/errorMessage'
+import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type {
@@ -14,8 +14,9 @@ import type {
   SchemeView,
 } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
+import EditorPage from '@/shared/components/EditorPage.vue'
+import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,9 +28,10 @@ const product = ref<ProductView | null>(null)
 const scheme = ref<SchemeView | null>(null)
 const loading = ref(true)
 const errorText = ref('')
-const conflictError = ref('')
-const validationErrors = reactive<Record<string, string>>({})
-const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
+const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
+  ['name'],
+  '方案已被其他操作修改，请重新打开后再保存',
+)
 const budgetPreview = ref<SchemeBudgetView | null>(null)
 const previewLoading = ref(false)
 const previewError = ref('')
@@ -39,7 +41,6 @@ const isDirty = computed(
   () => loading.value === false && JSON.stringify(form) !== initialSnapshot.value,
 )
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
-const formAlert = computed(() => conflictError.value || otherFieldErrors('name').join('；'))
 
 const form = reactive({
   name: '',
@@ -59,6 +60,7 @@ const form = reactive({
 
 async function load(): Promise<void> {
   loading.value = true
+  errorText.value = ''
   try {
     product.value = await productService.get(productId)
     if (editing) {
@@ -145,12 +147,10 @@ async function save(): Promise<void> {
   if (product.value === null) {
     return
   }
-  conflictError.value = ''
-  for (const key of Object.keys(validationErrors)) {
-    delete validationErrors[key]
-  }
-  if (form.name.trim() === '') {
-    validationErrors.name = '请填写方案名称'
+  const valid = validate([
+    { field: 'name', invalid: form.name.trim() === '', message: '请填写方案名称' },
+  ])
+  if (!valid) {
     return
   }
   const action: () => Promise<unknown> =
@@ -163,16 +163,9 @@ async function save(): Promise<void> {
             scheme.value!.rowVersion,
           )
       : () => productService.createScheme(productId, input(), product.value!.contentVersion)
-  await run<unknown>(action, {
+  await submit<unknown>(action, {
     success: '方案已保存，预算由服务端重新计算',
     fallback: '方案保存失败',
-    handled: (error) => {
-      if (isErrorType(error, 'CONCURRENT_CONFLICT')) {
-        conflictError.value = '方案已被其他操作修改，请重新打开后再保存'
-        return true
-      }
-      return false
-    },
     onSuccess: async () => {
       allowLeave()
       await router.replace(`/products/${productId}`)
@@ -184,174 +177,106 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage v-loading="loading" class="scheme-editor">
-    <header class="head">
-      <h1>{{ editing ? '编辑自定义方案' : '新建自定义方案' }}</h1>
-      <div>
-        <el-button @click="router.back()">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存方案</el-button>
-      </div>
-    </header>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert
-      type="info"
-      :closable="false"
-      title="人工、工时、提成与额外单件费用继承商品，本页不能覆盖；保存后由后端返回预算。"
-      class="alert"
-    />
-    <div class="editor-grid">
-      <el-form label-width="150px" class="form">
-        <el-alert
-          v-if="formAlert"
-          type="error"
-          :closable="false"
-          :title="formAlert"
-          class="alert"
-        />
-        <el-form-item
-          label="方案名称"
-          required
-          :error="validationErrors.name || fieldError('name')"
-        >
-          <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item label="目标工序">
-          <el-select v-model="form.targetProcess">
-            <el-option label="制作" value="MAKING" />
-            <el-option label="捏毛装袋" value="BAGGING" />
-            <el-option label="缝边剪袋" value="SEAM_CUTTING" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="销售价">
-          <el-input v-model="form.salePrice" />
-        </el-form-item>
-        <el-form-item label="胶水供料方">
-          <el-select v-model="form.glueSource">
-            <el-option label="工作室" value="STUDIO" />
-            <el-option label="客户" value="CUSTOMER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="色浆供料方">
-          <el-select v-model="form.colorPasteSource">
-            <el-option label="工作室" value="STUDIO" />
-            <el-option label="客户" value="CUSTOMER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="制作其他材料">
-          <el-input v-model="form.makingOtherMaterialCost" />
-        </el-form-item>
-        <el-form-item label="单件袋子成本">
-          <el-input v-model="form.baggingBagUnitCost" />
-        </el-form-item>
-        <el-form-item label="袋子供料方">
-          <el-select v-model="form.baggingBagSource">
-            <el-option label="工作室" value="STUDIO" />
-            <el-option label="客户" value="CUSTOMER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="单件装饰品">
-          <el-input v-model="form.baggingDecorationUnitPrice" />
-        </el-form-item>
-        <el-form-item label="装饰品供料方">
-          <el-select v-model="form.baggingDecorationSource">
-            <el-option label="工作室" value="STUDIO" />
-            <el-option label="客户" value="CUSTOMER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="捏毛装袋其他费用">
-          <el-input v-model="form.baggingOtherCost" />
-        </el-form-item>
-        <el-form-item label="综合材料成本">
-          <el-input v-model="form.seamCombinedMaterialCost" />
-        </el-form-item>
-        <el-form-item label="缝边剪袋其他费用">
-          <el-input v-model="form.seamOtherCost" />
-        </el-form-item>
-      </el-form>
-      <aside class="budget-preview">
-        <h2>预算预览</h2>
-        <p v-if="previewLoading" class="hint">正在计算…</p>
-        <el-alert v-else-if="previewError" type="error" :closable="false" :title="previewError" />
-        <template v-else-if="budgetPreview">
-          <dl>
-            <dt>全资源成本</dt>
-            <dd><MoneyText :value="budgetPreview.fullResourceUnitCost" /></dd>
-            <dt>工作室成本</dt>
-            <dd><MoneyText :value="budgetPreview.studioBorneUnitCost" /></dd>
-            <dt>预计利润</dt>
-            <dd><MoneyText :value="budgetPreview.expectedUnitProfit" /></dd>
-            <dt>利润率</dt>
-            <dd>
-              {{
-                budgetPreview.expectedProfitRate === null
-                  ? '—'
-                  : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
-              }}
-            </dd>
-          </dl>
-          <p class="hint">只读预览，保存后以服务端预算结果为准。</p>
-        </template>
-        <p v-else class="hint">填写目标工序和销售价后显示预算预览。</p>
-      </aside>
-    </div>
-  </WorkspacePage>
+  <EditorPage
+    :title="editing ? '编辑自定义方案' : '新建自定义方案'"
+    preview-title="预算预览"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
+    <template #actions>
+      <el-button @click="router.back()">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="save">保存方案</el-button>
+    </template>
+    <template #notice>
+      <el-alert
+        type="info"
+        :closable="false"
+        title="人工、工时、提成与额外单件费用继承商品，本页不能覆盖；保存后由后端返回预算。"
+      />
+    </template>
+    <el-form v-if="!loading" label-width="150px">
+      <FormErrorAlert :error="formAlert" class="alert" />
+      <el-form-item label="方案名称" required :error="validationErrors.name || fieldError('name')">
+        <el-input v-model="form.name" />
+      </el-form-item>
+      <el-form-item label="目标工序">
+        <el-select v-model="form.targetProcess">
+          <el-option label="制作" value="MAKING" />
+          <el-option label="捏毛装袋" value="BAGGING" />
+          <el-option label="缝边剪袋" value="SEAM_CUTTING" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="销售价">
+        <el-input v-model="form.salePrice" />
+      </el-form-item>
+      <el-form-item label="胶水供料方">
+        <el-select v-model="form.glueSource">
+          <el-option label="工作室" value="STUDIO" />
+          <el-option label="客户" value="CUSTOMER" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="色浆供料方">
+        <el-select v-model="form.colorPasteSource">
+          <el-option label="工作室" value="STUDIO" />
+          <el-option label="客户" value="CUSTOMER" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="制作其他材料">
+        <el-input v-model="form.makingOtherMaterialCost" />
+      </el-form-item>
+      <el-form-item label="单件袋子成本">
+        <el-input v-model="form.baggingBagUnitCost" />
+      </el-form-item>
+      <el-form-item label="袋子供料方">
+        <el-select v-model="form.baggingBagSource">
+          <el-option label="工作室" value="STUDIO" />
+          <el-option label="客户" value="CUSTOMER" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="单件装饰品">
+        <el-input v-model="form.baggingDecorationUnitPrice" />
+      </el-form-item>
+      <el-form-item label="装饰品供料方">
+        <el-select v-model="form.baggingDecorationSource">
+          <el-option label="工作室" value="STUDIO" />
+          <el-option label="客户" value="CUSTOMER" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="捏毛装袋其他费用">
+        <el-input v-model="form.baggingOtherCost" />
+      </el-form-item>
+      <el-form-item label="综合材料成本">
+        <el-input v-model="form.seamCombinedMaterialCost" />
+      </el-form-item>
+      <el-form-item label="缝边剪袋其他费用">
+        <el-input v-model="form.seamOtherCost" />
+      </el-form-item>
+    </el-form>
+
+    <template #preview>
+      <p v-if="previewLoading" class="hint">正在计算…</p>
+      <el-alert v-else-if="previewError" type="error" :closable="false" :title="previewError" />
+      <template v-else-if="budgetPreview">
+        <dl>
+          <dt>全资源成本</dt>
+          <dd><MoneyText :value="budgetPreview.fullResourceUnitCost" /></dd>
+          <dt>工作室成本</dt>
+          <dd><MoneyText :value="budgetPreview.studioBorneUnitCost" /></dd>
+          <dt>预计利润</dt>
+          <dd><MoneyText :value="budgetPreview.expectedUnitProfit" /></dd>
+          <dt>利润率</dt>
+          <dd>
+            {{
+              budgetPreview.expectedProfitRate === null
+                ? '—'
+                : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
+            }}
+          </dd>
+        </dl>
+        <p class="hint">只读预览，保存后以服务端预算结果为准。</p>
+      </template>
+      <p v-else class="hint">填写目标工序和销售价后显示预算预览。</p>
+    </template>
+  </EditorPage>
 </template>
-
-<style scoped>
-.editor-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 16px;
-  align-items: start;
-}
-
-.budget-preview {
-  position: sticky;
-  top: 12px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
-  padding: 12px 16px;
-  background: var(--el-fill-color-lighter);
-}
-
-.budget-preview h2 {
-  margin-top: 0;
-}
-
-.budget-preview dl {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 8px 12px;
-  margin: 0;
-}
-
-.budget-preview dt {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.budget-preview dd {
-  margin: 0;
-  font-size: 13px;
-}
-
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.form {
-  max-width: 680px;
-}
-
-.alert {
-  margin-bottom: 12px;
-}
-</style>

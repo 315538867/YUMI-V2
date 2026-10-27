@@ -106,7 +106,7 @@ test('客户新建使用整页表单并展示资料预览', async ({ page }) => 
   await page.getByLabel('电话').fill('13900000002')
   await page.getByLabel('默认地址').fill('上海市整页路 1 号')
   await expect(page.getByText('客户资料预览')).toBeVisible()
-  await expect(page.locator('.preview').getByText(name)).toBeVisible()
+  await expect(page.locator('.editor-page__preview').getByText(name)).toBeVisible()
   await page.getByRole('button', { name: '保存' }).click()
   await expect(page).toHaveURL(/\/customers\/CUS-/)
   await expect(page.getByRole('heading', { name })).toBeVisible()

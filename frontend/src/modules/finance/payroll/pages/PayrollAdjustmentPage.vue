@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
-import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { reactive } from 'vue'
+import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
+import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
-const validationErrors = reactive<Record<string, string>>({})
-const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
-const formAlert = computed(() =>
-  otherFieldErrors('resultBusinessId', 'amountDelta', 'reasonText', 'referenceRunBusinessId').join(
-    '；',
-  ),
+const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
+  ['resultBusinessId', 'amountDelta', 'reasonText', 'referenceRunBusinessId'],
+  '工资结果已被其他操作修改，请重新打开后再调整',
 )
 const form = reactive({
   resultBusinessId: '',
@@ -18,27 +16,31 @@ const form = reactive({
   referenceRunBusinessId: '',
 })
 
-function validate(): boolean {
-  for (const key of Object.keys(validationErrors)) {
-    delete validationErrors[key]
-  }
-  if (form.resultBusinessId.trim() === '') {
-    validationErrors.resultBusinessId = '请填写工资结果'
-  }
-  if (!/^-?\d+(\.\d{1,2})?$/.test(form.amountDelta) || Number(form.amountDelta) === 0) {
-    validationErrors.amountDelta = '差额必须为非 0 且最多两位小数'
-  }
-  if (form.reasonText.trim() === '') {
-    validationErrors.reasonText = '请填写调整原因'
-  }
-  return Object.keys(validationErrors).length === 0
+function validateForm(): boolean {
+  return validate([
+    {
+      field: 'resultBusinessId',
+      invalid: form.resultBusinessId.trim() === '',
+      message: '请填写工资结果',
+    },
+    {
+      field: 'amountDelta',
+      invalid: !/^-?\d+(\.\d{1,2})?$/.test(form.amountDelta) || Number(form.amountDelta) === 0,
+      message: '差额必须为非 0 且最多两位小数',
+    },
+    {
+      field: 'reasonText',
+      invalid: form.reasonText.trim() === '',
+      message: '请填写调整原因',
+    },
+  ])
 }
 
-async function submit(): Promise<void> {
-  if (!validate()) {
+async function submitAdjustment(): Promise<void> {
+  if (!validateForm()) {
     return
   }
-  await run(
+  await submit(
     () =>
       payrollService.adjust({
         resultBusinessId: form.resultBusinessId.trim(),
@@ -65,7 +67,7 @@ async function submit(): Promise<void> {
       class="alert"
     />
     <el-form label-width="120px" class="form">
-      <el-alert v-if="formAlert" type="error" :closable="false" :title="formAlert" class="alert" />
+      <FormErrorAlert :error="formAlert" class="alert" />
       <el-form-item
         label="工资结果"
         :error="validationErrors.resultBusinessId || fieldError('resultBusinessId')"
@@ -81,7 +83,7 @@ async function submit(): Promise<void> {
       <el-form-item label="复核运行（可选）" :error="fieldError('referenceRunBusinessId')">
         <el-input v-model="form.referenceRunBusinessId" />
       </el-form-item>
-      <el-button type="primary" :loading="saving" @click="submit">提交调整</el-button>
+      <el-button type="primary" :loading="saving" @click="submitAdjustment">提交调整</el-button>
     </el-form>
   </WorkspacePage>
 </template>

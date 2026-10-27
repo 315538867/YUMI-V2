@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { isErrorType, userMessageOf } from '@/platform/services/errorMessage'
-import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { userMessageOf } from '@/platform/services/errorMessage'
+import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import { money } from '@/platform/services/money'
 import type {
@@ -12,8 +12,9 @@ import type {
   ProductView,
 } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
+import EditorPage from '@/shared/components/EditorPage.vue'
+import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 type MoneyKey =
   | 'standardSalePrice'
@@ -73,9 +74,10 @@ const productId =
 const editing = productId !== ''
 const loading = ref(true)
 const errorText = ref('')
-const conflictError = ref('')
-const validationErrors = reactive<Record<string, string>>({})
-const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
+const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
+  ['name'],
+  '商品已被其他操作修改，请重新打开后再保存',
+)
 const configuration = ref<EntryConfiguration | null>(null)
 const original = ref<ProductView | null>(null)
 const budgetPreview = ref<SchemeBudgetView | null>(null)
@@ -87,7 +89,6 @@ const isDirty = computed(
   () => loading.value === false && JSON.stringify(form) !== initialSnapshot.value,
 )
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
-const formAlert = computed(() => conflictError.value || otherFieldErrors('name').join('；'))
 
 const form = reactive<EditorForm>({
   name: '',
@@ -146,6 +147,7 @@ const extraFields: Array<{ key: MoneyKey; label: string }> = [
 
 async function load(): Promise<void> {
   loading.value = true
+  errorText.value = ''
   try {
     configuration.value = await productService.entryConfiguration()
     form.makingStarCode = configuration.value.makingStars[0]?.starCode ?? form.makingStarCode
@@ -257,28 +259,19 @@ onBeforeUnmount(() => {
 })
 
 async function save(): Promise<void> {
-  conflictError.value = ''
-  for (const key of Object.keys(validationErrors)) {
-    delete validationErrors[key]
-  }
-  if (form.name.trim() === '') {
-    validationErrors.name = '请填写商品名称'
+  const valid = validate([
+    { field: 'name', invalid: form.name.trim() === '', message: '请填写商品名称' },
+  ])
+  if (!valid) {
     return
   }
   const action =
     editing && original.value !== null
       ? () => productService.update(productId, definition(), original.value!.rowVersion)
       : () => productService.create(definition())
-  await run(action, {
+  await submit(action, {
     success: '商品已保存',
     fallback: '商品保存失败',
-    handled: (error) => {
-      if (isErrorType(error, 'CONCURRENT_CONFLICT')) {
-        conflictError.value = '商品已被其他操作修改，请重新打开后再保存'
-        return true
-      }
-      return false
-    },
     onSuccess: async (saved) => {
       allowLeave()
       await router.replace(`/products/${saved.productBusinessId}`)
@@ -290,187 +283,111 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage v-loading="loading" class="product-editor">
-    <header class="head">
-      <h1>{{ editing ? '编辑商品' : '新增商品' }}</h1>
-      <div>
-        <el-button @click="router.back()">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存商品</el-button>
-      </div>
-    </header>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
+  <EditorPage
+    :title="editing ? '编辑商品' : '新增商品'"
+    preview-title="预算预览"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
+    <template #actions>
+      <el-button @click="router.back()">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="save">保存商品</el-button>
+    </template>
+    <el-form v-if="!loading" label-width="128px">
+      <FormErrorAlert :error="formAlert" class="alert" />
+      <h2>1. 基本信息</h2>
+      <el-form-item label="商品名称" required :error="validationErrors.name || fieldError('name')">
+        <el-input v-model="form.name" />
+      </el-form-item>
+      <el-form-item label="描述">
+        <el-input v-model="form.description" type="textarea" :rows="2" />
+      </el-form-item>
+      <el-form-item label="标准重量（克）">
+        <el-input v-model="form.standardWeightGrams" />
+      </el-form-item>
+      <el-form-item label="制作星级">
+        <el-select v-model="form.makingStarCode">
+          <el-option
+            v-for="star in configuration?.makingStars ?? []"
+            :key="star.starCode"
+            :label="`${star.name} / ${star.standardMinutes} 分钟`"
+            :value="star.starCode"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="制作标准分钟">
+        <el-input v-model.number="form.makingStandardMinutes" type="number" />
+      </el-form-item>
+      <el-form-item label="标准售价">
+        <el-input v-model="form.standardSalePrice" />
+      </el-form-item>
+      <el-form-item label="胶水损耗率">
+        <el-input v-model="form.glueLossRate" />
+      </el-form-item>
+      <el-form-item label="胶水单价/克">
+        <el-input v-model="form.glueUnitPrice" />
+      </el-form-item>
+      <el-form-item label="色浆单价/克">
+        <el-input v-model="form.colorPasteUnitPrice" />
+      </el-form-item>
+      <el-form-item label="模具数量">
+        <el-input v-model.number="form.mouldCount" type="number" />
+      </el-form-item>
+      <el-form-item label="每日批次">
+        <el-input v-model.number="form.mouldDailyBatches" type="number" />
+      </el-form-item>
 
-    <div class="editor-grid">
-      <el-form v-if="!loading" label-width="128px" class="form">
-        <el-alert
-          v-if="formAlert"
-          type="error"
-          :closable="false"
-          :title="formAlert"
-          class="alert"
-        />
-        <h2>1. 基本信息</h2>
-        <el-form-item
-          label="商品名称"
-          required
-          :error="validationErrors.name || fieldError('name')"
-        >
-          <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" type="textarea" :rows="2" />
-        </el-form-item>
-        <el-form-item label="标准重量（克）">
-          <el-input v-model="form.standardWeightGrams" />
-        </el-form-item>
-        <el-form-item label="制作星级">
-          <el-select v-model="form.makingStarCode">
-            <el-option
-              v-for="star in configuration?.makingStars ?? []"
-              :key="star.starCode"
-              :label="`${star.name} / ${star.standardMinutes} 分钟`"
-              :value="star.starCode"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="制作标准分钟">
-          <el-input v-model.number="form.makingStandardMinutes" type="number" />
-        </el-form-item>
-        <el-form-item label="标准售价">
-          <el-input v-model="form.standardSalePrice" />
-        </el-form-item>
-        <el-form-item label="胶水损耗率">
-          <el-input v-model="form.glueLossRate" />
-        </el-form-item>
-        <el-form-item label="胶水单价/克">
-          <el-input v-model="form.glueUnitPrice" />
-        </el-form-item>
-        <el-form-item label="色浆单价/克">
-          <el-input v-model="form.colorPasteUnitPrice" />
-        </el-form-item>
-        <el-form-item label="模具数量">
-          <el-input v-model.number="form.mouldCount" type="number" />
-        </el-form-item>
-        <el-form-item label="每日批次">
-          <el-input v-model.number="form.mouldDailyBatches" type="number" />
-        </el-form-item>
+      <h2>2. 制作</h2>
+      <el-form-item v-for="field in makingFields" :key="field.key" :label="field.label">
+        <el-input v-model="form[field.key]" />
+      </el-form-item>
 
-        <h2>2. 制作</h2>
-        <el-form-item v-for="field in makingFields" :key="field.key" :label="field.label">
-          <el-input v-model="form[field.key]" />
-        </el-form-item>
+      <h2>3. 捏毛装袋</h2>
+      <el-form-item label="标准分钟">
+        <el-input v-model.number="form.baggingStandardMinutes" type="number" />
+      </el-form-item>
+      <el-form-item v-for="field in baggingFields" :key="field.key" :label="field.label">
+        <el-input v-model="form[field.key]" />
+      </el-form-item>
 
-        <h2>3. 捏毛装袋</h2>
-        <el-form-item label="标准分钟">
-          <el-input v-model.number="form.baggingStandardMinutes" type="number" />
-        </el-form-item>
-        <el-form-item v-for="field in baggingFields" :key="field.key" :label="field.label">
-          <el-input v-model="form[field.key]" />
-        </el-form-item>
+      <h2>4. 缝边剪袋</h2>
+      <el-form-item label="标准分钟">
+        <el-input v-model.number="form.seamStandardMinutes" type="number" />
+      </el-form-item>
+      <el-form-item v-for="field in seamFields" :key="field.key" :label="field.label">
+        <el-input v-model="form[field.key]" />
+      </el-form-item>
 
-        <h2>4. 缝边剪袋</h2>
-        <el-form-item label="标准分钟">
-          <el-input v-model.number="form.seamStandardMinutes" type="number" />
-        </el-form-item>
-        <el-form-item v-for="field in seamFields" :key="field.key" :label="field.label">
-          <el-input v-model="form[field.key]" />
-        </el-form-item>
+      <h2>5. 额外单件费用</h2>
+      <el-form-item v-for="field in extraFields" :key="field.key" :label="field.label">
+        <el-input v-model="form[field.key]" />
+      </el-form-item>
+    </el-form>
 
-        <h2>5. 额外单件费用</h2>
-        <el-form-item v-for="field in extraFields" :key="field.key" :label="field.label">
-          <el-input v-model="form[field.key]" />
-        </el-form-item>
-      </el-form>
-      <aside class="budget-preview">
-        <h2>预算预览</h2>
-        <p v-if="previewLoading" class="hint">正在计算…</p>
-        <el-alert v-else-if="previewError" type="error" :closable="false" :title="previewError" />
-        <template v-else-if="budgetPreview">
-          <dl>
-            <dt>全资源成本</dt>
-            <dd><MoneyText :value="budgetPreview.fullResourceUnitCost" /></dd>
-            <dt>工作室成本</dt>
-            <dd><MoneyText :value="budgetPreview.studioBorneUnitCost" /></dd>
-            <dt>预计利润</dt>
-            <dd><MoneyText :value="budgetPreview.expectedUnitProfit" /></dd>
-            <dt>利润率</dt>
-            <dd>
-              {{
-                budgetPreview.expectedProfitRate === null
-                  ? '—'
-                  : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
-              }}
-            </dd>
-          </dl>
-          <p class="hint">只读预览，保存后以服务端预算结果为准。</p>
-        </template>
-        <p v-else class="hint">填写商品名称和制作星级后显示预算预览。</p>
-      </aside>
-    </div>
-  </WorkspacePage>
+    <template #preview>
+      <p v-if="previewLoading" class="hint">正在计算…</p>
+      <el-alert v-else-if="previewError" type="error" :closable="false" :title="previewError" />
+      <template v-else-if="budgetPreview">
+        <dl>
+          <dt>全资源成本</dt>
+          <dd><MoneyText :value="budgetPreview.fullResourceUnitCost" /></dd>
+          <dt>工作室成本</dt>
+          <dd><MoneyText :value="budgetPreview.studioBorneUnitCost" /></dd>
+          <dt>预计利润</dt>
+          <dd><MoneyText :value="budgetPreview.expectedUnitProfit" /></dd>
+          <dt>利润率</dt>
+          <dd>
+            {{
+              budgetPreview.expectedProfitRate === null
+                ? '—'
+                : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
+            }}
+          </dd>
+        </dl>
+        <p class="hint">只读预览，保存后以服务端预算结果为准。</p>
+      </template>
+      <p v-else class="hint">填写商品名称和制作星级后显示预算预览。</p>
+    </template>
+  </EditorPage>
 </template>
-
-<style scoped>
-.editor-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 16px;
-  align-items: start;
-}
-
-.budget-preview {
-  position: sticky;
-  top: 12px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
-  padding: 12px 16px;
-  background: var(--el-fill-color-lighter);
-}
-
-.budget-preview h2 {
-  margin-top: 0;
-}
-
-.budget-preview dl {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 8px 12px;
-  margin: 0;
-}
-
-.budget-preview dt {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.budget-preview dd {
-  margin: 0;
-  font-size: 13px;
-}
-
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 20px;
-}
-
-h2 {
-  margin: 20px 0 10px;
-  font-size: 16px;
-  color: var(--el-text-color-primary);
-}
-
-.form {
-  max-width: 720px;
-}
-
-.alert {
-  margin-bottom: 12px;
-}
-</style>

@@ -3,8 +3,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
-import { useAsyncAction } from '@/platform/composables/useAsyncAction'
+import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
+import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
 import { money } from '@/platform/services/money'
 import type { CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
@@ -19,10 +20,20 @@ const customers = ref<CustomerView[]>([])
 const products = ref<ProductView[]>([])
 const schemes = ref<SchemeView[]>([])
 const errorText = ref('')
-const conflictError = ref('')
-const validationErrors = reactive<Record<string, string>>({})
 const initialSnapshot = ref('')
-const { loading: saving, fieldError, otherFieldErrors, run } = useAsyncAction()
+const { saving, validationErrors, formAlert, fieldError, validate, submit } = useEditorForm(
+  [
+    'customerBusinessId',
+    'productBusinessId',
+    'schemeBusinessId',
+    'quantity',
+    'unitPrice',
+    'recipientName',
+    'recipientPhone',
+    'recipientAddress',
+  ],
+  '订单已被其他操作修改，请重新打开后再提交',
+)
 const form = reactive({
   customerBusinessId: '',
   originalOrderReference: '',
@@ -45,20 +56,6 @@ const isDirty = computed(
     JSON.stringify(form) !== initialSnapshot.value,
 )
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
-const formAlert = computed(
-  () =>
-    conflictError.value ||
-    otherFieldErrors(
-      'customerBusinessId',
-      'productBusinessId',
-      'schemeBusinessId',
-      'quantity',
-      'unitPrice',
-      'recipientName',
-      'recipientPhone',
-      'recipientAddress',
-    ).join('；'),
-)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -92,45 +89,58 @@ async function loadSchemes(): Promise<void> {
   form.unitPrice = schemes.value[0]?.salePrice.amount ?? '0.00'
 }
 
-function validate(): boolean {
-  conflictError.value = ''
-  for (const key of Object.keys(validationErrors)) {
-    delete validationErrors[key]
-  }
-  if (form.customerBusinessId === '') {
-    validationErrors.customerBusinessId = '请选择客户'
-  }
-  if (form.productBusinessId === '') {
-    validationErrors.productBusinessId = '请选择商品'
-  }
-  if (form.schemeBusinessId === '') {
-    validationErrors.schemeBusinessId = '请选择方案'
-  }
-  if (!Number.isFinite(Number(form.quantity)) || Number(form.quantity) <= 0) {
-    validationErrors.quantity = '接管数量必须大于 0'
-  }
-  if (!/^\d+(\.\d{1,2})?$/.test(form.unitPrice) || Number(form.unitPrice) <= 0) {
-    validationErrors.unitPrice = '单件价格必须大于 0 且最多两位小数'
-  }
-  if (form.recipientName.trim() === '') {
-    validationErrors.recipientName = '请填写收货人'
-  }
-  if (form.recipientPhone.trim() === '') {
-    validationErrors.recipientPhone = '请填写电话'
-  }
-  if (form.recipientAddress.trim() === '') {
-    validationErrors.recipientAddress = '请填写地址'
-  }
-  return Object.keys(validationErrors).length === 0
+function validateForm(): boolean {
+  return validate([
+    {
+      field: 'customerBusinessId',
+      invalid: form.customerBusinessId === '',
+      message: '请选择客户',
+    },
+    {
+      field: 'productBusinessId',
+      invalid: form.productBusinessId === '',
+      message: '请选择商品',
+    },
+    {
+      field: 'schemeBusinessId',
+      invalid: form.schemeBusinessId === '',
+      message: '请选择方案',
+    },
+    {
+      field: 'quantity',
+      invalid: !Number.isFinite(Number(form.quantity)) || Number(form.quantity) <= 0,
+      message: '接管数量必须大于 0',
+    },
+    {
+      field: 'unitPrice',
+      invalid: !/^\d+(\.\d{1,2})?$/.test(form.unitPrice) || Number(form.unitPrice) <= 0,
+      message: '单件价格必须大于 0 且最多两位小数',
+    },
+    {
+      field: 'recipientName',
+      invalid: form.recipientName.trim() === '',
+      message: '请填写收货人',
+    },
+    {
+      field: 'recipientPhone',
+      invalid: form.recipientPhone.trim() === '',
+      message: '请填写电话',
+    },
+    {
+      field: 'recipientAddress',
+      invalid: form.recipientAddress.trim() === '',
+      message: '请填写地址',
+    },
+  ])
 }
 
 async function save(): Promise<void> {
-  if (!validate()) {
+  if (!validateForm()) {
     return
   }
   try {
     const entry = await productService.orderEntry(form.schemeBusinessId)
-    await run(
+    await submit(
       () =>
         orderService.intake({
           customerBusinessId: form.customerBusinessId,
@@ -204,7 +214,7 @@ onMounted(load)
       class="alert"
     />
     <el-form label-width="120px" class="form">
-      <el-alert v-if="formAlert" type="error" :closable="false" :title="formAlert" class="alert" />
+      <FormErrorAlert :error="formAlert" class="alert" />
       <el-form-item
         label="客户"
         :error="validationErrors.customerBusinessId || fieldError('customerBusinessId')"
