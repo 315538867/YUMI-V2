@@ -23,7 +23,7 @@ function elementPlusPlugin() {
   }
 }
 
-async function mountEmployeePage() {
+async function mountEmployeePage(path = '/payroll/employees') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -31,7 +31,7 @@ async function mountEmployeePage() {
       { path: '/payroll/periods', component: { template: '<div>periods</div>' } },
     ],
   })
-  await router.push('/payroll/employees')
+  await router.push(path)
   await router.isReady()
   return mount(PayrollEmployeePage, {
     global: { plugins: [elementPlusPlugin(), router] },
@@ -50,6 +50,39 @@ describe('工资空态', () => {
 
     expect(result).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('请从工资期间页选择员工')
+  })
+
+  it('工资参考行缺少金额时显示占位而不是抛错', async () => {
+    result.mockResolvedValue({
+      resultBusinessId: 'RES-test',
+      periodBusinessId: 'PYP-test',
+      employeeBusinessId: 'EMP-test',
+      status: 'REFERENCE_READY',
+      referenceRunBusinessId: 'RUN-test',
+      referenceFingerprint: 'FP-test',
+      confirmedAmount: null,
+      payableAmount: null,
+      rowVersion: 1,
+      lines: [
+        {
+          lineBusinessId: 'LINE-test',
+          lineType: 'MATERIAL',
+          sourceBusinessId: 'SRC-test',
+          componentCode: 'SEAM_OTHER',
+          quantity: 1,
+          unitAmount: '0.00',
+          occurred: true,
+          estimated: false,
+          materialSource: null,
+          incomplete: false,
+          note: null,
+        },
+      ],
+    })
+    const wrapper = await mountEmployeePage('/payroll/employees?period=PYP-test&employee=EMP-test')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('—')
   })
 
   it('胶水配置页未配置时显示提示，不显示加载失败', async () => {

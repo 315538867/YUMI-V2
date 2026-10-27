@@ -16,7 +16,7 @@ export interface ReferenceLineView {
   componentCode: string
   quantity: number | null
   unitAmount: string | null
-  referenceAmount: MoneyWire
+  referenceAmount?: MoneyWire | null
   occurred: boolean
   estimated: boolean
   materialSource: string | null

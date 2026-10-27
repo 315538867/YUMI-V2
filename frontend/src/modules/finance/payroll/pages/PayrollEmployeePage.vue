@@ -165,7 +165,7 @@ onMounted(load)
         <el-table-column prop="quantity" label="数量" width="80" />
         <el-table-column prop="unitAmount" label="单价" width="100" />
         <el-table-column label="参考金额" width="130">
-          <template #default="{ row }">{{ row.referenceAmount.amount }}</template>
+          <template #default="{ row }">{{ row.referenceAmount?.amount ?? '—' }}</template>
         </el-table-column>
         <el-table-column label="状态" width="160">
           <template #default="{ row }">
