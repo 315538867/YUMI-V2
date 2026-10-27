@@ -144,12 +144,12 @@ public class AfterSalesCaseServiceImpl
     public java.util.List<AfterSalesCaseView> search(
             String keyword, AfterSalesCaseStatus status, int page, int size) {
         authorization.require(PermissionCodes.AFTER_SALES_READ, ResourceScope.GLOBAL);
-        int safePage = Math.max(0, page);
+        int safePage = Math.max(1, page);
         int safeSize = Math.min(Math.max(1, size), 100);
         return cases.searchCases(
                         keyword == null ? "" : keyword.strip(),
                         status == null ? null : status.name(),
-                        safePage * safeSize, safeSize)
+                        (safePage - 1) * safeSize, safeSize)
                 .stream().map(this::toView).toList();
     }
 

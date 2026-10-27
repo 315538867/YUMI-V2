@@ -168,7 +168,7 @@ class OrderOpeningIT extends AbstractOrderFixtureTest {
         OrderRef order = intake(uniqueKey("OPEN-QUERY"), 2, List.of(
                 new ProductionOpeningLine(OpeningStageCode.NOT_STARTED, null, null, 2, null)));
 
-        var summaries = asAdmin(() -> orderQuery.search(order.orderNo(), null, 0, 10));
+        var summaries = asAdmin(() -> orderQuery.search(order.orderNo(), null, 1, 10));
         assertThat(summaries).singleElement().satisfies(summary -> {
             assertThat(summary.orderBusinessId()).isEqualTo(order.orderBusinessId());
             assertThat(summary.origin()).isEqualTo(OrderOrigin.LEGACY_INTAKE);

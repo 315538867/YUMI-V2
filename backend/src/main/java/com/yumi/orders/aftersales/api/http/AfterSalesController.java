@@ -164,7 +164,7 @@ public class AfterSalesController {
     public java.util.List<AfterSalesCaseView> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) com.yumi.orders.aftersales.api.AfterSalesCaseStatus status,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return queries.search(keyword, status, page, size);
     }

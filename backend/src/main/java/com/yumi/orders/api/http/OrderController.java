@@ -137,7 +137,7 @@ public class OrderController {
     public List<OrderSummaryView> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) OrderStatus status,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return query.search(keyword, status, page, size);
     }

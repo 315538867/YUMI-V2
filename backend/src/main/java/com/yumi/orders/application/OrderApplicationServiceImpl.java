@@ -219,13 +219,13 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
     public List<OrderSummaryView> search(
             String keyword, OrderStatus status, int page, int size) {
         authorization.require(PermissionCodes.ORDER_READ, ResourceScope.GLOBAL);
-        if (page < 0 || size <= 0 || size > 200) {
+        if (page < 1 || size <= 0 || size > 200) {
             throw new ApiException(
                     ApiErrorType.VALIDATION, "ORDER_PAGE_INVALID", "分页参数不合法");
         }
         return orders.searchOrders(
                         keyword == null ? "" : keyword.strip(),
-                        status == null ? null : status.name(), page * size, size)
+                        status == null ? null : status.name(), (page - 1) * size, size)
                 .stream()
                 .map(record -> new OrderSummaryView(
                         record.orderBusinessId(), record.orderNo(),
