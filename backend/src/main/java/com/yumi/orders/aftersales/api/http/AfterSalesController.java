@@ -1,5 +1,6 @@
 package com.yumi.orders.aftersales.api.http;
 
+import com.yumi.orders.aftersales.api.AfterSalesAmountDecisionRef;
 import com.yumi.orders.aftersales.api.AfterSalesApplicationService;
 import com.yumi.orders.aftersales.api.AfterSalesCancellationRef;
 import com.yumi.orders.aftersales.api.AfterSalesCaseRef;
@@ -18,6 +19,8 @@ import com.yumi.orders.aftersales.api.AfterSalesRouteType;
 import com.yumi.orders.aftersales.api.CancelAfterSalesObligationCommand;
 import com.yumi.orders.aftersales.api.ChangeAfterSalesObligationCommand;
 import com.yumi.orders.aftersales.api.CompleteAfterSalesCaseCommand;
+import com.yumi.orders.aftersales.api.ConfirmAfterSalesDeliveryCommand;
+import com.yumi.orders.aftersales.api.DecideAfterSalesAmountCommand;
 import com.yumi.orders.aftersales.api.DisposeReturnedProductCommand;
 import com.yumi.orders.aftersales.api.OpenAfterSalesCaseCommand;
 import com.yumi.orders.aftersales.api.ReceiveReturnCommand;
@@ -172,6 +175,39 @@ public class AfterSalesController {
     @GetMapping("/cases/{caseBusinessId}")
     public AfterSalesCaseView get(@PathVariable String caseBusinessId) {
         return queries.get(caseBusinessId);
+    }
+
+    public record DecideAmountRequest(String obligationBusinessId, SettlementMoney amount, String note) {
+    }
+
+    @PostMapping("/amount-decisions")
+    public ResponseEntity<AfterSalesAmountDecisionRef> decideAmount(
+            @RequestHeader(HttpHeaders.IDEMPOTENCY_KEY) String idempotencyKey,
+            @RequestBody DecideAmountRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(cases.decideAmount(
+                new DecideAfterSalesAmountCommand(
+                        idempotencyKey, request.obligationBusinessId(),
+                        request.amount(), request.note())));
+    }
+
+    public record ConfirmDeliveryRequest(
+            String obligationBusinessId,
+            int quantity,
+            String productionSourceBusinessId,
+            LocalDateTime deliveredAt,
+            RecipientInfo recipient,
+            String trackingNo) {
+    }
+
+    @PostMapping("/deliveries")
+    public ResponseEntity<AfterSalesDeliveryRef> deliver(
+            @RequestHeader(HttpHeaders.IDEMPOTENCY_KEY) String idempotencyKey,
+            @RequestBody ConfirmDeliveryRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(returns.deliver(
+                new ConfirmAfterSalesDeliveryCommand(
+                        idempotencyKey, request.obligationBusinessId(), request.quantity(),
+                        request.productionSourceBusinessId(), request.deliveredAt(),
+                        request.recipient(), request.trackingNo())));
     }
 
     @PostMapping("/returns")

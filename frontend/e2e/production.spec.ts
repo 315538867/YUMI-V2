@@ -149,3 +149,13 @@ test('整体进度与默认全部订单追溯可查看', async ({ page }) => {
   await expect(page.getByText(/^订单 /).first()).toBeVisible()
   await expect(page.getByText('查看链路').or(page.getByText('收起链路')).first()).toBeVisible()
 })
+
+test('返工任务从返工来源进入并提示工序约束', async ({ page }) => {
+  await login(page)
+  await page.goto('/production/tasks/new')
+  await page.locator('.el-form-item').filter({ hasText: '任务类型' }).locator('.el-select').click()
+  await page.getByRole('option', { name: '返工', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await expect(page.getByText('返工只能从核验产生的返工来源或售后修复来源选择')).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '来源类型' })).toBeVisible()
+})

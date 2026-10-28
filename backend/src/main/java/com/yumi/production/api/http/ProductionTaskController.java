@@ -220,6 +220,12 @@ public class ProductionTaskController {
         return tasks.availableSources(processCode);
     }
 
+    @GetMapping("/available-repair-sources")
+    public java.util.List<com.yumi.production.api.AvailableRepairSourceView> availableRepairSources(
+            @RequestParam com.yumi.production.api.TargetProcess processCode) {
+        return tasks.availableRepairSources(processCode);
+    }
+
     @GetMapping("/demands")
     public List<ProductionProjectionRow> demands(
             @RequestParam String productBusinessId,

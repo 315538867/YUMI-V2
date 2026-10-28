@@ -30,6 +30,16 @@ public interface AfterSalesRepository {
     void updateObligationStatus(
             String obligationBusinessId, String status, long expectedRowVersion);
 
+    void insertAmountDecision(AmountDecisionRecord record);
+
+    List<AmountDecisionRecord> findAmountDecisions(String caseBusinessId);
+
+    List<AmountDecisionRecord> findAmountDecisionsByObligation(String obligationBusinessId);
+
+    List<CaseDeliveryRecord> findDeliveriesOfCase(String caseBusinessId);
+
+    List<CaseReturnRecord> findReturnsOfCase(String caseBusinessId);
+
     void insertCompletion(CompletionRecord record);
 
     Optional<CompletionRecord> findCompletion(String caseBusinessId);
@@ -192,6 +202,21 @@ public interface AfterSalesRepository {
             String createdByChangeBusinessId, Integer targetQuantity, BigDecimal targetAmount,
             int fulfilledQuantity, BigDecimal fulfilledAmount,
             LocalDate dueDate, String note, String status, long rowVersion) {
+    }
+
+    record CaseReturnRecord(
+            String receiptItemBusinessId, String obligationBusinessId, int quantity,
+            String conditionCode, Instant receivedAt) {
+    }
+
+    record CaseDeliveryRecord(
+            String deliveryFactBusinessId, String obligationBusinessId, String deliveryType,
+            Instant deliveredAt, String trackingNo, int quantity) {
+    }
+
+    record AmountDecisionRecord(
+            String decisionBusinessId, String caseBusinessId, String obligationBusinessId,
+            BigDecimal amount, String note, Instant decidedAt, String operatorId) {
     }
 
     record CompletionRecord(

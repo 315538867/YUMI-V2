@@ -41,9 +41,13 @@ public interface DispositionRepository {
 
     Optional<DefectReasonRow> findDefectReason(String code);
 
-    void insertDefectReason(String code, String name, DefectReasonStatus status, boolean other);
+    void insertDefectReason(
+            String code, String name, DefectReasonStatus status, boolean other,
+            String applicableProcess, boolean requiresText);
 
-    boolean updateDefectReason(String code, String name, boolean other, long expectedRowVersion);
+    boolean updateDefectReason(
+            String code, String name, boolean other, String applicableProcess,
+            boolean requiresText, long expectedRowVersion);
 
     boolean updateDefectReasonStatus(
             String code, DefectReasonStatus status, long expectedRowVersion);
@@ -93,7 +97,7 @@ public interface DispositionRepository {
     /** 缺陷原因。 */
     record DefectReasonRow(
             String defectReasonCode, String name, DefectReasonStatus status, boolean other,
-            long rowVersion) {
+            String applicableProcess, boolean requiresText, long rowVersion) {
     }
 
     /** 明细上下文。 */
@@ -104,7 +108,8 @@ public interface DispositionRepository {
     /** 便于视图组装的缺陷原因视图转换。 */
     static DefectReasonView toView(DefectReasonRow row) {
         return new DefectReasonView(
-                row.defectReasonCode(), row.name(), row.status(), row.other(), row.rowVersion());
+                row.defectReasonCode(), row.name(), row.status(), row.other(),
+                row.applicableProcess(), row.requiresText(), row.rowVersion());
     }
 
     /** 供实现层使用的时间类型。 */

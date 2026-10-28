@@ -149,6 +149,9 @@ void load()
       <el-table-column label="金额" width="130">
         <template #default="{ row }"><MoneyText :value="row.amount" /></template>
       </el-table-column>
+      <el-table-column label="有效性" width="90">
+        <template #default="{ row }">{{ row.valid ? '有效' : '冲正' }}</template>
+      </el-table-column>
       <el-table-column label="已分摊" width="90">
         <template #default="{ row }">{{ row.allocated ? '是' : '否' }}</template>
       </el-table-column>
@@ -202,6 +205,9 @@ void load()
         <MoneyText :value="detailEntry.amount" />
       </el-descriptions-item>
       <el-descriptions-item label="业务日期">{{ detailEntry.businessDate }}</el-descriptions-item>
+      <el-descriptions-item label="有效性">
+        {{ detailEntry.valid ? '有效' : '冲正' }}
+      </el-descriptions-item>
       <el-descriptions-item label="操作">
         <CodeTag category="finance.costOperation" :code="detailEntry.operationType" />
       </el-descriptions-item>

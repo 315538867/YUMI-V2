@@ -10,6 +10,7 @@ import com.yumi.reporting.api.RebuildReportingProjectionCommand;
 import com.yumi.reporting.api.ReportingIngestionService;
 import com.yumi.reporting.api.ReportingRebuildService;
 import com.yumi.reporting.application.ReportingRebuildRepository;
+import com.yumi.reporting.application.ReportingSourceReader;
 import com.yumi.reporting.application.ReportingRebuildServiceImpl;
 import com.yumi.support.AbstractOrderFixtureTest;
 import java.lang.reflect.InvocationTargetException;
@@ -48,6 +49,9 @@ class ReportingRebuildIT extends AbstractOrderFixtureTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private ReportingSourceReader sourceReader;
 
     @Test
     @DisplayName("从空影子重建合计一致并原子切换，旧版本保留为 RETIRED")
@@ -92,9 +96,11 @@ class ReportingRebuildIT extends AbstractOrderFixtureTest {
         var active = asAdmin(() -> rebuilds.rebuild(
                 new RebuildReportingProjectionCommand(uniqueKey("REPORT-REBUILD"))));
 
-        var failing = failingRepository();
+        ReportingSourceReader failing = versionId -> {
+            throw new IllegalStateException("注入影子重建失败");
+        };
         var service = new ReportingRebuildServiceImpl(
-                failing, idempotency, authorization, clock, transactionManager);
+                rebuildRepository, failing, idempotency, authorization, clock, transactionManager);
         assertThatThrownBy(() -> asAdmin(() -> service.rebuild(
                 new RebuildReportingProjectionCommand(uniqueKey("REPORT-REBUILD")))))
                 .isInstanceOf(IllegalStateException.class)
@@ -108,18 +114,4 @@ class ReportingRebuildIT extends AbstractOrderFixtureTest {
         assertThat(asAdmin(() -> rebuilds.listVersions())).hasSize(1);
     }
 
-    private ReportingRebuildRepository failingRepository() {
-        return (ReportingRebuildRepository) Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[] {ReportingRebuildRepository.class},
-                (proxy, method, args) -> {
-                    if (method.getName().equals("copyLiveRecords")) {
-                        throw new IllegalStateException("注入影子复制失败");
-                    }
-                    try {
-                        return method.invoke(rebuildRepository, args);
-                    } catch (InvocationTargetException exception) {
-                        throw exception.getCause();
-                    }
-                });
-    }
 }

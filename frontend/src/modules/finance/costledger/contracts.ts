@@ -13,6 +13,7 @@ export interface CostEntryView {
   sourceBusinessId: string
   basisRef: string | null
   reasonText: string | null
+  valid: boolean
   allocated: boolean
   occurredAt: string
 }

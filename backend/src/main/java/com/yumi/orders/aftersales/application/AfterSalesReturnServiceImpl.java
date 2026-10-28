@@ -2,6 +2,7 @@ package com.yumi.orders.aftersales.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yumi.orders.aftersales.api.AfterSalesDeliveryRef;
+import com.yumi.orders.aftersales.api.ConfirmAfterSalesDeliveryCommand;
 import com.yumi.orders.aftersales.api.AfterSalesReturnService;
 import com.yumi.orders.aftersales.api.ReceiveReturnCommand;
 import com.yumi.orders.aftersales.api.ReceiveReturnRef;
@@ -20,9 +21,14 @@ import com.yumi.platform.api.idempotency.CommandRequest;
 import com.yumi.platform.api.idempotency.IdempotentCommandService;
 import com.yumi.platform.api.identity.CurrentActorProvider;
 import com.yumi.production.api.PhysicalDestination;
+import com.yumi.production.api.ConsumeProductionCommand;
+import com.yumi.production.api.ConsumptionPreview;
+import com.yumi.production.api.ConsumptionResult;
 import com.yumi.production.api.PreparedReturnDisposition;
 import com.yumi.production.api.PreparedReturnReentry;
 import com.yumi.production.api.ProductionAfterSalesReturnParticipant;
+import com.yumi.production.api.ProductionConsumptionParticipant;
+import com.yumi.production.api.ProductionLinkRef;
 import com.yumi.production.api.RegisterReturnCommand;
 import com.yumi.production.api.ReturnDispositionCommand;
 import com.yumi.production.api.ReturnDispositionResult;
@@ -48,9 +54,11 @@ public class AfterSalesReturnServiceImpl implements AfterSalesReturnService {
 
     private static final String RECEIVE_SCOPE = "orders.aftersales.receive_return";
     private static final String RETURN_SCOPE = "orders.aftersales.return_to_customer";
+    private static final String DELIVER_SCOPE = "orders.aftersales.deliver";
 
     private final AfterSalesRepository cases;
     private final ProductionAfterSalesReturnParticipant productionReturns;
+    private final ProductionConsumptionParticipant productionConsumption;
     private final IdempotentCommandService idempotency;
     private final AuthorizationService authorization;
     private final CurrentActorProvider currentActor;
@@ -62,6 +70,7 @@ public class AfterSalesReturnServiceImpl implements AfterSalesReturnService {
     public AfterSalesReturnServiceImpl(
             AfterSalesRepository cases,
             ProductionAfterSalesReturnParticipant productionReturns,
+            ProductionConsumptionParticipant productionConsumption,
             IdempotentCommandService idempotency,
             AuthorizationService authorization,
             CurrentActorProvider currentActor,
@@ -71,6 +80,7 @@ public class AfterSalesReturnServiceImpl implements AfterSalesReturnService {
             PlatformTransactionManager transactionManager) {
         this.cases = cases;
         this.productionReturns = productionReturns;
+        this.productionConsumption = productionConsumption;
         this.idempotency = idempotency;
         this.authorization = authorization;
         this.currentActor = currentActor;
@@ -119,6 +129,87 @@ public class AfterSalesReturnServiceImpl implements AfterSalesReturnService {
         return new AfterSalesDeliveryRef(
                 item.deliveryFactBusinessId(), item.deliveryItemBusinessId(),
                 item.productionConsumptionFactBusinessId(), item.quantity());
+    }
+
+    @Override
+    public AfterSalesDeliveryRef deliver(ConfirmAfterSalesDeliveryCommand command) {
+        authorization.require(PermissionCodes.AFTER_SALES_MANAGE, ResourceScope.GLOBAL);
+        if (command == null) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_DELIVERY", "售后交付命令不能为空");
+        }
+        CommandOutcome outcome = transactionTemplate.execute(status -> idempotency.execute(
+                new CommandRequest(
+                        DELIVER_SCOPE, command.idempotencyKey(),
+                        sha256(command.obligationBusinessId() + "|" + command.quantity()
+                                + "|" + command.productionSourceBusinessId())),
+                () -> new CommandOutcome(
+                        "AFTER_SALES_DELIVERY", doDeliver(command))).outcome());
+        var item = cases.findDeliveryItem(outcome.resultBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.SYSTEM_FAILURE, "AFTER_SALES_DELIVERY_MISSING",
+                        "售后交付明细无法读取"));
+        return new AfterSalesDeliveryRef(
+                item.deliveryFactBusinessId(), item.deliveryItemBusinessId(),
+                item.productionConsumptionFactBusinessId(), item.quantity());
+    }
+
+    private String doDeliver(ConfirmAfterSalesDeliveryCommand command) {
+        Instant now = clock.instant();
+        String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
+        var obligation = cases.findObligation(command.obligationBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "AFTER_SALES_OBLIGATION_NOT_FOUND", "售后义务不存在"));
+        cases.lockCase(obligation.caseBusinessId());
+        obligation = cases.lockObligation(command.obligationBusinessId()).orElseThrow();
+        if (!"RETURN_AND_REPAIR".equals(obligation.obligationType())
+                && !"REPLACEMENT".equals(obligation.obligationType())) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "AFTER_SALES_DELIVERY_INVALID",
+                    "只有返修或补发义务可以执行售后交付");
+        }
+        if ("VOIDED".equals(obligation.status()) || "FULFILLED".equals(obligation.status())) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "AFTER_SALES_DELIVERY_INVALID",
+                    "义务已结束，不能继续交付");
+        }
+        int target = obligation.targetQuantity() == null ? 0 : obligation.targetQuantity();
+        int remaining = target - obligation.fulfilledQuantity();
+        if (command.quantity() > remaining) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "AFTER_SALES_DELIVERY_EXCEEDS",
+                    "交付数量超过义务剩余数量：可交付 " + remaining);
+        }
+
+        String deliveryFactId = "ADF-" + UUID.randomUUID();
+        String deliveryItemId = "ADI-" + UUID.randomUUID();
+        ConsumptionPreview prepared = productionConsumption.prepareConsume(
+                new ConsumeProductionCommand(
+                        new ProductionLinkRef("orders", "AFTER_SALES_DELIVERY", deliveryFactId),
+                        command.productionSourceBusinessId(), command.quantity()));
+        ConsumptionResult consumed = productionConsumption.commitConsume(prepared);
+        String deliveryType = "REPLACEMENT".equals(obligation.obligationType())
+                ? "REPLACEMENT_DELIVERY" : "REPAIR_DELIVERY";
+        cases.insertDeliveryFact(new AfterSalesRepository.DeliveryFactRecord(
+                deliveryFactId, obligation.obligationBusinessId(),
+                obligation.orderItemBusinessId(), deliveryType,
+                command.deliveredAt().toInstant(ZoneOffset.UTC), writeJson(command.recipient()),
+                command.trackingNo(), operatorId));
+        cases.insertDeliveryItem(new AfterSalesRepository.DeliveryItemRecord(
+                deliveryItemId, deliveryFactId, "PRODUCTION_SOURCE",
+                consumed.productionSourceBusinessId(), null,
+                prepared.physicalRootSourceBusinessId(), command.quantity(),
+                consumed.consumptionFactBusinessId()));
+        int fulfilled = obligation.fulfilledQuantity() + command.quantity();
+        cases.updateObligationProgress(
+                obligation.obligationBusinessId(), fulfilled, obligation.fulfilledAmount(),
+                fulfilled >= target ? "FULFILLED" : "IN_PROGRESS", obligation.rowVersion());
+        audit.record(new RecordAuditCommand(
+                RequestCorrelationHolder.getOrUnknown(), operatorId, "orders",
+                "DELIVER_AFTER_SALES_PRODUCT", "AFTER_SALES_OBLIGATION",
+                obligation.obligationBusinessId(), "SUCCESS",
+                Map.of("deliveryItemId", deliveryItemId,
+                        "quantity", String.valueOf(command.quantity())), now));
+        return deliveryItemId;
     }
 
     private String doReceive(ReceiveReturnCommand command) {

@@ -18,6 +18,7 @@ import { afterSalesService } from '@/modules/orders/aftersales/services/afterSal
 import { orderService } from '@/modules/orders/services/orderService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import DateTimeText from '@/shared/components/DateTimeText.vue'
 import BusinessFileUpload from '@/shared/components/BusinessFileUpload.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
@@ -81,6 +82,7 @@ const form = reactive({
   recipientAddress: '',
   trackingNo: '',
   offlineInventoryName: '',
+  productionSourceBusinessId: '',
   offlineInventoryNote: '',
   handedOverBy: '',
   receivedBy: '',
@@ -311,6 +313,25 @@ async function submit(): Promise<void> {
         })
         successText.value = '义务已取消'
         await load()
+      } else if (action.value === 'deliver') {
+        await afterSalesService.deliverAfterSales({
+          obligationBusinessId: form.obligationId,
+          quantity: Number(form.quantity),
+          productionSourceBusinessId: form.productionSourceBusinessId,
+          deliveredAt: `${form.businessDate}T10:00:00`,
+          recipient: {
+            customerName: form.recipientName,
+            phone: form.recipientPhone,
+            address: form.recipientAddress,
+          },
+          trackingNo: form.trackingNo,
+        })
+        successText.value = '售后交付已登记；生产来源已消费'
+        await load()
+      } else if (action.value === 'decide') {
+        await afterSalesService.decideAmount(form.obligationId, form.amount, form.reason)
+        successText.value = '金额决定已保存；与实际付款分开'
+        await load()
       } else if (action.value === 'pay') {
         const obligation = current.value?.obligations.find(
           (row) => row.obligationBusinessId === form.obligationId,
@@ -478,6 +499,23 @@ async function submit(): Promise<void> {
                   >赔付/退款</el-button
                 >
                 <el-button
+                  v-if="row.obligationType === 'REFUND' || row.obligationType === 'COMPENSATION'"
+                  link
+                  type="primary"
+                  @click="openAction('decide', row.obligationBusinessId)"
+                  >金额决定</el-button
+                >
+                <el-button
+                  v-if="
+                    row.obligationType === 'REPLACEMENT' ||
+                    row.obligationType === 'RETURN_AND_REPAIR'
+                  "
+                  link
+                  type="primary"
+                  @click="openAction('deliver', row.obligationBusinessId)"
+                  >售后交付</el-button
+                >
+                <el-button
                   link
                   type="primary"
                   @click="openAction('return', row.obligationBusinessId)"
@@ -496,6 +534,62 @@ async function submit(): Promise<void> {
                   >取消</el-button
                 >
               </template>
+            </el-table-column>
+          </el-table>
+
+          <h2>退回历史</h2>
+          <el-table
+            :data="current.returns"
+            empty-text="暂无退回接收记录"
+            border
+            size="small"
+            class="case-list"
+          >
+            <el-table-column prop="receiptItemBusinessId" label="接收明细" min-width="200" />
+            <el-table-column prop="obligationBusinessId" label="义务" min-width="200" />
+            <el-table-column prop="quantity" label="数量" width="80" />
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }"
+                ><CodeTag category="afterSales.conditionCode" :code="row.conditionCode"
+              /></template>
+            </el-table-column>
+            <el-table-column label="接收时间" width="200">
+              <template #default="{ row }"><DateTimeText :value="row.receivedAt" /></template>
+            </el-table-column>
+          </el-table>
+
+          <h2>售后交付</h2>
+          <el-table
+            :data="current.deliveries"
+            empty-text="暂无售后交付记录"
+            border
+            size="small"
+            class="case-list"
+          >
+            <el-table-column prop="obligationBusinessId" label="义务" min-width="200" />
+            <el-table-column prop="deliveryType" label="类型" width="180" />
+            <el-table-column prop="quantity" label="数量" width="80" />
+            <el-table-column prop="trackingNo" label="物流单号" min-width="160" />
+            <el-table-column label="交付时间" width="200">
+              <template #default="{ row }"><DateTimeText :value="row.deliveredAt" /></template>
+            </el-table-column>
+          </el-table>
+
+          <h2>金额决定</h2>
+          <el-table
+            :data="current.amountDecisions"
+            empty-text="暂未记录退款/赔付金额决定"
+            border
+            size="small"
+            class="case-list"
+          >
+            <el-table-column prop="obligationBusinessId" label="义务" min-width="200" />
+            <el-table-column label="决定金额" width="140">
+              <template #default="{ row }"><MoneyText :value="row.amount" /></template>
+            </el-table-column>
+            <el-table-column prop="note" label="说明" min-width="220" />
+            <el-table-column label="决定时间" width="200">
+              <template #default="{ row }"><DateTimeText :value="row.decidedAt" /></template>
             </el-table-column>
           </el-table>
 
@@ -617,6 +711,27 @@ async function submit(): Promise<void> {
             <el-form-item v-else label="目标数量"
               ><el-input v-model.number="form.quantity" type="number"
             /></el-form-item>
+          </template>
+          <template v-if="action === 'deliver'">
+            <el-form-item label="数量"
+              ><el-input v-model.number="form.quantity" type="number"
+            /></el-form-item>
+            <el-form-item label="生产来源">
+              <el-input v-model="form.productionSourceBusinessId" />
+            </el-form-item>
+            <el-form-item label="交付日期">
+              <el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" />
+            </el-form-item>
+            <el-form-item label="收货人"><el-input v-model="form.recipientName" /></el-form-item>
+            <el-form-item label="电话"><el-input v-model="form.recipientPhone" /></el-form-item>
+            <el-form-item label="地址"><el-input v-model="form.recipientAddress" /></el-form-item>
+            <el-form-item label="物流单号"><el-input v-model="form.trackingNo" /></el-form-item>
+          </template>
+          <template v-if="action === 'decide'">
+            <el-form-item label="决定金额"><el-input v-model="form.amount" /></el-form-item>
+            <el-form-item label="决定说明">
+              <el-input v-model="form.reason" type="textarea" :rows="2" />
+            </el-form-item>
           </template>
           <template v-if="action === 'pay'">
             <el-form-item label="金额"

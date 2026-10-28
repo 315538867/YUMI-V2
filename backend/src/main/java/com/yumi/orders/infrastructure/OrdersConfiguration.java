@@ -135,6 +135,7 @@ public class OrdersConfiguration {
     public com.yumi.orders.aftersales.api.AfterSalesReturnDispositionService afterSalesReturnDispositionService(
             com.yumi.orders.aftersales.application.port.AfterSalesRepository afterSalesRepository,
             com.yumi.production.api.ProductionAfterSalesReturnParticipant productionReturns,
+            com.yumi.production.api.ProductionConsumptionParticipant productionConsumption,
             IdempotentCommandService idempotentCommandService,
             AuthorizationService authorization,
             CurrentActorProvider currentActorProvider,
@@ -167,6 +168,7 @@ public class OrdersConfiguration {
     public com.yumi.orders.aftersales.api.AfterSalesReturnService afterSalesReturnService(
             com.yumi.orders.aftersales.application.port.AfterSalesRepository afterSalesRepository,
             com.yumi.production.api.ProductionAfterSalesReturnParticipant productionReturns,
+            com.yumi.production.api.ProductionConsumptionParticipant productionConsumption,
             IdempotentCommandService idempotentCommandService,
             AuthorizationService authorization,
             CurrentActorProvider currentActorProvider,
@@ -175,8 +177,9 @@ public class OrdersConfiguration {
             Clock clock,
             PlatformTransactionManager transactionManager) {
         return new com.yumi.orders.aftersales.application.AfterSalesReturnServiceImpl(
-                afterSalesRepository, productionReturns, idempotentCommandService, authorization,
-                currentActorProvider, audit, objectMapper, clock, transactionManager);
+                afterSalesRepository, productionReturns, productionConsumption,
+                idempotentCommandService, authorization, currentActorProvider, audit,
+                objectMapper, clock, transactionManager);
     }
 
     @Bean(name = "afterSalesRouteService")
@@ -209,6 +212,7 @@ public class OrdersConfiguration {
             com.yumi.orders.aftersales.application.port.AfterSalesRepository afterSalesRepository,
             com.yumi.production.api.ProductionAfterSalesDemandParticipant productionAfterSalesDemands,
             com.yumi.production.api.ProductionAfterSalesReturnParticipant productionReturns,
+            com.yumi.production.api.ProductionConsumptionParticipant productionConsumption,
             IdempotentCommandService idempotentCommandService,
             AuthorizationService authorization,
             CurrentActorProvider currentActorProvider,

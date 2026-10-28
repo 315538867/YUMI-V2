@@ -31,12 +31,14 @@ public class ReportingConfiguration {
     @Bean(name = "reportingRebuildService")
     public com.yumi.reporting.api.ReportingRebuildService reportingRebuildService(
             com.yumi.reporting.application.ReportingRebuildRepository rebuildRepository,
+            com.yumi.reporting.application.ReportingSourceReader sourceReader,
             IdempotentCommandService idempotency,
             AuthorizationService authorization,
             Clock clock,
             PlatformTransactionManager transactionManager) {
         return new com.yumi.reporting.application.ReportingRebuildServiceImpl(
-                rebuildRepository, idempotency, authorization, clock, transactionManager);
+                rebuildRepository, sourceReader, idempotency, authorization, clock,
+                transactionManager);
     }
 
     @Bean(name = "operatingReportQuery")
@@ -59,7 +61,7 @@ public class ReportingConfiguration {
     }
 
     @Bean(name = "reportingIngestionService")
-    public ReportingIngestionService reportingIngestionService(
+    public com.yumi.reporting.application.ReportingIngestionServiceImpl reportingIngestionService(
             JdbcClient jdbcClient,
             CustomerReportingFeed customerReportingFeed,
             ProductReportingFeed productReportingFeed,

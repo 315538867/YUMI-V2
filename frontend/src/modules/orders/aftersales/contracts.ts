@@ -32,6 +32,28 @@ export interface AfterSalesCaseView {
   openedAt: string
   contentVersion: number
   obligations: ObligationView[]
+  amountDecisions: Array<{
+    decisionBusinessId: string
+    obligationBusinessId: string
+    amount: MoneyWire
+    note: string
+    decidedAt: string
+  }>
+  deliveries: Array<{
+    deliveryFactBusinessId: string
+    obligationBusinessId: string
+    deliveryType: string
+    deliveredAt: string
+    trackingNo: string | null
+    quantity: number
+  }>
+  returns: Array<{
+    receiptItemBusinessId: string
+    obligationBusinessId: string
+    quantity: number
+    conditionCode: string
+    receivedAt: string
+  }>
   completedAt: string | null
 }
 

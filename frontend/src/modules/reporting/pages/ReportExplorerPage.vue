@@ -26,7 +26,7 @@ const themes = [
 
 async function load(): Promise<void> {
   await run(async () => {
-    summary.value = await reportingService.monthlySummary(filters.month)
+    summary.value = await reportingService.themeSummary(filters.month, filters.theme)
   }, '主题报表加载失败')
 }
 

@@ -15,6 +15,7 @@ import com.yumi.product.api.ProductSnapshotRef;
 import com.yumi.product.api.ProductSnapshotService;
 import com.yumi.production.api.AdjustTaskCommand;
 import com.yumi.production.api.AvailableProductionSourceView;
+import com.yumi.production.api.AvailableRepairSourceView;
 import com.yumi.production.api.ArrangeTaskCommand;
 import com.yumi.production.api.CancelTaskCommand;
 import com.yumi.production.api.DemandType;
@@ -35,6 +36,7 @@ import com.yumi.production.application.port.OtherTaskRepository;
 import com.yumi.production.application.port.ProductionRepository;
 import com.yumi.production.application.port.SourceRecord;
 import com.yumi.production.application.port.ReductionRepository;
+import com.yumi.production.application.port.RepairSourceRepository;
 import com.yumi.production.application.port.SourceReservationRepository;
 import com.yumi.production.application.port.TaskItemRecord;
 import com.yumi.production.application.port.TaskRecord;
@@ -93,6 +95,7 @@ public class TaskArrangementService implements TaskApplicationService {
     private final TaskRepository tasks;
     private final ProductionRepository production;
     private final SourceReservationRepository sourceReservations;
+    private final RepairSourceRepository repairSources;
     private final ReductionRepository reductions;
     private final OtherTaskRepository otherTasks;
     private final AssessmentRepository assessments;
@@ -114,6 +117,7 @@ public class TaskArrangementService implements TaskApplicationService {
             TaskRepository tasks,
             ProductionRepository production,
             SourceReservationRepository sourceReservations,
+            RepairSourceRepository repairSources,
             ReductionRepository reductions,
             OtherTaskRepository otherTasks,
             AssessmentRepository assessments,
@@ -133,6 +137,7 @@ public class TaskArrangementService implements TaskApplicationService {
         this.tasks = tasks;
         this.production = production;
         this.sourceReservations = sourceReservations;
+        this.repairSources = repairSources;
         this.reductions = reductions;
         this.otherTasks = otherTasks;
         this.assessments = assessments;
@@ -248,21 +253,38 @@ public class TaskArrangementService implements TaskApplicationService {
         Map<CapacityKey, NewProductCapacityService.CapacityLock> capacityLocks =
                 lockAdjustmentCapacity(oldMaking, newMaking);
 
-        Map<String, Integer> oldBySource = pending.stream().collect(
-                java.util.stream.Collectors.groupingBy(
+        Map<String, Integer> oldBySource = pending.stream()
+                .filter(item -> item.repairSourceBusinessId() == null)
+                .collect(java.util.stream.Collectors.groupingBy(
                         TaskItemRecord::productionSourceBusinessId,
                         LinkedHashMap::new,
                         java.util.stream.Collectors.summingInt(TaskItemRecord::plannedQuantity)));
-        Map<String, Integer> newBySource = planned.stream().collect(
-                java.util.stream.Collectors.groupingBy(
+        Map<String, Integer> newBySource = planned.stream()
+                .filter(item -> item.repairSourceBusinessId() == null)
+                .collect(java.util.stream.Collectors.groupingBy(
                         PlannedItem::productionSourceBusinessId,
                         LinkedHashMap::new,
                         java.util.stream.Collectors.summingInt(PlannedItem::quantity)));
         Map<String, PlannedItem> firstNewBySource = new LinkedHashMap<>();
-        planned.forEach(item -> firstNewBySource.putIfAbsent(
-                item.productionSourceBusinessId(), item));
+        planned.stream().filter(item -> item.repairSourceBusinessId() == null)
+                .forEach(item -> firstNewBySource.putIfAbsent(
+                        item.productionSourceBusinessId(), item));
+        Map<String, Integer> oldRepairBySource = pending.stream()
+                .filter(item -> item.repairSourceBusinessId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        TaskItemRecord::repairSourceBusinessId,
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.summingInt(TaskItemRecord::plannedQuantity)));
+        Map<String, Integer> newRepairBySource = planned.stream()
+                .filter(item -> item.repairSourceBusinessId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        PlannedItem::repairSourceBusinessId,
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.summingInt(PlannedItem::quantity)));
         lockAndValidateSources(
                 oldBySource, newBySource, firstNewBySource, command.processCode());
+        lockAndValidateRepairSources(
+                oldRepairBySource, newRepairBySource);
 
         long releasedSeconds = pending.stream()
                 .mapToLong(item -> (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L)
@@ -276,7 +298,9 @@ public class TaskArrangementService implements TaskApplicationService {
         requirePermitted(task.taskType(), assessed.comparison(), command.overrideReason());
 
         applyCapacityAdjustment(capacityLocks, oldMaking, newMaking);
-        applySourceReservationChanges(oldBySource, newBySource, pending);
+        applySourceReservationChanges(
+                oldBySource, newBySource, oldRepairBySource, newRepairBySource, pending, now,
+                operatorId);
 
         for (TaskItemRecord item : removed) {
             tasks.cancelTaskItem(
@@ -294,7 +318,13 @@ public class TaskArrangementService implements TaskApplicationService {
             tasks.insertItemAssignmentFact(record, newVersion, operation, now, operatorId);
             sourceReservations.upsertActiveHold(new SourceReservationRepository.SourceHold(
                     task.taskBusinessId(), record.taskItemBusinessId(),
-                    record.productionSourceBusinessId(), record.plannedQuantity(), "ACTIVE"));
+                    record.productionSourceBusinessId(), record.repairSourceBusinessId(),
+                    record.plannedQuantity(), "ACTIVE"));
+            if (record.repairSourceBusinessId() != null) {
+                repairSources.recordFact(
+                        record.repairSourceBusinessId(), "RESERVED", record.plannedQuantity(),
+                        task.taskBusinessId(), record.taskItemBusinessId(), now, operatorId);
+            }
         }
 
         int verifiedQuantity = allItems.stream()
@@ -435,6 +465,26 @@ public class TaskArrangementService implements TaskApplicationService {
     }
 
     @Override
+    public List<AvailableRepairSourceView> availableRepairSources(TargetProcess processCode) {
+        authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
+        if (processCode == null) {
+            return List.of();
+        }
+        return repairSources.listAvailable().stream()
+                .filter(source -> source.repairProcessCode() == processCode)
+                .map(source -> new AvailableRepairSourceView(
+                        source.repairSourceBusinessId(), source.originType(),
+                        source.demandBusinessId(), source.productionSourceBusinessId(),
+                        source.demandType(), source.productBusinessId(), source.schemeBusinessId(),
+                        source.targetProcess(), source.repairProcessCode(),
+                        source.originalQuantity(), source.completedQuantity(),
+                        source.reservedQuantity(),
+                        Math.max(0, source.availableQuantity() - source.reservedQuantity())))
+                .filter(source -> source.availableQuantity() > 0)
+                .toList();
+    }
+
+    @Override
     public TaskView getTask(String taskBusinessId) {
         authorization.require(PermissionCodes.PRODUCTION_READ, ResourceScope.GLOBAL);
         TaskRecord task = tasks.findTask(taskBusinessId)
@@ -453,6 +503,8 @@ public class TaskArrangementService implements TaskApplicationService {
     }
 
     private TaskRef doCancel(CancelTaskCommand command) {
+        Instant now = clock.instant();
+        String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
         TaskRecord task = tasks.lockTask(command.taskBusinessId())
                 .orElseThrow(() -> new ApiException(
                         ApiErrorType.NOT_FOUND, "PRODUCTION_TASK_NOT_FOUND", "任务不存在"));
@@ -484,7 +536,8 @@ public class TaskArrangementService implements TaskApplicationService {
         Map<String, Integer> makingByProduct = new LinkedHashMap<>();
         if (task.processCode() == TargetProcess.MAKING) {
             for (TaskItemRecord item : pending) {
-                if (item.demandType() == com.yumi.production.api.DemandType.NEW_PRODUCT) {
+                if (item.demandType() == com.yumi.production.api.DemandType.NEW_PRODUCT
+                        && item.repairSourceBusinessId() == null) {
                     makingByProduct.merge(
                             item.productBusinessId(), item.plannedQuantity(), Integer::sum);
                 }
@@ -499,6 +552,9 @@ public class TaskArrangementService implements TaskApplicationService {
 
         pending.stream().map(TaskItemRecord::productionSourceBusinessId).distinct().sorted()
                 .forEach(sourceReservations::lockReservedQuantity);
+        pending.stream().map(TaskItemRecord::repairSourceBusinessId)
+                .filter(id -> id != null).distinct().sorted()
+                .forEach(repairSources::lock);
 
         if (otherTaskPending) {
             for (String employeeId : participants) {
@@ -510,14 +566,23 @@ public class TaskArrangementService implements TaskApplicationService {
             reductions.updateItemPlannedQuantity(
                     item.taskItemBusinessId(), 0, item.plannedQuantity());
             sourceReservations.releaseHold(item.taskItemBusinessId());
-            sourceReservations.release(
-                    item.productionSourceBusinessId(), item.plannedQuantity());
+            if (item.repairSourceBusinessId() != null) {
+                repairSources.release(
+                        item.repairSourceBusinessId(), item.plannedQuantity());
+                repairSources.recordFact(
+                        item.repairSourceBusinessId(), "RELEASED", item.plannedQuantity(),
+                        item.taskBusinessId(), item.taskItemBusinessId(), now, operatorId);
+            } else {
+                sourceReservations.release(
+                        item.productionSourceBusinessId(), item.plannedQuantity());
+            }
             long seconds = (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L;
             for (String employeeId : participants) {
                 dailyLoadService.releasePlan(employeeId, task.workDate(), seconds);
             }
             if (task.processCode() == TargetProcess.MAKING
-                    && item.demandType() == com.yumi.production.api.DemandType.NEW_PRODUCT) {
+                    && item.demandType() == com.yumi.production.api.DemandType.NEW_PRODUCT
+                    && item.repairSourceBusinessId() == null) {
                 capacityService.releasePlan(
                         capacityLocks.get(item.productBusinessId()), item.plannedQuantity());
             }
@@ -668,6 +733,23 @@ public class TaskArrangementService implements TaskApplicationService {
                             "同一明细不能重复提交");
                 }
             }
+            String repairSourceId = request.repairSourceBusinessId() != null
+                    ? request.repairSourceBusinessId()
+                    : (existing == null ? null : existing.repairSourceBusinessId());
+            if (repairSourceId != null) {
+                requireRepairTask(task.taskType());
+                if (!seenSources.add(repairSourceId)) {
+                    throw new ApiException(
+                            ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID",
+                            "同一任务不能重复同一来源明细");
+                }
+                planned.add(planRepairItem(
+                        task.taskType(), command.processCode(), repairSourceId,
+                        existing == null ? "TI-" + UUID.randomUUID() : existing.taskItemBusinessId(),
+                        existing == null ? nextOrder++ : existing.itemOrder(),
+                        request.plannedQuantity()));
+                continue;
+            }
             SourceRecord source = production.findSource(request.productionSourceBusinessId())
                     .orElseThrow(() -> new ApiException(
                             ApiErrorType.NOT_FOUND, "PRODUCTION_SOURCE_NOT_FOUND",
@@ -676,6 +758,7 @@ public class TaskArrangementService implements TaskApplicationService {
                     .orElseThrow(() -> new ApiException(
                             ApiErrorType.NOT_FOUND, "PRODUCTION_DEMAND_NOT_FOUND", "生产需求不存在"));
             requireTaskTypeConsistency(task.taskType(), command.processCode(), demand.demandType());
+            requireRepairSourceBinding(task.taskType(), demand.demandType());
             requireTargetReachable(source.targetProcess(), command.processCode());
             if (!seenSources.add(source.productionSourceBusinessId())) {
                 throw new ApiException(
@@ -686,7 +769,7 @@ public class TaskArrangementService implements TaskApplicationService {
                     existing == null ? nextOrder++ : existing.itemOrder(),
                     demand.demandBusinessId(), demand.demandType(),
                     source.productionSourceBusinessId(), source.physicalRootSourceBusinessId(),
-                    existing == null ? null : existing.repairSourceBusinessId(),
+                    null,
                     demand.orderBusinessId(), demand.orderItemBusinessId(),
                     demand.productBusinessId(), demand.productSnapshotRef(),
                     demand.schemeBusinessId(), demand.schemeSnapshotRef(),
@@ -818,11 +901,49 @@ public class TaskArrangementService implements TaskApplicationService {
         }
     }
 
+    private void lockAndValidateRepairSources(
+            Map<String, Integer> oldBySource, Map<String, Integer> newBySource) {
+        Set<String> sources = new TreeSet<>();
+        sources.addAll(oldBySource.keySet());
+        sources.addAll(newBySource.keySet());
+        for (String sourceId : sources) {
+            RepairSourceRepository.RepairSourceRecord repair = repairSources.lock(sourceId);
+            int newQuantity = newBySource.getOrDefault(sourceId, 0);
+            if (newQuantity <= 0) {
+                continue;
+            }
+            if (!"ACTIVE".equals(repair.status())) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_REPAIR_SOURCE_NOT_AVAILABLE",
+                        "返工来源已失效，不能安排任务：" + sourceId);
+            }
+            int effectiveReserved = repair.reservedQuantity()
+                    - oldBySource.getOrDefault(sourceId, 0);
+            if (effectiveReserved < 0) {
+                throw new ApiException(
+                        ApiErrorType.SYSTEM_FAILURE, "PRODUCTION_REPAIR_SOURCE_INCONSISTENT",
+                        "返工来源预留不守恒：" + sourceId);
+            }
+            int available = repair.availableQuantity() - effectiveReserved;
+            if (available < newQuantity) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_REPAIR_SOURCE_INSUFFICIENT",
+                        "返工来源可安排数量不足：需要 " + newQuantity + "，可用 " + available);
+            }
+        }
+    }
+
     private void applySourceReservationChanges(
             Map<String, Integer> oldBySource, Map<String, Integer> newBySource,
-            List<TaskItemRecord> pending) {
+            Map<String, Integer> oldRepairBySource, Map<String, Integer> newRepairBySource,
+            List<TaskItemRecord> pending, Instant now, String operatorId) {
         for (TaskItemRecord item : pending) {
             sourceReservations.releaseHold(item.taskItemBusinessId());
+            if (item.repairSourceBusinessId() != null) {
+                repairSources.recordFact(
+                        item.repairSourceBusinessId(), "RELEASED", item.plannedQuantity(),
+                        item.taskBusinessId(), item.taskItemBusinessId(), now, operatorId);
+            }
         }
         for (var entry : oldBySource.entrySet()) {
             if (entry.getValue() > 0) {
@@ -832,6 +953,16 @@ public class TaskArrangementService implements TaskApplicationService {
         for (var entry : newBySource.entrySet()) {
             if (entry.getValue() > 0) {
                 sourceReservations.reserve(entry.getKey(), entry.getValue());
+            }
+        }
+        for (var entry : oldRepairBySource.entrySet()) {
+            if (entry.getValue() > 0) {
+                repairSources.release(entry.getKey(), entry.getValue());
+            }
+        }
+        for (var entry : newRepairBySource.entrySet()) {
+            if (entry.getValue() > 0) {
+                repairSources.reserve(entry.getKey(), entry.getValue());
             }
         }
     }
@@ -1001,10 +1132,17 @@ public class TaskArrangementService implements TaskApplicationService {
             TaskItemRecord record = item.toRecord(taskBusinessId, 1L);
             tasks.insertTaskItem(record);
             tasks.insertItemAssignmentFact(record, 1L, "CREATE", now, operatorId);
-            sourceReservations.reserve(item.productionSourceBusinessId(), item.quantity());
+            if (item.repairSourceBusinessId() != null) {
+                repairSources.reserve(item.repairSourceBusinessId(), item.quantity());
+                repairSources.recordFact(
+                        item.repairSourceBusinessId(), "RESERVED", item.quantity(),
+                        taskBusinessId, item.taskItemBusinessId(), now, operatorId);
+            } else {
+                sourceReservations.reserve(item.productionSourceBusinessId(), item.quantity());
+            }
             sourceReservations.upsertActiveHold(new SourceReservationRepository.SourceHold(
                     taskBusinessId, item.taskItemBusinessId(), item.productionSourceBusinessId(),
-                    item.quantity(), "ACTIVE"));
+                    item.repairSourceBusinessId(), item.quantity(), "ACTIVE"));
         }
         tasks.insertAssignmentFact(
                 taskBusinessId, 1L, "CREATE", null,
@@ -1067,6 +1205,17 @@ public class TaskArrangementService implements TaskApplicationService {
         Set<String> seenSources = new LinkedHashSet<>();
         int itemOrder = 1;
         for (TaskItemRequest request : command.items()) {
+            if (request.repairSourceBusinessId() != null) {
+                requireRepairTask(command.taskType());
+                if (!seenSources.add(request.repairSourceBusinessId())) {
+                    throw new ApiException(
+                            ApiErrorType.VALIDATION, "PRODUCTION_TASK_INVALID", "同一任务不能重复同一来源明细");
+                }
+                items.add(planRepairItem(
+                        command.taskType(), command.processCode(), request.repairSourceBusinessId(),
+                        "TI-" + UUID.randomUUID(), itemOrder++, request.plannedQuantity()));
+                continue;
+            }
             SourceRecord source = production.findSource(request.productionSourceBusinessId())
                     .orElseThrow(() -> new ApiException(
                             ApiErrorType.NOT_FOUND, "PRODUCTION_SOURCE_NOT_FOUND",
@@ -1076,6 +1225,7 @@ public class TaskArrangementService implements TaskApplicationService {
                             ApiErrorType.NOT_FOUND, "PRODUCTION_DEMAND_NOT_FOUND", "生产需求不存在"));
 
             requireTaskTypeConsistency(command.taskType(), command.processCode(), demand.demandType());
+            requireRepairSourceBinding(command.taskType(), demand.demandType());
             requireTargetReachable(source.targetProcess(), command.processCode());
             if (!seenSources.add(request.productionSourceBusinessId())) {
                 throw new ApiException(
@@ -1091,6 +1241,59 @@ public class TaskArrangementService implements TaskApplicationService {
                     standardMinutesOf(demand, command.processCode())));
         }
         return items;
+    }
+
+    private PlannedItem planRepairItem(
+            TaskType taskType, TargetProcess processCode, String repairSourceBusinessId,
+            String taskItemBusinessId, int itemOrder, int plannedQuantity) {
+        requireRepairTask(taskType);
+        RepairSourceRepository.RepairSourceRecord repair = repairSources.find(repairSourceBusinessId)
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCTION_REPAIR_SOURCE_NOT_FOUND",
+                        "返工来源不存在：" + repairSourceBusinessId));
+        if (!"ACTIVE".equals(repair.status())) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_REPAIR_SOURCE_NOT_AVAILABLE",
+                    "返工来源已失效，不能安排任务：" + repairSourceBusinessId);
+        }
+        TargetProcess repairProcess = TargetProcess.valueOf(repair.repairProcessCode());
+        if (processCode != repairProcess) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_TASK_TYPE_INVALID",
+                    "返工任务工序必须与返工来源的修复工序一致：" + repairProcess);
+        }
+        SourceRecord source = production.findSource(repair.productionSourceBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCTION_SOURCE_NOT_FOUND", "返工来源缺少履约生产来源"));
+        DemandRecord demand = production.findDemand(repair.demandBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCTION_DEMAND_NOT_FOUND", "返工来源缺少生产需求"));
+        requireTaskTypeConsistency(taskType, processCode, demand.demandType());
+        requireTargetReachable(source.targetProcess(), processCode);
+        return new PlannedItem(
+                taskItemBusinessId, itemOrder, demand.demandBusinessId(), demand.demandType(),
+                source.productionSourceBusinessId(), repair.physicalRootSourceBusinessId(),
+                repair.repairSourceBusinessId(), demand.orderBusinessId(),
+                demand.orderItemBusinessId(), demand.productBusinessId(),
+                demand.productSnapshotRef(), demand.schemeBusinessId(), demand.schemeSnapshotRef(),
+                source.targetProcess(), processCode, plannedQuantity,
+                standardMinutesOf(demand, processCode));
+    }
+
+    private static void requireRepairTask(TaskType taskType) {
+        if (taskType != TaskType.REPAIR) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_TASK_TYPE_INVALID",
+                    "只有返工任务可以关联返工来源");
+        }
+    }
+
+    private static void requireRepairSourceBinding(TaskType taskType, DemandType demandType) {
+        if (taskType == TaskType.REPAIR && demandType != DemandType.RETURNED_PRODUCT_REPAIR) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_TASK_TYPE_INVALID",
+                    "返工任务必须关联返工来源，不能直接用生产来源安排");
+        }
     }
 
     private static void requireTaskTypeConsistency(
@@ -1138,6 +1341,22 @@ public class TaskArrangementService implements TaskApplicationService {
     }
 
     private void requireSourceAvailable(PlannedItem item) {
+        if (item.repairSourceBusinessId() != null) {
+            RepairSourceRepository.RepairSourceRecord repair =
+                    repairSources.lock(item.repairSourceBusinessId());
+            if (!"ACTIVE".equals(repair.status())) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_REPAIR_SOURCE_NOT_AVAILABLE",
+                        "返工来源已失效，不能安排任务：" + item.repairSourceBusinessId());
+            }
+            int available = repair.availableQuantity() - repair.reservedQuantity();
+            if (available < item.quantity()) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_REPAIR_SOURCE_INSUFFICIENT",
+                        "返工来源可安排数量不足：需要 " + item.quantity() + "，可用 " + available);
+            }
+            return;
+        }
         SourceRecord source = production.lockSource(item.productionSourceBusinessId());
         if (OPENING_PENDING.equals(source.openingStatus())) {
             throw new ApiException(
@@ -1206,6 +1425,16 @@ public class TaskArrangementService implements TaskApplicationService {
             throw new ApiException(
                     ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_WORKLOAD_UNAVAILABLE",
                     "缺少工时、资格、效率或有效时间依据，不能安排任务");
+        }
+        if (comparison == WorkloadComparison.OVER_STANDARD
+                && !taskType.allowsOverStandard()) {
+            if (overrideReason == null || overrideReason.isBlank()) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_WORKLOAD_OVER_STANDARD",
+                        "超出每日有效工作时间，需要覆盖权限并填写原因");
+            }
+            authorization.require(
+                    PermissionCodes.PRODUCTION_OVERRIDE_OVER_STANDARD, ResourceScope.GLOBAL);
         }
         if (!workloadAssessor.permits(taskType, comparison, overrideReason)) {
             throw new ApiException(

@@ -28,6 +28,22 @@ export interface AvailableProductionSourceView {
   availableQuantity: number
 }
 
+export interface AvailableRepairSourceView {
+  repairSourceBusinessId: string
+  originType: string
+  demandBusinessId: string
+  productionSourceBusinessId: string
+  demandType: string
+  productBusinessId: string
+  schemeBusinessId: string
+  targetProcess: TargetProcess
+  repairProcessCode: TargetProcess
+  originalQuantity: number
+  completedQuantity: number
+  reservedQuantity: number
+  availableQuantity: number
+}
+
 export interface ProductionOverview {
   orderCount: number
   requiredQuantity: number
@@ -126,6 +142,8 @@ export interface DefectReasonView {
   name: string
   status: DefectReasonStatus
   other: boolean
+  applicableProcess: string | null
+  requiresText: boolean
   rowVersion: number
 }
 

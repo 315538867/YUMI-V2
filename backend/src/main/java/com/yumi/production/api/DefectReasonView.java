@@ -6,5 +6,7 @@ public record DefectReasonView(
         String name,
         DefectReasonStatus status,
         boolean other,
+        String applicableProcess,
+        boolean requiresText,
         long rowVersion) {
 }

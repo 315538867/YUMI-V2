@@ -25,6 +25,7 @@ import com.yumi.production.application.port.DailyLoadRepository;
 import com.yumi.production.application.port.DemandRecord;
 import com.yumi.production.application.port.OtherTaskRepository;
 import com.yumi.production.application.port.ProductionRepository;
+import com.yumi.production.application.port.RepairSourceRepository;
 import com.yumi.production.application.port.SourceReservationRepository;
 import com.yumi.production.application.port.TaskItemRecord;
 import com.yumi.production.application.port.TaskRecord;
@@ -58,6 +59,7 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
     private final TaskRepository tasks;
     private final ProductionRepository production;
     private final SourceReservationRepository sourceReservations;
+    private final RepairSourceRepository repairSources;
     private final VerificationRepository verifications;
     private final OtherTaskRepository otherTasks;
     private final AssessmentRepository assessments;
@@ -73,6 +75,7 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
             TaskRepository tasks,
             ProductionRepository production,
             SourceReservationRepository sourceReservations,
+            RepairSourceRepository repairSources,
             VerificationRepository verifications,
             OtherTaskRepository otherTasks,
             AssessmentRepository assessments,
@@ -86,6 +89,7 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
         this.tasks = tasks;
         this.production = production;
         this.sourceReservations = sourceReservations;
+        this.repairSources = repairSources;
         this.verifications = verifications;
         this.otherTasks = otherTasks;
         this.assessments = assessments;
@@ -182,7 +186,8 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
             verified.add(writeItemFacts(task, item, request, now, operatorId, makingCompletedByProduct,
                     demandDeltas));
             if (task.processCode() == TargetProcess.MAKING
-                    && item.demandType() == DemandType.NEW_PRODUCT) {
+                    && item.demandType() == DemandType.NEW_PRODUCT
+                    && item.repairSourceBusinessId() == null) {
                 makingPlannedByProduct.merge(item.productBusinessId(), item.plannedQuantity(), Integer::sum);
             }
             plannedSecondsTotal += (long) item.plannedQuantity() * item.itemStandardMinutes() * 60L;
@@ -195,13 +200,21 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
         // 来源占用：未完成与完成都要释放本次明细的全部预留（未完成回到可安排数量）
         for (TaskItemResultRequest request : results) {
             TaskItemRecord item = byId.get(request.taskItemBusinessId());
-            sourceReservations.release(
-                    item.productionSourceBusinessId(),
-                    Math.min(item.plannedQuantity(), reservedOf(item.productionSourceBusinessId())));
+            if (item.repairSourceBusinessId() != null) {
+                repairSources.complete(
+                        item.repairSourceBusinessId(), item.plannedQuantity(),
+                        request.completedQuantity());
+                repairSources.recordFact(
+                        item.repairSourceBusinessId(), "COMPLETED",
+                        request.completedQuantity(), taskBusinessId, item.taskItemBusinessId(),
+                        now, operatorId);
+            } else {
+                sourceReservations.release(
+                        item.productionSourceBusinessId(),
+                        Math.min(item.plannedQuantity(),
+                                reservedOf(item.productionSourceBusinessId())));
+            }
             sourceReservations.releaseHold(item.taskItemBusinessId());
-            tasks.findTaskItems(taskBusinessId).stream()
-                    .filter(candidate -> candidate.taskItemBusinessId().equals(item.taskItemBusinessId()))
-                    .findFirst();
         }
 
         applyLoadAndCapacity(task, makingPlannedByProduct, makingCompletedByProduct,
@@ -341,7 +354,8 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
                         ApiErrorType.BUSINESS_REJECTION, "PRODUCTION_DEFECT_INVALID",
                         "缺陷原因已停用，不能用于新核验：" + defect.defectReasonCode());
             }
-            if (reason.other() && (defect.defectReasonText() == null
+            if ((reason.other() || reason.requiresText())
+                    && (defect.defectReasonText() == null
                     || defect.defectReasonText().isBlank())) {
                 throw new ApiException(
                         ApiErrorType.VALIDATION, "PRODUCTION_DEFECT_INVALID",
@@ -452,11 +466,15 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
                 request.qualifiedQuantity(), request.reworkQuantity(), request.scrappedQuantity(),
                 request.destroyedQuantity(), request.scrapOfflineQuantity(), VERIFIED);
 
-        if (task.processCode() == TargetProcess.MAKING && demand.demandType() == DemandType.NEW_PRODUCT) {
+        if (task.processCode() == TargetProcess.MAKING
+                && demand.demandType() == DemandType.NEW_PRODUCT
+                && item.repairSourceBusinessId() == null) {
             makingByProduct.merge(item.productBusinessId(), request.completedQuantity(), Integer::sum);
         }
         demandDeltas.computeIfAbsent(demand.demandBusinessId(), key -> new int[5]);
-        accumulateDemand(demandDeltas.get(demand.demandBusinessId()), demand, task.processCode(), request);
+        accumulateDemand(
+                demandDeltas.get(demand.demandBusinessId()), demand, task.processCode(), request,
+                item.repairSourceBusinessId() != null);
 
         // 材料成本来源：仅真实生产/修复任务，按依据中的材料行逐项写入，不含金额
         if (request.completedQuantity() > 0) {
@@ -488,11 +506,25 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
 
     /** 需求投影增量：索引 0 未制、1 在制、2 目标就绪、3 缺口。 */
     private static void accumulateDemand(
-            int[] delta, DemandRecord demand, TargetProcess process, TaskItemResultRequest request) {
+            int[] delta, DemandRecord demand, TargetProcess process, TaskItemResultRequest request,
+            boolean repair) {
         int completed = request.completedQuantity();
         boolean atTarget = process == demand.targetProcess();
         boolean atMaking = process == TargetProcess.MAKING;
 
+        if (repair) {
+            // 返工只移动原制品：完成数量先退出在制，合格回到目标就绪或在制，
+            // 返工继续在制并生成新返工来源，报废退出在制并形成缺口。
+            delta[1] -= completed;
+            if (atTarget) {
+                delta[2] += request.qualifiedQuantity();
+            } else {
+                delta[1] += request.qualifiedQuantity();
+            }
+            delta[1] += request.reworkQuantity();
+            delta[3] += request.scrappedQuantity();
+            return;
+        }
         if (atMaking) {
             delta[0] -= completed;
         } else {
@@ -540,7 +572,8 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
                     .findFirst()
                     .orElseThrow();
             boolean atMaking = task.processCode() == TargetProcess.MAKING
-                    && item.demandType() == DemandType.NEW_PRODUCT;
+                    && item.demandType() == DemandType.NEW_PRODUCT
+                    && item.repairSourceBusinessId() == null;
             int[] delta = deltas.computeIfAbsent(item.physicalRootSourceBusinessId(), key -> new int[5]);
             if (atMaking) {
                 // 制作完成即产生制品：合格与返工仍在系统内，报废按去向退出

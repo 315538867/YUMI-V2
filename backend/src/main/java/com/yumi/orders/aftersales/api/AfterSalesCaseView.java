@@ -17,7 +17,35 @@ public record AfterSalesCaseView(
         Instant openedAt,
         long contentVersion,
         List<ObligationView> obligations,
+        List<AmountDecisionView> amountDecisions,
+        List<DeliveryView> deliveries,
+        List<ReturnView> returns,
         Instant completedAt) {
+
+    public record ReturnView(
+            String receiptItemBusinessId,
+            String obligationBusinessId,
+            int quantity,
+            String conditionCode,
+            Instant receivedAt) {
+    }
+
+    public record DeliveryView(
+            String deliveryFactBusinessId,
+            String obligationBusinessId,
+            String deliveryType,
+            Instant deliveredAt,
+            String trackingNo,
+            int quantity) {
+    }
+
+    public record AmountDecisionView(
+            String decisionBusinessId,
+            String obligationBusinessId,
+            SettlementMoney amount,
+            String note,
+            Instant decidedAt) {
+    }
 
     public record ObligationView(
             String obligationBusinessId,

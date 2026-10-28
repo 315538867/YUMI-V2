@@ -187,6 +187,8 @@ public interface VerificationRepository {
     }
 
     /** 缺陷原因。 */
-    record DefectReasonRecord(String code, String name, String status, boolean other) {
+    record DefectReasonRecord(
+            String code, String name, String status, boolean other,
+            String applicableProcess, boolean requiresText) {
     }
 }

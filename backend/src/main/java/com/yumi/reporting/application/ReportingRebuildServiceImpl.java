@@ -34,6 +34,7 @@ public class ReportingRebuildServiceImpl implements ReportingRebuildService {
             "AFTER_SALES", "PAYROLL", "COST", "CASH");
 
     private final ReportingRebuildRepository repository;
+    private final ReportingSourceReader sourceReader;
     private final IdempotentCommandService idempotency;
     private final AuthorizationService authorization;
     private final Clock clock;
@@ -41,11 +42,13 @@ public class ReportingRebuildServiceImpl implements ReportingRebuildService {
 
     public ReportingRebuildServiceImpl(
             ReportingRebuildRepository repository,
+            ReportingSourceReader sourceReader,
             IdempotentCommandService idempotency,
             AuthorizationService authorization,
             Clock clock,
             PlatformTransactionManager transactionManager) {
         this.repository = repository;
+        this.sourceReader = sourceReader;
         this.idempotency = idempotency;
         this.authorization = authorization;
         this.clock = clock;
@@ -90,7 +93,7 @@ public class ReportingRebuildServiceImpl implements ReportingRebuildService {
         var now = clock.instant();
         String versionId = "RPV-" + UUID.randomUUID();
         repository.insertVersion(versionId, "BUILDING", now);
-        repository.copyLiveRecords(versionId);
+        sourceReader.readAllInto(versionId);
         long recordCount = repository.countVersionRecords(versionId);
         int differences = 0;
         for (String feed : FEEDS) {

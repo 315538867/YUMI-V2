@@ -13,6 +13,8 @@ public interface ReportingQuery {
 
     OperatingReportQuery.MonthlyOperatingSummary getMonthlySummary(LocalDate month);
 
+    OperatingReportQuery.MonthlyOperatingSummary getThemeSummary(LocalDate month, String theme);
+
     AfterSalesMonthlySummary getAfterSalesSummary(LocalDate month);
 
     FreshnessView getFreshness();

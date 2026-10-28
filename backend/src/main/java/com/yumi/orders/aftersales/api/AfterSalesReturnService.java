@@ -8,4 +8,6 @@ public interface AfterSalesReturnService {
     ReceiveReturnRef receiveReturn(ReceiveReturnCommand command);
 
     AfterSalesDeliveryRef returnToCustomer(ReturnToCustomerCommand command);
+
+    AfterSalesDeliveryRef deliver(ConfirmAfterSalesDeliveryCommand command);
 }

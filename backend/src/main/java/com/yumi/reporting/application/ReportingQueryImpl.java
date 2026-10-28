@@ -44,12 +44,41 @@ public class ReportingQueryImpl implements ReportingQuery {
 
     @Override
     public OperatingReportQuery.MonthlyOperatingSummary getMonthlySummary(LocalDate month) {
+        authorization.require(PermissionCodes.REPORTING_READ, ResourceScope.GLOBAL);
+        authorization.require(PermissionCodes.REPORT_ORDER_READ, ResourceScope.GLOBAL);
+        authorization.require(PermissionCodes.REPORT_PRODUCTION_READ, ResourceScope.GLOBAL);
+        authorization.require(PermissionCodes.REPORT_AFTER_SALES_READ, ResourceScope.GLOBAL);
+        authorization.require(PermissionCodes.REPORT_PAYROLL_READ, ResourceScope.GLOBAL);
+        authorization.require(PermissionCodes.REPORT_COST_READ, ResourceScope.GLOBAL);
+        authorization.require(PermissionCodes.REPORT_CASH_READ, ResourceScope.GLOBAL);
         return operating.getMonthlySummary(month);
+    }
+
+    @Override
+    public OperatingReportQuery.MonthlyOperatingSummary getThemeSummary(
+            LocalDate month, String theme) {
+        authorization.require(PermissionCodes.REPORTING_READ, ResourceScope.GLOBAL);
+        authorization.require(themePermission(theme), ResourceScope.GLOBAL);
+        return operating.getMonthlySummary(month);
+    }
+
+    private static String themePermission(String theme) {
+        return switch (theme == null ? "" : theme) {
+            case "ORDER" -> PermissionCodes.REPORT_ORDER_READ;
+            case "PRODUCTION" -> PermissionCodes.REPORT_PRODUCTION_READ;
+            case "AFTER_SALES" -> PermissionCodes.REPORT_AFTER_SALES_READ;
+            case "PAYROLL" -> PermissionCodes.REPORT_PAYROLL_READ;
+            case "COST" -> PermissionCodes.REPORT_COST_READ;
+            case "CASH" -> PermissionCodes.REPORT_CASH_READ;
+            default -> throw new ApiException(
+                    ApiErrorType.VALIDATION, "REPORT_THEME_INVALID", "报表主题不合法");
+        };
     }
 
     @Override
     public AfterSalesMonthlySummary getAfterSalesSummary(LocalDate month) {
         authorization.require(PermissionCodes.REPORTING_READ, ResourceScope.GLOBAL);
+        authorization.require(PermissionCodes.REPORT_AFTER_SALES_READ, ResourceScope.GLOBAL);
         if (month == null) {
             throw new ApiException(ApiErrorType.VALIDATION, "MISSING_REPORT_MONTH", "报表月份不能为空");
         }

@@ -31,6 +31,12 @@ public class ReportingController {
         return reports.getMonthlySummary(monthStart(month));
     }
 
+    @GetMapping("/theme-summary")
+    public MonthlyOperatingSummary themeSummary(
+            @RequestParam String month, @RequestParam String theme) {
+        return reports.getThemeSummary(monthStart(month), theme);
+    }
+
     @GetMapping("/after-sales-summary")
     public ReportingQuery.AfterSalesMonthlySummary afterSalesSummary(@RequestParam String month) {
         return reports.getAfterSalesSummary(monthStart(month));

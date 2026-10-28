@@ -75,7 +75,7 @@ public class JdbcSourceReservationRepository implements SourceReservationReposit
     public Optional<SourceHold> findHold(String taskItemBusinessId) {
         return jdbc.sql("""
                         SELECT task_item_business_id, task_business_id, production_source_business_id,
-                               reserved_quantity, status
+                               repair_source_business_id, reserved_quantity, status
                         FROM production_source_holds WHERE task_item_business_id = :itemId
                         """)
                 .param("itemId", taskItemBusinessId)
@@ -83,6 +83,7 @@ public class JdbcSourceReservationRepository implements SourceReservationReposit
                         resultSet.getString("task_business_id"),
                         resultSet.getString("task_item_business_id"),
                         resultSet.getString("production_source_business_id"),
+                        resultSet.getString("repair_source_business_id"),
                         resultSet.getInt("reserved_quantity"),
                         resultSet.getString("status")))
                 .optional();
@@ -93,9 +94,13 @@ public class JdbcSourceReservationRepository implements SourceReservationReposit
         jdbc.sql("""
                         INSERT INTO production_source_holds (
                             task_item_business_id, task_business_id, production_source_business_id,
-                            reserved_quantity, status, reserved_at, row_version)
-                        VALUES (:itemId, :taskId, :sourceId, :quantity, 'ACTIVE', UTC_TIMESTAMP(6), 1)
+                            repair_source_business_id, reserved_quantity, status, reserved_at,
+                            row_version)
+                        VALUES (:itemId, :taskId, :sourceId, :repairSourceId, :quantity, 'ACTIVE',
+                                UTC_TIMESTAMP(6), 1)
                         ON DUPLICATE KEY UPDATE
+                            production_source_business_id = :sourceId,
+                            repair_source_business_id = :repairSourceId,
                             reserved_quantity = :quantity, status = 'ACTIVE',
                             reserved_at = UTC_TIMESTAMP(6), released_at = NULL,
                             row_version = row_version + 1
@@ -103,6 +108,7 @@ public class JdbcSourceReservationRepository implements SourceReservationReposit
                 .param("itemId", hold.taskItemBusinessId())
                 .param("taskId", hold.taskBusinessId())
                 .param("sourceId", hold.productionSourceBusinessId())
+                .param("repairSourceId", hold.repairSourceBusinessId())
                 .param("quantity", hold.quantity())
                 .update();
     }

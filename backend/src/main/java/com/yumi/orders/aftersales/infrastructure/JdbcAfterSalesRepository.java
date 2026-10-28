@@ -176,6 +176,120 @@ public class JdbcAfterSalesRepository implements AfterSalesRepository {
     }
 
     @Override
+    public void insertAmountDecision(AmountDecisionRecord record) {
+        jdbc.sql("""
+                        INSERT INTO after_sales_amount_decisions (
+                            decision_business_id, case_business_id, obligation_business_id,
+                            amount, note, decided_at, operator_id, is_valid)
+                        VALUES (:id, :caseId, :obligationId, :amount, :note, :decidedAt, :operatorId, 1)
+                        """)
+                .param("id", record.decisionBusinessId())
+                .param("caseId", record.caseBusinessId())
+                .param("obligationId", record.obligationBusinessId())
+                .param("amount", record.amount())
+                .param("note", record.note())
+                .param("decidedAt", JdbcTimes.toUtc(record.decidedAt()))
+                .param("operatorId", record.operatorId())
+                .update();
+    }
+
+    @Override
+    public List<AmountDecisionRecord> findAmountDecisions(String caseBusinessId) {
+        return jdbc.sql("""
+                        SELECT decision_business_id, case_business_id, obligation_business_id,
+                               amount, note, decided_at, operator_id
+                        FROM after_sales_amount_decisions
+                        WHERE case_business_id = :caseId AND is_valid = 1
+                        ORDER BY decided_at, decision_business_id
+                        """)
+                .param("caseId", caseBusinessId)
+                .query((resultSet, rowNumber) -> new AmountDecisionRecord(
+                        resultSet.getString("decision_business_id"),
+                        resultSet.getString("case_business_id"),
+                        resultSet.getString("obligation_business_id"),
+                        resultSet.getBigDecimal("amount"),
+                        resultSet.getString("note"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "decided_at", java.time.LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public List<AmountDecisionRecord> findAmountDecisionsByObligation(String obligationBusinessId) {
+        return jdbc.sql("""
+                        SELECT decision_business_id, case_business_id, obligation_business_id,
+                               amount, note, decided_at, operator_id
+                        FROM after_sales_amount_decisions
+                        WHERE obligation_business_id = :obligationId AND is_valid = 1
+                        ORDER BY decided_at, decision_business_id
+                        """)
+                .param("obligationId", obligationBusinessId)
+                .query((resultSet, rowNumber) -> new AmountDecisionRecord(
+                        resultSet.getString("decision_business_id"),
+                        resultSet.getString("case_business_id"),
+                        resultSet.getString("obligation_business_id"),
+                        resultSet.getBigDecimal("amount"),
+                        resultSet.getString("note"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "decided_at", java.time.LocalDateTime.class)),
+                        resultSet.getString("operator_id")))
+                .list();
+    }
+
+    @Override
+    public List<CaseDeliveryRecord> findDeliveriesOfCase(String caseBusinessId) {
+        return jdbc.sql("""
+                        SELECT f.fact_business_id, f.obligation_business_id, f.delivery_type,
+                               f.delivered_at, f.tracking_no,
+                               COALESCE(SUM(i.quantity), 0) AS quantity
+                        FROM after_sales_delivery_facts f
+                        JOIN after_sales_obligations o
+                          ON o.obligation_business_id = f.obligation_business_id
+                        LEFT JOIN after_sales_delivery_items i
+                          ON i.delivery_fact_business_id = f.fact_business_id
+                        WHERE o.case_business_id = :caseId AND f.is_valid = 1
+                        GROUP BY f.fact_business_id, f.obligation_business_id, f.delivery_type,
+                                 f.delivered_at, f.tracking_no
+                        ORDER BY f.delivered_at, f.fact_business_id
+                        """)
+                .param("caseId", caseBusinessId)
+                .query((resultSet, rowNumber) -> new CaseDeliveryRecord(
+                        resultSet.getString("fact_business_id"),
+                        resultSet.getString("obligation_business_id"),
+                        resultSet.getString("delivery_type"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "delivered_at", java.time.LocalDateTime.class)),
+                        resultSet.getString("tracking_no"),
+                        resultSet.getInt("quantity")))
+                .list();
+    }
+
+    @Override
+    public List<CaseReturnRecord> findReturnsOfCase(String caseBusinessId) {
+        return jdbc.sql("""
+                        SELECT i.receipt_item_business_id, i.obligation_business_id, i.quantity,
+                               f.condition_code, f.received_at
+                        FROM after_sales_return_receipt_items i
+                        JOIN after_sales_return_receipt_facts f
+                          ON f.fact_business_id = i.receipt_fact_business_id
+                        JOIN after_sales_obligations o
+                          ON o.obligation_business_id = i.obligation_business_id
+                        WHERE o.case_business_id = :caseId AND f.is_valid = 1
+                        ORDER BY f.received_at, i.receipt_item_business_id
+                        """)
+                .param("caseId", caseBusinessId)
+                .query((resultSet, rowNumber) -> new CaseReturnRecord(
+                        resultSet.getString("receipt_item_business_id"),
+                        resultSet.getString("obligation_business_id"),
+                        resultSet.getInt("quantity"),
+                        resultSet.getString("condition_code"),
+                        JdbcTimes.toInstant(resultSet.getObject(
+                                "received_at", java.time.LocalDateTime.class))))
+                .list();
+    }
+
+    @Override
     public void insertCompletion(CompletionRecord record) {
         jdbc.sql("""
                         INSERT INTO after_sales_completion_facts (

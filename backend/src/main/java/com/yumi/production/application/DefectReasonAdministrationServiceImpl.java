@@ -52,14 +52,18 @@ public class DefectReasonAdministrationServiceImpl
         }
         var existing = repository.findDefectReason(code);
         if (existing.isEmpty()) {
-            repository.insertDefectReason(code, name, DefectReasonStatus.ACTIVE, command.other());
+            repository.insertDefectReason(
+                    code, name, DefectReasonStatus.ACTIVE, command.other(),
+                    command.applicableProcess(), command.requiresText());
             return toView(code);
         }
         if (command.expectedRowVersion() <= 0) {
             throw new ApiException(
                     ApiErrorType.VALIDATION, "PRODUCTION_DEFECT_INVALID", "修改缺陷原因必须携带行版本");
         }
-        if (!repository.updateDefectReason(code, name, command.other(), command.expectedRowVersion())) {
+        if (!repository.updateDefectReason(
+                code, name, command.other(), command.applicableProcess(),
+                command.requiresText(), command.expectedRowVersion())) {
             throw new ApiException(
                     ApiErrorType.CONCURRENT_CONFLICT, "PRODUCTION_DEFECT_REASON_CONFLICT",
                     "缺陷原因已被其他操作修改，请刷新后重试");

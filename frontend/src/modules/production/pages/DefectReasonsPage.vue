@@ -15,7 +15,13 @@ const { loading: saving, run: runAction } = useAsyncAction()
 const auth = useAuthStore()
 const reasons = ref<DefectReasonView[]>([])
 const dialogVisible = ref(false)
-const form = reactive({ defectReasonCode: '', name: '', other: false })
+const form = reactive({
+  defectReasonCode: '',
+  name: '',
+  other: false,
+  applicableProcess: '',
+  requiresText: false,
+})
 const canManage = auth.hasPermission('production.defect-reason.manage')
 
 async function load(): Promise<void> {
@@ -31,6 +37,8 @@ async function save(): Promise<void> {
         defectReasonCode: form.defectReasonCode.trim(),
         name: form.name.trim(),
         other: form.other,
+        applicableProcess: form.applicableProcess === '' ? null : form.applicableProcess,
+        requiresText: form.requiresText,
         expectedRowVersion: 0,
       }),
     {
@@ -54,6 +62,14 @@ async function toggle(reason: DefectReasonView): Promise<void> {
       ),
     { fallback: '状态更新失败', onSuccess: load },
   )
+}
+
+function processLabel(value: string | null): string {
+  if (value === null || value === '') return '全部工序'
+  if (value === 'MAKING') return '制作'
+  if (value === 'BAGGING') return '捏毛装袋'
+  if (value === 'SEAM_CUTTING') return '缝边剪袋'
+  return value
 }
 
 onMounted(load)
@@ -84,6 +100,12 @@ onMounted(load)
       <el-table-column label="其他" width="80">
         <template #default="{ row }">{{ row.other ? '是' : '否' }}</template>
       </el-table-column>
+      <el-table-column label="适用工序" width="120">
+        <template #default="{ row }">{{ processLabel(row.applicableProcess) }}</template>
+      </el-table-column>
+      <el-table-column label="强制说明" width="100">
+        <template #default="{ row }">{{ row.requiresText ? '是' : '否' }}</template>
+      </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <CodeTag category="common.status" :code="row.status" />
@@ -104,6 +126,15 @@ onMounted(load)
       <el-form-item label="代码"><el-input v-model="form.defectReasonCode" /></el-form-item>
       <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
       <el-form-item label="其他原因"><el-switch v-model="form.other" /></el-form-item>
+      <el-form-item label="适用工序">
+        <el-select v-model="form.applicableProcess" placeholder="全部工序">
+          <el-option label="全部工序" value="" />
+          <el-option label="制作" value="MAKING" />
+          <el-option label="捏毛装袋" value="BAGGING" />
+          <el-option label="缝边剪袋" value="SEAM_CUTTING" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="强制说明"><el-switch v-model="form.requiresText" /></el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>

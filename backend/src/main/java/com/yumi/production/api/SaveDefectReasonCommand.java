@@ -10,7 +10,14 @@ public record SaveDefectReasonCommand(
         String defectReasonCode,
         String name,
         boolean other,
+        String applicableProcess,
+        boolean requiresText,
         long expectedRowVersion) {
+
+    public SaveDefectReasonCommand(
+            String defectReasonCode, String name, boolean other, long expectedRowVersion) {
+        this(defectReasonCode, name, other, null, false, expectedRowVersion);
+    }
 
     public SaveDefectReasonCommand {
         if (name == null || name.isBlank()) {

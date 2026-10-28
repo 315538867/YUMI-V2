@@ -82,11 +82,18 @@ function defaults(item: TaskView['items'][number]): ItemForm {
 
 async function load(): Promise<void> {
   await run(async () => {
-    reasons.value = (await productionService.defectReasons()).filter(
+    const activeReasons = (await productionService.defectReasons()).filter(
       (reason) => reason.status === 'ACTIVE',
     )
+    reasons.value = activeReasons
     if (taskId !== '') {
       task.value = await productionService.task(taskId)
+      reasons.value = activeReasons.filter(
+        (reason) =>
+          reason.applicableProcess === null ||
+          reason.applicableProcess === '' ||
+          reason.applicableProcess === task.value?.processCode,
+      )
       items.value = task.value.items
         .filter((item) => item.verificationStatus === 'PENDING')
         .map(defaults)
@@ -100,11 +107,9 @@ function defectQuantity(item: ItemForm): number {
   return Number(item.reworkQuantity) + Number(item.scrappedQuantity)
 }
 
-function reasonIsOther(item: ItemForm): boolean {
-  return (
-    reasons.value.find((reason) => reason.defectReasonCode === item.defectReasonCode)?.other ===
-    true
-  )
+function reasonNeedsText(item: ItemForm): boolean {
+  const reason = reasons.value.find((row) => row.defectReasonCode === item.defectReasonCode)
+  return reason?.other === true || reason?.requiresText === true
 }
 
 function itemError(item: ItemForm): string | null {
@@ -124,8 +129,8 @@ function itemError(item: ItemForm): string | null {
   if (item.defectReasonCode === '') {
     return '存在返工或报废时必须选择缺陷原因'
   }
-  if (reasonIsOther(item) && item.defectReasonText.trim() === '') {
-    return '缺陷原因为“其他”时必须填写说明'
+  if (reasonNeedsText(item) && item.defectReasonText.trim() === '') {
+    return '该缺陷原因必须填写说明'
   }
   if (Number(item.scrappedQuantity) > 0) {
     if (item.responsibilityType === '') {
@@ -336,7 +341,7 @@ onMounted(load)
                       />
                     </el-select>
                   </el-form-item>
-                  <el-form-item v-if="reasonIsOther(item)" label="其他说明">
+                  <el-form-item v-if="reasonNeedsText(item)" label="原因说明">
                     <el-input v-model="item.defectReasonText" />
                   </el-form-item>
                 </div>

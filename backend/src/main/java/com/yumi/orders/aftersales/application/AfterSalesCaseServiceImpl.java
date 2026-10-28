@@ -1,5 +1,6 @@
 package com.yumi.orders.aftersales.application;
 
+import com.yumi.orders.aftersales.api.AfterSalesAmountDecisionRef;
 import com.yumi.orders.aftersales.api.AfterSalesApplicationService;
 import com.yumi.orders.aftersales.api.AfterSalesBearerType;
 import com.yumi.orders.aftersales.api.AfterSalesCaseRef;
@@ -13,6 +14,7 @@ import com.yumi.orders.aftersales.api.AfterSalesQuery;
 import com.yumi.orders.aftersales.api.AfterSalesReturnDispositionService;
 import com.yumi.orders.aftersales.api.AfterSalesRouteType;
 import com.yumi.orders.aftersales.api.CompleteAfterSalesCaseCommand;
+import com.yumi.orders.aftersales.api.DecideAfterSalesAmountCommand;
 import com.yumi.orders.aftersales.api.DisposeReturnedProductCommand;
 import com.yumi.orders.aftersales.api.OpenAfterSalesCaseCommand;
 import com.yumi.orders.aftersales.api.ReturnDispositionRef;
@@ -56,6 +58,7 @@ public class AfterSalesCaseServiceImpl
 
     private static final String OPEN_SCOPE = "orders.aftersales.open";
     private static final String COMPLETE_SCOPE = "orders.aftersales.complete";
+    private static final String DECIDE_AMOUNT_SCOPE = "orders.aftersales.decide_amount";
 
     private final AfterSalesRepository cases;
     private final AfterSalesReturnDispositionService dispositions;
@@ -132,6 +135,59 @@ public class AfterSalesCaseServiceImpl
     }
 
     @Override
+    public AfterSalesAmountDecisionRef decideAmount(DecideAfterSalesAmountCommand command) {
+        authorization.require(PermissionCodes.AFTER_SALES_MANAGE, ResourceScope.GLOBAL);
+        if (command == null) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_CASE", "金额决定命令不能为空");
+        }
+        CommandOutcome outcome = transactionTemplate.execute(status -> idempotency.execute(
+                new CommandRequest(
+                        DECIDE_AMOUNT_SCOPE, command.idempotencyKey(),
+                        sha256(command.obligationBusinessId() + "|"
+                                + command.amount().value().toPlainString())),
+                () -> new CommandOutcome(
+                        "AFTER_SALES_AMOUNT_DECISION", doDecideAmount(command))).outcome());
+        var decision = cases.findAmountDecisionsByObligation(command.obligationBusinessId())
+                .stream().filter(row -> row.decisionBusinessId().equals(outcome.resultBusinessId()))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.SYSTEM_FAILURE, "AFTER_SALES_DECISION_MISSING",
+                        "售后金额决定无法读取"));
+        return new AfterSalesAmountDecisionRef(
+                decision.decisionBusinessId(), decision.obligationBusinessId(),
+                SettlementMoney.of(decision.amount(), CurrencyCode.CNY), decision.decidedAt());
+    }
+
+    private String doDecideAmount(DecideAfterSalesAmountCommand command) {
+        var obligation = cases.lockObligation(command.obligationBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "AFTER_SALES_OBLIGATION_NOT_FOUND", "售后义务不存在"));
+        cases.lockCase(obligation.caseBusinessId());
+        if (!"REFUND".equals(obligation.obligationType())
+                && !"COMPENSATION".equals(obligation.obligationType())) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "AFTER_SALES_AMOUNT_DECISION_INVALID",
+                    "只有退款或赔付义务需要金额决定");
+        }
+        if ("VOIDED".equals(obligation.status())) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "AFTER_SALES_AMOUNT_DECISION_INVALID",
+                    "已作废义务不能进行金额决定");
+        }
+        String decisionId = "ASD-" + UUID.randomUUID();
+        Instant now = clock.instant();
+        String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
+        cases.insertAmountDecision(new AfterSalesRepository.AmountDecisionRecord(
+                decisionId, obligation.caseBusinessId(), obligation.obligationBusinessId(),
+                command.amount().value(), command.note().strip(), now, operatorId));
+        audit.record(new RecordAuditCommand(
+                RequestCorrelationHolder.getOrUnknown(), operatorId, "orders",
+                "DECIDE_AFTER_SALES_AMOUNT", "AFTER_SALES_CASE", obligation.caseBusinessId(),
+                "SUCCESS", Map.of("obligation", obligation.obligationBusinessId()), now));
+        return decisionId;
+    }
+
+    @Override
     public AfterSalesCaseView get(String caseBusinessId) {
         authorization.require(PermissionCodes.AFTER_SALES_READ, ResourceScope.GLOBAL);
         var record = cases.findCase(caseBusinessId)
@@ -155,6 +211,9 @@ public class AfterSalesCaseServiceImpl
 
     private AfterSalesCaseView toView(AfterSalesRepository.CaseRecord record) {
         var obligations = cases.findObligations(record.caseBusinessId());
+        var decisions = cases.findAmountDecisions(record.caseBusinessId());
+        var deliveries = cases.findDeliveriesOfCase(record.caseBusinessId());
+        var returns = cases.findReturnsOfCase(record.caseBusinessId());
         var completion = cases.findCompletion(record.caseBusinessId()).orElse(null);
         return new AfterSalesCaseView(
                 record.caseBusinessId(), record.caseNo(), record.orderBusinessId(),
@@ -171,6 +230,17 @@ public class AfterSalesCaseServiceImpl
                                 : SettlementMoney.of(row.targetAmount(), CurrencyCode.CNY),
                         row.dueDate(), row.note(),
                         AfterSalesObligationStatus.valueOf(row.status()), row.rowVersion())).toList(),
+                decisions.stream().map(row -> new AfterSalesCaseView.AmountDecisionView(
+                        row.decisionBusinessId(), row.obligationBusinessId(),
+                        SettlementMoney.of(row.amount(), CurrencyCode.CNY),
+                        row.note(), row.decidedAt())).toList(),
+                deliveries.stream().map(row -> new AfterSalesCaseView.DeliveryView(
+                        row.deliveryFactBusinessId(), row.obligationBusinessId(),
+                        row.deliveryType(), row.deliveredAt(), row.trackingNo(),
+                        row.quantity())).toList(),
+                returns.stream().map(row -> new AfterSalesCaseView.ReturnView(
+                        row.receiptItemBusinessId(), row.obligationBusinessId(),
+                        row.quantity(), row.conditionCode(), row.receivedAt())).toList(),
                 completion == null ? null : completion.occurredAt());
     }
 

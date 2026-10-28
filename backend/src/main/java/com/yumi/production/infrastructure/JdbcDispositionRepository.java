@@ -227,7 +227,7 @@ public class JdbcDispositionRepository implements DispositionRepository {
     @Override
     public List<DefectReasonRow> findAllDefectReasons() {
         return jdbc.sql("""
-                        SELECT defect_reason_code, name, status, is_other, row_version
+                        SELECT defect_reason_code, name, status, is_other, applicable_process, requires_text, row_version
                         FROM production_defect_reasons ORDER BY defect_reason_code
                         """)
                 .query(JdbcDispositionRepository::mapReason)
@@ -237,7 +237,7 @@ public class JdbcDispositionRepository implements DispositionRepository {
     @Override
     public List<DefectReasonRow> findActiveDefectReasons() {
         return jdbc.sql("""
-                        SELECT defect_reason_code, name, status, is_other, row_version
+                        SELECT defect_reason_code, name, status, is_other, applicable_process, requires_text, row_version
                         FROM production_defect_reasons WHERE status = 'ACTIVE' ORDER BY defect_reason_code
                         """)
                 .query(JdbcDispositionRepository::mapReason)
@@ -247,7 +247,7 @@ public class JdbcDispositionRepository implements DispositionRepository {
     @Override
     public Optional<DefectReasonRow> findDefectReason(String code) {
         return jdbc.sql("""
-                        SELECT defect_reason_code, name, status, is_other, row_version
+                        SELECT defect_reason_code, name, status, is_other, applicable_process, requires_text, row_version
                         FROM production_defect_reasons WHERE defect_reason_code = :code
                         """)
                 .param("code", code)
@@ -256,28 +256,38 @@ public class JdbcDispositionRepository implements DispositionRepository {
     }
 
     @Override
-    public void insertDefectReason(String code, String name, DefectReasonStatus status, boolean other) {
+    public void insertDefectReason(
+            String code, String name, DefectReasonStatus status, boolean other,
+            String applicableProcess, boolean requiresText) {
         jdbc.sql("""
                         INSERT INTO production_defect_reasons (
-                            defect_reason_code, name, status, is_other, row_version)
-                        VALUES (:code, :name, :status, :other, 1)
+                            defect_reason_code, name, status, is_other, applicable_process,
+                            requires_text, row_version)
+                        VALUES (:code, :name, :status, :other, :process, :requiresText, 1)
                         """)
                 .param("code", code)
                 .param("name", name)
                 .param("status", status.name())
                 .param("other", other)
+                .param("process", applicableProcess)
+                .param("requiresText", requiresText)
                 .update();
     }
 
     @Override
-    public boolean updateDefectReason(String code, String name, boolean other, long expectedRowVersion) {
+    public boolean updateDefectReason(
+            String code, String name, boolean other, String applicableProcess,
+            boolean requiresText, long expectedRowVersion) {
         return jdbc.sql("""
                         UPDATE production_defect_reasons
-                        SET name = :name, is_other = :other, row_version = row_version + 1
+                        SET name = :name, is_other = :other, applicable_process = :process,
+                            requires_text = :requiresText, row_version = row_version + 1
                         WHERE defect_reason_code = :code AND row_version = :version
                         """)
                 .param("name", name)
                 .param("other", other)
+                .param("process", applicableProcess)
+                .param("requiresText", requiresText)
                 .param("code", code)
                 .param("version", expectedRowVersion)
                 .update() == 1;
@@ -329,6 +339,8 @@ public class JdbcDispositionRepository implements DispositionRepository {
                 resultSet.getString("name"),
                 DefectReasonStatus.valueOf(resultSet.getString("status")),
                 resultSet.getBoolean("is_other"),
+                resultSet.getString("applicable_process"),
+                resultSet.getBoolean("requires_text"),
                 resultSet.getLong("row_version"));
     }
 }

@@ -45,6 +45,7 @@ public class CostLedgerQueryImpl implements CostLedgerQuery {
                         resultSet.getString("source_business_id"),
                         resultSet.getString("basis_ref"),
                         resultSet.getString("reason_text"),
+                        !"REVERSE".equals(resultSet.getString("operation_type")),
                         resultSet.getBoolean("allocated"),
                         JdbcTimes.toInstant(resultSet.getObject(
                                 "occurred_at", java.time.LocalDateTime.class))))

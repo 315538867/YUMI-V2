@@ -13,4 +13,6 @@ public interface AfterSalesApplicationService {
     ReturnDispositionRef disposeReturnedProduct(DisposeReturnedProductCommand command);
 
     AfterSalesCompletionRef complete(CompleteAfterSalesCaseCommand command);
+
+    AfterSalesAmountDecisionRef decideAmount(DecideAfterSalesAmountCommand command);
 }

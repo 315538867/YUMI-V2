@@ -2,6 +2,7 @@ import { api } from '@/platform/services/api'
 import { newIdempotencyKey } from '@/platform/services/idempotency'
 import type {
   AvailableProductionSourceView,
+  AvailableRepairSourceView,
   CorrectionFeedItem,
   DefectReasonStatus,
   DefectReasonView,
@@ -22,7 +23,11 @@ export interface ArrangeInput {
   subject: { subjectType: 'EMPLOYEE' | 'TEAM'; subjectBusinessId: string }
   workDate: string
   processCode: TargetProcess | null
-  items: Array<{ productionSourceBusinessId: string; plannedQuantity: number }>
+  items: Array<{
+    productionSourceBusinessId: string
+    repairSourceBusinessId: string | null
+    plannedQuantity: number
+  }>
   enteredStandardMinutes: number | null
   otherTask: {
     workContent: string
@@ -114,6 +119,12 @@ export const productionService = {
     )
   },
 
+  availableRepairSources(processCode: TargetProcess): Promise<AvailableRepairSourceView[]> {
+    return api.query<AvailableRepairSourceView[]>(
+      `/api/production/tasks/available-repair-sources?processCode=${encodeURIComponent(processCode)}`,
+    )
+  },
+
   arrange(input: ArrangeInput): Promise<{ taskBusinessId: string }> {
     return api.command<{ taskBusinessId: string }, ArrangeInput>(
       '/api/production/tasks/arrangements',
@@ -197,6 +208,8 @@ export const productionService = {
     defectReasonCode: string
     name: string
     other: boolean
+    applicableProcess?: string | null
+    requiresText?: boolean
     expectedRowVersion: number
   }): Promise<DefectReasonView> {
     return api.command<DefectReasonView, typeof input>('/api/production/quality/defect-reasons', {

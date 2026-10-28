@@ -31,4 +31,7 @@ public interface TaskApplicationService {
     java.util.List<TaskView> listTasks(java.time.LocalDate startDate, java.time.LocalDate endDate);
 
     java.util.List<AvailableProductionSourceView> availableSources(TargetProcess processCode);
+
+    /** 按工序读取可安排的返工来源；返工任务只能从该列表选择原不合格来源。 */
+    java.util.List<AvailableRepairSourceView> availableRepairSources(TargetProcess processCode);
 }

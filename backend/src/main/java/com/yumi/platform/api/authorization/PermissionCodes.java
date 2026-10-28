@@ -43,6 +43,8 @@ public final class PermissionCodes {
     public static final String PRODUCTION_RESPONSIBILITY_MANAGE = "production.responsibility.manage";
     public static final String PRODUCTION_CONSUME = "production.consume";
     public static final String PRODUCTION_TRANSFER = "production.transfer";
+    public static final String PRODUCTION_OVERRIDE_OVER_STANDARD =
+            "production.task.override-over-standard";
 
     // 订单与售后
     public static final String ORDER_READ = "order.read";
@@ -82,6 +84,12 @@ public final class PermissionCodes {
 
     // 报表
     public static final String REPORTING_READ = "reporting.read";
+    public static final String REPORT_ORDER_READ = "report.order.read";
+    public static final String REPORT_PRODUCTION_READ = "report.production.read";
+    public static final String REPORT_AFTER_SALES_READ = "report.after-sales.read";
+    public static final String REPORT_PAYROLL_READ = "report.payroll.read";
+    public static final String REPORT_COST_READ = "report.cost.read";
+    public static final String REPORT_CASH_READ = "report.cash.read";
     public static final String REPORTING_ADMIN = "reporting.admin";
 
     private static final java.util.Set<String> ALL = java.util.Set.of(
@@ -94,7 +102,7 @@ public final class PermissionCodes {
             WORKFORCE_STANDARD_MANAGE,
             PRODUCTION_READ, PRODUCTION_SCHEDULE, PRODUCTION_VERIFY, PRODUCTION_DISPOSE,
             PRODUCTION_CORRECT, PRODUCTION_DEFECT_REASON_MANAGE, PRODUCTION_RESPONSIBILITY_MANAGE,
-            PRODUCTION_CONSUME, PRODUCTION_TRANSFER,
+            PRODUCTION_CONSUME, PRODUCTION_TRANSFER, PRODUCTION_OVERRIDE_OVER_STANDARD,
             ORDER_READ, ORDER_CREATE, ORDER_CHANGE, ORDER_CANCEL, ORDER_SHIP, ORDER_COMPLETE,
             ORDER_LEGACY_INTAKE, AFTER_SALES_READ, AFTER_SALES_MANAGE,
             PAYROLL_PERIOD_MANAGE, PAYROLL_CALCULATE, PAYROLL_CONFIRM, PAYROLL_ADJUST,
@@ -103,7 +111,9 @@ public final class PermissionCodes {
             COST_ACCRUE, COST_ADJUST, COST_ALLOCATE, COST_READ,
             CASH_RECEIVE, CASH_PAY, CASH_REVERSE, CASH_PAYROLL_RETURN, FINANCE_READ,
             FINANCE_SENSITIVE_READ,
-            REPORTING_READ, REPORTING_ADMIN);
+            REPORTING_READ, REPORT_ORDER_READ, REPORT_PRODUCTION_READ,
+            REPORT_AFTER_SALES_READ, REPORT_PAYROLL_READ, REPORT_COST_READ,
+            REPORT_CASH_READ, REPORTING_ADMIN);
 
     private PermissionCodes() {
     }

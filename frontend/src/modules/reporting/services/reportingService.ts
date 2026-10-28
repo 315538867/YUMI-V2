@@ -7,6 +7,10 @@ import type {
 } from '@/modules/reporting/contracts'
 
 export const reportingService = {
+  themeSummary(month: string, theme: string): Promise<MonthlyOperatingSummary> {
+    return api.query(`/api/reports/theme-summary?month=${month}&theme=${theme}`)
+  },
+
   monthlySummary(month: string): Promise<MonthlyOperatingSummary> {
     return api.query<MonthlyOperatingSummary>(
       `/api/reporting/monthly-summary?month=${encodeURIComponent(month)}`,

@@ -620,7 +620,8 @@ public class JdbcVerificationRepository implements VerificationRepository {
     @Override
     public Optional<DefectReasonRecord> findDefectReason(String code) {
         return jdbc.sql("""
-                        SELECT defect_reason_code, name, status, is_other
+                        SELECT defect_reason_code, name, status, is_other,
+                               applicable_process, requires_text
                         FROM production_defect_reasons WHERE defect_reason_code = :code
                         """)
                 .param("code", code)
@@ -628,7 +629,9 @@ public class JdbcVerificationRepository implements VerificationRepository {
                         resultSet.getString("defect_reason_code"),
                         resultSet.getString("name"),
                         resultSet.getString("status"),
-                        resultSet.getBoolean("is_other")))
+                        resultSet.getBoolean("is_other"),
+                        resultSet.getString("applicable_process"),
+                        resultSet.getBoolean("requires_text")))
                 .optional();
     }
 }

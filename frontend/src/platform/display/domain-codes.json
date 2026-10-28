@@ -283,6 +283,16 @@
         "tag": "warning"
       }
     },
+    "production.repairOriginType": {
+      "INTERNAL_DEFECT": {
+        "label": "内部质量返工",
+        "tag": "warning"
+      },
+      "AFTER_SALES_RETURN": {
+        "label": "售后退回返工",
+        "tag": "warning"
+      }
+    },
     "production.demandStatus": {
       "ACTIVE": {
         "label": "进行中",
@@ -950,6 +960,10 @@
         "label": "生产转线下",
         "tag": ""
       },
+      "production.task.override-over-standard": {
+        "label": "超标准安排覆盖",
+        "tag": ""
+      },
       "production.defect-reason.manage": {
         "label": "缺陷原因管理",
         "tag": ""
@@ -1064,6 +1078,30 @@
       },
       "reporting.read": {
         "label": "报表查看",
+        "tag": ""
+      },
+      "report.order.read": {
+        "label": "报表-订单",
+        "tag": ""
+      },
+      "report.production.read": {
+        "label": "报表-生产",
+        "tag": ""
+      },
+      "report.after-sales.read": {
+        "label": "报表-售后",
+        "tag": ""
+      },
+      "report.payroll.read": {
+        "label": "报表-工资",
+        "tag": ""
+      },
+      "report.cost.read": {
+        "label": "报表-成本",
+        "tag": ""
+      },
+      "report.cash.read": {
+        "label": "报表-现金",
         "tag": ""
       },
       "reporting.admin": {

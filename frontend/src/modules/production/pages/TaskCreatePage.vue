@@ -7,6 +7,7 @@ import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
 import type {
   AvailableProductionSourceView,
+  AvailableRepairSourceView,
   TargetProcess,
   TaskType,
 } from '@/modules/production/contracts'
@@ -23,8 +24,24 @@ type CreateTaskType = Extract<
   'OTHER_TASK' | 'NORMAL_PRODUCTION' | 'EXTRA_PRODUCTION' | 'REPAIR'
 >
 
+type SourceKind = 'PRODUCTION' | 'INTERNAL_REPAIR' | 'AFTER_SALES_REPAIR'
+
+interface SourceRow {
+  key: string
+  kind: SourceKind
+  productionSourceBusinessId: string
+  repairSourceBusinessId: string | null
+  productBusinessId: string
+  schemeBusinessId: string
+  demandType: string
+  originType: string | null
+  targetProcess: string
+  processCode: TargetProcess
+  availableQuantity: number
+}
+
 interface SelectedSource {
-  source: AvailableProductionSourceView
+  source: SourceRow
   quantity: number
 }
 
@@ -34,8 +51,9 @@ const subjectType = ref<'EMPLOYEE' | 'TEAM'>('EMPLOYEE')
 const subjectBusinessId = ref('')
 const workDate = ref(new Date().toISOString().slice(0, 10))
 const processCode = ref<TargetProcess>('MAKING')
+const overrideReason = ref('')
 const selected = ref<SelectedSource[]>([])
-const sources = ref<AvailableProductionSourceView[]>([])
+const sources = ref<SourceRow[]>([])
 const productNames = ref<Record<string, string>>({})
 const employees = ref<EmployeeView[]>([])
 const teams = ref<TeamView[]>([])
@@ -51,11 +69,7 @@ const other = reactive({
 })
 
 const isOtherTask = computed(() => taskType.value === 'OTHER_TASK')
-const visibleSources = computed(() =>
-  taskType.value === 'REPAIR'
-    ? sources.value.filter((source) => source.demandType === 'RETURNED_PRODUCT_REPAIR')
-    : sources.value.filter((source) => source.demandType !== 'RETURNED_PRODUCT_REPAIR'),
-)
+const visibleSources = computed(() => sources.value)
 const subjectOptions = computed(() =>
   subjectType.value === 'EMPLOYEE'
     ? employees.value.filter((employee) => employee.employmentStatus === 'EMPLOYED')
@@ -82,7 +96,33 @@ async function loadSources(): Promise<void> {
     return
   }
   await runSources(async () => {
-    sources.value = await productionService.availableSources(processCode.value)
+    const productionSources = await productionService.availableSources(processCode.value)
+    let repairSourceRows: SourceRow[] = []
+    if (taskType.value === 'REPAIR') {
+      const repairSources: AvailableRepairSourceView[] =
+        await productionService.availableRepairSources(processCode.value)
+      repairSourceRows = repairSources.map((source) => ({
+        key: `R:${source.repairSourceBusinessId}`,
+        kind: 'INTERNAL_REPAIR',
+        productionSourceBusinessId: source.productionSourceBusinessId,
+        repairSourceBusinessId: source.repairSourceBusinessId,
+        productBusinessId: source.productBusinessId,
+        schemeBusinessId: source.schemeBusinessId,
+        demandType: source.demandType,
+        originType: source.originType,
+        targetProcess: source.targetProcess,
+        processCode: source.repairProcessCode,
+        availableQuantity: source.availableQuantity,
+      }))
+    }
+    const productionRows = productionSources
+      .filter((source) =>
+        taskType.value === 'REPAIR'
+          ? source.demandType === 'RETURNED_PRODUCT_REPAIR'
+          : source.demandType !== 'RETURNED_PRODUCT_REPAIR',
+      )
+      .map((source) => productionRow(source))
+    sources.value = [...repairSourceRows, ...productionRows]
     const names: Record<string, string> = {}
     await Promise.all(
       [...new Set(sources.value.map((source) => source.productBusinessId))].map(async (id) => {
@@ -95,6 +135,22 @@ async function loadSources(): Promise<void> {
     )
     productNames.value = names
   }, '可安排来源加载失败')
+}
+
+function productionRow(source: AvailableProductionSourceView): SourceRow {
+  return {
+    key: `P:${source.productionSourceBusinessId}`,
+    kind: taskType.value === 'REPAIR' ? 'AFTER_SALES_REPAIR' : 'PRODUCTION',
+    productionSourceBusinessId: source.productionSourceBusinessId,
+    repairSourceBusinessId: null,
+    productBusinessId: source.productBusinessId,
+    schemeBusinessId: source.schemeBusinessId,
+    demandType: source.demandType,
+    originType: null,
+    targetProcess: source.targetProcess,
+    processCode: processCode.value,
+    availableQuantity: source.availableQuantity,
+  }
 }
 
 function changeTaskType(): void {
@@ -117,12 +173,8 @@ function changeSubjectType(): void {
   subjectBusinessId.value = ''
 }
 
-function addSource(source: AvailableProductionSourceView): void {
-  if (
-    selected.value.some(
-      (row) => row.source.productionSourceBusinessId === source.productionSourceBusinessId,
-    )
-  ) {
+function addSource(source: SourceRow): void {
+  if (selected.value.some((row) => row.source.key === source.key)) {
     return
   }
   selected.value.push({ source, quantity: 1 })
@@ -132,7 +184,7 @@ function removeSource(index: number): void {
   selected.value.splice(index, 1)
 }
 
-function sourceLabel(source: AvailableProductionSourceView): string {
+function sourceLabel(source: SourceRow): string {
   return `${productNames.value[source.productBusinessId] ?? source.productBusinessId} / ${source.schemeBusinessId}`
 }
 
@@ -195,6 +247,7 @@ async function save(): Promise<void> {
           ? []
           : selected.value.map((row) => ({
               productionSourceBusinessId: row.source.productionSourceBusinessId,
+              repairSourceBusinessId: row.source.repairSourceBusinessId,
               plannedQuantity: Number(row.quantity),
             })),
         enteredStandardMinutes: isOtherTask.value ? Number(other.enteredStandardMinutes) : null,
@@ -209,7 +262,7 @@ async function save(): Promise<void> {
                 other.relatedProductBusinessId.trim() === '' ? null : Number(other.plannedQuantity),
             }
           : null,
-        overrideReason: null,
+        overrideReason: overrideReason.value.trim() === '' ? null : overrideReason.value.trim(),
       }),
     {
       success: '任务已安排',
@@ -225,7 +278,10 @@ onMounted(load)
 </script>
 
 <template>
-  <PageShell title="新建任务" hint="正常生产与超额生产从可安排来源进入；其他任务不关联来源。">
+  <PageShell
+    title="新建任务"
+    hint="正常生产与超额生产从可安排来源进入；返工从核验产生的返工来源进入；其他任务不关联来源。"
+  >
     <template #actions>
       <el-button @click="router.push('/production/schedule')">取消</el-button>
       <el-button type="primary" :loading="saving" @click="save">保存并查看任务</el-button>
@@ -300,9 +356,19 @@ onMounted(load)
               <el-option label="缝边剪袋" value="SEAM_CUTTING" />
             </el-select>
           </el-form-item>
+          <el-form-item label="超量原因">
+            <el-input v-model="overrideReason" placeholder="仅超出每日标准且具备覆盖权限时填写" />
+          </el-form-item>
         </el-form>
 
         <template v-if="!isOtherTask">
+          <el-alert
+            v-if="taskType === 'REPAIR'"
+            type="info"
+            :closable="false"
+            title="返工只能从核验产生的返工来源或售后修复来源选择；返工工序必须与来源记录一致。"
+            class="yumi-alert"
+          />
           <el-alert
             v-if="sourceError"
             type="error"
@@ -323,18 +389,25 @@ onMounted(load)
                 <el-table-column label="商品 / 方案" min-width="200">
                   <template #default="{ row }">{{ sourceLabel(row) }}</template>
                 </el-table-column>
-                <el-table-column label="需求类型" width="140">
+                <el-table-column label="来源类型" width="140">
                   <template #default="{ row }">
                     <CodeLabel
+                      v-if="row.kind === 'INTERNAL_REPAIR'"
+                      category="production.repairOriginType"
+                      :code="row.originType"
+                      fallback="内部返工"
+                    />
+                    <CodeLabel
+                      v-else
                       category="production.demandType"
                       :code="row.demandType"
                       fallback="其他需求"
                     />
                   </template>
                 </el-table-column>
-                <el-table-column label="需求工序" width="120">
+                <el-table-column label="工序" width="120">
                   <template #default="{ row }">
-                    <CodeTag category="production.targetProcess" :code="row.targetProcess" />
+                    <CodeTag category="production.targetProcess" :code="row.processCode" />
                   </template>
                 </el-table-column>
                 <el-table-column prop="availableQuantity" label="可安排" width="90" />

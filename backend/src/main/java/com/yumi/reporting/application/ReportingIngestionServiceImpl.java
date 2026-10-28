@@ -40,7 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>只调用各模块公开 Feed，不跨模块 SQL 取数；每个 Feed 独立水位，失败记录可定位且不阻塞业务。
  */
-public class ReportingIngestionServiceImpl implements ReportingIngestionService {
+public class ReportingIngestionServiceImpl implements ReportingIngestionService, ReportingSourceReader {
 
     private static final int PAGE_SIZE = 100;
     private static final String SCOPE = "reporting.ingest_sources";
@@ -167,6 +167,46 @@ public class ReportingIngestionServiceImpl implements ReportingIngestionService 
         String[] parts = outcome.resultBusinessId().split("\\|");
         return new ReportingIngestionRef(
                 Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+    }
+
+    @Override
+    public int readAllInto(String versionBusinessId) {
+        int records = 0;
+        for (var entry : readers.entrySet()) {
+            String feed = entry.getKey();
+            String cursor = null;
+            while (true) {
+                FeedPage page = entry.getValue().read(cursor, PAGE_SIZE);
+                for (FeedItem item : page.items()) {
+                    insertVersionRecord(versionBusinessId, feed, item);
+                    records++;
+                }
+                if (page.nextCursor() == null) {
+                    break;
+                }
+                cursor = page.nextCursor();
+            }
+        }
+        return records;
+    }
+
+    private void insertVersionRecord(String versionBusinessId, String feed, FeedItem item) {
+        jdbc.sql("""
+                        INSERT INTO reporting_projection_version_records (
+                            version_business_id, feed_code, source_business_id, source_version,
+                            payload_json, occurred_at)
+                        VALUES (:versionId, :feed, :sourceId, :version, :payload, :occurredAt)
+                        ON DUPLICATE KEY UPDATE payload_json = VALUES(payload_json),
+                            source_version = VALUES(source_version),
+                            occurred_at = VALUES(occurred_at)
+                        """)
+                .param("versionId", versionBusinessId)
+                .param("feed", feed)
+                .param("sourceId", item.sourceBusinessId())
+                .param("version", item.sourceVersion())
+                .param("payload", write(item.payload()))
+                .param("occurredAt", JdbcTimes.toUtc(item.occurredAt()))
+                .update();
     }
 
     private int[] doIngest() {

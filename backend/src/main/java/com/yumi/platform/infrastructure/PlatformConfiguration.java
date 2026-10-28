@@ -10,6 +10,7 @@ import com.yumi.platform.authorization.application.port.RoleRepository;
 import com.yumi.platform.aftercommit.application.AfterCommitTaskRepository;
 import com.yumi.platform.aftercommit.application.AfterCommitTaskService;
 import com.yumi.platform.audit.application.AuditService;
+import com.yumi.platform.audit.application.SensitiveReadAuditInterceptor;
 import com.yumi.platform.file.application.FileApplicationService;
 import com.yumi.platform.file.application.port.FileContentStore;
 import com.yumi.platform.file.application.port.FileRepository;
@@ -43,6 +44,23 @@ import org.springframework.transaction.PlatformTransactionManager;
  */
 @Configuration
 public class PlatformConfiguration {
+
+    @Bean
+    public org.springframework.web.servlet.config.annotation.WebMvcConfigurer sensitiveReadAuditConfigurer(
+            AuditService audit,
+            CurrentActorProvider currentActorProvider,
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        SensitiveReadAuditInterceptor interceptor = new SensitiveReadAuditInterceptor(
+                audit, currentActorProvider, clock, transactionManager);
+        return new org.springframework.web.servlet.config.annotation.WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(
+                    org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+                registry.addInterceptor(interceptor).addPathPatterns("/api/**");
+            }
+        };
+    }
 
     @Bean
     public Clock platformClock() {

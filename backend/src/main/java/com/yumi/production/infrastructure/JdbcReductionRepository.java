@@ -23,6 +23,7 @@ public class JdbcReductionRepository implements ReductionRepository {
                                item_standard_minutes, product_business_id, demand_type
                         FROM production_task_items
                         WHERE production_source_business_id = :id AND verification_status = 'PENDING'
+                          AND repair_source_business_id IS NULL
                         ORDER BY task_business_id, item_order
                         """)
                 .param("id", productionSourceBusinessId)

@@ -124,6 +124,7 @@ public class ProductionConfiguration {
             TaskRepository taskRepository,
             ProductionRepository productionRepository,
             SourceReservationRepository sourceReservations,
+            com.yumi.production.application.port.RepairSourceRepository repairSourceRepository,
             VerificationRepository verifications,
             OtherTaskRepository otherTasks,
             AssessmentRepository assessments,
@@ -135,7 +136,8 @@ public class ProductionConfiguration {
             Clock clock,
             PlatformTransactionManager transactionManager) {
         return new TaskVerificationServiceImpl(
-                taskRepository, productionRepository, sourceReservations, verifications, otherTasks,
+                taskRepository, productionRepository, sourceReservations, repairSourceRepository,
+                verifications, otherTasks,
                 assessments, dailyLoadService, newProductCapacityService, authorization,
                 currentActorProvider, objectMapper, clock, transactionManager);
     }
@@ -316,6 +318,7 @@ public class ProductionConfiguration {
             TaskRepository taskRepository,
             ProductionRepository productionRepository,
             SourceReservationRepository sourceReservations,
+            com.yumi.production.application.port.RepairSourceRepository repairSourceRepository,
             com.yumi.production.application.port.ReductionRepository reductionRepository,
             OtherTaskRepository otherTasks,
             AssessmentRepository assessments,
@@ -333,8 +336,8 @@ public class ProductionConfiguration {
             Clock clock,
             PlatformTransactionManager transactionManager) {
         return new TaskArrangementService(
-                taskRepository, productionRepository, sourceReservations, reductionRepository,
-                otherTasks, assessments,
+                taskRepository, productionRepository, sourceReservations, repairSourceRepository,
+                reductionRepository, otherTasks, assessments,
                 dailyLoads, dailyLoadService, newProductCapacityService,
                 productSnapshots, assignmentSubjectSnapshots, workforceReservations,
                 workloadAssessor, numbering, authorization, currentActorProvider, objectMapper, clock,

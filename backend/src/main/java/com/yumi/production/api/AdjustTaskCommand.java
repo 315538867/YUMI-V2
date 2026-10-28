@@ -48,11 +48,25 @@ public record AdjustTaskCommand(
     public record ItemRequest(
             String taskItemBusinessId,
             String productionSourceBusinessId,
+            String repairSourceBusinessId,
             int plannedQuantity) {
 
+        public ItemRequest(
+                String taskItemBusinessId, String productionSourceBusinessId,
+                int plannedQuantity) {
+            this(taskItemBusinessId, productionSourceBusinessId, null, plannedQuantity);
+        }
+
         public ItemRequest {
-            if (productionSourceBusinessId == null || productionSourceBusinessId.isBlank()) {
-                throw new IllegalArgumentException("任务明细必须关联履约生产来源");
+            boolean hasProduction = productionSourceBusinessId != null
+                    && !productionSourceBusinessId.isBlank();
+            boolean hasRepair = repairSourceBusinessId != null
+                    && !repairSourceBusinessId.isBlank();
+            if (!hasProduction && !hasRepair) {
+                throw new IllegalArgumentException("任务明细必须关联履约生产来源或返工来源");
+            }
+            if (!hasRepair) {
+                repairSourceBusinessId = null;
             }
             if (plannedQuantity <= 0) {
                 throw new IllegalArgumentException("任务明细计划数量必须大于 0");

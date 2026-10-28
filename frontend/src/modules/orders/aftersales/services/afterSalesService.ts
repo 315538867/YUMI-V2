@@ -136,6 +136,27 @@ export const afterSalesService = {
     )
   },
 
+  deliverAfterSales(input: {
+    obligationBusinessId: string
+    quantity: number
+    productionSourceBusinessId: string
+    deliveredAt: string
+    recipient: { customerName: string; phone: string; address: string }
+    trackingNo: string
+  }): Promise<unknown> {
+    return api.command('/api/after-sales/deliveries', {
+      idempotencyKey: newIdempotencyKey('aftersales-delivery'),
+      body: input,
+    })
+  },
+
+  decideAmount(obligationBusinessId: string, amount: string, note: string): Promise<unknown> {
+    return api.command('/api/after-sales/amount-decisions', {
+      idempotencyKey: newIdempotencyKey('aftersales-amount-decision'),
+      body: { obligationBusinessId, amount: { amount, currency: 'CNY' }, note },
+    })
+  },
+
   complete(caseBusinessId: string): Promise<unknown> {
     return api.command(`/api/after-sales/cases/${encodeURIComponent(caseBusinessId)}/completion`, {
       idempotencyKey: newIdempotencyKey('aftersales-complete'),
