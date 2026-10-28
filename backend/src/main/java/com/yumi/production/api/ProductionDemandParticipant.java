@@ -17,6 +17,9 @@ public interface ProductionDemandParticipant {
 
     ProductionDemandRef commitCreate(PreparedDemand prepared);
 
+    /** 订单数量增量：增加需求、来源初始数量与待执行投影。 */
+    ProductionDemandRef increase(IncreaseProductionDemandCommand command);
+
     /** 订单减量预检：只读校验，返回分类数量与阻塞原因。 */
     DemandReductionPreview previewReduction(ReduceProductionDemandCommand command);
 

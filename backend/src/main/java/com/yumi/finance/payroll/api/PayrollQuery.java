@@ -10,4 +10,6 @@ public interface PayrollQuery {
     List<EmployeePayrollView> listPeriodResults(String periodBusinessId);
 
     EmployeePayrollView getEmployeePayroll(String periodBusinessId, String employeeBusinessId);
+
+    PayrollReviewView getReview(String reviewRunBusinessId);
 }

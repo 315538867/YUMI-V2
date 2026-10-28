@@ -223,6 +223,38 @@ public class JdbcVerificationRepository implements VerificationRepository {
     }
 
     @Override
+    public void insertOfflineTransfer(OfflineTransferRecord record) {
+        jdbc.sql("""
+                        INSERT INTO production_offline_inventory_transfers (
+                            transfer_fact_business_id, terminal_exit_business_id,
+                            production_source_business_id, physical_root_source_business_id,
+                            demand_business_id, product_business_id, reason_code,
+                            upstream_change_business_id, offline_inventory_name, offline_inventory_note,
+                            handed_over_by, received_by, transferred_at, quantity, occurred_at,
+                            operator_id, is_valid)
+                        VALUES (:id, :exitId, :sourceId, :physicalRoot, :demandId, :productId,
+                                :reasonCode, NULL, :inventoryName, :inventoryNote, :handedOverBy,
+                                :receivedBy, :transferredAt, :quantity, :occurredAt, :operatorId, 1)
+                        """)
+                .param("id", record.transferFactBusinessId())
+                .param("exitId", record.terminalExitBusinessId())
+                .param("sourceId", record.productionSourceBusinessId())
+                .param("physicalRoot", record.physicalRootSourceBusinessId())
+                .param("demandId", record.demandBusinessId())
+                .param("productId", record.productBusinessId())
+                .param("reasonCode", record.reasonCode())
+                .param("inventoryName", record.offlineInventoryName())
+                .param("inventoryNote", record.offlineInventoryNote())
+                .param("handedOverBy", record.handedOverBy())
+                .param("receivedBy", record.receivedBy())
+                .param("transferredAt", JdbcTimes.toUtc(record.transferredAt()))
+                .param("quantity", record.quantity())
+                .param("occurredAt", JdbcTimes.toUtc(record.occurredAt()))
+                .param("operatorId", record.operatorId())
+                .update();
+    }
+
+    @Override
     public void insertResponsibility(ResponsibilityFact fact) {
         jdbc.sql("""
                         INSERT INTO production_responsibility_facts (

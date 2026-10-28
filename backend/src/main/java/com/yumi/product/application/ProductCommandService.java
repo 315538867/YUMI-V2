@@ -26,6 +26,7 @@ import com.yumi.product.api.ProductView;
 import com.yumi.product.api.SchemeType;
 import com.yumi.product.api.UpdateProductCommand;
 import com.yumi.product.application.port.BudgetRepository;
+import com.yumi.product.application.port.ProductEntryConfigurationRepository;
 import com.yumi.product.application.port.ProductRecord;
 import com.yumi.product.application.port.ProductRepository;
 import com.yumi.product.application.port.SchemeRecord;
@@ -69,6 +70,8 @@ public class ProductCommandService implements ProductApplicationService, Product
 
     private final BudgetRepository budgets;
 
+    private final ProductEntryConfigurationRepository configurations;
+
     private final BusinessNumberService numbering;
 
     private final AuthorizationService authorization;
@@ -87,6 +90,7 @@ public class ProductCommandService implements ProductApplicationService, Product
             ProductRepository products,
             SchemeRepository schemes,
             BudgetRepository budgets,
+            ProductEntryConfigurationRepository configurations,
             BusinessNumberService numbering,
             AuthorizationService authorization,
             CurrentActorProvider currentActor,
@@ -97,6 +101,7 @@ public class ProductCommandService implements ProductApplicationService, Product
         this.products = products;
         this.schemes = schemes;
         this.budgets = budgets;
+        this.configurations = configurations;
         this.numbering = numbering;
         this.authorization = authorization;
         this.currentActor = currentActor;
@@ -109,7 +114,7 @@ public class ProductCommandService implements ProductApplicationService, Product
     @Override
     public ProductRef create(CreateProductCommand command) {
         authorization.require(PermissionCodes.PRODUCT_CREATE, ResourceScope.GLOBAL);
-        ValidatedDefinition definition = validate(command);
+        ValidatedDefinition definition = validate(command, null);
 
         return transactionTemplate.execute(status -> {
             Instant now = clock.instant();
@@ -143,13 +148,12 @@ public class ProductCommandService implements ProductApplicationService, Product
             throw new ApiException(ApiErrorType.VALIDATION, "MISSING_DEFINITION", "商品定义不能为空");
         }
         String productBusinessId = requireText(command.productBusinessId(), "商品标识", 64);
-        ValidatedDefinition definition = validate(command.definition());
+        ProductRecord existing = products.findByBusinessId(productBusinessId)
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCT_NOT_FOUND", "商品不存在"));
+        ValidatedDefinition definition = validate(command.definition(), existing);
 
         return transactionTemplate.execute(status -> {
-            ProductRecord existing = products.findByBusinessId(productBusinessId)
-                    .orElseThrow(() -> new ApiException(
-                            ApiErrorType.NOT_FOUND, "PRODUCT_NOT_FOUND", "商品不存在"));
-
             Instant now = clock.instant();
             String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
             DailyCapacityResult capacity = budgetMapper.capacity(
@@ -176,7 +180,7 @@ public class ProductCommandService implements ProductApplicationService, Product
     @Override
     public SchemeView.SchemeBudgetView previewBudget(CreateProductCommand command) {
         authorization.require(PermissionCodes.PRODUCT_READ, ResourceScope.GLOBAL);
-        ValidatedDefinition definition = validate(command);
+        ValidatedDefinition definition = validate(command, null);
         Instant now = clock.instant();
         ProductRecord product = definition.toRecord(
                 "PREVIEW", "PREVIEW", 0, ProductStatus.ACTIVE, now, "preview");
@@ -384,7 +388,7 @@ public class ProductCommandService implements ProductApplicationService, Product
                         costs.extraOtherCost()));
     }
 
-    private ValidatedDefinition validate(CreateProductCommand command) {
+    private ValidatedDefinition validate(CreateProductCommand command, ProductRecord existing) {
         if (command == null) {
             throw new ApiException(ApiErrorType.VALIDATION, "MISSING_DEFINITION", "商品定义不能为空");
         }
@@ -401,10 +405,13 @@ public class ProductCommandService implements ProductApplicationService, Product
                     ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", "单件标准克重必须大于 0");
         }
         String starCode = requireText(command.makingStarCode(), "制作星级", 32);
-        if (command.makingStandardMinutes() <= 0) {
-            throw new ApiException(
-                    ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", "单件标准制作分钟必须大于 0");
-        }
+        StarSnapshot star = resolveStar(starCode, existing);
+        int baggingMinutes = resolveProcessMinutes(
+                "BAGGING", "捏毛装袋标准分钟", command.baggingStandardMinutes(),
+                existing == null ? null : existing.processCosts().baggingStandardMinutes());
+        int seamMinutes = resolveProcessMinutes(
+                "SEAM_CUTTING", "缝边剪袋标准分钟", command.seamStandardMinutes(),
+                existing == null ? null : existing.processCosts().seamStandardMinutes());
         if (command.standardSalePrice() == null) {
             throw new ApiException(ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", "标准售价不能为空");
         }
@@ -422,18 +429,10 @@ public class ProductCommandService implements ProductApplicationService, Product
                     ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", "模具每日生产批次必须大于 0");
         }
         requireNonNegative(command.makingOtherMaterialCost(), "制作工序其他材料费用");
-        if (command.baggingStandardMinutes() <= 0) {
-            throw new ApiException(
-                    ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", "捏毛装袋标准分钟必须大于 0");
-        }
         requireNonNegative(command.baggingLaborCost(), "捏毛装袋人工成本");
         requireNonNegative(command.baggingBagUnitCost(), "单件袋子成本");
         requireNonNegative(command.baggingDecorationUnitPrice(), "单件装饰品价格");
         requireNonNegative(command.baggingOtherCost(), "捏毛装袋其他费用");
-        if (command.seamStandardMinutes() <= 0) {
-            throw new ApiException(
-                    ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", "缝边剪袋标准分钟必须大于 0");
-        }
         requireNonNegative(command.seamLaborCost(), "缝边剪袋人工成本");
         requireNonNegative(command.seamCombinedMaterialCost(), "单件综合材料成本");
         requireNonNegative(command.seamOtherCost(), "缝边剪袋其他费用");
@@ -446,19 +445,56 @@ public class ProductCommandService implements ProductApplicationService, Product
 
         return new ValidatedDefinition(
                 name, description, command.standardWeightGrams().value(), starCode,
-                command.makingStandardMinutes(), command.standardSalePrice().value(),
+                star.name(), star.standardMinutes(), command.standardSalePrice().value(),
                 command.glueLossRate().value(), command.glueUnitPrice().value(),
                 command.colorPasteUnitPrice().value(), command.makingCommission().value(),
                 command.mouldCount(), command.mouldDailyBatches(),
                 command.makingOtherMaterialCost().value(),
-                command.baggingStandardMinutes(), command.baggingLaborCost().value(),
+                baggingMinutes, command.baggingLaborCost().value(),
                 command.baggingBagUnitCost().value(), command.baggingDecorationUnitPrice().value(),
                 command.baggingOtherCost().value(),
-                command.seamStandardMinutes(), command.seamLaborCost().value(),
+                seamMinutes, command.seamLaborCost().value(),
                 command.seamCombinedMaterialCost().value(), command.seamOtherCost().value(),
                 command.extraOtherTaskLaborCost().value(), command.extraTransportPackagingCost().value(),
                 command.extraDailyMiscCost().value(), command.extraRentUtilitiesCost().value(),
                 command.extraMouldAmortizationCost().value(), command.extraOtherCost().value());
+    }
+
+    private StarSnapshot resolveStar(String starCode, ProductRecord existing) {
+        if (existing != null && starCode.equals(existing.makingStarCode())) {
+            return new StarSnapshot(existing.makingStarName(), existing.makingStandardMinutes());
+        }
+        var star = configurations.loadMakingStars().stream()
+                .filter(option -> option.starCode().equals(starCode))
+                .filter(option -> "ACTIVE".equals(option.status()))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.VALIDATION, "MAKING_STAR_NOT_FOUND",
+                        "制作星级不存在或已停用：" + starCode));
+        if (star.standardMinutes() <= 0) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", "制作星级标准分钟必须大于 0");
+        }
+        return new StarSnapshot(star.name(), star.standardMinutes());
+    }
+
+    private int resolveProcessMinutes(
+            String processCode, String label, int requestedMinutes, Integer existingMinutes) {
+        if (requestedMinutes <= 0) {
+            throw new ApiException(ApiErrorType.VALIDATION, "PRODUCT_FIELD_INVALID", label + "必须大于 0");
+        }
+        if (existingMinutes != null && requestedMinutes == existingMinutes) {
+            return requestedMinutes;
+        }
+        boolean matched = configurations.loadProcessTimeOptions(processCode).stream()
+                .filter(option -> "ACTIVE".equals(option.status()))
+                .anyMatch(option -> option.standardMinutes() == requestedMinutes);
+        if (!matched) {
+            throw new ApiException(
+                    ApiErrorType.VALIDATION, "PROCESS_TIME_NOT_FOUND",
+                    label + "必须来自已启用的工序标准时间选项");
+        }
+        return requestedMinutes;
     }
 
     private static void requireNonNegative(CostAmount amount, String label) {
@@ -562,6 +598,7 @@ public class ProductCommandService implements ProductApplicationService, Product
             String description,
             BigDecimal standardWeightGrams,
             String makingStarCode,
+            String makingStarName,
             int makingStandardMinutes,
             BigDecimal standardSalePrice,
             BigDecimal glueLossRate,
@@ -593,7 +630,7 @@ public class ProductCommandService implements ProductApplicationService, Product
             Instant now = createdAt;
             return new ProductRecord(
                     0L, productBusinessId, productNo, name, description, standardWeightGrams,
-                    makingStarCode, makingStarCode, makingStandardMinutes, standardSalePrice,
+                    makingStarCode, makingStarName, makingStandardMinutes, standardSalePrice,
                     glueLossRate, glueUnitPrice, colorPasteUnitPrice, makingCommission,
                     mouldCount, mouldDailyBatches, dailyCapacity, status,
                     1, 1, now, createdBy, now, createdBy,
@@ -604,5 +641,8 @@ public class ProductCommandService implements ProductApplicationService, Product
                             extraOtherTaskLaborCost, extraTransportPackagingCost, extraDailyMiscCost,
                             extraRentUtilitiesCost, extraMouldAmortizationCost, extraOtherCost));
         }
+    }
+
+    private record StarSnapshot(String name, int standardMinutes) {
     }
 }

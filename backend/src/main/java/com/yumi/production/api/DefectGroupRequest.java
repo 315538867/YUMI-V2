@@ -1,5 +1,6 @@
 package com.yumi.production.api;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -50,7 +51,22 @@ public record DefectGroupRequest(
             PhysicalDestination physicalDestination,
             ResponsibilityType responsibilityType,
             String responsibleSubjectBusinessId,
-            String waivedReason) {
+            String waivedReason,
+            String offlineInventoryName,
+            String offlineInventoryNote,
+            String handedOverBy,
+            String receivedBy,
+            LocalDate transferredAt) {
+
+        public ScrapPartRequest(
+                int quantity,
+                PhysicalDestination physicalDestination,
+                ResponsibilityType responsibilityType,
+                String responsibleSubjectBusinessId,
+                String waivedReason) {
+            this(quantity, physicalDestination, responsibilityType, responsibleSubjectBusinessId,
+                    waivedReason, null, null, null, null, null);
+        }
 
         public ScrapPartRequest {
             if (quantity <= 0) {
@@ -69,6 +85,20 @@ public record DefectGroupRequest(
             } else if (responsibleSubjectBusinessId == null
                     || responsibleSubjectBusinessId.isBlank()) {
                 throw new IllegalArgumentException("责任主体必须填写稳定标识");
+            }
+            if (physicalDestination == PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY) {
+                if (offlineInventoryName == null || offlineInventoryName.isBlank()) {
+                    throw new IllegalArgumentException("转线下库存必须填写库存名称");
+                }
+                if (handedOverBy == null || handedOverBy.isBlank()) {
+                    throw new IllegalArgumentException("转线下库存必须填写交接人");
+                }
+                if (receivedBy == null || receivedBy.isBlank()) {
+                    throw new IllegalArgumentException("转线下库存必须填写接收人");
+                }
+                if (transferredAt == null) {
+                    throw new IllegalArgumentException("转线下库存必须填写移交日期");
+                }
             }
         }
     }

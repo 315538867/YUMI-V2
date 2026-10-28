@@ -71,7 +71,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'products/entry-settings',
         name: 'product-entry-settings',
         component: () => import('@/modules/product/pages/ProductEntrySettingsPage.vue'),
-        meta: { requiresAuth: true, title: '商品录入设置', permission: 'product.read' },
+        meta: { requiresAuth: true, title: '商品录入设置', permission: 'product.update' },
       },
       {
         path: 'products/new',

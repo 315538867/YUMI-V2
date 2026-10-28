@@ -197,6 +197,10 @@
       "SEAM_CUTTING": {
         "label": "缝边剪袋",
         "tag": ""
+      },
+      "OTHER_TASK": {
+        "label": "其他任务",
+        "tag": ""
       }
     },
     "workforce.teamStatus": {
@@ -713,6 +717,10 @@
       "DISABLED": {
         "label": "已停用",
         "tag": "info"
+      },
+      "LOCKED": {
+        "label": "已锁定",
+        "tag": "danger"
       }
     },
     "platform.afterCommitTaskStatus": {
@@ -1450,13 +1458,17 @@
       }
     },
     "afterSales.dispositionType": {
-      "REPAIR_REQUIRED": {
-        "label": "需返修",
+      "RETURN_TO_CUSTOMER": {
+        "label": "退回客户",
         "tag": "warning"
       },
       "SCRAPPED": {
         "label": "报废",
         "tag": "danger"
+      },
+      "RELEASE_FROM_OBLIGATION": {
+        "label": "释放义务",
+        "tag": "info"
       }
     },
     "production.factKind": {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
 import type {
   OrderView,
@@ -12,8 +13,6 @@ import type {
 import { orderService, type ShipmentRequest } from '@/modules/orders/services/orderService'
 import { productionService } from '@/modules/production/services/productionService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
-import { customerService } from '@/modules/customer/services/customerService'
-import { productService } from '@/modules/product/services/productService'
 import { fileService } from '@/platform/services/fileService'
 import BusinessFileUpload from '@/shared/components/BusinessFileUpload.vue'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -88,7 +87,13 @@ const correctionForm = reactive({
 })
 
 const changeDialog = ref(false)
-const changeForm = reactive({ unitPrice: '', reason: '' })
+const changeForm = reactive({
+  mode: 'price' as 'price' | 'quantity',
+  orderItemBusinessId: '',
+  unitPrice: '',
+  quantity: 0,
+  reason: '',
+})
 
 const voucherDialog = ref(false)
 const voucherFiles = ref<Array<{ label: string; url: string }>>([])
@@ -127,22 +132,11 @@ async function load(): Promise<void> {
     workspace.value = current
     order.value = current.order
 
-    try {
-      customerName.value = (await customerService.get(current.order.customerBusinessId)).name
-    } catch {
-      customerName.value = current.order.customerBusinessId
-    }
-
+    customerName.value = current.order.customerSnapshotName ?? current.order.customerBusinessId
     const names: Record<string, string> = {}
-    await Promise.all(
-      current.order.items.map(async (item) => {
-        try {
-          names[item.productBusinessId] = (await productService.get(item.productBusinessId)).name
-        } catch {
-          names[item.productBusinessId] = item.productBusinessId
-        }
-      }),
-    )
+    for (const item of current.order.items) {
+      names[item.productBusinessId] = item.productSnapshotName ?? item.productBusinessId
+    }
     productNames.value = names
 
     const shippedByItem: Record<string, number> = {}
@@ -330,11 +324,16 @@ async function submitCorrection(): Promise<void> {
   )
 }
 
-function openChange(): void {
+function openChange(itemId?: string, mode: 'price' | 'quantity' = 'price'): void {
   if (order.value === null) {
     return
   }
-  changeForm.unitPrice = order.value.items[0]?.agreement.unitPrice.amount ?? ''
+  const item =
+    order.value.items.find((row) => row.orderItemBusinessId === itemId) ?? order.value.items[0]
+  changeForm.mode = mode
+  changeForm.orderItemBusinessId = item?.orderItemBusinessId ?? ''
+  changeForm.unitPrice = item?.agreement.unitPrice.amount ?? ''
+  changeForm.quantity = item?.activeQuantity ?? 0
   changeForm.reason = ''
   changeDialog.value = true
 }
@@ -343,30 +342,44 @@ async function submitChange(): Promise<void> {
   if (order.value === null) {
     return
   }
-  if (changeForm.unitPrice.trim() === '' || changeForm.reason.trim() === '') {
-    errorText.value = '请填写新单价和变更原因'
+  if (changeForm.reason.trim() === '') {
+    errorText.value = '请填写变更原因'
     return
   }
+  if (changeForm.mode === 'price' && changeForm.unitPrice.trim() === '') {
+    errorText.value = '请填写新单价'
+    return
+  }
+  if (changeForm.mode === 'quantity' && Number(changeForm.quantity) <= 0) {
+    errorText.value = '新数量必须大于 0'
+    return
+  }
+  const action =
+    changeForm.mode === 'price'
+      ? {
+          kind: 'PRICE_OR_RECIPIENT',
+          orderItemBusinessId: changeForm.orderItemBusinessId,
+          newUnitPrice: { amount: changeForm.unitPrice, currency: 'CNY' },
+          newRecipient: null,
+          newQuantity: null,
+          newSchemeSnapshotRef: null,
+          newTargetProcess: null,
+          newMaterialSources: null,
+          migratedQuantity: null,
+        }
+      : {
+          kind: 'QUANTITY',
+          orderItemBusinessId: changeForm.orderItemBusinessId,
+          newUnitPrice: null,
+          newRecipient: null,
+          newQuantity: Number(changeForm.quantity),
+          newSchemeSnapshotRef: null,
+          newTargetProcess: null,
+          newMaterialSources: null,
+          migratedQuantity: null,
+        }
   await runChanging(
-    () =>
-      orderService.change(
-        orderId,
-        orderContentVersion.value,
-        [
-          {
-            kind: 'PRICE_OR_RECIPIENT',
-            orderItemBusinessId: order.value!.items[0]?.orderItemBusinessId,
-            newUnitPrice: { amount: changeForm.unitPrice, currency: 'CNY' },
-            newRecipient: null,
-            newQuantity: null,
-            newSchemeSnapshotRef: null,
-            newTargetProcess: null,
-            newMaterialSources: null,
-            migratedQuantity: null,
-          },
-        ],
-        changeForm.reason,
-      ),
+    () => orderService.change(orderId, orderContentVersion.value, [action], changeForm.reason),
     {
       success: '订单变更已提交',
       fallback: '订单变更失败',
@@ -374,6 +387,43 @@ async function submitChange(): Promise<void> {
         changeDialog.value = false
         await load()
       },
+    },
+  )
+}
+
+async function cancelOrder(): Promise<void> {
+  if (order.value === null) {
+    return
+  }
+  const reason = await ElMessageBox.prompt(
+    '取消会减少原订单项和生产需求；已生产未消费数量必须另行移交线下，否则后端会整笔拒绝。',
+    '取消订单',
+    { confirmButtonText: '确认取消', cancelButtonText: '返回', inputPlaceholder: '取消原因' },
+  )
+    .then((result: { value: string }) => result.value)
+    .catch(() => '')
+  if (reason.trim() === '') {
+    return
+  }
+  const actions = order.value.items
+    .filter((item) => item.activeQuantity > 0)
+    .map((item) => ({
+      kind: 'CANCELLATION',
+      orderItemBusinessId: item.orderItemBusinessId,
+      newUnitPrice: null,
+      newRecipient: null,
+      newQuantity: 0,
+      newSchemeSnapshotRef: null,
+      newTargetProcess: null,
+      newMaterialSources: null,
+      migratedQuantity: null,
+    }))
+  await runChanging(
+    () => orderService.change(orderId, orderContentVersion.value, actions, reason.trim()),
+    {
+      success: '订单已取消',
+      fallback: '订单取消失败',
+      onSuccess: load,
     },
   )
 }
@@ -429,7 +479,21 @@ onMounted(load)
         <PermissionButton permission="order.ship" @click="openShipment()">
           登记发货
         </PermissionButton>
-        <PermissionButton permission="order.change" @click="openChange">变更价格</PermissionButton>
+        <PermissionButton permission="order.change" @click="openChange(undefined, 'price')">
+          变更价格
+        </PermissionButton>
+        <PermissionButton permission="order.change" @click="openChange(undefined, 'quantity')">
+          变更数量
+        </PermissionButton>
+        <PermissionButton
+          v-if="order.status === 'CONFIRMED' || order.status === 'IN_FULFILLMENT'"
+          permission="order.cancel"
+          type="danger"
+          plain
+          @click="cancelOrder"
+        >
+          取消订单
+        </PermissionButton>
         <PermissionButton permission="order.complete" type="primary" @click="complete">
           完成订单
         </PermissionButton>
@@ -502,6 +566,34 @@ onMounted(load)
                     {{ row.agreement.recipient.customerName }} ·
                     {{ row.agreement.recipient.phone }} ·
                     {{ row.agreement.recipient.address }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="180" fixed="right">
+                  <template #default="{ row }">
+                    <PermissionButton
+                      permission="order.ship"
+                      link
+                      type="primary"
+                      @click="openShipment(row.orderItemBusinessId)"
+                    >
+                      发货
+                    </PermissionButton>
+                    <PermissionButton
+                      permission="order.change"
+                      link
+                      type="primary"
+                      @click="openChange(row.orderItemBusinessId, 'price')"
+                    >
+                      改价
+                    </PermissionButton>
+                    <PermissionButton
+                      permission="order.change"
+                      link
+                      type="primary"
+                      @click="openChange(row.orderItemBusinessId, 'quantity')"
+                    >
+                      改量
+                    </PermissionButton>
                   </template>
                 </el-table-column>
               </el-table>
@@ -751,9 +843,28 @@ onMounted(load)
           </template>
         </el-dialog>
 
-        <el-dialog v-model="changeDialog" title="变更订单价格" width="440px">
+        <el-dialog
+          v-model="changeDialog"
+          :title="changeForm.mode === 'price' ? '变更订单价格' : '变更订单数量'"
+          width="440px"
+        >
           <el-form label-width="100px">
-            <el-form-item label="新单价"><el-input v-model="changeForm.unitPrice" /></el-form-item>
+            <el-form-item label="订单项">
+              <el-select v-model="changeForm.orderItemBusinessId">
+                <el-option
+                  v-for="item in order?.items ?? []"
+                  :key="item.orderItemBusinessId"
+                  :label="`${productNames[item.productBusinessId] ?? item.productBusinessId} · ${item.activeQuantity} 件`"
+                  :value="item.orderItemBusinessId"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item v-if="changeForm.mode === 'price'" label="新单价">
+              <el-input v-model="changeForm.unitPrice" />
+            </el-form-item>
+            <el-form-item v-else label="新数量">
+              <el-input v-model.number="changeForm.quantity" type="number" />
+            </el-form-item>
             <el-form-item label="变更原因">
               <el-input v-model="changeForm.reason" type="textarea" :rows="2" />
             </el-form-item>

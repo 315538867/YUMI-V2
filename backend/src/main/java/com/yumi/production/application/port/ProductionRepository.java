@@ -50,6 +50,8 @@ public interface ProductionRepository {
 
     void updateSourceOpening(String productionSourceBusinessId, String openingStatus, String status);
 
+    void increaseSourceQuantity(String productionSourceBusinessId, int deltaQuantity);
+
     void insertStageProjection(StageProjection projection);
 
     /** 期初事实：只保存接管时状态，不进入劳动、材料或责任来源。 */

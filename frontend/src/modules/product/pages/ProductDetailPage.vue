@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
-import { useAuthStore } from '@/platform/stores/auth'
 import type { ProductView, SchemeView } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -14,13 +13,11 @@ import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
 const productId = String(route.params.productBusinessId ?? '')
 const product = ref<ProductView | null>(null)
 const schemes = ref<SchemeView[]>([])
 const { loading, errorText, run } = useAsyncLoad()
 const { run: runAction } = useAsyncAction()
-const canManage = computed(() => auth.hasPermission('product.update'))
 const standardBudget = computed(
   () =>
     schemes.value.find((scheme) => scheme.schemeType === 'SYSTEM_STANDARD')?.latestBudget ?? null,
@@ -207,12 +204,8 @@ onMounted(load)
             <dd><MoneyText :value="product.bagging.laborCost" /></dd>
             <dt>袋子成本</dt>
             <dd><MoneyText :value="product.bagging.bagUnitCost" /></dd>
-            <dt>袋子供料方</dt>
-            <dd>{{ materialSourceText(product.bagging.bagSource) }}</dd>
             <dt>装饰品价格</dt>
             <dd><MoneyText :value="product.bagging.decorationUnitPrice" /></dd>
-            <dt>装饰品供料方</dt>
-            <dd>{{ materialSourceText(product.bagging.decorationSource) }}</dd>
             <dt>其他费用</dt>
             <dd><MoneyText :value="product.bagging.otherCost" /></dd>
           </dl>
@@ -321,22 +314,24 @@ onMounted(load)
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button
-              v-if="row.schemeType === 'CUSTOM' && canManage"
+            <PermissionButton
+              v-if="row.schemeType === 'CUSTOM'"
+              permission="product.scheme.manage"
               link
               type="primary"
               @click="router.push(`/products/${productId}/schemes/${row.schemeBusinessId}`)"
             >
               编辑
-            </el-button>
-            <el-button
+            </PermissionButton>
+            <PermissionButton
               v-if="row.schemeType === 'CUSTOM'"
+              permission="product.scheme.manage"
               link
-              type="danger"
+              :type="row.status === 'ACTIVE' ? 'warning' : 'success'"
               @click="toggleScheme(row)"
             >
-              停用
-            </el-button>
+              {{ row.status === 'ACTIVE' ? '停用' : '启用' }}
+            </PermissionButton>
           </template>
         </el-table-column>
       </el-table>

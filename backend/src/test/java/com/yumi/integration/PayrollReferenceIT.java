@@ -75,6 +75,8 @@ class PayrollReferenceIT extends AbstractOrderFixtureTest {
         EmployeePayrollView studio = asAdmin(() -> payrollQuery.getEmployeePayroll(
                 period.periodBusinessId(), studioWorker));
         assertThat(studio.status()).isEqualTo("REFERENCE_READY");
+        assertThat(studio.employeeName()).isNotBlank();
+        assertThat(studio.employeeNo()).startsWith("E-");
         assertThat(studio.lines())
                 .filteredOn(line -> line.lineType().equals("LABOR"))
                 .anySatisfy(line -> {

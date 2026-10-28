@@ -127,7 +127,9 @@ class AfterSalesCancellationIT extends AbstractOrderFixtureTest {
                                 "OTHER", "修复失败", 3, 0,
                                 List.of(new DefectGroupRequest.ScrapPartRequest(
                                         3, PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY,
-                                        ResponsibilityType.WAIVED, null, "修复失败转线下")))),
+                                        ResponsibilityType.WAIVED, null, "修复失败转线下",
+                                        "瑕疵品仓", null, "张三", "李四",
+                                        LocalDate.parse("2026-10-06"))))),
                         null)))));
 
         AfterSalesCancellationRef cancelled = asAdmin(() -> obligationChanges.cancel(
@@ -155,8 +157,11 @@ class AfterSalesCancellationIT extends AbstractOrderFixtureTest {
         assertThat(count("production_terminal_exits")).isEqualTo(2);
         assertThat(orderJdbc.sql("SELECT SUM(quantity) FROM production_terminal_exits")
                 .query(Integer.class).single()).isEqualTo(10);
-        // 修复报废只记终态退出；池释放走池移交表，不混入生产来源移交表
-        assertThat(count("production_offline_inventory_transfers")).isZero();
+        // 修复报废转线下写生产移交；池释放走池移交表
+        assertThat(count("production_offline_inventory_transfers")).isEqualTo(1);
+        assertThat(orderJdbc.sql("""
+                        SELECT reason_code FROM production_offline_inventory_transfers
+                        """).query(String.class).single()).isEqualTo("QUALITY_SCRAP");
         assertThat(repairDemandState(repair.demandBusinessId())).containsExactly(0, 0, 0, 0, 0);
 
         // 再次取消不新增处置或退出

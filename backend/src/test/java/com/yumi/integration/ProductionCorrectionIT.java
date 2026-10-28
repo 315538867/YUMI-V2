@@ -102,7 +102,9 @@ class ProductionCorrectionIT extends AbstractProductionFixtureTest {
                                 List.of(new DefectGroupRequest.ScrapPartRequest(
                                         2, PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY,
                                         ResponsibilityType.EMPLOYEE,
-                                        employeeId(), null)))), null)))));
+                                        employeeId(), null,
+                                        "瑕疵品仓", null, "张三", "李四",
+                                        LocalDate.parse("2026-10-06"))))), null)))));
 
         var before = physical(demand);
         assertThat(before).containsExactly(10, 8, 0, 0, 2);

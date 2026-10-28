@@ -33,6 +33,9 @@ public interface VerificationRepository {
 
     void insertTerminalExit(TerminalExit exit);
 
+    /** 报废转线下时追加同一次退出的移交事实。 */
+    void insertOfflineTransfer(OfflineTransferRecord record);
+
     void insertResponsibility(ResponsibilityFact fact);
 
     /** 发布验收报废责任 APPLY 修订，供工资责任 Feed 消费。 */
@@ -136,6 +139,16 @@ public interface VerificationRepository {
             String terminalExitBusinessId, String productionSourceBusinessId,
             String physicalRootSourceBusinessId, String demandBusinessId, String taskItemBusinessId,
             String exitReason, PhysicalDestination physicalDestination, int quantity, Instant occurredAt) {
+    }
+
+    /** 线下移交事实：与报废终态退出共享退出标识。 */
+    record OfflineTransferRecord(
+            String transferFactBusinessId, String terminalExitBusinessId,
+            String productionSourceBusinessId, String physicalRootSourceBusinessId,
+            String demandBusinessId, String productBusinessId, String reasonCode,
+            String offlineInventoryName, String offlineInventoryNote, String handedOverBy,
+            String receivedBy, Instant transferredAt, int quantity, Instant occurredAt,
+            String operatorId) {
     }
 
     /** 责任事实。 */

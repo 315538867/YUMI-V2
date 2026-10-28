@@ -105,6 +105,15 @@ public class ProductSnapshotServiceImpl implements ProductSnapshotService {
     }
 
     @Override
+    public ProductSnapshotView resolveProductById(String snapshotBusinessId) {
+        authorization.require(PermissionCodes.PRODUCT_SNAPSHOT_READ, ResourceScope.GLOBAL);
+        ProductSnapshotRecord record = snapshots.findProductSnapshotByBusinessId(snapshotBusinessId)
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCT_SNAPSHOT_INVALID", "商品快照不存在"));
+        return toProductView(record);
+    }
+
+    @Override
     public SchemeSnapshotView resolveScheme(ProductSnapshotRef ref) {
         authorization.require(PermissionCodes.PRODUCT_SNAPSHOT_READ, ResourceScope.GLOBAL);
         if (ref == null || ref.snapshotType() != ProductSnapshotRef.SnapshotType.SCHEME) {

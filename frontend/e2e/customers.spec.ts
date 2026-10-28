@@ -57,6 +57,7 @@ test('客户列表、编辑、启停与历史引用使用真实接口', async ({
   await expect(page.getByRole('heading', { name: renamed })).toBeVisible()
 
   await page.getByRole('button', { name: '停用客户' }).click()
+  await page.getByRole('button', { name: '确认' }).click()
   await expect(page.getByText('停用', { exact: true }).first()).toBeVisible()
   await page.reload()
   await expect(page.getByRole('button', { name: '启用客户' })).toBeVisible()

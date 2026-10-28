@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { navigationGroups } from '@/app/navigation'
+import { navigationItems } from '@/app/navigation'
 import { useAuthStore } from '@/platform/stores/auth'
 import PageShell from '@/shared/components/PageShell.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
@@ -10,9 +10,7 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const entries = computed(() =>
-  navigationGroups
-    .flatMap((group) => group.items)
-    .filter((item) => auth.hasPermission(item.permission)),
+  navigationItems.filter((item) => auth.hasPermission(item.permission)),
 )
 </script>
 

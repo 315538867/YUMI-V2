@@ -69,7 +69,8 @@ class TaskVerificationIT extends AbstractProductionFixtureTest {
                                 employee.employeeBusinessId(), null),
                         new DefectGroupRequest.ScrapPartRequest(
                                 1, PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY,
-                                ResponsibilityType.WAIVED, null, "客户提供的材料已确认"))));
+                                ResponsibilityType.WAIVED, null, "客户提供的材料已确认",
+                                "瑕疵品仓", null, "张三", "李四", LocalDate.parse("2026-10-06")))));
         VerifyTaskCommand verify = new VerifyTaskCommand(
                 List.of(new TaskItemResultRequest(itemId, 2, 90, 5, 3, defects, null)));
         VerificationView result = asAdmin(() -> verificationService.verify(verify));
@@ -240,12 +241,22 @@ class TaskVerificationIT extends AbstractProductionFixtureTest {
                         new DefectGroupRequest("DEFORMED", null, 2, 0, List.of(
                                 new DefectGroupRequest.ScrapPartRequest(
                                         2, PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY,
-                                        ResponsibilityType.STUDIO, "STUDIO-1", null)))), null)))));
+                                        ResponsibilityType.STUDIO, "STUDIO-1", null,
+                                        "瑕疵品仓", null, "张三", "李四",
+                                        LocalDate.parse("2026-10-06"))))), null)))));
 
         assertThat(jdbc.sql("""
                         SELECT COUNT(*) FROM production_terminal_exits
                         WHERE task_item_business_id = :id AND physical_destination = 'TRANSFERRED_OFFLINE_INVENTORY'
                         """).param("id", itemId).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                        SELECT COUNT(*) FROM production_offline_inventory_transfers t
+                        JOIN production_terminal_exits e
+                          ON e.terminal_exit_business_id = t.terminal_exit_business_id
+                        WHERE e.task_item_business_id = :id
+                        """).param("id", itemId).query(Long.class).single())
+                .as("转线下报废必须写移交事实")
+                .isEqualTo(1);
         assertThat(jdbc.sql("""
                         SELECT quantity FROM production_responsibility_facts
                         """).query(Integer.class).single())

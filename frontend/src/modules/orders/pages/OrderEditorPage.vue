@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useEditorForm } from '@/platform/composables/useEditorForm'
 import { useUnsavedGuard } from '@/platform/composables/useUnsavedGuard'
 import FormErrorAlert from '@/shared/components/FormErrorAlert.vue'
@@ -38,6 +38,7 @@ interface DraftItem {
 }
 
 const router = useRouter()
+const route = useRoute()
 const customers = ref<CustomerView[]>([])
 const products = ref<ProductView[]>([])
 const items = ref<DraftItem[]>([])
@@ -107,7 +108,12 @@ async function load(): Promise<void> {
       customerService.list('', 'ACTIVE', 1, 100),
       productService.list('', 'ACTIVE', 1, 100),
     ])
-    form.customerBusinessId = customers.value[0]?.customerBusinessId ?? ''
+    const requestedCustomer = typeof route.query.customer === 'string' ? route.query.customer : ''
+    form.customerBusinessId = customers.value.some(
+      (customer) => customer.customerBusinessId === requestedCustomer,
+    )
+      ? requestedCustomer
+      : (customers.value[0]?.customerBusinessId ?? '')
     applyCustomer()
     const firstProduct = products.value[0]
     if (firstProduct) {

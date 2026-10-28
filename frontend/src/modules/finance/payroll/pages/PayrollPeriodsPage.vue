@@ -86,6 +86,9 @@ onMounted(load)
   <ListPage
     class="periods-page"
     title="工资期间"
+    :heading="false"
+    panel-title="工资期间"
+    panel-hint="按期间刷新参考、逐人核定并进入付款"
     :loading="loading"
     :error="errorText"
     @retry="load"
@@ -106,7 +109,7 @@ onMounted(load)
         />
       </el-select>
     </template>
-    <template #actions>
+    <template #panel-actions>
       <el-button @click="dialogVisible = true">新建期间</el-button>
       <el-button type="primary" :loading="saving" @click="ingestAndCalculate">刷新参考</el-button>
       <el-button @click="router.push(`/payroll/payments?period=${filters.period}`)">付款</el-button>
@@ -116,20 +119,31 @@ onMounted(load)
       <el-alert v-if="successText" type="success" :closable="false" :title="successText" />
     </template>
     <el-table :data="results" empty-text="该期间暂无工资结果；请先刷新参考" border>
-      <el-table-column prop="employeeBusinessId" label="员工" min-width="200" />
+      <el-table-column label="员工" min-width="220">
+        <template #default="{ row }">
+          <span class="yumi-cell-title">{{ row.employeeName ?? row.employeeBusinessId }}</span>
+          <span v-if="row.employeeNo" class="yumi-cell-sub">{{ row.employeeNo }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="130">
         <template #default="{ row }"
           ><CodeTag category="finance.payrollResultStatus" :code="row.status"
         /></template>
       </el-table-column>
-      <el-table-column label="参考行" width="100">
-        <template #default="{ row }">{{ row.lines.length }}</template>
+      <el-table-column label="系统参考" width="130">
+        <template #default="{ row }"><MoneyText :value="row.referenceAmount" /></template>
       </el-table-column>
       <el-table-column label="实际核定" width="130">
         <template #default="{ row }"><MoneyText :value="row.confirmedAmount" /></template>
       </el-table-column>
       <el-table-column label="应付" width="130">
         <template #default="{ row }"><MoneyText :value="row.payableAmount" /></template>
+      </el-table-column>
+      <el-table-column label="已付 / 待付" width="170">
+        <template #default="{ row }">
+          <MoneyText :value="row.paidAmount" /> /
+          <MoneyText :value="row.remainingAmount" />
+        </template>
       </el-table-column>
       <el-table-column label="操作" width="110">
         <template #default="{ row }">

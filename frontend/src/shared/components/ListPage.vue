@@ -7,6 +7,7 @@ withDefaults(
     title: string
     hint?: string
     meta?: string
+    heading?: boolean
     panelTitle?: string
     panelHint?: string
     loading?: boolean
@@ -17,6 +18,7 @@ withDefaults(
   {
     hint: '',
     meta: '',
+    heading: true,
     panelTitle: '',
     panelHint: '',
     loading: false,
@@ -31,7 +33,7 @@ defineEmits<{ retry: [] }>()
 
 <template>
   <div class="list-page">
-    <header class="yumi-page-heading">
+    <header v-if="heading" class="yumi-page-heading">
       <div class="yumi-page-heading__copy">
         <h1 class="yumi-page-heading__title">{{ title }}</h1>
         <span v-if="hint" class="yumi-page-heading__hint">{{ hint }}</span>
@@ -46,7 +48,9 @@ defineEmits<{ retry: [] }>()
           <h2 v-if="panelTitle">{{ panelTitle }}</h2>
           <span v-if="panelHint" class="yumi-hint">{{ panelHint }}</span>
         </div>
-        <slot name="panel-actions" />
+        <div v-if="$slots['panel-actions']" class="yumi-actions">
+          <slot name="panel-actions" />
+        </div>
       </div>
       <div class="list-page__body">
         <div v-if="$slots.filters" class="yumi-toolbar"><slot name="filters" /></div>

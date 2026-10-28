@@ -19,7 +19,9 @@ public interface CostLedgerQuery {
     record CostEntryView(
             String costEntryBusinessId, String costCategory, String subjectType,
             String subjectBusinessId, BigDecimal amount, LocalDate businessDate,
-            String operationType, boolean allocated, Instant occurredAt) {
+            String operationType, String sourceModule, String sourceType,
+            String sourceBusinessId, String basisRef, String reasonText,
+            boolean allocated, Instant occurredAt) {
     }
 
     record CostFailureView(

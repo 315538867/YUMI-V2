@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import ModuleTabsPage from '@/shared/components/ModuleTabsPage.vue'
 
-const route = useRoute()
-const router = useRouter()
-const active = computed(() => route.path)
 const tabs = [
   { path: '/settings/accounts', label: '账号与角色' },
   { path: '/settings/glue', label: '胶水配置' },
@@ -14,22 +10,5 @@ const tabs = [
 </script>
 
 <template>
-  <el-tabs
-    :model-value="active"
-    class="settings-tabs"
-    @tab-change="(path: string | number) => router.push(String(path))"
-  >
-    <el-tab-pane v-for="tab in tabs" :key="tab.path" :label="tab.label" :name="tab.path" />
-  </el-tabs>
-  <RouterView />
+  <ModuleTabsPage title="设置与账号" hint="账号角色、胶水配置、审计检索与提交后任务" :tabs="tabs" />
 </template>
-
-<style scoped>
-.settings-tabs {
-  background: var(--yumi-surface);
-  border: 1px solid var(--yumi-border-color);
-  border-radius: var(--yumi-radius-lg);
-  padding: 0 var(--yumi-space-4);
-  margin-bottom: var(--yumi-space-3);
-}
-</style>

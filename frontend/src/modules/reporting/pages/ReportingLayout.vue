@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import ModuleTabsPage from '@/shared/components/ModuleTabsPage.vue'
 
-const route = useRoute()
-const router = useRouter()
-const active = computed(() => route.path)
 const tabs = [
   { path: '/reporting/monthly', label: '月汇总' },
   { path: '/reporting/explorer', label: '主题报表' },
@@ -14,22 +10,5 @@ const tabs = [
 </script>
 
 <template>
-  <el-tabs
-    :model-value="active"
-    class="reporting-tabs"
-    @tab-change="(path: string | number) => router.push(String(path))"
-  >
-    <el-tab-pane v-for="tab in tabs" :key="tab.path" :label="tab.label" :name="tab.path" />
-  </el-tabs>
-  <RouterView />
+  <ModuleTabsPage title="报表" hint="月度、主题、来源对账与影子重建" :tabs="tabs" />
 </template>
-
-<style scoped>
-.reporting-tabs {
-  background: var(--yumi-surface);
-  border: 1px solid var(--yumi-border-color);
-  border-radius: var(--yumi-radius-lg);
-  padding: 0 var(--yumi-space-4);
-  margin-bottom: var(--yumi-space-3);
-}
-</style>

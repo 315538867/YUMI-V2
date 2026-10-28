@@ -93,10 +93,16 @@ public class PayrollAdjustmentServiceImpl implements PayrollAdjustmentService {
         }
 
         BigDecimal payable = result.payableAmount().add(command.amountDelta().value());
+        BigDecimal paid = payroll.paidAmount(result.resultBusinessId());
         if (payable.signum() < 0) {
             throw new ApiException(
                     ApiErrorType.BUSINESS_REJECTION, "PAYROLL_ADJUSTMENT_BELOW_ZERO",
                     "调整后应付不得小于零");
+        }
+        if (payable.compareTo(paid) < 0) {
+            throw new ApiException(
+                    ApiErrorType.BUSINESS_REJECTION, "PAYROLL_ADJUSTMENT_BELOW_PAID",
+                    "调整后应付不得小于已付净额");
         }
         String adjustmentId = "PYA-" + UUID.randomUUID();
         var now = clock.instant();

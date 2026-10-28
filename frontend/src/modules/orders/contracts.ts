@@ -33,6 +33,8 @@ export interface OrderSummaryView {
   expectedDeliveryDate: string
   currentReceivable: MoneyWire
   netReceipts: MoneyWire
+  requiredQuantity: number
+  shippedQuantity: number
   deliveryFulfilled: boolean
   paymentFulfilled: boolean
   contentVersion: number
@@ -46,6 +48,7 @@ export interface OrderView {
   status: OrderStatus
   customerBusinessId: string
   customerSnapshotRef: string
+  customerSnapshotName?: string | null
   orderDate: string
   expectedDeliveryDate: string
   note: string | null
@@ -56,6 +59,7 @@ export interface OrderView {
     orderItemBusinessId: string
     productBusinessId: string
     productSnapshotRef: string
+    productSnapshotName?: string | null
     orderedQuantity: number
     activeQuantity: number
     status: CodeOf<'order.itemStatus'>

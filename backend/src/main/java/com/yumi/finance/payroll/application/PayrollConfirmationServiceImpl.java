@@ -10,6 +10,7 @@ import com.yumi.platform.api.authorization.PermissionCodes;
 import com.yumi.platform.api.authorization.ResourceScope;
 import com.yumi.platform.api.http.ApiErrorType;
 import com.yumi.platform.api.http.ApiException;
+import com.yumi.platform.api.http.RequestContext;
 import com.yumi.platform.api.http.RequestCorrelationHolder;
 import com.yumi.platform.api.idempotency.CommandOutcome;
 import com.yumi.platform.api.idempotency.CommandRequest;
@@ -22,6 +23,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -127,6 +130,8 @@ public class PayrollConfirmationServiceImpl implements PayrollConfirmationServic
 
         String confirmationId = "PYC-" + UUID.randomUUID();
         var now = clock.instant();
+        LocalDate businessDate = LocalDate.ofInstant(
+                now, ZoneId.of(RequestContext.DEFAULT_BUSINESS_ZONE));
         String operatorId = currentActor.requireCurrentActor().accountBusinessId().value();
         payroll.insertConfirmation(new PayrollRepository.ConfirmationRecord(
                 confirmationId, result.resultBusinessId(), command.confirmedAmount().value(),
@@ -148,7 +153,7 @@ public class PayrollConfirmationServiceImpl implements PayrollConfirmationServic
                     .setScale(4, java.math.RoundingMode.HALF_UP);
             payroll.insertDirectLaborCost(new PayrollRepository.DirectLaborCostRecord(
                     "DLC-" + UUID.randomUUID(), result.resultBusinessId(), costAmount,
-                    period.endDate(), now));
+                    businessDate, now));
         }
 
         audit.record(new RecordAuditCommand(

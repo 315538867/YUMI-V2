@@ -81,24 +81,6 @@ defineEmits<{ retry: [] }>()
   background: var(--yumi-bg-muted);
 }
 
-.editor-page__preview :deep(dl) {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: var(--yumi-space-2) var(--yumi-space-3);
-  margin: 0;
-}
-
-.editor-page__preview :deep(dt) {
-  color: var(--yumi-text-secondary);
-  font-size: var(--yumi-font-size-sm);
-}
-
-.editor-page__preview :deep(dd) {
-  margin: 0;
-  font-size: var(--yumi-font-size-sm);
-  word-break: break-all;
-}
-
 .editor-page__preview :deep(.yumi-hint) {
   margin-top: var(--yumi-space-3);
 }

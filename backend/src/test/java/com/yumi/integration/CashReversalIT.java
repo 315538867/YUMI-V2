@@ -89,7 +89,11 @@ class CashReversalIT extends AbstractOrderFixtureTest {
         assertThat(orderJdbc.sql("""
                         SELECT is_valid FROM finance_cash_facts WHERE cash_fact_business_id = :id
                         """).param("id", receipt.cashFactBusinessId())
-                .query(Boolean.class).single()).isFalse();
+                .query(Boolean.class).single()).isTrue();
+        assertThat(orderJdbc.sql("""
+                        SELECT COUNT(*) FROM finance_cash_facts WHERE reverses_fact_business_id = :id
+                        """).param("id", receipt.cashFactBusinessId())
+                .query(Long.class).single()).isEqualTo(1);
 
         // 新收款并发冲销只成功一次
         OrderRef another = confirmOrderForMaking(2);

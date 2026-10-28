@@ -97,7 +97,15 @@
   /* ===== 布局 ===== */
   --yumi-content-max-width: 1600px;
   --yumi-content-padding: var(--yumi-space-6) var(--yumi-space-8) var(--yumi-space-12);
-  --yumi-sidebar-width: 216px;
+  --yumi-rail-width: 76px;
+  --yumi-rail-width-sm: 58px;
+  --yumi-rail-padding: 18px;
+  --yumi-rail-brand-size: 36px;
+  --yumi-rail-brand-size-sm: 32px;
+  --yumi-rail-item-size: 42px;
+  --yumi-rail-item-size-sm: 36px;
+  --yumi-rail-gap: 12px;
+  --yumi-rail-nav-offset: 34px;
   --yumi-header-height: 70px;
   --yumi-card-padding: var(--yumi-space-4);
   --yumi-toolbar-gap: var(--yumi-space-2);

@@ -71,6 +71,9 @@ void load()
   <ListPage
     class="tasks-page"
     title="提交后任务"
+    :heading="false"
+    panel-title="提交后任务"
+    panel-hint="查看待执行、等待重试与需人工处理的任务"
     :loading="loading"
     :error="errorText"
     :empty="!loading && errorText === '' && tasks.length === 0"

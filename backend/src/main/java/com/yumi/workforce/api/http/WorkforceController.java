@@ -10,6 +10,7 @@ import com.yumi.workforce.api.AssignmentSubjectRef;
 import com.yumi.workforce.api.AssignmentSubjectType;
 import com.yumi.workforce.api.ChangeQualificationCommand;
 import com.yumi.workforce.api.CreateTeamCommand;
+import com.yumi.workforce.api.ActivateTeamCommand;
 import com.yumi.workforce.api.DeactivateTeamCommand;
 import com.yumi.workforce.api.EmployeeRef;
 import com.yumi.workforce.api.EmploymentStatus;
@@ -273,6 +274,26 @@ public class WorkforceController {
                         CommandExecutionFacade.fingerprint(objectMapper, command)),
                 () -> {
                     workforce.deactivateTeam(command);
+                    return new CommandOutcome("TEAM", teamBusinessId);
+                });
+        return findTeam(teamBusinessId);
+    }
+
+    @PostMapping("/teams/{teamBusinessId}/activate")
+    public TeamView activateTeam(
+            @PathVariable String teamBusinessId,
+            @RequestBody DeactivateTeamRequest request,
+            HttpServletRequest servletRequest) {
+        ActivateTeamCommand command = new ActivateTeamCommand(
+                teamBusinessId, request.expectedRowVersion(), request.reason());
+        var context = contextResolver.resolveCommand(servletRequest);
+        commands.execute(
+                new CommandRequest(
+                        "workforce.activateTeam",
+                        context.idempotencyKey(),
+                        CommandExecutionFacade.fingerprint(objectMapper, command)),
+                () -> {
+                    workforce.activateTeam(command);
                     return new CommandOutcome("TEAM", teamBusinessId);
                 });
         return findTeam(teamBusinessId);

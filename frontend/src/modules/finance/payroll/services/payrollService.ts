@@ -88,6 +88,12 @@ export const payrollService = {
     })
   },
 
+  reviewResult(
+    reviewRunBusinessId: string,
+  ): Promise<import('@/modules/finance/payroll/contracts').PayrollReviewView> {
+    return api.query(`/api/payroll/reviews/${encodeURIComponent(reviewRunBusinessId)}`)
+  },
+
   adjust(input: {
     resultBusinessId: string
     amountDelta: string

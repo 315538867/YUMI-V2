@@ -36,6 +36,9 @@ async function load(): Promise<void> {
   <ListPage
     class="audit-page"
     title="审计检索"
+    :heading="false"
+    panel-title="审计检索"
+    panel-hint="按目标检索；记录只读，不修改或删除"
     :loading="loading"
     :error="errorText"
     :empty="!loading && errorText === '' && entries.length === 0"

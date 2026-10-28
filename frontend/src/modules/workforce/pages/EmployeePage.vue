@@ -9,7 +9,6 @@ import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
-import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const { loading, errorText, run } = useAsyncLoad()
 
@@ -41,8 +40,9 @@ void load()
     class="employee-page"
     title="员工与资格"
     hint="管理在职、离职与工种资格"
+    :heading="false"
     panel-title="员工列表"
-    panel-hint="管理在职、离职与工种资格"
+    panel-hint="管理在职与离职员工；员工编号创建后不可修改"
     :loading="loading"
     :error="errorText"
     @retry="load"
@@ -70,15 +70,6 @@ void load()
       </el-select>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
-    </template>
-    <template #actions>
-      <PermissionButton
-        permission="workforce.employee.manage"
-        type="primary"
-        @click="router.push('/workforce/employees/new')"
-      >
-        新增员工
-      </PermissionButton>
     </template>
     <el-table :data="employees" empty-text="没有匹配的员工" border>
       <el-table-column prop="employeeNo" label="员工编号" width="130" />

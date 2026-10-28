@@ -111,7 +111,7 @@ public class CashController {
                                 .map(allocation -> new PayPayrollCommand.PayrollAllocation(
                                         allocation.resultBusinessId(), allocation.amount()))
                                 .toList(),
-                        request.businessDate())));
+                        request.businessDate(), nullToEmpty(request.voucherFileRefs()))));
     }
 
     @PostMapping("/daily-cash")
@@ -134,7 +134,8 @@ public class CashController {
                 new com.yumi.finance.cash.api.ReturnPayrollPaymentCommand(
                         idempotencyKey, request.originalCashFactBusinessId(),
                         request.resultBusinessId(), request.amount(),
-                        request.businessDate(), request.reasonText(), List.of())));
+                        request.businessDate(), request.reasonText(),
+                        nullToEmpty(request.voucherFileRefs()))));
     }
 
     @PostMapping("/reversals")
@@ -144,7 +145,7 @@ public class CashController {
         return ResponseEntity.status(HttpStatus.CREATED).body(cash.reverse(
                 new com.yumi.finance.cash.api.ReverseCashFactCommand(
                         idempotencyKey, request.cashFactBusinessId(), request.businessDate(),
-                        request.reasonText())));
+                        request.reasonText(), nullToEmpty(request.voucherFileRefs()))));
     }
 
     public record OrderPaymentRequest(
@@ -158,7 +159,8 @@ public class CashController {
     }
 
     public record PayrollPaymentRequest(
-            List<PayrollAllocation> allocations, LocalDate businessDate) {
+            List<PayrollAllocation> allocations, LocalDate businessDate,
+            List<String> voucherFileRefs) {
 
         public record PayrollAllocation(String resultBusinessId, SettlementMoney amount) {
         }
@@ -166,11 +168,13 @@ public class CashController {
 
     public record PayrollReturnRequest(
             String originalCashFactBusinessId, String resultBusinessId,
-            SettlementMoney amount, LocalDate businessDate, String reasonText) {
+            SettlementMoney amount, LocalDate businessDate, String reasonText,
+            List<String> voucherFileRefs) {
     }
 
     public record ReversalRequest(
-            String cashFactBusinessId, LocalDate businessDate, String reasonText) {
+            String cashFactBusinessId, LocalDate businessDate, String reasonText,
+            List<String> voucherFileRefs) {
     }
 
     public record DailyCashRequest(

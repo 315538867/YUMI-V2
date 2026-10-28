@@ -110,6 +110,9 @@ onMounted(load)
     <el-form v-if="!loading" label-width="96px" @submit.prevent>
       <FormErrorAlert :error="formAlert" class="yumi-alert" />
       <h2>基本资料</h2>
+      <el-form-item v-if="editing" label="客户编号">
+        <el-input :model-value="customer?.customerNo ?? '—'" disabled />
+      </el-form-item>
       <el-form-item label="客户名称" required :error="validationErrors.name || fieldError('name')">
         <el-input v-model="form.name" aria-label="客户名称" />
       </el-form-item>
@@ -134,7 +137,9 @@ onMounted(load)
     </el-form>
 
     <template #preview>
-      <dl>
+      <dl class="yumi-info-grid">
+        <dt v-if="editing">客户编号</dt>
+        <dd v-if="editing">{{ customer?.customerNo ?? '—' }}</dd>
         <dt>客户名称</dt>
         <dd>{{ form.name || '未填写' }}</dd>
         <dt>联系人</dt>

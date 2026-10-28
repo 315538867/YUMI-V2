@@ -27,6 +27,8 @@ public interface WorkforceApplicationService {
 
     void deactivateTeam(DeactivateTeamCommand command);
 
+    void activateTeam(ActivateTeamCommand command);
+
     void createEfficiencyStandard(CreateEfficiencyStandardCommand command);
 
     void updateEfficiencyStandard(UpdateEfficiencyStandardCommand command);

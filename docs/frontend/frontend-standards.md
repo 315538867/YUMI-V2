@@ -39,7 +39,8 @@
 | `MoneyText` | 金额对象/字符串统一展示 |
 | `DateTimeText` | 时间统一格式化 |
 | `PageShell` | 裸页面页头：标题、说明、右侧动作，卡片内容由页面自理 |
-| `WorkspacePage` | 工作区白底卡片外壳：边框、圆角、默认 16px 内边距 |
+| `ModuleTabsPage` | 模块页外壳：模块标题在页签之上，页签负责子路由，`overview` 插槽放模块概览 |
+| `WorkspacePage` | 工作区白底卡片外壳：可带卡片标题、说明与动作；默认 16px 内边距 |
 | `DetailPage` | 只读详情页外壳：标题/元信息、动作区、PageState |
 | `EditorPage` | 单记录编辑页外壳：标题/操作、PageState、表单与预览两栏 |
 | `ListPage` | 列表页外壳：标题/数量、统一工具条、PageState 与分页插槽 |
@@ -53,14 +54,15 @@
   - 契约测试第二组规则扫描。
 - 页面不再自写 `status === 'ACTIVE' ? '启用' : '停用'` 这类零散映射；新增编码先加码表，再在页面使用组件。
 - 页面结构统一：`ListPage` / `EditorPage` / `DetailPage` 自带页头；裸页面使用 `PageShell`；页头在卡片外，筛选/表单/只读内容在卡片内。
+- 模块页统一使用 `ModuleTabsPage`：模块标题 `h1` 在页签上方，子页不再重复页头；子页标题与主操作放在 `WorkspacePage` 卡头或 `ListPage` 的 `panel-title` / `panel-actions`。
 - 样式分三层：`platform/theme/tokens.css`（基础令牌）→ `platform/theme/components.css`（组件样式与 Element Plus 统一外观）→ 页面 scoped CSS（只保留该页独有布局）。
 - 页面禁止写死颜色、字号、字重、圆角、`margin/padding/gap` 数字；必须使用 `--yumi-*` 令牌。
 - 页面禁止直接使用 `var(--el-*)`，Element Plus 变量只在主题文件中映射。
-- 通用结构使用 `yumi-page-heading`、`yumi-toolbar`、`yumi-panel`、`yumi-stat-grid`、`yumi-card-grid`、`yumi-info-grid`、`yumi-form-grid` 等组件类；不得在页面重复定义 `h1`、`.head`、`.toolbar`、`.alert`、`.hint`、`.meta`、`.actions`。
+- 通用结构使用 `yumi-page-heading`、`yumi-module-tabs`、`yumi-toolbar`、`yumi-panel`、`yumi-stat-grid`、`yumi-card-grid`、`yumi-info-grid`、`yumi-form-grid` 等组件类；不得在页面重复定义 `h1`、`.head`、`.toolbar`、`.alert`、`.hint`、`.meta`、`.actions`。
 - 结构门禁：`frontend/src/platform/theme/style.contract.test.ts` 扫描所有 `<style>`，拦截上述硬编码与重复样式。
 - 单记录新建/编辑页统一使用 `EditorPage`：标题与操作放 `actions` 插槽，表单放默认插槽，右侧预览放 `preview` 插槽；加载失败与重试由外壳统一处理，页面不再重复写标题栏、两栏网格和预览卡片样式。
 - 多明细或表格型编辑页（如订单建单、已有订单接管）布局差异较大，可继续使用 `WorkspacePage`，不强行套 `EditorPage`。
-- 列表页统一使用 `ListPage`：筛选控件放 `filters` 插槽，新增/接管等主操作放 `actions` 插槽并排在筛选之后；表格放默认插槽，分页放 `pager` 插槽。页面不再自写标题栏、工具条和间距样式。
+- 列表页统一使用 `ListPage`：筛选控件放 `filters` 插槽，新增/接管等主操作放 `actions` 插槽并排在筛选之后；表格放默认插槽，分页放 `pager` 插槽。模块子页设置 `heading=false`，主操作改放 `panel-actions`。页面不再自写标题栏、工具条和间距样式。
 - 只读详情页统一使用 `DetailPage`：标题与 `meta` 插槽放页头，显式动作放 `actions` 插槽，`notice` 放操作提示，详情内容放默认插槽；页面不再自写页头、meta 与动作区样式。
 
 ## 4. 权限与操作可见性

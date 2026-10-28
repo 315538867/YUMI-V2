@@ -11,8 +11,8 @@ function productBody(name: string) {
     name,
     description: 'E2E 商品',
     standardWeightGrams: '120.0000',
-    makingStarCode: '4',
-    makingStandardMinutes: 30,
+    makingStarCode: 'STAR_4',
+    makingStandardMinutes: 60,
     standardSalePrice: amount('50.00'),
     glueLossRate: '0.0500',
     glueUnitPrice: one,
@@ -68,6 +68,7 @@ test('商品列表、详情与编辑保留标准售价且不出现商品目标�
   await expect(page.getByRole('cell', { name, exact: true })).toBeVisible()
   await page.getByRole('button', { name: '查看' }).first().click()
   await expect(page.getByRole('heading', { name })).toBeVisible()
+  await expect(page.getByText('四星')).toBeVisible()
   await expect(page.getByText('50.00 CNY').first()).toBeVisible()
 
   await page.getByRole('button', { name: '编辑商品' }).click()
@@ -81,6 +82,31 @@ test('商品列表、详情与编辑保留标准售价且不出现商品目标�
   await page.reload()
   await expect(page.getByText('66.00 CNY').first()).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/products/${product.productBusinessId}$`))
+})
+
+test('制作星级带出只读标准分钟且切换星级会同步', async ({ page }) => {
+  await login(page)
+  await page.goto('/products/new')
+
+  const starSelect = page
+    .locator('.el-form-item')
+    .filter({ hasText: '制作星级' })
+    .locator('.el-select')
+  const minutes = formInput(page, '制作标准分钟')
+  await expect(minutes).toBeDisabled()
+
+  const minutesOf = (text: string) => Number(text.match(/(\d+)\s*分钟/)?.[1] ?? 0)
+  await expect(starSelect).toBeVisible()
+  await expect(minutes).toHaveValue(String(minutesOf(await starSelect.innerText())))
+
+  await starSelect.click()
+  const options = page.getByRole('option')
+  expect(await options.count()).toBeGreaterThan(1)
+  const secondLabel = await options.nth(1).innerText()
+  await options.nth(1).click()
+  await expect(minutes).toHaveValue(String(minutesOf(secondLabel)))
+  await expect(page.getByText('捏毛装袋 5 分钟').first()).toBeVisible()
+  await expect(page.getByText('缝边剪袋 4 分钟').first()).toBeVisible()
 })
 
 test('录入默认值与标准时间由商品设置维护', async ({ page }) => {

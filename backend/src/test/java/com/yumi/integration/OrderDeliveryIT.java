@@ -214,7 +214,8 @@ class OrderDeliveryIT extends AbstractOrderFixtureTest {
 
         assertThat(corrected.shippedQuantity()).isEqualTo(-2);
         assertThat(corrected.totalShippedQuantity()).isEqualTo(3);
-        assertThat(itemQuantity(shipmentItemId)).isEqualTo(3);
+        assertThat(itemQuantity(shipmentItemId)).isEqualTo(5);
+        assertThat(effectiveQuantity(shipmentItemId)).isEqualTo(3);
         assertThat(fulfilledOf(groupId)).isEqualTo(3);
         assertThat(projection(order)).containsExactly(6, 3, false);
         assertThat(netConsumedOf(sourceId)).isEqualTo(3);
@@ -240,7 +241,8 @@ class OrderDeliveryIT extends AbstractOrderFixtureTest {
         asAdmin(() -> deliveries.correctShipment(new CorrectShipmentCommand(
                 uniqueKey("CORR-2"), shipmentId, shipmentItemId, 4, "整笔退回")));
 
-        assertThat(itemQuantity(shipmentItemId)).isZero();
+        assertThat(itemQuantity(shipmentItemId)).isEqualTo(4);
+        assertThat(effectiveQuantity(shipmentItemId)).isZero();
         assertThat(fulfilledOf(groupId)).isZero();
         assertThat(groupStatus(groupId)).isEqualTo("ACTIVE");
         assertThat(projection(order)).containsExactly(4, 0, false);
@@ -272,6 +274,7 @@ class OrderDeliveryIT extends AbstractOrderFixtureTest {
                         .isEqualTo("PRODUCTION_TRANSFER_IRREVERSIBLE"));
 
         assertThat(itemQuantity(shipmentItemId)).isEqualTo(2);
+        assertThat(effectiveQuantity(shipmentItemId)).isEqualTo(2);
         assertThat(consumptionOf(sourceId, "CONSUME")).isEqualTo(2);
         assertThat(consumptionOf(sourceId, "REVERSE")).isZero();
         assertThat(orderJdbc.sql("SELECT COUNT(*) FROM orders_shipment_correction_facts")
@@ -433,6 +436,17 @@ List.of(new OrderItemRequest(
     private int itemQuantity(String shipmentItemId) {
         return orderJdbc.sql("""
                         SELECT quantity FROM orders_shipment_items WHERE shipment_item_business_id = :id
+                        """).param("id", shipmentItemId).query(Integer.class).single();
+    }
+
+    private int effectiveQuantity(String shipmentItemId) {
+        return orderJdbc.sql("""
+                        SELECT i.quantity + COALESCE(SUM(c.quantity_delta), 0)
+                        FROM orders_shipment_items i
+                        LEFT JOIN orders_shipment_correction_facts c
+                          ON c.shipment_item_business_id = i.shipment_item_business_id
+                        WHERE i.shipment_item_business_id = :id
+                        GROUP BY i.shipment_item_business_id, i.quantity
                         """).param("id", shipmentItemId).query(Integer.class).single();
     }
 }

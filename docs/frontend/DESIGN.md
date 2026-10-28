@@ -31,7 +31,7 @@
 | `--yumi-color-muted` | `#65746c` | 说明、辅助字段、占位 |
 | `--yumi-color-line` | `#e5ebe7` | 卡片、表格、分隔线 |
 | `--yumi-color-canvas` | `#f5f7f5` | 内容区底色 |
-| `--yumi-color-surface` | `#ffffff` | 工作区、侧栏、顶栏 |
+| `--yumi-color-surface` | `#ffffff` | 工作区、顶栏 |
 | `--yumi-color-gold` | `#8b5e2b` | 待处理、部分完成、风险提醒 |
 | `--yumi-color-danger` | `#a85b50` | 失败、报废、错误 |
 | `--yumi-color-rail` | `#1d3028` | 侧栏底色 |
@@ -66,13 +66,15 @@
 | `--yumi-radius-xs/sm/md/lg/xl` | `4 / 5 / 6 / 8 / 10px` |
 | `--yumi-radius-pill` | `999px` |
 | `--yumi-content-max-width` | `1600px` |
+| `--yumi-rail-width` | `76px`（窄屏 `58px`） |
 | `--yumi-content-padding` | `24px 32px 48px` |
 | `--yumi-card-padding` | `16px` |
 
-- 应用外壳：侧栏 `216px` 深绿单栏导航，顶栏 `70px`；内容区最大宽度 `1600px`。保留单栏文字导航的信息架构，视觉采用原型的深绿侧栏、浅灰底和白卡片。
+- 应用外壳：侧栏 `76px` 深绿图标 rail，顶栏 `70px`；内容区最大宽度 `1600px`。每个一级模块一个图标入口，名称通过右侧悬浮提示和 `aria-label` 给出；窄屏 rail 收至 `58px`。
 - 页头在卡片外：标题左、说明紧随，主操作右；列表筛选与表格在卡片内。
-- 工作区卡片统一使用 `WorkspacePage`（白底、`1px` 浅边框、圆角 `8px`、默认内边距 `16px`）。
-- 列表页使用 `ListPage`：页头在卡片外，卡片头可选，筛选条在卡片内。
+- 模块页统一使用 `ModuleTabsPage`：模块标题 `h1` 固定在页签上方，子页不再重复页头；子页标题与主操作进入卡片头 `h2`。
+- 工作区卡片统一使用 `WorkspacePage`（白底、`1px` 浅边框、圆角 `8px`、默认内边距 `16px`）；带卡片头时标题与动作位于卡头，正文保持同一内边距。
+- 列表页使用 `ListPage`：页头在卡片外，卡片头可选，筛选条在卡片内；模块子页设置 `heading=false`，动作放 `panel-actions` 插槽。
 - 编辑页使用 `EditorPage`：主表单 `minmax(0, 1fr)`、右侧 `300px` 预览、间距 `16px`。
 - 详情页使用 `DetailPage`：页头在卡片外，只读内容在卡片内。
 - 表格：撑满工作区宽度，`border` 样式；表头 `11px`，行内边距 `16px`，金额列右对齐。
@@ -85,13 +87,15 @@
 | 组件/类 | 用途 |
 |---|---|
 | `PageShell` | 裸页面页头：标题、说明、右侧动作，卡片内容由页面自理 |
-| `WorkspacePage` | 白底工作区卡片外壳 |
-| `ListPage` | 列表页：页头、卡头、筛选条、PageState、分页 |
+| `ModuleTabsPage` | 模块页：模块标题在页签之上，页签切换子路由，`overview` 插槽放模块概览 |
+| `WorkspacePage` | 白底工作区卡片外壳；可带卡片头（标题、说明、动作），无标题时整卡内边距 |
+| `ListPage` | 列表页：页头、卡头、筛选条、PageState、分页；模块子页用 `heading=false` 隐藏页头 |
 | `EditorPage` | 编辑页：页头、表单与预览两栏 |
 | `DetailPage` | 详情页：页头、动作区、只读内容 |
 | `PageState` | 加载、失败重试、空态 |
 | `ListPager` | 上一页/下一页与每页条数 |
 | `.yumi-page-heading` | 页头布局与标题排版 |
+| `.yumi-module-tabs` | 模块页签条：白底、浅边框、与子页标题分层 |
 | `.yumi-toolbar` / `.yumi-actions` | 筛选条与动作组 |
 | `.yumi-panel` / `.yumi-panel__header/body` | 卡片及卡头 |
 | `.yumi-stat-grid` / `.yumi-stat-card` | 统计卡片组 |
@@ -99,6 +103,7 @@
 | `.yumi-info-grid` | `dl/dt/dd` 信息网格 |
 | `.yumi-form-grid` | 两列/三列表单网格 |
 | `.yumi-hint` / `.yumi-meta` / `.yumi-cell-title` | 辅助文字与表格双层单元格 |
+| `.yumi-text-positive` / `.yumi-text-pending` | 已达成的绿色文字与待处理的金色文字 |
 
 ### 页面样式规则
 

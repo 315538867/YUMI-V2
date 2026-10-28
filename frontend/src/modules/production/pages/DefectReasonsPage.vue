@@ -63,11 +63,14 @@ onMounted(load)
   <ListPage
     class="reasons-page"
     title="缺陷原因"
+    :heading="false"
+    panel-title="缺陷原因"
+    panel-hint="维护可用于责任更正的原因代码"
     :loading="loading"
     :error="errorText"
     @retry="load"
   >
-    <template #actions>
+    <template #panel-actions>
       <PermissionButton
         permission="production.defect-reason.manage"
         type="primary"

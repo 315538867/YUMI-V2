@@ -18,6 +18,8 @@ public interface ProductSnapshotService {
 
     ProductSnapshotView resolveProduct(ProductSnapshotRef ref);
 
+    ProductSnapshotView resolveProductById(String snapshotBusinessId);
+
     SchemeSnapshotView resolveScheme(ProductSnapshotRef ref);
 
     /** 方案快照引用与其冻结视图，避免调用方二次查询。 */

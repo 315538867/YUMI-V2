@@ -171,6 +171,20 @@ export const workforceService = {
     )
   },
 
+  activateTeam(
+    teamBusinessId: string,
+    expectedRowVersion: number,
+    reason: string,
+  ): Promise<TeamView> {
+    return api.command<TeamView, { expectedRowVersion: number; reason: string }>(
+      `/api/workforce/teams/${encodeURIComponent(teamBusinessId)}/activate`,
+      {
+        idempotencyKey: newIdempotencyKey('team-activate'),
+        body: { expectedRowVersion, reason },
+      },
+    )
+  },
+
   standards(): Promise<WorkforceStandardView> {
     return api.query<WorkforceStandardView>('/api/workforce/standards')
   },

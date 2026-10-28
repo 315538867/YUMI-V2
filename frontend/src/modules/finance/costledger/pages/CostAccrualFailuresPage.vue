@@ -44,6 +44,9 @@ onMounted(load)
   <ListPage
     class="failures-page"
     title="成本归集失败"
+    :heading="false"
+    panel-title="成本归集失败"
+    panel-hint="失败来源保留待恢复；重试沿用原命令"
     :loading="loading"
     :error="errorText"
     @retry="load"

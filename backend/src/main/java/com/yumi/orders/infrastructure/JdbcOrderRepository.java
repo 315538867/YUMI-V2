@@ -511,6 +511,37 @@ public class JdbcOrderRepository implements OrderRepository {
     }
 
     @Override
+    public int effectiveShipmentQuantity(String shipmentBusinessId) {
+        return jdbc.sql("""
+                        SELECT COALESCE(SUM(i.quantity + COALESCE(c.delta, 0)), 0)
+                        FROM orders_shipment_items i
+                        LEFT JOIN (
+                            SELECT shipment_item_business_id, SUM(quantity_delta) AS delta
+                            FROM orders_shipment_correction_facts
+                            WHERE is_valid = 1
+                            GROUP BY shipment_item_business_id
+                        ) c ON c.shipment_item_business_id = i.shipment_item_business_id
+                        WHERE i.shipment_business_id = :id
+                        """).param("id", shipmentBusinessId).query(Integer.class).single();
+    }
+
+    @Override
+    public int effectiveShippedQuantityOfOrder(String orderBusinessId) {
+        return jdbc.sql("""
+                        SELECT COALESCE(SUM(i.quantity + COALESCE(c.delta, 0)), 0)
+                        FROM orders_shipment_items i
+                        JOIN orders_shipments s ON s.shipment_business_id = i.shipment_business_id
+                        LEFT JOIN (
+                            SELECT shipment_item_business_id, SUM(quantity_delta) AS delta
+                            FROM orders_shipment_correction_facts
+                            WHERE is_valid = 1
+                            GROUP BY shipment_item_business_id
+                        ) c ON c.shipment_item_business_id = i.shipment_item_business_id
+                        WHERE s.order_business_id = :id AND s.is_valid = 1
+                        """).param("id", orderBusinessId).query(Integer.class).single();
+    }
+
+    @Override
     public java.util.List<ShipmentOfOrderRecord> findShipmentsOfOrder(String orderBusinessId) {
         return jdbc.sql("""
                         SELECT shipment_business_id, shipment_no, shipped_at, tracking_no, is_valid
@@ -1017,6 +1048,8 @@ public class JdbcOrderRepository implements OrderRepository {
                                o.currency_code, o.delivery_fulfilled, o.payment_fulfilled,
                                o.content_version, o.row_version, o.created_at, o.created_by,
                                o.updated_at,
+                               COALESCE(p.required_quantity, 0) AS required_quantity,
+                               COALESCE(p.shipped_quantity, 0) AS shipped_quantity,
                                COALESCE(cs.name, '') AS customer_name,
                                COALESCE((
                                    SELECT GROUP_CONCAT(DISTINCT
@@ -1063,7 +1096,9 @@ public class JdbcOrderRepository implements OrderRepository {
                 .query((resultSet, rowNumber) -> new OrderSummaryRecord(
                         mapOrder(resultSet, rowNumber),
                         resultSet.getString("customer_name"),
-                        resultSet.getString("product_names")))
+                        resultSet.getString("product_names"),
+                        resultSet.getInt("required_quantity"),
+                        resultSet.getInt("shipped_quantity")))
                 .list();
     }
 

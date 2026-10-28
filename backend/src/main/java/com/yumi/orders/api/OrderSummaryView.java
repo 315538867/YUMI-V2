@@ -17,6 +17,8 @@ public record OrderSummaryView(
         LocalDate expectedDeliveryDate,
         SettlementMoney currentReceivable,
         SettlementMoney netReceipts,
+        int requiredQuantity,
+        int shippedQuantity,
         boolean deliveryFulfilled,
         boolean paymentFulfilled,
         long contentVersion,

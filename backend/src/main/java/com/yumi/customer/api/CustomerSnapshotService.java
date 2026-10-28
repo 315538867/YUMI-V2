@@ -16,4 +16,6 @@ public interface CustomerSnapshotService {
             String customerBusinessId, DeliveryContactOverride override);
 
     CustomerSnapshotView resolve(CustomerSnapshotRef ref);
+
+    CustomerSnapshotView resolveById(String snapshotBusinessId);
 }

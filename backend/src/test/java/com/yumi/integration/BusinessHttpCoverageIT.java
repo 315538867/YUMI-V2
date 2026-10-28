@@ -210,7 +210,7 @@ class BusinessHttpCoverageIT extends AbstractOrderFixtureTest {
                 .andReturn();
         String itemId = json(task).get("items").get(0).get("taskItemBusinessId").asText();
 
-        command("/api/production/tasks/verification", new VerifyTaskCommand(List.of(
+        VerifyTaskCommand verification = new VerifyTaskCommand(List.of(
                 new TaskItemResultRequest(itemId, 0, 1, 0, 1,
                         List.of(new com.yumi.production.api.DefectGroupRequest(
                                 "OTHER", "接口报废", 1, 0,
@@ -218,8 +218,10 @@ class BusinessHttpCoverageIT extends AbstractOrderFixtureTest {
                                         1, com.yumi.production.api.PhysicalDestination
                                                 .TRANSFERRED_OFFLINE_INVENTORY,
                                         com.yumi.production.api.ResponsibilityType.STUDIO,
-                                        "STUDIO", null)))),
-                        null))))
+                                        "STUDIO", null, "瑕疵品仓", "接口测试移交",
+                                        "交接人", "接收人", LocalDate.parse("2026-10-15"))))),
+                        null)));
+        command("/api/production/tasks/verification", verification)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.taskBusinessId").value(taskId));
         getAsAdmin("/api/production/offline-transfers",
@@ -480,7 +482,7 @@ List.of(new com.yumi.orders.api.OrderItemRequest(
     private static CreateProductCommand productDefinition() {
         CostAmount one = cost("1.00");
         return new CreateProductCommand(
-                "HTTP 商品", "接口商品", WeightGram.ofGrams("120.0000"), "4", 30,
+                "HTTP 商品", "接口商品", WeightGram.ofGrams("120.0000"), "STAR_4", 60,
                 money("50.00"), LossRate.of(new BigDecimal("0.0500")),
                 one, one, one, 4, 10, one, 5,
                 one, one, one, one, 4, one, one, one,

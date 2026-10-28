@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import type { CustomerStatus, CustomerView } from '@/modules/customer/contracts'
 import { customerService } from '@/modules/customer/services/customerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
@@ -11,6 +13,7 @@ import ListPager from '@/shared/components/ListPager.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const { loading, errorText, run } = useAsyncLoad()
+const { run: runAction } = useAsyncAction()
 
 const router = useRouter()
 const rows = ref<CustomerView[]>([])
@@ -19,6 +22,31 @@ const { filters, page, size, sizes, search, reset, goPage, changeSize } = useLis
   { keyword: '', status: '' as CustomerStatus | '' },
   { onSearch: () => void load() },
 )
+
+async function toggleStatus(row: CustomerView): Promise<void> {
+  const target = row.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+  try {
+    await ElMessageBox.confirm(
+      target === 'ACTIVE'
+        ? `确认启用客户「${row.name}」？`
+        : `确认停用客户「${row.name}」？停用后新订单不能再引用。`,
+      target === 'ACTIVE' ? '确认启用' : '确认停用',
+      { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  await runAction(
+    () => customerService.changeStatus(row.customerBusinessId, target, row.rowVersion),
+    {
+      success: target === 'ACTIVE' ? '客户已启用' : '客户已停用',
+      fallback: '客户状态更新失败',
+      onSuccess: async () => {
+        await load()
+      },
+    },
+  )
+}
 
 async function load(): Promise<void> {
   await run(async () => {
@@ -92,7 +120,7 @@ void load()
           <CodeTag category="common.status" :code="row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button
             link
@@ -101,6 +129,22 @@ void load()
           >
             查看
           </el-button>
+          <PermissionButton
+            permission="customer.manage"
+            link
+            type="primary"
+            @click="router.push(`/customers/${row.customerBusinessId}/edit`)"
+          >
+            编辑
+          </PermissionButton>
+          <PermissionButton
+            permission="customer.manage"
+            link
+            :type="row.status === 'ACTIVE' ? 'warning' : 'success'"
+            @click="toggleStatus(row)"
+          >
+            {{ row.status === 'ACTIVE' ? '停用' : '启用' }}
+          </PermissionButton>
         </template>
       </el-table-column>
     </el-table>

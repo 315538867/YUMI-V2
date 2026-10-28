@@ -106,6 +106,17 @@ public class CustomerSnapshotServiceImpl implements CustomerSnapshotService {
                 record.phone(), record.address());
     }
 
+    @Override
+    public CustomerSnapshotView resolveById(String snapshotBusinessId) {
+        authorization.require(PermissionCodes.CUSTOMER_READ, ResourceScope.GLOBAL);
+        CustomerSnapshotRecord record = snapshots.findByBusinessId(snapshotBusinessId)
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "CUSTOMER_SNAPSHOT_NOT_FOUND", "客户快照不存在"));
+        return new CustomerSnapshotView(
+                toRef(record), record.customerNo(), record.name(), record.contactName(),
+                record.phone(), record.address());
+    }
+
     private CustomerSnapshotRef createSnapshot(
             CustomerRecord customer, DeliveryContactOverride override, ContentFingerprint overrideFingerprint) {
         Instant now = clock.instant();

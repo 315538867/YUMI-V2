@@ -67,6 +67,11 @@ export interface VerifyItemInput {
       responsibilityType: ResponsibilityType
       responsibleSubjectBusinessId: string | null
       waivedReason: string | null
+      offlineInventoryName?: string | null
+      offlineInventoryNote?: string | null
+      handedOverBy?: string | null
+      receivedBy?: string | null
+      transferredAt?: string | null
     }>
   }>
   resultNote: string | null

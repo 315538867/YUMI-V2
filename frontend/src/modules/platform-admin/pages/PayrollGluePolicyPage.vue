@@ -4,7 +4,6 @@ import { isErrorCode } from '@/platform/services/errorMessage'
 import type { GluePolicyView } from '@/modules/finance/payroll/contracts'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
-import PageShell from '@/shared/components/PageShell.vue'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 
@@ -63,60 +62,69 @@ onMounted(load)
 </script>
 
 <template>
-  <PageShell title="胶水减免设置">
-    <WorkspacePage class="glue-policy-page">
-      <el-alert
-        type="info"
-        :closable="false"
-        title="配置按生效月追加版本；修订不会重算已核定工资。"
-        class="yumi-alert"
-      />
-      <el-alert
-        v-if="errorText"
-        type="error"
-        :closable="false"
-        :title="errorText"
-        class="yumi-alert"
-      />
-      <el-alert
-        v-if="successText"
-        type="success"
-        :closable="false"
-        :title="successText"
-        class="yumi-alert"
-      />
-      <el-alert
-        v-if="policyMissing"
-        type="info"
-        :closable="false"
-        title="该月尚未配置胶水减免；填写下方表单并发布首个版本。"
-        class="yumi-alert"
-      />
-      <el-form inline>
-        <el-form-item label="生效月">
-          <el-input v-model="month" type="month" class="month" @change="load" />
-        </el-form-item>
-        <el-form-item label="每人免扣重量">
-          <el-input v-model="form.exemptWeightGrams" class="weight" />
-        </el-form-item>
-        <el-form-item label="原因">
-          <el-input v-model="form.reasonText" class="reason" />
-        </el-form-item>
-        <el-button type="primary" :loading="saving" @click="publish">发布版本</el-button>
-      </el-form>
-      <el-descriptions v-if="policy" :column="3" border class="current">
-        <el-descriptions-item label="当前版本">v{{ policy.version }}</el-descriptions-item>
-        <el-descriptions-item label="生效月">{{ policy.effectiveMonth }}</el-descriptions-item>
-        <el-descriptions-item label="免扣重量"
-          >{{ policy.exemptWeightGrams }} 克/人/月</el-descriptions-item
-        >
-      </el-descriptions>
-    </WorkspacePage>
-  </PageShell>
+  <WorkspacePage
+    class="glue-policy-page"
+    title="胶水减免设置"
+    hint="配置按生效月追加版本；修订不会重算已核定工资"
+  >
+    <el-alert
+      type="info"
+      :closable="false"
+      title="配置按生效月追加版本；修订不会重算已核定工资。"
+      class="yumi-alert"
+    />
+    <el-alert
+      v-if="errorText"
+      type="error"
+      :closable="false"
+      :title="errorText"
+      class="yumi-alert"
+    />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="yumi-alert"
+    />
+    <el-alert
+      v-if="policyMissing"
+      type="info"
+      :closable="false"
+      title="该月尚未配置胶水减免；填写下方表单并发布首个版本。"
+      class="yumi-alert"
+    />
+    <el-form inline>
+      <el-form-item label="生效月">
+        <el-date-picker
+          v-model="month"
+          type="month"
+          value-format="YYYY-MM"
+          format="YYYY-MM"
+          class="month"
+          @change="load"
+        />
+      </el-form-item>
+      <el-form-item label="每人免扣重量">
+        <el-input v-model="form.exemptWeightGrams" class="weight" />
+      </el-form-item>
+      <el-form-item label="原因">
+        <el-input v-model="form.reasonText" class="reason" />
+      </el-form-item>
+      <el-button type="primary" :loading="saving" @click="publish">发布版本</el-button>
+    </el-form>
+    <el-descriptions v-if="policy" :column="3" border class="current">
+      <el-descriptions-item label="当前版本">v{{ policy.version }}</el-descriptions-item>
+      <el-descriptions-item label="生效月">{{ policy.effectiveMonth }}</el-descriptions-item>
+      <el-descriptions-item label="免扣重量"
+        >{{ policy.exemptWeightGrams }} 克/人/月</el-descriptions-item
+      >
+    </el-descriptions>
+  </WorkspacePage>
 </template>
 
 <style scoped>
-.month {
+:deep(.month) {
   width: 150px;
 }
 .weight {

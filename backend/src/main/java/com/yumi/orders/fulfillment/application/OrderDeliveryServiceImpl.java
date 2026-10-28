@@ -231,8 +231,6 @@ public class OrderDeliveryServiceImpl implements OrderDeliveryService {
                 "SHC-" + UUID.randomUUID(), shipment.shipmentBusinessId(),
                 item.shipmentItemBusinessId(), "QUANTITY_DECREASE", -command.quantityDecrease(),
                 command.reasonText(), occurredAt, operatorId));
-        orders.updateShipmentItemQuantity(
-                item.shipmentItemBusinessId(), item.quantity() - command.quantityDecrease());
 
         var group = orders.findGroupById(item.agreementGroupBusinessId())
                 .orElseThrow(() -> new ApiException(
@@ -357,9 +355,7 @@ public class OrderDeliveryServiceImpl implements OrderDeliveryService {
         var shipment = orders.findShipment(shipmentBusinessId)
                 .orElseThrow(() -> new ApiException(
                         ApiErrorType.SYSTEM_FAILURE, "SHIPMENT_NOT_FOUND", "发货结果无法读取"));
-        int shipmentQuantity = orders.findShipmentItems(shipmentBusinessId).stream()
-                .mapToInt(OrderRepository.ShipmentItemRecord::quantity)
-                .sum();
+        int shipmentQuantity = orders.effectiveShipmentQuantity(shipmentBusinessId);
         int totalShipped = currentShipped(shipment.orderBusinessId());
         boolean deliveryFulfilled = orders.findProjection(shipment.orderBusinessId())
                 .map(OrderRepository.ProjectionRecord::deliveryFulfilled)
@@ -370,9 +366,7 @@ public class OrderDeliveryServiceImpl implements OrderDeliveryService {
     }
 
     private int currentShipped(String orderBusinessId) {
-        return orders.findShipmentItemsOfOrder(orderBusinessId).stream()
-                .mapToInt(OrderRepository.ShipmentItemRecord::quantity)
-                .sum();
+        return orders.effectiveShippedQuantityOfOrder(orderBusinessId);
     }
 
     private static List<ShipmentItemRequest> sortedItems(List<ShipmentItemRequest> items) {

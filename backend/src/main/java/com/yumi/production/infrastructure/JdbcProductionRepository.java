@@ -395,6 +395,18 @@ public class JdbcProductionRepository implements ProductionRepository {
     }
 
     @Override
+    public void increaseSourceQuantity(String productionSourceBusinessId, int deltaQuantity) {
+        jdbc.sql("""
+                        UPDATE production_sources
+                        SET initial_quantity = initial_quantity + :delta, row_version = row_version + 1
+                        WHERE production_source_business_id = :id
+                        """)
+                .param("delta", deltaQuantity)
+                .param("id", productionSourceBusinessId)
+                .update();
+    }
+
+    @Override
     public void updateSourceOpening(String productionSourceBusinessId, String openingStatus, String status) {
         jdbc.sql("""
                         UPDATE production_sources

@@ -49,6 +49,13 @@ describe('列表页外壳', () => {
     expect(wrapper.find('.list-page__toolbar').exists()).toBe(false)
   })
 
+  it('模块子页隐藏页头时只保留卡片与工具条', () => {
+    const wrapper = mountList({ heading: false, panelTitle: '员工列表' })
+    expect(wrapper.find('h1').exists()).toBe(false)
+    expect(wrapper.text()).toContain('员工列表')
+    expect(wrapper.find('.keyword').exists()).toBe(true)
+  })
+
   it('失败时展示错误并支持重试', async () => {
     const wrapper = mountList({ error: '列表加载失败' })
     expect(wrapper.text()).toContain('列表加载失败')

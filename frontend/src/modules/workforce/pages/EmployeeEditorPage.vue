@@ -52,7 +52,11 @@ async function load(): Promise<void> {
 async function save(): Promise<void> {
   const valid = validate([
     { field: 'name', invalid: form.name.trim() === '', message: '请填写姓名' },
-    { field: 'phone', invalid: form.phone.trim() === '', message: '请填写电话' },
+    {
+      field: 'phone',
+      invalid: form.phone.trim() !== '' && !/^1\d{10}$/.test(form.phone.trim()),
+      message: '手机号应为 11 位且以 1 开头',
+    },
   ])
   if (!valid) {
     return
@@ -103,9 +107,9 @@ onMounted(load)
     <el-form v-if="!loading" label-width="96px" @submit.prevent>
       <FormErrorAlert :error="formAlert" class="yumi-alert" />
       <el-form-item label="姓名" required :error="validationErrors.name || fieldError('name')">
-        <el-input v-model="form.name" aria-label="姓名" />
+        <el-input v-model="form.name" maxlength="30" aria-label="姓名" />
       </el-form-item>
-      <el-form-item label="电话" required :error="validationErrors.phone || fieldError('phone')">
+      <el-form-item label="电话" :error="validationErrors.phone || fieldError('phone')">
         <el-input v-model="form.phone" aria-label="电话" />
       </el-form-item>
       <el-form-item
@@ -117,13 +121,14 @@ onMounted(load)
           type="date"
           value-format="YYYY-MM-DD"
           :disabled="editing"
+          :disabled-date="(date: Date) => date.getTime() > Date.now()"
           aria-label="生效日期"
         />
       </el-form-item>
     </el-form>
 
     <template #preview>
-      <dl>
+      <dl class="yumi-info-grid">
         <dt>姓名</dt>
         <dd>{{ form.name || '未填写' }}</dd>
         <dt>电话</dt>

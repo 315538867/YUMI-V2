@@ -30,6 +30,9 @@ const form = reactive({
 const initialSnapshot = ref(JSON.stringify(form))
 const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value)
 const { allowLeave } = useUnsavedGuard(() => isDirty.value)
+const activeEmployees = computed(() =>
+  employees.value.filter((employee) => employee.employmentStatus === 'EMPLOYED'),
+)
 const memberNames = computed(() =>
   form.memberEmployeeBusinessIds
     .map((id) => employees.value.find((employee) => employee.employeeBusinessId === id)?.name ?? id)
@@ -59,8 +62,8 @@ async function save(): Promise<void> {
     { field: 'name', invalid: form.name.trim() === '', message: '请填写小组名称' },
     {
       field: 'memberEmployeeBusinessIds',
-      invalid: form.memberEmployeeBusinessIds.length === 0,
-      message: '请至少选择一名成员',
+      invalid: form.memberEmployeeBusinessIds.length < 2,
+      message: '小组至少需要两名在职成员',
     },
   ])
   if (!valid) {
@@ -127,7 +130,7 @@ onMounted(load)
           aria-label="成员"
         >
           <el-option
-            v-for="employee in employees"
+            v-for="employee in activeEmployees"
             :key="employee.employeeBusinessId"
             :label="`${employee.name}（${employee.employeeNo}）`"
             :value="employee.employeeBusinessId"
@@ -137,7 +140,7 @@ onMounted(load)
     </el-form>
 
     <template #preview>
-      <dl>
+      <dl class="yumi-info-grid">
         <dt>小组名称</dt>
         <dd>{{ form.name || '未填写' }}</dd>
         <dt>成员</dt>

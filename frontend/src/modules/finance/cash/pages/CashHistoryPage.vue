@@ -13,6 +13,7 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
+import BusinessFileUpload from '@/shared/components/BusinessFileUpload.vue'
 
 const { loading, errorText, run } = useAsyncLoad()
 
@@ -27,6 +28,7 @@ const { filters, search, reset } = useListQuery(
   { paged: false, onSearch: () => void load() },
 )
 const successText = ref('')
+const voucherId = ref<string | null>(null)
 const { loading: saving, run: runAction } = useAsyncAction()
 const { loading: detailLoading, errorText: detailError, run: runDetail } = useAsyncLoad()
 const detailVisible = ref(false)
@@ -57,6 +59,7 @@ function open(kind: 'reverse' | 'return', row: CashFactView): void {
   form.resultBusinessId = ''
   form.businessDate = new Date().toISOString().slice(0, 10)
   form.reasonText = ''
+  voucherId.value = null
   dialogVisible.value = true
 }
 
@@ -83,7 +86,12 @@ async function submit(): Promise<void> {
   await runAction(
     async () => {
       if (action.value === 'reverse') {
-        await cashService.reverse(form.cashFactBusinessId, form.businessDate, form.reasonText)
+        await cashService.reverse(
+          form.cashFactBusinessId,
+          form.businessDate,
+          form.reasonText,
+          voucherId.value === null ? [] : [voucherId.value],
+        )
       } else {
         await cashService.returnPayroll({
           originalCashFactBusinessId: form.cashFactBusinessId,
@@ -91,6 +99,7 @@ async function submit(): Promise<void> {
           amount: form.amount,
           businessDate: form.businessDate,
           reasonText: form.reasonText,
+          voucherFileRefs: voucherId.value === null ? [] : [voucherId.value],
         })
       }
     },
@@ -113,6 +122,9 @@ void load()
   <ListPage
     class="history-page"
     title="现金流水"
+    :heading="false"
+    panel-title="现金流水"
+    panel-hint="按业务日期查看有效与冲销流水"
     :loading="loading"
     :error="errorText"
     :empty="!loading && errorText === '' && facts.length === 0"
@@ -168,7 +180,7 @@ void load()
       <el-table-column label="有效" width="80">
         <template #default="{ row }">{{ row.valid ? '是' : '否' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="230">
+      <el-table-column label="操作" min-width="230">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
           <el-button link type="danger" :disabled="!row.valid" @click="open('reverse', row)"
@@ -247,7 +259,15 @@ void load()
         ><el-input v-model="form.amount" :disabled="action === 'reverse'"
       /></el-form-item>
       <el-form-item label="业务日期">
-        <el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD" />
+        <el-date-picker
+          v-model="form.businessDate"
+          type="date"
+          value-format="YYYY-MM-DD"
+          :disabled-date="(date: Date) => date.getTime() > Date.now()"
+        />
+      </el-form-item>
+      <el-form-item label="凭证（可选）">
+        <BusinessFileUpload v-model="voucherId" permission-code="finance.read" label="上传凭证" />
       </el-form-item>
       <el-form-item label="原因"
         ><el-input v-model="form.reasonText" type="textarea" :rows="2"

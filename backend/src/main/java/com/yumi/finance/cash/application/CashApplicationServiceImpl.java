@@ -389,7 +389,7 @@ public class CashApplicationServiceImpl implements CashApplicationService {
                             command.businessDate(), original.amount(), "CNY", clock.instant(),
                             currentActor.requireCurrentActor().accountBusinessId().value(),
                             original.cashFactBusinessId()));
-                    attachVouchers(id, List.of());
+                    attachVouchers(id, command.voucherFileRefs());
                     reverseBusinessLink(original, id, command.reasonText());
                     for (var allocation : cash.findAllocations(original.cashFactBusinessId())) {
                         cash.insertAllocation(new CashRepository.AllocationRecord(
@@ -398,7 +398,6 @@ public class CashApplicationServiceImpl implements CashApplicationService {
                                 allocation.amount()));
                         reverseProjection(allocation, original.cashType());
                     }
-                    cash.markCashFactInvalid(original.cashFactBusinessId());
                     return id;
                 });
         return ref(reversalId);

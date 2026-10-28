@@ -15,8 +15,10 @@ import type {
   ReturnDispositionType,
 } from '@/modules/orders/aftersales/contracts'
 import { afterSalesService } from '@/modules/orders/aftersales/services/afterSalesService'
+import { orderService } from '@/modules/orders/services/orderService'
 import { cashService } from '@/modules/finance/cash/services/cashService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import BusinessFileUpload from '@/shared/components/BusinessFileUpload.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
@@ -47,11 +49,14 @@ const costs = ref<
   }>
 >([])
 const successText = ref('')
+const voucherId = ref<string | null>(null)
 const dialogVisible = ref(false)
 const action = ref('open')
 const costCategoryOptions = codesOf('finance.costCategory')
+const orderItems = ref<Array<{ orderItemBusinessId: string; label: string }>>([])
 const form = reactive({
   orderBusinessId: '',
+  orderItemBusinessId: '',
   issueSummary: '',
   routeType: 'REFUND_ONLY' as AfterSalesRouteType,
   obligationType: 'REFUND' as ObligationType,
@@ -76,6 +81,10 @@ const form = reactive({
   recipientAddress: '',
   trackingNo: '',
   offlineInventoryName: '',
+  offlineInventoryNote: '',
+  handedOverBy: '',
+  receivedBy: '',
+  transferredAt: new Date().toISOString().slice(0, 10),
 })
 
 onMounted(() => {
@@ -146,12 +155,36 @@ async function load(): Promise<void> {
   }, '售后案例加载失败')
 }
 
+async function loadOrderItems(): Promise<void> {
+  orderItems.value = []
+  form.orderItemBusinessId = ''
+  if (form.orderBusinessId.trim() === '') {
+    return
+  }
+  try {
+    const workspace = await orderService.workspace(form.orderBusinessId.trim())
+    orderItems.value = workspace.order.items.map((item) => ({
+      orderItemBusinessId: item.orderItemBusinessId,
+      label: `${item.orderItemBusinessId} · ${item.activeQuantity} 件`,
+    }))
+  } catch {
+    orderItems.value = []
+  }
+}
+
 async function submit(): Promise<void> {
   errorText.value = ''
   successText.value = ''
   await runAction(
     async () => {
       if (action.value === 'open') {
+        if (
+          form.obligationType !== 'REFUND' &&
+          form.obligationType !== 'COMPENSATION' &&
+          form.orderItemBusinessId === ''
+        ) {
+          throw new Error('退回返修、补发等义务必须先选择订单项')
+        }
         const obligation =
           form.obligationType === 'REFUND' || form.obligationType === 'COMPENSATION'
             ? {
@@ -167,7 +200,7 @@ async function submit(): Promise<void> {
                 targetAmount: null,
                 dueDate: form.dueDate,
                 note: form.issueSummary,
-                orderItemBusinessId: null,
+                orderItemBusinessId: form.orderItemBusinessId || null,
               }
         const created = await afterSalesService.openCase({
           orderBusinessId: form.orderBusinessId.trim(),
@@ -207,12 +240,16 @@ async function submit(): Promise<void> {
           waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
           offlineInventoryName:
             form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.offlineInventoryName : null,
-          offlineInventoryNote: null,
-          handedOverBy: null,
-          receivedBy: null,
+          offlineInventoryNote:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'
+              ? form.offlineInventoryNote || null
+              : null,
+          handedOverBy:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.handedOverBy : null,
+          receivedBy: form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.receivedBy : null,
           transferredAt:
             form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'
-              ? `${form.businessDate}T10:00:00`
+              ? `${form.transferredAt}T10:00:00`
               : null,
         })
         successText.value = '池内制品已处置；生产与售后指向同一次处置'
@@ -256,11 +293,19 @@ async function submit(): Promise<void> {
           responsibleSubjectBusinessId:
             form.responsibilityType === 'WAIVED' ? null : form.responsibleSubjectBusinessId,
           waivedReason: form.responsibilityType === 'WAIVED' ? form.waivedReason : null,
-          offlineInventoryName: null,
-          offlineInventoryNote: null,
-          handedOverBy: null,
-          receivedBy: null,
-          transferredAt: null,
+          offlineInventoryName:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.offlineInventoryName : null,
+          offlineInventoryNote:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'
+              ? form.offlineInventoryNote || null
+              : null,
+          handedOverBy:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.handedOverBy : null,
+          receivedBy: form.destination === 'TRANSFERRED_OFFLINE_INVENTORY' ? form.receivedBy : null,
+          transferredAt:
+            form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'
+              ? `${form.transferredAt}T10:00:00`
+              : null,
           businessDate: form.businessDate,
           reasonText: form.reason,
         })
@@ -274,6 +319,7 @@ async function submit(): Promise<void> {
           form.obligationId,
           form.amount || obligation?.targetAmount?.amount || '0.00',
           form.businessDate,
+          voucherId.value === null ? [] : [voucherId.value],
         )
         successText.value = '赔付/退款已登记到现金'
       } else if (action.value === 'cost') {
@@ -523,8 +569,24 @@ async function submit(): Promise<void> {
         <el-form label-width="110px">
           <template v-if="action === 'open'">
             <el-form-item label="订单标识"
-              ><el-input v-model="form.orderBusinessId"
+              ><el-input v-model="form.orderBusinessId" @change="loadOrderItems"
             /></el-form-item>
+            <el-form-item
+              v-if="form.obligationType !== 'REFUND' && form.obligationType !== 'COMPENSATION'"
+              label="订单项"
+            >
+              <el-select
+                v-model="form.orderItemBusinessId"
+                placeholder="先填写订单标识，再选择订单项"
+              >
+                <el-option
+                  v-for="item in orderItems"
+                  :key="item.orderItemBusinessId"
+                  :label="item.label"
+                  :value="item.orderItemBusinessId"
+                />
+              </el-select>
+            </el-form-item>
             <el-form-item label="问题说明"
               ><el-input v-model="form.issueSummary" type="textarea" :rows="2"
             /></el-form-item>
@@ -563,6 +625,13 @@ async function submit(): Promise<void> {
             <el-form-item label="业务日期"
               ><el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD"
             /></el-form-item>
+            <el-form-item label="凭证（可选）">
+              <BusinessFileUpload
+                v-model="voucherId"
+                permission-code="finance.read"
+                label="上传凭证"
+              />
+            </el-form-item>
           </template>
           <template v-if="action === 'return'">
             <el-form-item label="数量"
@@ -582,8 +651,9 @@ async function submit(): Promise<void> {
             /></el-form-item>
             <el-form-item label="处置">
               <el-select v-model="form.dispositionType">
-                <el-option label="需返修" value="REPAIR_REQUIRED" />
+                <el-option label="退回客户" value="RETURN_TO_CUSTOMER" />
                 <el-option label="报废" value="SCRAPPED" />
+                <el-option label="释放义务" value="RELEASE_FROM_OBLIGATION" />
               </el-select>
             </el-form-item>
             <el-form-item label="去向">
@@ -592,9 +662,27 @@ async function submit(): Promise<void> {
                 <el-option label="转线下库存" value="TRANSFERRED_OFFLINE_INVENTORY" />
               </el-select>
             </el-form-item>
-            <el-form-item label="线下名称"
-              ><el-input v-model="form.offlineInventoryName"
-            /></el-form-item>
+            <template v-if="form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'">
+              <el-form-item label="线下名称">
+                <el-input v-model="form.offlineInventoryName" />
+              </el-form-item>
+              <el-form-item label="库存说明">
+                <el-input v-model="form.offlineInventoryNote" />
+              </el-form-item>
+              <el-form-item label="交接人">
+                <el-input v-model="form.handedOverBy" />
+              </el-form-item>
+              <el-form-item label="接收人">
+                <el-input v-model="form.receivedBy" />
+              </el-form-item>
+              <el-form-item label="移交日期">
+                <el-date-picker
+                  v-model="form.transferredAt"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                />
+              </el-form-item>
+            </template>
             <el-form-item label="责任类型">
               <el-select v-model="form.responsibilityType">
                 <el-option label="工作室" value="STUDIO" />
@@ -633,11 +721,10 @@ async function submit(): Promise<void> {
             /></el-form-item>
             <el-form-item label="新路线">
               <el-select v-model="form.changeRoute">
+                <el-option label="补发" value="REPLACEMENT" />
                 <el-option label="退款" value="REFUND" />
                 <el-option label="赔付" value="COMPENSATION" />
-                <el-option label="返修" value="REPAIR" />
-                <el-option label="补发" value="REPLACEMENT" />
-                <el-option label="客户配合" value="CUSTOMER_COOPERATION" />
+                <el-option label="结束" value="END" />
               </el-select>
             </el-form-item>
             <el-form-item
@@ -651,8 +738,9 @@ async function submit(): Promise<void> {
           <template v-if="action === 'cancel'">
             <el-form-item label="池内处置">
               <el-select v-model="form.dispositionType">
-                <el-option label="需返修" value="REPAIR_REQUIRED" />
+                <el-option label="退回客户" value="RETURN_TO_CUSTOMER" />
                 <el-option label="报废" value="SCRAPPED" />
+                <el-option label="释放义务" value="RELEASE_FROM_OBLIGATION" />
               </el-select>
             </el-form-item>
             <el-form-item label="去向">
@@ -661,6 +749,27 @@ async function submit(): Promise<void> {
                 <el-option label="转线下库存" value="TRANSFERRED_OFFLINE_INVENTORY" />
               </el-select>
             </el-form-item>
+            <template v-if="form.destination === 'TRANSFERRED_OFFLINE_INVENTORY'">
+              <el-form-item label="线下名称">
+                <el-input v-model="form.offlineInventoryName" />
+              </el-form-item>
+              <el-form-item label="库存说明">
+                <el-input v-model="form.offlineInventoryNote" />
+              </el-form-item>
+              <el-form-item label="交接人">
+                <el-input v-model="form.handedOverBy" />
+              </el-form-item>
+              <el-form-item label="接收人">
+                <el-input v-model="form.receivedBy" />
+              </el-form-item>
+              <el-form-item label="移交日期">
+                <el-date-picker
+                  v-model="form.transferredAt"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                />
+              </el-form-item>
+            </template>
             <el-form-item label="原因"><el-input v-model="form.reason" /></el-form-item>
           </template>
           <template v-if="action === 'cost' || action === 'cost-correct'">
@@ -681,6 +790,13 @@ async function submit(): Promise<void> {
             <el-form-item label="业务日期"
               ><el-date-picker v-model="form.businessDate" type="date" value-format="YYYY-MM-DD"
             /></el-form-item>
+            <el-form-item label="凭证（可选）">
+              <BusinessFileUpload
+                v-model="voucherId"
+                permission-code="finance.read"
+                label="上传凭证"
+              />
+            </el-form-item>
             <el-form-item label="原因"
               ><el-input v-model="form.reason" type="textarea" :rows="2"
             /></el-form-item>

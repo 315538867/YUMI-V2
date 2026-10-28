@@ -33,6 +33,7 @@ import com.yumi.production.application.port.VerificationRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -406,6 +407,16 @@ public class TaskVerificationServiceImpl implements TaskVerificationService {
                         exitId, item.productionSourceBusinessId(), item.physicalRootSourceBusinessId(),
                         demand.demandBusinessId(), item.taskItemBusinessId(), "QUALITY_SCRAP",
                         part.physicalDestination(), part.quantity(), now));
+                if (part.physicalDestination() == PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY) {
+                    verifications.insertOfflineTransfer(new VerificationRepository.OfflineTransferRecord(
+                            "TRF-" + UUID.randomUUID(), exitId, item.productionSourceBusinessId(),
+                            item.physicalRootSourceBusinessId(), demand.demandBusinessId(),
+                            demand.productBusinessId(), "QUALITY_SCRAP",
+                            part.offlineInventoryName().strip(), part.offlineInventoryNote(),
+                            part.handedOverBy().strip(), part.receivedBy().strip(),
+                            part.transferredAt().atStartOfDay().toInstant(ZoneOffset.UTC),
+                            part.quantity(), now, operatorId));
+                }
                 String dispositionId = "DSF-" + UUID.randomUUID();
                 verifications.insertDisposition(new VerificationRepository.DispositionFact(
                         dispositionId, defectFactId, item.taskItemBusinessId(), "SCRAPPED",

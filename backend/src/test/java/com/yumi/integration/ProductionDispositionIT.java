@@ -81,7 +81,8 @@ class ProductionDispositionIT extends AbstractProductionFixtureTest {
         DefectGroupRequest defect = new DefectGroupRequest("GLUE_OVERFLOW", null, 5, 3, List.of(
                 new DefectGroupRequest.ScrapPartRequest(
                         2, PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY,
-                        ResponsibilityType.EMPLOYEE, employee.employeeBusinessId(), null)));
+                        ResponsibilityType.EMPLOYEE, employee.employeeBusinessId(), null,
+                        "瑕疵品仓", null, "张三", "李四", LocalDate.parse("2026-10-06"))));
         asAdmin(() -> verificationService.verify(new VerifyTaskCommand(
                 List.of(new TaskItemResultRequest(itemId, 0, 7, 3, 2, List.of(defect), null)))));
 
@@ -151,7 +152,8 @@ class ProductionDispositionIT extends AbstractProductionFixtureTest {
                         3, PhysicalDestination.DESTROYED, ResponsibilityType.STUDIO, "STUDIO-1", null),
                 new DefectGroupRequest.ScrapPartRequest(
                         1, PhysicalDestination.TRANSFERRED_OFFLINE_INVENTORY,
-                        ResponsibilityType.WAIVED, null, "客户要求外观降级接收")));
+                        ResponsibilityType.WAIVED, null, "客户要求外观降级接收",
+                        "瑕疵品仓", null, "张三", "李四", LocalDate.parse("2026-10-06"))));
         asAdmin(() -> verificationService.verify(new VerifyTaskCommand(
                 List.of(new TaskItemResultRequest(itemId, 0, 6, 0, 4, List.of(defect), null)))));
 

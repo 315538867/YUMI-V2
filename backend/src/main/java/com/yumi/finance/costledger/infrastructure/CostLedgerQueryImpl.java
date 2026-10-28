@@ -21,7 +21,8 @@ public class CostLedgerQueryImpl implements CostLedgerQuery {
         return jdbc.sql("""
                         SELECT cost_entry_business_id, cost_category, subject_type,
                                subject_business_id, amount, business_date, operation_type,
-                               allocated, occurred_at
+                               source_module, source_type, source_business_id,
+                               basis_ref, reason_text, allocated, occurred_at
                         FROM finance_cost_entries
                         WHERE subject_type = :subjectType AND subject_business_id = :subjectId
                           AND business_date BETWEEN :startDate AND :endDate
@@ -39,6 +40,11 @@ public class CostLedgerQueryImpl implements CostLedgerQuery {
                         resultSet.getBigDecimal("amount"),
                         resultSet.getObject("business_date", java.time.LocalDate.class),
                         resultSet.getString("operation_type"),
+                        resultSet.getString("source_module"),
+                        resultSet.getString("source_type"),
+                        resultSet.getString("source_business_id"),
+                        resultSet.getString("basis_ref"),
+                        resultSet.getString("reason_text"),
                         resultSet.getBoolean("allocated"),
                         JdbcTimes.toInstant(resultSet.getObject(
                                 "occurred_at", java.time.LocalDateTime.class))))

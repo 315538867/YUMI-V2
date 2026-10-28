@@ -38,6 +38,28 @@ async function load(): Promise<void> {
   }, '小组详情加载失败')
 }
 
+async function activate(): Promise<void> {
+  if (team.value === null) {
+    return
+  }
+  const reason = await ElMessageBox.prompt('请填写启用原因', '启用小组', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+  })
+    .then((result) => result.value)
+    .catch(() => '')
+  if (reason === '') {
+    return
+  }
+  await runAction(() => workforceService.activateTeam(teamId, team.value!.rowVersion, reason), {
+    success: '小组已启用',
+    fallback: '小组启用失败',
+    onSuccess: async () => {
+      await load()
+    },
+  })
+}
+
 async function deactivate(): Promise<void> {
   if (team.value === null) {
     return
@@ -92,6 +114,14 @@ void load()
           @click="deactivate"
         >
           停用小组
+        </PermissionButton>
+        <PermissionButton
+          v-else
+          permission="workforce.team.manage"
+          type="success"
+          @click="activate"
+        >
+          启用小组
         </PermissionButton>
       </template>
     </template>

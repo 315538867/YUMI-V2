@@ -205,7 +205,7 @@ void load()
             <CodeTag category="workforce.qualificationStatus" :code="row.status" />
           </template>
         </el-table-column>
-        <el-table-column prop="effectiveFrom" label="生效日期" width="140" />
+        <el-table-column prop="effectiveFrom" label="生效日期" min-width="140" />
       </el-table>
 
       <el-tabs class="history-tabs">
@@ -219,7 +219,7 @@ void load()
               <template #default="{ row }">{{ row.reason || '—' }}</template>
             </el-table-column>
             <el-table-column prop="operatorId" label="操作人" width="140" />
-            <el-table-column label="记录时间" width="200">
+            <el-table-column label="记录时间" min-width="200">
               <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
             </el-table-column>
           </el-table>
@@ -241,7 +241,7 @@ void load()
               <template #default="{ row }">{{ qualificationTypeText(row.factType) }}</template>
             </el-table-column>
             <el-table-column prop="operatorId" label="操作人" width="140" />
-            <el-table-column label="记录时间" width="200">
+            <el-table-column label="记录时间" min-width="200">
               <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
             </el-table-column>
           </el-table>

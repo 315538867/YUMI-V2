@@ -79,10 +79,15 @@ public class OrderChangeServiceImpl implements OrderChangeService {
 
     @Override
     public OrderChangeRef change(ChangeConfirmedOrderCommand command) {
-        authorization.require(PermissionCodes.ORDER_CHANGE, ResourceScope.GLOBAL);
         if (command == null) {
             throw new ApiException(ApiErrorType.VALIDATION, "MISSING_CHANGE", "变更命令不能为空");
         }
+        boolean cancellationOnly = !command.actions().isEmpty()
+                && command.actions().stream()
+                        .allMatch(action -> action.kind() == OrderChangeKind.CANCELLATION);
+        authorization.require(
+                cancellationOnly ? PermissionCodes.ORDER_CANCEL : PermissionCodes.ORDER_CHANGE,
+                ResourceScope.GLOBAL);
         return transactionTemplate.execute(status -> doChange(command));
     }
 
@@ -258,9 +263,8 @@ public class OrderChangeServiceImpl implements OrderChangeService {
         int before = group.activeQuantity();
         int reduction = before - target;
         if (reduction < 0) {
-            throw new ApiException(
-                    ApiErrorType.BUSINESS_REJECTION, "ORDER_CHANGE_UNSUPPORTED",
-                    "一期不支持通过变更增加订单数量，请新建订单");
+            productionDemands.increase(new com.yumi.production.api.IncreaseProductionDemandCommand(
+                    demandId, -reduction, action.kind().name()));
         }
         if (reduction > 0) {
             reduceDemand(demandId, target, group.agreementGroupBusinessId());
@@ -284,7 +288,10 @@ public class OrderChangeServiceImpl implements OrderChangeService {
                 item.orderItemBusinessId(), target, target == 0 ? "CANCELLED" : item.status());
         orders.insertChangeAction(new OrderRepository.ChangeActionRecord(
                 changeId, item.orderItemBusinessId(), group.agreementGroupBusinessId(), null, null,
-                demandId, null, reduction > 0 ? "QUANTITY_REDUCE" : "CANCELLATION", 0, before, target,
+                demandId, null,
+                reduction > 0 ? "QUANTITY_REDUCE"
+                        : reduction < 0 ? "QUANTITY_INCREASE" : "CANCELLATION",
+                0, before, target,
                 group.activeVersionNo(), nextVersionNo));
         return version.unitPrice().multiply(BigDecimal.valueOf(target - before));
     }

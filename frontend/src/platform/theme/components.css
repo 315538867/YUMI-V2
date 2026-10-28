@@ -56,6 +56,15 @@
   line-height: var(--yumi-line-height-relaxed);
 }
 
+/* ===== 模块页签 ===== */
+.yumi-module-tabs {
+  margin-bottom: var(--yumi-space-5);
+}
+
+.yumi-module-tabs > .el-tabs__header {
+  margin-bottom: 0;
+}
+
 /* ===== 工具条与动作 ===== */
 .yumi-toolbar {
   display: flex;
@@ -73,8 +82,9 @@
   width: 140px;
 }
 
-.yumi-toolbar > :where(.el-date-editor) {
+.yumi-toolbar > .el-date-editor {
   width: 160px;
+  --el-date-editor-width: 160px;
 }
 
 .yumi-actions {
@@ -243,6 +253,14 @@
   color: var(--yumi-text-secondary);
   font-size: var(--yumi-font-size-sm);
   line-height: var(--yumi-line-height-relaxed);
+}
+
+.yumi-text-positive {
+  color: var(--yumi-color-brand);
+}
+
+.yumi-text-pending {
+  color: var(--yumi-color-gold);
 }
 
 .yumi-meta {

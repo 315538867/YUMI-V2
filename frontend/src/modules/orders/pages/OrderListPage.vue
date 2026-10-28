@@ -15,6 +15,12 @@ const { loading, errorText, run } = useAsyncLoad()
 
 const router = useRouter()
 const rows = ref<OrderSummaryView[]>([])
+function deliveryPercent(row: OrderSummaryView): number {
+  return row.requiredQuantity === 0
+    ? 0
+    : Math.min(100, Math.round((row.shippedQuantity / row.requiredQuantity) * 100))
+}
+
 const { filters, page, size, sizes, search, reset, goPage, changeSize } = useListQuery(
   { keyword: '', status: '' as OrderStatus | '' },
   { onSearch: () => void load() },
@@ -78,38 +84,39 @@ void load()
           <span class="yumi-cell-sub">{{ row.customerName }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="商品" min-width="160" show-overflow-tooltip>
+      <el-table-column label="商品" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">
           <span class="yumi-cell-title">{{ row.productNames }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="来源" width="150">
-        <template #default="{ row }"
-          ><CodeTag category="order.origin" :code="row.origin"
-        /></template>
+      <el-table-column prop="expectedDeliveryDate" label="预计交付" width="120" />
+      <el-table-column label="当前应收" width="130">
+        <template #default="{ row }"><MoneyText :value="row.currentReceivable" /></template>
       </el-table-column>
-      <el-table-column label="状态" width="120">
+      <el-table-column label="交付 / 付款" width="180">
+        <template #default="{ row }">
+          <div class="progress-meta">
+            <span :class="row.deliveryFulfilled ? 'yumi-text-positive' : 'yumi-text-pending'">
+              {{ row.deliveryFulfilled ? '已交付' : '待交付' }}
+            </span>
+            <span>{{ row.shippedQuantity }} / {{ row.requiredQuantity }}</span>
+          </div>
+          <el-progress
+            :percentage="deliveryPercent(row)"
+            :show-text="false"
+            :stroke-width="6"
+            :aria-label="`订单 ${row.orderNo} 交付进度`"
+          />
+          <span class="yumi-cell-sub"> 付款{{ row.paymentFulfilled ? '已收清' : '未收清' }} </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="净收款" width="130">
+        <template #default="{ row }"><MoneyText :value="row.netReceipts" /></template>
+      </el-table-column>
+      <el-table-column label="状态" width="110">
         <template #default="{ row }"
           ><CodeTag category="order.status" :code="row.status"
         /></template>
-      </el-table-column>
-      <el-table-column prop="orderDate" label="订单日期" width="120" />
-      <el-table-column prop="expectedDeliveryDate" label="预计交付" width="120" />
-      <el-table-column label="当前应收" width="150">
-        <template #default="{ row }"><MoneyText :value="row.currentReceivable" /></template>
-      </el-table-column>
-      <el-table-column label="净收款" width="150">
-        <template #default="{ row }"><MoneyText :value="row.netReceipts" /></template>
-      </el-table-column>
-      <el-table-column label="交付 / 付款" width="140">
-        <template #default="{ row }">
-          <span class="yumi-cell-title">
-            {{ row.deliveryFulfilled ? '已交付' : '未交付' }}
-          </span>
-          <span class="yumi-cell-sub">
-            {{ row.paymentFulfilled ? '已收清' : '未收清' }}
-          </span>
-        </template>
       </el-table-column>
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
@@ -133,6 +140,20 @@ void load()
 </template>
 
 <style scoped>
+.progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yumi-space-2);
+  margin-bottom: var(--yumi-space-1);
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-xs);
+}
+
+.progress-meta + :deep(.el-progress) {
+  margin-bottom: var(--yumi-space-1);
+}
+
 .keyword {
   width: 240px;
 }

@@ -46,6 +46,9 @@ onMounted(loadProducts)
   <ListPage
     class="gap-page"
     title="需求缺口"
+    :heading="false"
+    panel-title="需求缺口"
+    panel-hint="按商品查看待制、在制、合格完成与缺口"
     :loading="loading"
     :error="errorText"
     :empty="!loading && errorText === '' && rows.length === 0"

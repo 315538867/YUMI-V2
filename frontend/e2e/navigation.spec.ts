@@ -44,11 +44,12 @@ test('登录后统一导航可进入业务模块', async ({ page }) => {
     '工资',
     '现金与成本',
     '报表',
+    '设置与账号',
   ]) {
-    await expect(page.getByRole('menuitem', { name: label })).toBeVisible()
+    await expect(page.getByRole('link', { name: label })).toBeVisible()
   }
 
-  await page.getByRole('menuitem', { name: '客户' }).click()
+  await page.getByRole('link', { name: '客户' }).click()
   await expect(page).toHaveURL(/\/customers$/)
   await expect(page.getByRole('heading', { name: '客户', level: 1 })).toBeVisible()
 })

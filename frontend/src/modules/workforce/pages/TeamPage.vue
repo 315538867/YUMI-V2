@@ -8,7 +8,6 @@ import { workforceService } from '@/modules/workforce/services/workforceService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
-import PermissionButton from '@/shared/components/PermissionButton.vue'
 
 const { loading, errorText, run } = useAsyncLoad()
 
@@ -38,8 +37,9 @@ void load()
     class="team-page"
     title="小组"
     hint="小组成员与人数效率标准"
+    :heading="false"
     panel-title="小组列表"
-    panel-hint="小组成员在小组编辑中维护"
+    panel-hint="至少两名在职员工组成一个小组；同一员工可以加入多个小组"
     :loading="loading"
     :error="errorText"
     @retry="load"
@@ -59,15 +59,6 @@ void load()
       </el-select>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
-    </template>
-    <template #actions>
-      <PermissionButton
-        permission="workforce.team.manage"
-        type="primary"
-        @click="router.push('/workforce/teams/new')"
-      >
-        新增小组
-      </PermissionButton>
     </template>
     <el-table :data="teams" empty-text="没有匹配的小组" border>
       <el-table-column prop="teamNo" label="小组编号" width="130" />

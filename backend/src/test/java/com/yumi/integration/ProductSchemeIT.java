@@ -21,6 +21,7 @@ import com.yumi.product.application.ProductBudgetMapper;
 import com.yumi.product.application.ProductCommandService;
 import com.yumi.product.application.ProductSchemeCommandService;
 import com.yumi.product.infrastructure.JdbcBudgetRepository;
+import com.yumi.product.infrastructure.JdbcProductEntryConfigurationRepository;
 import com.yumi.product.infrastructure.JdbcProductRepository;
 import com.yumi.product.infrastructure.JdbcSchemeRepository;
 import com.yumi.support.AbstractMySqlIntegrationTest;
@@ -83,7 +84,7 @@ class ProductSchemeIT extends AbstractMySqlIntegrationTest {
 
         products = new ProductCommandService(
                 productRepository, schemeRepository, budgetRepository,
-                new RecordingNumbering("P-"), authorization, identity, audit, mapper,
+                new JdbcProductEntryConfigurationRepository(jdbc), new RecordingNumbering("P-"), authorization, identity, audit, mapper,
                 Clock.systemUTC(), transactionManager);
         schemes = new ProductSchemeCommandService(
                 schemeRepository, budgetRepository, products, authorization, identity, audit, mapper,

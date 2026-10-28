@@ -3,7 +3,6 @@ import { reactive, ref } from 'vue'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
-import PageShell from '@/shared/components/PageShell.vue'
 
 const { loading: saving, run: runAction } = useAsyncAction()
 const errorText = ref('')
@@ -29,38 +28,36 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <PageShell title="成本更正">
-    <WorkspacePage class="adjust-page">
-      <el-alert
-        type="info"
-        :closable="false"
-        title="更正不覆盖历史来源；原金额整笔反向，再写入新金额。"
-        class="yumi-alert"
-      />
-      <el-alert
-        v-if="errorText"
-        type="error"
-        :closable="false"
-        :title="errorText"
-        class="yumi-alert"
-      />
-      <el-alert
-        v-if="successText"
-        type="success"
-        :closable="false"
-        :title="successText"
-        class="yumi-alert"
-      />
-      <el-form label-width="110px" class="form">
-        <el-form-item label="成本事实"><el-input v-model="form.entryId" /></el-form-item>
-        <el-form-item label="新金额"><el-input v-model="form.newAmount" /></el-form-item>
-        <el-form-item label="更正原因"
-          ><el-input v-model="form.reasonText" type="textarea" :rows="2"
-        /></el-form-item>
-        <el-button type="primary" :loading="saving" @click="submit">提交更正</el-button>
-      </el-form>
-    </WorkspacePage>
-  </PageShell>
+  <WorkspacePage class="adjust-page" title="成本更正" hint="原金额整笔反向，再写入新金额">
+    <el-alert
+      type="info"
+      :closable="false"
+      title="更正不覆盖历史来源；原金额整笔反向，再写入新金额。"
+      class="yumi-alert"
+    />
+    <el-alert
+      v-if="errorText"
+      type="error"
+      :closable="false"
+      :title="errorText"
+      class="yumi-alert"
+    />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="yumi-alert"
+    />
+    <el-form label-width="110px" class="form">
+      <el-form-item label="成本事实"><el-input v-model="form.entryId" /></el-form-item>
+      <el-form-item label="新金额"><el-input v-model="form.newAmount" /></el-form-item>
+      <el-form-item label="更正原因"
+        ><el-input v-model="form.reasonText" type="textarea" :rows="2"
+      /></el-form-item>
+      <el-button type="primary" :loading="saving" @click="submit">提交更正</el-button>
+    </el-form>
+  </WorkspacePage>
 </template>
 
 <style scoped>

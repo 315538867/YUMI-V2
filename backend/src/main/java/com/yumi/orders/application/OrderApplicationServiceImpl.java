@@ -236,6 +236,7 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
                             record.orderDate(), record.expectedDeliveryDate(),
                             SettlementMoney.of(record.currentReceivableAmount(), CurrencyCode.CNY),
                             SettlementMoney.of(record.netReceipts(), CurrencyCode.CNY),
+                            summary.requiredQuantity(), summary.shippedQuantity(),
                             record.deliveryFulfilled(), record.paymentFulfilled(),
                             record.contentVersion(), record.updatedAt());
                 })
@@ -426,6 +427,7 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
                     group.agreementGroupBusinessId(), group.activeVersionNo()).orElseThrow();
             items.add(new OrderView.ItemView(
                     item.orderItemBusinessId(), item.productBusinessId(), item.productSnapshotRef(),
+                    productSnapshotName(item.productSnapshotRef()),
                     item.orderedQuantity(), item.activeQuantity(), item.status(),
                     new OrderView.AgreementView(
                             group.agreementGroupBusinessId(), version.agreementVersionBusinessId(),
@@ -443,7 +445,8 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
         return new OrderView(
                 record.orderBusinessId(), record.orderNo(), OrderOrigin.valueOf(record.origin()),
                 OrderStatus.valueOf(record.status()), record.customerBusinessId(),
-                record.customerSnapshotRef(), record.orderDate(), record.expectedDeliveryDate(),
+                record.customerSnapshotRef(), customerSnapshotName(record.customerSnapshotRef()),
+                record.orderDate(), record.expectedDeliveryDate(),
                 record.note(),
                 SettlementMoney.of(record.currentReceivableAmount(), CurrencyCode.CNY),
                 record.deliveryFulfilled(), record.paymentFulfilled(), items,
@@ -453,6 +456,22 @@ public class OrderApplicationServiceImpl implements OrderApplicationService, Ord
                         SettlementMoney.of(projection.receivedAmount(), CurrencyCode.CNY),
                         SettlementMoney.of(projection.refundedAmount(), CurrencyCode.CNY),
                         projection.deliveryFulfilled(), projection.paymentFulfilled(), blocking));
+    }
+
+    private String customerSnapshotName(String snapshotBusinessId) {
+        try {
+            return customerSnapshots.resolveById(snapshotBusinessId).name();
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private String productSnapshotName(String snapshotBusinessId) {
+        try {
+            return productSnapshots.resolveProductById(snapshotBusinessId).name();
+        } catch (RuntimeException exception) {
+            return null;
+        }
     }
 
     private String fingerprint(CreateConfirmedOrderCommand command) {

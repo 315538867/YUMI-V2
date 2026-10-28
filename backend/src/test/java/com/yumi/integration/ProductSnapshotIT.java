@@ -19,6 +19,7 @@ import com.yumi.product.application.ProductCommandService;
 import com.yumi.product.application.ProductSchemeCommandService;
 import com.yumi.product.application.ProductSnapshotServiceImpl;
 import com.yumi.product.infrastructure.JdbcBudgetRepository;
+import com.yumi.product.infrastructure.JdbcProductEntryConfigurationRepository;
 import com.yumi.product.infrastructure.JdbcProductRepository;
 import com.yumi.product.infrastructure.JdbcProductSnapshotRepository;
 import com.yumi.product.infrastructure.JdbcSchemeRepository;
@@ -90,7 +91,7 @@ class ProductSnapshotIT extends AbstractMySqlIntegrationTest {
 
         products = new ProductCommandService(
                 productRepository, schemeRepository, budgetRepository,
-                new RecordingNumbering("P-"), authorization, identity, audit, mapper,
+                new JdbcProductEntryConfigurationRepository(jdbc), new RecordingNumbering("P-"), authorization, identity, audit, mapper,
                 Clock.systemUTC(), transactionManager);
         schemes = new ProductSchemeCommandService(
                 schemeRepository, budgetRepository, products, authorization, identity, audit, mapper,
@@ -119,7 +120,7 @@ class ProductSnapshotIT extends AbstractMySqlIntegrationTest {
         var oldView = snapshots.resolveProduct(oldSnapshot);
 
         products.update(new UpdateProductCommand(
-                product.productBusinessId(), definition("示例商品（改）", "30", "2.50"),
+                product.productBusinessId(), definition("示例商品（改）", "5", "2.50"),
                 product.rowVersion()));
 
         ProductSnapshotRef newSnapshot = snapshots.acquireProductSnapshot(product.productBusinessId());
@@ -148,7 +149,7 @@ class ProductSnapshotIT extends AbstractMySqlIntegrationTest {
         assertThat(acquired.view().budget().lines()).isNotEmpty();
 
         products.update(new UpdateProductCommand(
-                product.productBusinessId(), definition("示例商品（改）", "30", "2.50"),
+                product.productBusinessId(), definition("示例商品（改）", "5", "2.50"),
                 product.rowVersion()));
 
         var resolved = snapshots.resolveScheme(acquired.ref());
@@ -218,7 +219,7 @@ class ProductSnapshotIT extends AbstractMySqlIntegrationTest {
     }
 
     private ProductRef createProduct() {
-        return products.create(definition("示例商品", "30", "1.00"));
+        return products.create(definition("示例商品", "5", "1.00"));
     }
 
     private CreateProductCommand definition(String name, String baggingMinutes, String makingCommission) {

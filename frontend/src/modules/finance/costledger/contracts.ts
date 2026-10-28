@@ -8,6 +8,11 @@ export interface CostEntryView {
   amount: string
   businessDate: string
   operationType: CodeOf<'finance.costOperation'>
+  sourceModule: string
+  sourceType: string
+  sourceBusinessId: string
+  basisRef: string | null
+  reasonText: string | null
   allocated: boolean
   occurredAt: string
 }

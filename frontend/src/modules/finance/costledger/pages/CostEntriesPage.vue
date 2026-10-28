@@ -4,6 +4,7 @@ import { useListQuery } from '@/platform/composables/useListQuery'
 import type { CostEntryView, CostSubjectSummary } from '@/modules/finance/costledger/contracts'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
 import CodeTag from '@/shared/components/CodeTag.vue'
+import CodeLabel from '@/shared/components/CodeLabel.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import ListPage from '@/shared/components/ListPage.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
@@ -62,6 +63,9 @@ void load()
   <ListPage
     class="entries-page"
     title="成本明细与汇总"
+    :heading="false"
+    panel-title="成本明细与汇总"
+    panel-hint="按主体查看材料、实际人工与经营分摊"
     :loading="loading"
     :error="errorText"
     :empty="!loading && errorText === '' && entries.length === 0"
@@ -106,13 +110,37 @@ void load()
       <el-descriptions-item label="口径">材料 + 实际人工 + 售后 + 经营分摊</el-descriptions-item>
     </el-descriptions>
     <el-table :data="entries" border empty-text="暂无成本明细">
-      <el-table-column prop="costEntryBusinessId" label="成本事实" min-width="200" />
+      <el-table-column label="成本事实 / 来源" min-width="220">
+        <template #default="{ row }">
+          <span class="yumi-cell-title">{{ row.costEntryBusinessId }}</span>
+          <span class="yumi-cell-sub">
+            <CodeLabel
+              category="finance.costSourceModule"
+              :code="row.sourceModule"
+              fallback="其他模块"
+            />
+            ·
+            <CodeLabel
+              category="finance.costSourceType"
+              :code="row.sourceType"
+              fallback="其他来源"
+            />
+            · {{ row.sourceBusinessId }}
+          </span>
+        </template>
+      </el-table-column>
       <el-table-column label="分类" width="150">
         <template #default="{ row }"
           ><CodeTag category="finance.costCategory" :code="row.costCategory"
         /></template>
       </el-table-column>
       <el-table-column prop="businessDate" label="业务日期" width="120" />
+      <el-table-column label="计价依据" min-width="180">
+        <template #default="{ row }">
+          <span>{{ row.basisRef || '—' }}</span>
+          <span v-if="row.reasonText" class="yumi-cell-sub">{{ row.reasonText }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="110">
         <template #default="{ row }"
           ><CodeTag category="finance.costOperation" :code="row.operationType"
@@ -149,6 +177,26 @@ void load()
       <el-descriptions-item label="主体">
         <CodeTag category="finance.costSubjectType" :code="detailEntry.subjectType" />
         · {{ detailEntry.subjectBusinessId }}
+      </el-descriptions-item>
+      <el-descriptions-item label="来源">
+        <CodeLabel
+          category="finance.costSourceModule"
+          :code="detailEntry.sourceModule"
+          fallback="其他模块"
+        />
+        ·
+        <CodeLabel
+          category="finance.costSourceType"
+          :code="detailEntry.sourceType"
+          fallback="其他来源"
+        />
+        · {{ detailEntry.sourceBusinessId }}
+      </el-descriptions-item>
+      <el-descriptions-item label="计价依据">
+        {{ detailEntry.basisRef || '—' }}
+      </el-descriptions-item>
+      <el-descriptions-item label="说明">
+        {{ detailEntry.reasonText || '—' }}
       </el-descriptions-item>
       <el-descriptions-item label="金额">
         <MoneyText :value="detailEntry.amount" />

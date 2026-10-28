@@ -330,7 +330,7 @@ class WorkforceLifecycleIT extends AbstractMySqlIntegrationTest {
         assertThatThrownBy(() -> workforce.updateWorkTimeStandard(
                 new UpdateWorkTimeStandardCommand(0, 2L, null)))
                 .isInstanceOf(ApiException.class)
-                .hasMessageContaining("必须大于 0");
+                .hasMessageContaining("1 至 1440");
 
         var versions = workforce.getStandardHistory("DAILY_WORK_TIME", standards.dailyStandardBusinessId());
         assertThat(versions.versions()).first().satisfies(version -> {

@@ -14,6 +14,7 @@ import com.yumi.finance.payroll.api.PayrollConfirmationService;
 import com.yumi.finance.payroll.api.PayrollPeriodRef;
 import com.yumi.finance.payroll.api.PayrollQuery;
 import com.yumi.finance.payroll.api.PayrollReviewRef;
+import com.yumi.finance.payroll.api.PayrollReviewView;
 import com.yumi.finance.payroll.api.PayrollReviewService;
 import com.yumi.finance.payroll.api.ReviewPayrollCommand;
 import com.yumi.platform.api.http.HttpHeaders;
@@ -108,6 +109,11 @@ public class PayrollController {
                 new CreatePayrollPeriodCommand(
                         idempotencyKey, request.periodNo(),
                         request.startDate(), request.endDate())));
+    }
+
+    @GetMapping("/reviews/{reviewRunBusinessId}")
+    public PayrollReviewView getReview(@PathVariable String reviewRunBusinessId) {
+        return queries.getReview(reviewRunBusinessId);
     }
 
     @GetMapping("/periods")

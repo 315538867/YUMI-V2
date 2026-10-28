@@ -69,12 +69,23 @@ void load()
       >
         新增商品
       </PermissionButton>
-      <el-button @click="router.push('/products/entry-settings')">录入设置</el-button>
+      <PermissionButton
+        permission="product.update"
+        @click="router.push('/products/entry-settings')"
+      >
+        录入设置
+      </PermissionButton>
     </template>
     <el-table :data="rows" empty-text="没有匹配的商品" border>
       <el-table-column prop="productNo" label="商品编号" width="140" />
       <el-table-column prop="name" label="商品名称" min-width="160" />
       <el-table-column prop="makingStarName" label="制作星级" width="110" />
+      <el-table-column label="制作规格" width="160">
+        <template #default="{ row }">
+          <span class="yumi-cell-title">{{ row.standardWeightGrams }} g</span>
+          <span class="yumi-cell-sub">{{ row.makingStandardMinutes }} 分钟 / 件</span>
+        </template>
+      </el-table-column>
       <el-table-column label="标准售价" width="140">
         <template #default="{ row }">
           <MoneyText :value="row.standardSalePrice" />
@@ -86,11 +97,19 @@ void load()
           <CodeTag category="common.status" :code="row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="170" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="router.push(`/products/${row.productBusinessId}`)">
             查看
           </el-button>
+          <PermissionButton
+            permission="product.update"
+            link
+            type="primary"
+            @click="router.push(`/products/${row.productBusinessId}/edit`)"
+          >
+            编辑
+          </PermissionButton>
         </template>
       </el-table-column>
     </el-table>

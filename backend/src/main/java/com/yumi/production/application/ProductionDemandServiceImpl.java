@@ -9,6 +9,7 @@ import com.yumi.platform.api.http.ApiErrorType;
 import com.yumi.platform.api.http.ApiException;
 import com.yumi.production.api.CreateProductionDemandRequest;
 import com.yumi.production.api.DemandReductionPreview;
+import com.yumi.production.api.IncreaseProductionDemandCommand;
 import com.yumi.production.api.DemandReductionResult;
 import com.yumi.production.api.DemandStatus;
 import com.yumi.production.api.ReduceProductionDemandCommand;
@@ -213,6 +214,46 @@ public class ProductionDemandServiceImpl implements ProductionDemandParticipant 
         }
 
         return toRef(demand, source);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ProductionDemandRef increase(IncreaseProductionDemandCommand command) {
+        authorization.require(PermissionCodes.PRODUCTION_SCHEDULE, ResourceScope.GLOBAL);
+        if (command == null) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_DEMAND", "增量命令不能为空");
+        }
+        DemandRecord demand = repository.findDemand(command.demandBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PRODUCTION_DEMAND_NOT_FOUND", "生产需求不存在"));
+        List<SourceRecord> sources = repository.findSourcesOfDemand(demand.demandBusinessId());
+        if (sources.isEmpty()) {
+            throw new ApiException(
+                    ApiErrorType.SYSTEM_FAILURE, "PRODUCTION_SOURCE_MISSING", "生产需求缺少履约来源");
+        }
+        SourceRecord source = sources.getFirst();
+        var projection = repository.findDemandProjection(demand.demandBusinessId())
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.SYSTEM_FAILURE, "PRODUCTION_PROJECTION_MISSING", "需求数量投影缺失"));
+        int before = projection.requiredQuantity();
+        int after = before + command.deltaQuantity();
+        repository.insertDemandProjection(new QuantityProjections.DemandProjection(
+                demand.demandBusinessId(), after,
+                projection.pendingWorkQuantity() + command.deltaQuantity(),
+                projection.inProcessQuantity(), projection.targetReadyQuantity(),
+                projection.fulfilledQuantity(), projection.fulfillmentGapQuantity(),
+                projection.rowVersion() + 1));
+        repository.updateDemandRequiredQuantity(demand.demandBusinessId(), after);
+        repository.increaseSourceQuantity(source.productionSourceBusinessId(), command.deltaQuantity());
+        repository.insertDemandChangeFact(new ProductionRepository.DemandChangeFact(
+                "DCF-" + UUID.randomUUID(), demand.demandBusinessId(),
+                source.productionSourceBusinessId(), "ORDER_INCREASE", before, after,
+                command.deltaQuantity(), 0, 0, 0, 0,
+                null, command.reasonText()));
+        return new ProductionDemandRef(
+                demand.demandBusinessId(), demand.demandType(),
+                source.productionSourceBusinessId(), source.physicalRootSourceBusinessId(),
+                demand.targetProcess(), after, demand.status(), demand.rowVersion() + 1);
     }
 
     @Override

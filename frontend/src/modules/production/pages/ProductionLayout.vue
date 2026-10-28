@@ -15,7 +15,6 @@ const workspaceRoutes = new Set([
   'production-defect-reasons',
 ])
 const isWorkspace = computed(() => workspaceRoutes.has(String(route.name)))
-const isSchedule = computed(() => route.name === 'production-schedule')
 const tabs = [
   { path: '/production/schedule', label: '排班' },
   { path: '/production/demands', label: '需求缺口' },
@@ -28,7 +27,7 @@ const tabs = [
 
 <template>
   <template v-if="isWorkspace">
-    <header v-if="isSchedule" class="yumi-page-heading">
+    <header class="yumi-page-heading">
       <div class="yumi-page-heading__copy">
         <h1 class="yumi-page-heading__title">生产作业</h1>
         <span class="yumi-page-heading__hint">整体进度、周排班与核验</span>
@@ -37,7 +36,7 @@ const tabs = [
     <ProductionOverviewCard />
     <el-tabs
       :model-value="active"
-      class="production-tabs"
+      class="yumi-module-tabs"
       @tab-change="(path: string | number) => router.push(String(path))"
     >
       <el-tab-pane v-for="tab in tabs" :key="tab.path" :label="tab.label" :name="tab.path" />
@@ -45,13 +44,3 @@ const tabs = [
   </template>
   <RouterView />
 </template>
-
-<style scoped>
-.production-tabs {
-  background: var(--yumi-surface);
-  border: 1px solid var(--yumi-border-color);
-  border-radius: var(--yumi-radius-lg);
-  padding: 0 var(--yumi-space-4);
-  margin-bottom: var(--yumi-space-3);
-}
-</style>

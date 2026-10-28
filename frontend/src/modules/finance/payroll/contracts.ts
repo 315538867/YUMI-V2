@@ -29,11 +29,16 @@ export interface EmployeePayrollView {
   resultBusinessId: string
   periodBusinessId: string
   employeeBusinessId: string
+  employeeNo?: string | null
+  employeeName?: string | null
   status: CodeOf<'finance.payrollResultStatus'>
   referenceRunBusinessId: string
   referenceFingerprint: string
   confirmedAmount: MoneyWire | null
+  referenceAmount: MoneyWire | null
   payableAmount: MoneyWire | null
+  paidAmount: MoneyWire | null
+  remainingAmount: MoneyWire | null
   rowVersion: number
   lines: ReferenceLineView[]
 }
@@ -69,4 +74,14 @@ export interface GlueMonthReferenceView {
     preAmount: string
     postAmount: string
   }>
+}
+
+export interface PayrollReviewView {
+  reviewRunBusinessId: string
+  periodBusinessId: string
+  employeeBusinessId: string
+  runType: string
+  fingerprint: string
+  generatedAt: string
+  lines: ReferenceLineView[]
 }

@@ -3,7 +3,6 @@ import { reactive, ref } from 'vue'
 import { costLedgerService } from '@/modules/finance/costledger/services/costLedgerService'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
-import PageShell from '@/shared/components/PageShell.vue'
 
 const entryId = ref('')
 const { loading: saving, run: runAction } = useAsyncAction()
@@ -33,50 +32,44 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <PageShell title="成本显式分摊">
-    <WorkspacePage class="allocation-page">
-      <el-alert
-        type="info"
-        :closable="false"
-        title="分摊只保存人工依据，不另生成成本；未分摊成本在报表提示不完整。"
-        class="yumi-alert"
-      />
-      <el-alert
-        v-if="errorText"
-        type="error"
-        :closable="false"
-        :title="errorText"
-        class="yumi-alert"
-      />
-      <el-alert
-        v-if="successText"
-        type="success"
-        :closable="false"
-        :title="successText"
-        class="yumi-alert"
-      />
-      <el-form label-width="110px" class="form">
-        <el-form-item label="成本事实"><el-input v-model="entryId" /></el-form-item>
-        <el-form-item
-          v-for="(item, index) in allocations"
-          :key="index"
-          :label="`分摊 ${index + 1}`"
-        >
-          <div class="row">
-            <el-select v-model="item.subjectType" class="type" aria-label="成本主体类型">
-              <el-option label="订单" value="ORDER" />
-              <el-option label="员工" value="EMPLOYEE" />
-              <el-option label="商品" value="PRODUCT" />
-            </el-select>
-            <el-input v-model="item.subjectBusinessId" placeholder="主体标识" />
-            <el-input v-model="item.amount" placeholder="金额" class="amount" />
-          </div>
-        </el-form-item>
-        <el-button @click="add">增加分摊行</el-button>
-        <el-button type="primary" :loading="saving" @click="submit">保存分摊</el-button>
-      </el-form>
-    </WorkspacePage>
-  </PageShell>
+  <WorkspacePage class="allocation-page" title="成本显式分摊" hint="只保存人工依据，不另生成成本">
+    <el-alert
+      type="info"
+      :closable="false"
+      title="分摊只保存人工依据，不另生成成本；未分摊成本在报表提示不完整。"
+      class="yumi-alert"
+    />
+    <el-alert
+      v-if="errorText"
+      type="error"
+      :closable="false"
+      :title="errorText"
+      class="yumi-alert"
+    />
+    <el-alert
+      v-if="successText"
+      type="success"
+      :closable="false"
+      :title="successText"
+      class="yumi-alert"
+    />
+    <el-form label-width="110px" class="form">
+      <el-form-item label="成本事实"><el-input v-model="entryId" /></el-form-item>
+      <el-form-item v-for="(item, index) in allocations" :key="index" :label="`分摊 ${index + 1}`">
+        <div class="row">
+          <el-select v-model="item.subjectType" class="type" aria-label="成本主体类型">
+            <el-option label="订单" value="ORDER" />
+            <el-option label="员工" value="EMPLOYEE" />
+            <el-option label="商品" value="PRODUCT" />
+          </el-select>
+          <el-input v-model="item.subjectBusinessId" placeholder="主体标识" />
+          <el-input v-model="item.amount" placeholder="金额" class="amount" />
+        </div>
+      </el-form-item>
+      <el-button @click="add">增加分摊行</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">保存分摊</el-button>
+    </el-form>
+  </WorkspacePage>
 </template>
 
 <style scoped>

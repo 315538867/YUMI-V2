@@ -42,6 +42,7 @@ public class FinanceConfiguration {
     public com.yumi.finance.costledger.api.CostLedgerApplicationService costLedgerApplicationService(
             com.yumi.finance.costledger.application.CostLedgerRepository costLedgerRepository,
             com.yumi.production.api.ProductionPayrollMaterialSourceFeed payrollMaterialFeed,
+            com.yumi.workforce.api.WorkforceEmployeeDirectory workforceEmployeeDirectory,
             com.yumi.finance.payroll.api.PayrollCostSourceFeed payrollCostFeed,
             com.yumi.orders.aftersales.api.OrderAfterSalesCostSourceFeed afterSalesCostFeed,
             IdempotentCommandService idempotency,
@@ -162,6 +163,7 @@ public class FinanceConfiguration {
             com.yumi.finance.payroll.application.PayrollRepository payrollRepository,
             PayrollSourceRepository payrollSourceRepository,
             com.yumi.production.api.ProductionPayrollMaterialSourceFeed payrollMaterialFeed,
+            com.yumi.workforce.api.WorkforceEmployeeDirectory workforceEmployeeDirectory,
             com.yumi.finance.payroll.api.PayrollCostSourceFeed payrollCostFeed,
             com.yumi.orders.aftersales.api.OrderAfterSalesCostSourceFeed afterSalesCostFeed,
             IdempotentCommandService idempotency,
@@ -171,7 +173,8 @@ public class FinanceConfiguration {
             Clock clock,
             PlatformTransactionManager transactionManager) {
         return new com.yumi.finance.payroll.application.PayrollApplicationServiceImpl(
-                payrollRepository, payrollSourceRepository, payrollMaterialFeed, idempotency,
+                payrollRepository, payrollSourceRepository, payrollMaterialFeed,
+                workforceEmployeeDirectory, idempotency,
                 authorization, currentActorProvider, objectMapper, clock, transactionManager);
     }
 

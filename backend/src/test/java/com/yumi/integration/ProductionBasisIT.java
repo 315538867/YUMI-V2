@@ -22,6 +22,7 @@ import com.yumi.product.application.ProductCostBasisQueryImpl;
 import com.yumi.product.application.ProductSchemeCommandService;
 import com.yumi.product.application.ProductSnapshotServiceImpl;
 import com.yumi.product.infrastructure.JdbcBudgetRepository;
+import com.yumi.product.infrastructure.JdbcProductEntryConfigurationRepository;
 import com.yumi.product.infrastructure.JdbcProductRepository;
 import com.yumi.product.infrastructure.JdbcProductSnapshotRepository;
 import com.yumi.product.infrastructure.JdbcSchemeRepository;
@@ -89,7 +90,7 @@ class ProductionBasisIT extends AbstractMySqlIntegrationTest {
 
         products = new ProductCommandService(
                 productRepository, schemeRepository, budgetRepository,
-                new RecordingNumbering("P-"), authorization, identity, audit, mapper,
+                new JdbcProductEntryConfigurationRepository(jdbc), new RecordingNumbering("P-"), authorization, identity, audit, mapper,
                 Clock.systemUTC(), transactionManager);
         schemes = new ProductSchemeCommandService(
                 schemeRepository, budgetRepository, products, authorization, identity, audit, mapper,

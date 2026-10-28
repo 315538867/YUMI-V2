@@ -73,7 +73,7 @@ test('员工详情、资格、整页编辑与离职返聘使用真实接口', as
   await page.locator('.history-tabs').getByRole('tab', { name: '资格变更' }).click()
   await expect(page.locator('.el-table__row').filter({ hasText: '授予资格' }).first()).toBeVisible()
 
-  await page.locator('.workforce-tabs').getByRole('tab', { name: '活动引用' }).click()
+  await page.goto('/workforce/activity-references')
   await page
     .locator('.el-form-item')
     .filter({ hasText: '主体' })
@@ -125,7 +125,7 @@ test('小组详情、整页编辑与人员标准', async ({ page, request }) => 
   await page.locator('.history-tabs').getByRole('tab', { name: '状态记录' }).click()
   await expect(page.getByText('创建').first()).toBeVisible()
 
-  await page.locator('.workforce-tabs').getByRole('tab', { name: '人员标准' }).click()
+  await page.goto('/workforce/standards')
   await expect(page.locator('.efficiency-table .el-table__row').first()).toBeVisible()
   const existingCounts = (
     await page.locator('.efficiency-table .el-table__row td:first-child').allInnerTexts()

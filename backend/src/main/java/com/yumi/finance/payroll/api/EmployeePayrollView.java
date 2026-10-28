@@ -8,11 +8,16 @@ public record EmployeePayrollView(
         String resultBusinessId,
         String periodBusinessId,
         String employeeBusinessId,
+        String employeeNo,
+        String employeeName,
         String status,
         String referenceRunBusinessId,
         String referenceFingerprint,
         SettlementMoney confirmedAmount,
+        SettlementMoney referenceAmount,
         SettlementMoney payableAmount,
+        SettlementMoney paidAmount,
+        SettlementMoney remainingAmount,
         long rowVersion,
         List<ReferenceLineView> lines) {
 

@@ -7,7 +7,6 @@ import { productionService } from '@/modules/production/services/productionServi
 import PageState from '@/shared/components/PageState.vue'
 import ProductionTraceDetail from '@/modules/production/pages/ProductionTraceDetail.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
-import PageShell from '@/shared/components/PageShell.vue'
 
 const summaries = ref<ProductionTraceSummary[]>([])
 const traceCache = ref<Record<string, OrderProductionTrace>>({})
@@ -137,81 +136,79 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageShell title="订单生产追溯">
-    <WorkspacePage class="trace-page">
-      <div class="yumi-toolbar">
-        <el-input
-          v-model="filters.keyword"
-          placeholder="订单、订单项或商品"
-          clearable
-          class="input"
-          aria-label="订单、订单项或商品"
-          @keyup.enter="search"
-        />
-        <el-button type="primary" @click="search">查询</el-button>
-        <el-button @click="load(true)">刷新</el-button>
-        <el-button @click="reset">重置</el-button>
-        <el-button @click="expandAll">展开全部</el-button>
-        <el-button @click="collapseAll">收起全部</el-button>
-      </div>
-      <PageState
-        :loading="loading"
-        :error="errorText"
-        :empty="!loading && errorText === '' && groups.length === 0"
-        :empty-text="filters.keyword.trim() === '' ? '暂无生产追溯记录' : '没有匹配的生产记录'"
-        @retry="load(true)"
+  <WorkspacePage class="trace-page" title="订单生产追溯" hint="按订单查看需求、任务、核验与交付">
+    <div class="yumi-toolbar">
+      <el-input
+        v-model="filters.keyword"
+        placeholder="订单、订单项或商品"
+        clearable
+        class="input"
+        aria-label="订单、订单项或商品"
+        @keyup.enter="search"
+      />
+      <el-button type="primary" @click="search">查询</el-button>
+      <el-button @click="load(true)">刷新</el-button>
+      <el-button @click="reset">重置</el-button>
+      <el-button @click="expandAll">展开全部</el-button>
+      <el-button @click="collapseAll">收起全部</el-button>
+    </div>
+    <PageState
+      :loading="loading"
+      :error="errorText"
+      :empty="!loading && errorText === '' && groups.length === 0"
+      :empty-text="filters.keyword.trim() === '' ? '暂无生产追溯记录' : '没有匹配的生产记录'"
+      @retry="load(true)"
+    >
+      <el-card
+        v-for="group in groups"
+        :key="group.orderBusinessId"
+        class="order-card"
+        shadow="never"
       >
-        <el-card
-          v-for="group in groups"
-          :key="group.orderBusinessId"
-          class="order-card"
-          shadow="never"
-        >
-          <template #header>
-            <div class="order-head">
-              <div>
-                <strong>订单 {{ group.items[0]?.orderNo || group.orderBusinessId }}</strong>
-                <span class="yumi-meta">
-                  · {{ group.items[0]?.productNames || '未关联商品' }} ·
-                  {{ group.items.length }} 个订单项
-                </span>
-              </div>
-              <el-button link type="primary" @click="toggle(group.orderBusinessId)">
-                {{ isExpanded(group.orderBusinessId) ? '收起链路' : '查看链路' }}
-              </el-button>
+        <template #header>
+          <div class="order-head">
+            <div>
+              <strong>订单 {{ group.items[0]?.orderNo || group.orderBusinessId }}</strong>
+              <span class="yumi-meta">
+                · {{ group.items[0]?.productNames || '未关联商品' }} ·
+                {{ group.items.length }} 个订单项
+              </span>
             </div>
-          </template>
-          <div v-if="isExpanded(group.orderBusinessId)" class="order-body">
-            <div v-for="item in group.items" :key="item.orderItemBusinessId" class="trace-slot">
-              <ProductionTraceDetail
-                v-if="traceCache[item.orderItemBusinessId]"
-                :trace="traceCache[item.orderItemBusinessId]!"
-              />
-              <el-alert
-                v-else-if="traceErrors[item.orderItemBusinessId]"
-                type="error"
-                :closable="false"
-                :title="traceErrors[item.orderItemBusinessId]"
-              >
-                <template #default>
-                  <el-button size="small" @click="loadTrace(item.orderItemBusinessId)">
-                    重试
-                  </el-button>
-                </template>
-              </el-alert>
-              <p v-else class="yumi-meta">
-                {{ traceLoading[item.orderItemBusinessId] ? '正在加载链路…' : '等待加载链路' }}
-              </p>
-            </div>
+            <el-button link type="primary" @click="toggle(group.orderBusinessId)">
+              {{ isExpanded(group.orderBusinessId) ? '收起链路' : '查看链路' }}
+            </el-button>
           </div>
-          <p v-else class="yumi-meta">展开查看需求、任务与生产事实链路。</p>
-        </el-card>
-        <div v-if="hasMore" class="load-more">
-          <el-button :loading="loadingMore" @click="load(false)">加载更多</el-button>
+        </template>
+        <div v-if="isExpanded(group.orderBusinessId)" class="order-body">
+          <div v-for="item in group.items" :key="item.orderItemBusinessId" class="trace-slot">
+            <ProductionTraceDetail
+              v-if="traceCache[item.orderItemBusinessId]"
+              :trace="traceCache[item.orderItemBusinessId]!"
+            />
+            <el-alert
+              v-else-if="traceErrors[item.orderItemBusinessId]"
+              type="error"
+              :closable="false"
+              :title="traceErrors[item.orderItemBusinessId]"
+            >
+              <template #default>
+                <el-button size="small" @click="loadTrace(item.orderItemBusinessId)">
+                  重试
+                </el-button>
+              </template>
+            </el-alert>
+            <p v-else class="yumi-meta">
+              {{ traceLoading[item.orderItemBusinessId] ? '正在加载链路…' : '等待加载链路' }}
+            </p>
+          </div>
         </div>
-      </PageState>
-    </WorkspacePage>
-  </PageShell>
+        <p v-else class="yumi-meta">展开查看需求、任务与生产事实链路。</p>
+      </el-card>
+      <div v-if="hasMore" class="load-more">
+        <el-button :loading="loadingMore" @click="load(false)">加载更多</el-button>
+      </div>
+    </PageState>
+  </WorkspacePage>
 </template>
 
 <style scoped>

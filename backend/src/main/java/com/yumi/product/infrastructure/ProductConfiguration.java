@@ -53,6 +53,7 @@ public class ProductConfiguration {
             ProductRepository products,
             SchemeRepository schemes,
             BudgetRepository budgets,
+            ProductEntryConfigurationRepository configurations,
             BusinessNumberService numbering,
             AuthorizationService authorization,
             CurrentActorProvider currentActorProvider,
@@ -61,8 +62,8 @@ public class ProductConfiguration {
             Clock clock,
             PlatformTransactionManager transactionManager) {
         return new ProductCommandService(
-                products, schemes, budgets, numbering, authorization, currentActorProvider, audit,
-                productBudgetMapper, clock, transactionManager);
+                products, schemes, budgets, configurations, numbering, authorization,
+                currentActorProvider, audit, productBudgetMapper, clock, transactionManager);
     }
 
     @Bean(name = "productQuery")

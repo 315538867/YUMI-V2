@@ -18,6 +18,7 @@ import com.yumi.workforce.api.AssignmentSubjectType;
 import com.yumi.workforce.api.ChangeQualificationCommand;
 import com.yumi.workforce.api.CreateEfficiencyStandardCommand;
 import com.yumi.workforce.api.CreateTeamCommand;
+import com.yumi.workforce.api.ActivateTeamCommand;
 import com.yumi.workforce.api.DeactivateTeamCommand;
 import com.yumi.workforce.api.EmployeeHistoryView;
 import com.yumi.workforce.api.EmployeeRef;
@@ -364,6 +365,37 @@ public class WorkforceCommandService
     }
 
     @Override
+    public void activateTeam(ActivateTeamCommand command) {
+        authorization.require(PermissionCodes.WORKFORCE_TEAM_MANAGE, ResourceScope.GLOBAL);
+        if (command == null) {
+            throw new ApiException(ApiErrorType.VALIDATION, "MISSING_TEAM", "启用命令不能为空");
+        }
+        String teamBusinessId = requireText(command.teamBusinessId(), "小组标识", 64);
+
+        transactionTemplate.executeWithoutResult(status -> {
+            requireTeam(teamBusinessId);
+            List<String> members = repository.teamMemberIds(teamBusinessId);
+            if (members.size() < 2) {
+                throw new ApiException(
+                        ApiErrorType.BUSINESS_REJECTION, "WORKFORCE_TEAM_MEMBER_INSUFFICIENT",
+                        "小组至少需要两名成员才能启用");
+            }
+            lockGuardsInOrder(members, List.of(teamBusinessId));
+            Instant now = clock.instant();
+            if (!repository.updateTeamStatus(
+                    teamBusinessId, TeamStatus.ACTIVE, command.expectedRowVersion(), now, operatorId())) {
+                throw new ApiException(
+                        ApiErrorType.CONCURRENT_CONFLICT, "WORKFORCE_VERSION_CONFLICT",
+                        "小组已被其他操作修改，请重新打开后再操作");
+            }
+            repository.insertTeamStatusFact(
+                    teamBusinessId, "ACTIVATE", TeamStatus.ACTIVE, command.reason(),
+                    now, operatorId());
+            recordAudit("ACTIVATE_TEAM", teamBusinessId, Map.of());
+        });
+    }
+
+    @Override
     public void createEfficiencyStandard(CreateEfficiencyStandardCommand command) {
         authorization.require(PermissionCodes.WORKFORCE_STANDARD_MANAGE, ResourceScope.GLOBAL);
         if (command == null) {
@@ -448,9 +480,12 @@ public class WorkforceCommandService
     @Override
     public void updateWorkTimeStandard(UpdateWorkTimeStandardCommand command) {
         authorization.require(PermissionCodes.WORKFORCE_STANDARD_MANAGE, ResourceScope.GLOBAL);
-        if (command == null || command.effectiveMinutes() <= 0) {
+        if (command == null
+                || command.effectiveMinutes() <= 0
+                || command.effectiveMinutes() > 1440) {
             throw new ApiException(
-                    ApiErrorType.VALIDATION, "WORKFORCE_STANDARD_INVALID", "每日有效分钟必须大于 0");
+                    ApiErrorType.VALIDATION, "WORKFORCE_STANDARD_INVALID",
+                    "每日有效分钟必须为 1 至 1440 的整数");
         }
 
         transactionTemplate.executeWithoutResult(status -> {
@@ -464,6 +499,14 @@ public class WorkforceCommandService
                 throw new ApiException(
                         ApiErrorType.BUSINESS_REJECTION, "WORKFORCE_STANDARD_IN_USE",
                         "每日有效时间标准仍被活动任务引用，不能修改");
+            }
+            if (daily.effectiveMinutes() == command.effectiveMinutes()) {
+                if (daily.rowVersion() != command.expectedRowVersion()) {
+                    throw new ApiException(
+                            ApiErrorType.CONCURRENT_CONFLICT, "WORKFORCE_VERSION_CONFLICT",
+                            "每日有效时间标准已被其他操作修改，请重新打开后再保存");
+                }
+                return;
             }
             if (!repository.updateDailyStandard(
                     daily.standardBusinessId(), command.effectiveMinutes(), command.expectedRowVersion(),

@@ -57,10 +57,15 @@ export const cashService = {
   payPayroll(
     allocations: Array<{ resultBusinessId: string; amount: string }>,
     businessDate: string,
+    voucherFileRefs: string[] = [],
   ): Promise<CashFactRef> {
     return api.command<
       CashFactRef,
-      { allocations: Array<{ resultBusinessId: string; amount: unknown }>; businessDate: string }
+      {
+        allocations: Array<{ resultBusinessId: string; amount: unknown }>
+        businessDate: string
+        voucherFileRefs: string[]
+      }
     >('/api/finance/cash/payroll-payments', {
       idempotencyKey: newIdempotencyKey('payroll-payment'),
       body: {
@@ -69,6 +74,7 @@ export const cashService = {
           amount: money(item.amount),
         })),
         businessDate,
+        voucherFileRefs,
       },
     })
   },
@@ -113,6 +119,7 @@ export const cashService = {
     amount: string
     businessDate: string
     reasonText: string
+    voucherFileRefs?: string[]
   }): Promise<CashFactRef> {
     return api.command<CashFactRef, Record<string, unknown>>('/api/finance/cash/payroll-returns', {
       idempotencyKey: newIdempotencyKey('payroll-return'),
@@ -122,6 +129,7 @@ export const cashService = {
         amount: money(input.amount),
         businessDate: input.businessDate,
         reasonText: input.reasonText,
+        voucherFileRefs: input.voucherFileRefs ?? [],
       },
     })
   },
@@ -130,13 +138,19 @@ export const cashService = {
     cashFactBusinessId: string,
     businessDate: string,
     reasonText: string,
+    voucherFileRefs: string[] = [],
   ): Promise<CashFactRef> {
     return api.command<
       CashFactRef,
-      { cashFactBusinessId: string; businessDate: string; reasonText: string }
+      {
+        cashFactBusinessId: string
+        businessDate: string
+        reasonText: string
+        voucherFileRefs: string[]
+      }
     >('/api/finance/cash/reversals', {
       idempotencyKey: newIdempotencyKey('cash-reversal'),
-      body: { cashFactBusinessId, businessDate, reasonText },
+      body: { cashFactBusinessId, businessDate, reasonText, voucherFileRefs },
     })
   },
 

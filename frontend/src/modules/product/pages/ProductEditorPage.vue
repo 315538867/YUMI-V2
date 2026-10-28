@@ -149,7 +149,23 @@ const extraFields: Array<{ key: MoneyKey; label: string }> = [
 async function load(): Promise<void> {
   await run(async () => {
     configuration.value = await productService.entryConfiguration()
-    form.makingStarCode = configuration.value.makingStars[0]?.starCode ?? form.makingStarCode
+    const defaultStar = configuration.value.makingStars[0]
+    if (defaultStar) {
+      form.makingStarCode = defaultStar.starCode
+      form.makingStandardMinutes = defaultStar.standardMinutes
+    }
+    const defaultBagging = configuration.value.processTimeOptions.find(
+      (option) => option.processCode === 'BAGGING',
+    )
+    if (defaultBagging) {
+      form.baggingStandardMinutes = defaultBagging.standardMinutes
+    }
+    const defaultSeam = configuration.value.processTimeOptions.find(
+      (option) => option.processCode === 'SEAM_CUTTING',
+    )
+    if (defaultSeam) {
+      form.seamStandardMinutes = defaultSeam.standardMinutes
+    }
     form.glueLossRate = configuration.value.glueLossRate
     form.glueUnitPrice = configuration.value.glueUnitPrice.amount
     form.colorPasteUnitPrice = configuration.value.colorPasteUnitPrice.amount
@@ -190,6 +206,37 @@ async function load(): Promise<void> {
     initialSnapshot.value = JSON.stringify(form)
   }, '商品录入数据加载失败')
 }
+
+function syncMakingMinutes(starCode: string): void {
+  const star = configuration.value?.makingStars.find((item) => item.starCode === starCode)
+  if (star) {
+    form.makingStandardMinutes = star.standardMinutes
+  }
+}
+
+function processTimeOptions(processCode: string, current: number) {
+  const options =
+    configuration.value?.processTimeOptions.filter(
+      (option) => option.processCode === processCode,
+    ) ?? []
+  if (current > 0 && !options.some((option) => option.standardMinutes === current)) {
+    return [
+      ...options,
+      {
+        optionBusinessId: `CURRENT-${processCode}`,
+        processCode,
+        optionCode: 'CURRENT',
+        name: `当前商品 ${current} 分钟`,
+        standardMinutes: current,
+        sortOrder: Number.MAX_SAFE_INTEGER,
+      },
+    ]
+  }
+  return options
+}
+
+const baggingOptions = computed(() => processTimeOptions('BAGGING', form.baggingStandardMinutes))
+const seamOptions = computed(() => processTimeOptions('SEAM_CUTTING', form.seamStandardMinutes))
 
 function definition(): ProductDefinition {
   return {
@@ -302,7 +349,7 @@ onMounted(load)
         <el-input v-model="form.standardWeightGrams" />
       </el-form-item>
       <el-form-item label="制作星级">
-        <el-select v-model="form.makingStarCode">
+        <el-select v-model="form.makingStarCode" @change="syncMakingMinutes">
           <el-option
             v-for="star in configuration?.makingStars ?? []"
             :key="star.starCode"
@@ -312,7 +359,7 @@ onMounted(load)
         </el-select>
       </el-form-item>
       <el-form-item label="制作标准分钟">
-        <el-input v-model.number="form.makingStandardMinutes" type="number" />
+        <el-input v-model.number="form.makingStandardMinutes" type="number" disabled />
       </el-form-item>
       <el-form-item label="标准售价">
         <el-input v-model="form.standardSalePrice" />
@@ -340,7 +387,14 @@ onMounted(load)
 
       <h2>3. 捏毛装袋</h2>
       <el-form-item label="标准分钟">
-        <el-input v-model.number="form.baggingStandardMinutes" type="number" />
+        <el-select v-model="form.baggingStandardMinutes">
+          <el-option
+            v-for="option in baggingOptions"
+            :key="option.optionBusinessId"
+            :label="option.name"
+            :value="option.standardMinutes"
+          />
+        </el-select>
       </el-form-item>
       <el-form-item v-for="field in baggingFields" :key="field.key" :label="field.label">
         <el-input v-model="form[field.key]" />
@@ -348,7 +402,14 @@ onMounted(load)
 
       <h2>4. 缝边剪袋</h2>
       <el-form-item label="标准分钟">
-        <el-input v-model.number="form.seamStandardMinutes" type="number" />
+        <el-select v-model="form.seamStandardMinutes">
+          <el-option
+            v-for="option in seamOptions"
+            :key="option.optionBusinessId"
+            :label="option.name"
+            :value="option.standardMinutes"
+          />
+        </el-select>
       </el-form-item>
       <el-form-item v-for="field in seamFields" :key="field.key" :label="field.label">
         <el-input v-model="form[field.key]" />
@@ -379,6 +440,8 @@ onMounted(load)
                 : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
             }}
           </dd>
+          <dt>客户供料标准价值</dt>
+          <dd><MoneyText :value="budgetPreview.customerSuppliedUnitValue" /></dd>
         </dl>
         <p class="yumi-hint">只读预览，保存后以服务端预算结果为准。</p>
       </template>

@@ -100,6 +100,10 @@ public interface OrderRepository {
     /** 订单下全部发货明细（用于汇总已发数量）。 */
     java.util.List<ShipmentItemRecord> findShipmentItemsOfOrder(String orderBusinessId);
 
+    int effectiveShipmentQuantity(String shipmentBusinessId);
+
+    int effectiveShippedQuantityOfOrder(String orderBusinessId);
+
     void updateShipmentItemQuantity(String shipmentItemBusinessId, int quantity);
 
     void updateGroupFulfillment(
@@ -155,7 +159,9 @@ public interface OrderRepository {
     /** 列表摘要附带客户名与商品名；客户/商品名称取当前主数据，不替代历史快照。 */
     List<OrderSummaryRecord> searchOrderSummaries(String keyword, String status, int offset, int limit);
 
-    record OrderSummaryRecord(OrderRecord order, String customerName, String productNames) {
+    record OrderSummaryRecord(
+            OrderRecord order, String customerName, String productNames,
+            int requiredQuantity, int shippedQuantity) {
     }
 
     /** 订单工作区：发货头。 */

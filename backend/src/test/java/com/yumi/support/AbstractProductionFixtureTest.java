@@ -256,7 +256,7 @@ public abstract class AbstractProductionFixtureTest extends AbstractMySqlIntegra
         return asAdmin(() -> productService.create(new com.yumi.product.api.CreateProductCommand(
                 name, "集成测试商品",
                 com.yumi.platform.api.value.WeightGram.ofGrams("120.0000"),
-                "M1", 30, settlement,
+                "STAR_2", 30, settlement,
                 com.yumi.platform.api.value.LossRate.of(new BigDecimal("0.0500")),
                 money, money, money, mouldCount, mouldDailyBatches, money,
                 5, money, money, money, money,

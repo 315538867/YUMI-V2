@@ -10,6 +10,7 @@ import com.yumi.finance.payroll.api.PayrollCalculationRef;
 import com.yumi.finance.payroll.api.PayrollPeriodRef;
 import com.yumi.finance.payroll.api.PayrollQuery;
 import com.yumi.finance.payroll.api.PayrollReviewRef;
+import com.yumi.finance.payroll.api.PayrollReviewView;
 import com.yumi.platform.api.authorization.AuthorizationService;
 import com.yumi.platform.api.authorization.PermissionCodes;
 import com.yumi.platform.api.authorization.ResourceScope;
@@ -22,6 +23,7 @@ import com.yumi.platform.api.identity.CurrentActorProvider;
 import com.yumi.platform.api.value.CurrencyCode;
 import com.yumi.platform.api.value.SettlementMoney;
 import com.yumi.production.api.ProductionPayrollMaterialSourceFeed;
+import com.yumi.workforce.api.WorkforceEmployeeDirectory;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -54,6 +56,7 @@ public class PayrollApplicationServiceImpl implements PayrollApplicationService,
     private final PayrollRepository payroll;
     private final PayrollSourceRepository sources;
     private final ProductionPayrollMaterialSourceFeed materialFeed;
+    private final WorkforceEmployeeDirectory employees;
     private final IdempotentCommandService idempotency;
     private final AuthorizationService authorization;
     private final CurrentActorProvider currentActor;
@@ -65,6 +68,7 @@ public class PayrollApplicationServiceImpl implements PayrollApplicationService,
             PayrollRepository payroll,
             PayrollSourceRepository sources,
             ProductionPayrollMaterialSourceFeed materialFeed,
+            WorkforceEmployeeDirectory employees,
             IdempotentCommandService idempotency,
             AuthorizationService authorization,
             CurrentActorProvider currentActor,
@@ -74,6 +78,7 @@ public class PayrollApplicationServiceImpl implements PayrollApplicationService,
         this.payroll = payroll;
         this.sources = sources;
         this.materialFeed = materialFeed;
+        this.employees = employees;
         this.idempotency = idempotency;
         this.authorization = authorization;
         this.currentActor = currentActor;
@@ -413,6 +418,27 @@ public class PayrollApplicationServiceImpl implements PayrollApplicationService,
         return sha256(builder.toString());
     }
 
+    @Override
+    public PayrollReviewView getReview(String reviewRunBusinessId) {
+        authorization.require(PermissionCodes.PAYROLL_READ, ResourceScope.GLOBAL);
+        var run = payroll.findRun(reviewRunBusinessId)
+                .orElseThrow(() -> new ApiException(
+                        ApiErrorType.NOT_FOUND, "PAYROLL_REVIEW_NOT_FOUND", "工资复核运行不存在"));
+        List<EmployeePayrollView.ReferenceLineView> lines = payroll.listReferenceLines(
+                        run.runBusinessId()).stream()
+                .map(line -> new EmployeePayrollView.ReferenceLineView(
+                        line.lineBusinessId(), line.lineType(), line.sourceBusinessId(),
+                        line.componentCode(), line.quantity(), line.unitAmount(),
+                        line.referenceAmount() == null ? null
+                                : SettlementMoney.of(line.referenceAmount(), CurrencyCode.CNY),
+                        line.occurred(), line.estimated(), line.materialSource(),
+                        line.incomplete(), line.note()))
+                .toList();
+        return new PayrollReviewView(
+                run.runBusinessId(), run.periodBusinessId(), run.employeeBusinessId(),
+                run.runType(), run.fingerprint(), run.generatedAt(), lines);
+    }
+
     private EmployeePayrollView toView(PayrollRepository.ResultRecord result) {
         List<EmployeePayrollView.ReferenceLineView> lines = result.referenceRunBusinessId() == null
                 ? List.of()
@@ -425,12 +451,24 @@ public class PayrollApplicationServiceImpl implements PayrollApplicationService,
                         line.occurred(), line.estimated(), line.materialSource(),
                         line.incomplete(), line.note()))
                 .toList();
+        var employee = employees.find(result.employeeBusinessId()).orElse(null);
+        java.math.BigDecimal referenceTotal = lines.stream()
+                .map(EmployeePayrollView.ReferenceLineView::referenceAmount)
+                .filter(java.util.Objects::nonNull)
+                .map(SettlementMoney::value)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal paid = payroll.paidAmount(result.resultBusinessId());
         return new EmployeePayrollView(
                 result.resultBusinessId(), result.periodBusinessId(), result.employeeBusinessId(),
+                employee == null ? null : employee.employeeNo(),
+                employee == null ? null : employee.name(),
                 result.status(), result.referenceRunBusinessId(), result.referenceFingerprint(),
                 result.confirmedAmount() == null ? null
                         : SettlementMoney.of(result.confirmedAmount(), CurrencyCode.CNY),
+                SettlementMoney.of(referenceTotal, CurrencyCode.CNY),
                 SettlementMoney.of(result.payableAmount(), CurrencyCode.CNY),
+                SettlementMoney.of(paid, CurrencyCode.CNY),
+                SettlementMoney.of(result.payableAmount().subtract(paid).max(java.math.BigDecimal.ZERO), CurrencyCode.CNY),
                 result.rowVersion(), lines);
     }
 

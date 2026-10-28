@@ -7,7 +7,6 @@ import CodeTag from '@/shared/components/CodeTag.vue'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
-import PageShell from '@/shared/components/PageShell.vue'
 
 const { loading, errorText, run } = useAsyncLoad(true)
 
@@ -58,47 +57,45 @@ onMounted(load)
 </script>
 
 <template>
-  <PageShell title="来源对账">
-    <WorkspacePage class="reconciliation-page">
-      <PageState
-        :loading="loading"
-        :error="errorText"
-        :empty="!loading && errorText === '' && versions.length === 0"
-        empty-text="暂无投影版本"
-        @retry="load"
-      >
-        <el-table :data="versions" border>
-          <el-table-column prop="versionBusinessId" label="投影版本" min-width="220" />
-          <el-table-column label="状态" width="110">
-            <template #default="{ row }"
-              ><CodeTag category="reporting.versionStatus" :code="row.status"
-            /></template>
-          </el-table-column>
-          <el-table-column prop="recordCount" label="记录数" width="100" />
-          <el-table-column prop="differenceCount" label="差异数" width="100" />
-          <el-table-column label="切换时间" width="230">
-            <template #default="{ row }"><DateTimeText :value="row.activatedAt" /></template>
-          </el-table-column>
-          <el-table-column label="操作" width="110">
-            <template #default="{ row }">
-              <el-button link type="primary" @click="selectVersion(row.versionBusinessId)">
-                查看差异
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+  <WorkspacePage class="reconciliation-page" title="来源对账" hint="核对报表投影与来源事实的差异">
+    <PageState
+      :loading="loading"
+      :error="errorText"
+      :empty="!loading && errorText === '' && versions.length === 0"
+      empty-text="暂无投影版本"
+      @retry="load"
+    >
+      <el-table :data="versions" border>
+        <el-table-column prop="versionBusinessId" label="投影版本" min-width="220" />
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }"
+            ><CodeTag category="reporting.versionStatus" :code="row.status"
+          /></template>
+        </el-table-column>
+        <el-table-column prop="recordCount" label="记录数" width="100" />
+        <el-table-column prop="differenceCount" label="差异数" width="100" />
+        <el-table-column label="切换时间" width="230">
+          <template #default="{ row }"><DateTimeText :value="row.activatedAt" /></template>
+        </el-table-column>
+        <el-table-column label="操作" width="110">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="selectVersion(row.versionBusinessId)">
+              查看差异
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-        <h2>差异 {{ selected }}</h2>
-        <el-table :data="differences" border empty-text="该版本无来源差异">
-          <el-table-column label="来源" width="160">
-            <template #default="{ row }"
-              ><CodeTag category="reporting.feedCode" :code="row.feedCode"
-            /></template>
-          </el-table-column>
-          <el-table-column prop="differenceBusinessId" label="差异标识" min-width="220" />
-          <el-table-column prop="detailText" label="说明" min-width="320" />
-        </el-table>
-      </PageState>
-    </WorkspacePage>
-  </PageShell>
+      <h2>差异 {{ selected }}</h2>
+      <el-table :data="differences" border empty-text="该版本无来源差异">
+        <el-table-column label="来源" width="160">
+          <template #default="{ row }"
+            ><CodeTag category="reporting.feedCode" :code="row.feedCode"
+          /></template>
+        </el-table-column>
+        <el-table-column prop="differenceBusinessId" label="差异标识" min-width="220" />
+        <el-table-column prop="detailText" label="说明" min-width="320" />
+      </el-table>
+    </PageState>
+  </WorkspacePage>
 </template>

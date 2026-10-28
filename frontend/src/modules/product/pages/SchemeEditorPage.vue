@@ -190,6 +190,25 @@ onMounted(load)
         title="人工、工时、提成与额外单件费用继承商品，本页不能覆盖；保存后由后端返回预算。"
       />
     </template>
+    <div v-if="product" class="inherited yumi-panel">
+      <h2>继承商品（只读）</h2>
+      <dl class="yumi-info-grid">
+        <dt>单件标准克重</dt>
+        <dd>{{ product.standardWeightGrams }} g</dd>
+        <dt>制作星级</dt>
+        <dd>{{ product.makingStarName }} · {{ product.makingStandardMinutes }} 分钟</dd>
+        <dt>制作提成</dt>
+        <dd><MoneyText :value="product.makingCommission" /></dd>
+        <dt>捏毛装袋标准分钟</dt>
+        <dd>{{ product.bagging.standardMinutes }} 分钟</dd>
+        <dt>捏毛装袋人工</dt>
+        <dd><MoneyText :value="product.bagging.laborCost" /></dd>
+        <dt>缝边剪袋标准分钟</dt>
+        <dd>{{ product.seamCutting.standardMinutes }} 分钟</dd>
+        <dt>缝边剪袋人工</dt>
+        <dd><MoneyText :value="product.seamCutting.laborCost" /></dd>
+      </dl>
+    </div>
     <el-form v-if="!loading" label-width="150px">
       <FormErrorAlert :error="formAlert" class="yumi-alert" />
       <el-form-item label="方案名称" required :error="validationErrors.name || fieldError('name')">
@@ -220,33 +239,37 @@ onMounted(load)
       <el-form-item label="制作其他材料">
         <el-input v-model="form.makingOtherMaterialCost" />
       </el-form-item>
-      <el-form-item label="单件袋子成本">
-        <el-input v-model="form.baggingBagUnitCost" />
-      </el-form-item>
-      <el-form-item label="袋子供料方">
-        <el-select v-model="form.baggingBagSource">
-          <el-option label="工作室" value="STUDIO" />
-          <el-option label="客户" value="CUSTOMER" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="单件装饰品">
-        <el-input v-model="form.baggingDecorationUnitPrice" />
-      </el-form-item>
-      <el-form-item label="装饰品供料方">
-        <el-select v-model="form.baggingDecorationSource">
-          <el-option label="工作室" value="STUDIO" />
-          <el-option label="客户" value="CUSTOMER" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="捏毛装袋其他费用">
-        <el-input v-model="form.baggingOtherCost" />
-      </el-form-item>
-      <el-form-item label="综合材料成本">
-        <el-input v-model="form.seamCombinedMaterialCost" />
-      </el-form-item>
-      <el-form-item label="缝边剪袋其他费用">
-        <el-input v-model="form.seamOtherCost" />
-      </el-form-item>
+      <template v-if="form.targetProcess !== 'MAKING'">
+        <el-form-item label="单件袋子成本">
+          <el-input v-model="form.baggingBagUnitCost" />
+        </el-form-item>
+        <el-form-item label="袋子供料方">
+          <el-select v-model="form.baggingBagSource">
+            <el-option label="工作室" value="STUDIO" />
+            <el-option label="客户" value="CUSTOMER" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="单件装饰品">
+          <el-input v-model="form.baggingDecorationUnitPrice" />
+        </el-form-item>
+        <el-form-item label="装饰品供料方">
+          <el-select v-model="form.baggingDecorationSource">
+            <el-option label="工作室" value="STUDIO" />
+            <el-option label="客户" value="CUSTOMER" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="捏毛装袋其他费用">
+          <el-input v-model="form.baggingOtherCost" />
+        </el-form-item>
+      </template>
+      <template v-if="form.targetProcess === 'SEAM_CUTTING'">
+        <el-form-item label="综合材料成本">
+          <el-input v-model="form.seamCombinedMaterialCost" />
+        </el-form-item>
+        <el-form-item label="缝边剪袋其他费用">
+          <el-input v-model="form.seamOtherCost" />
+        </el-form-item>
+      </template>
     </el-form>
 
     <template #preview>
@@ -268,6 +291,8 @@ onMounted(load)
                 : `${(budgetPreview.expectedProfitRate * 100).toFixed(2)}%`
             }}
           </dd>
+          <dt>客户供料标准价值</dt>
+          <dd><MoneyText :value="budgetPreview.customerSuppliedUnitValue" /></dd>
         </dl>
         <p class="yumi-hint">只读预览，保存后以服务端预算结果为准。</p>
       </template>
@@ -275,3 +300,10 @@ onMounted(load)
     </template>
   </EditorPage>
 </template>
+
+<style scoped>
+.inherited {
+  padding: var(--yumi-space-4);
+  margin-bottom: var(--yumi-space-4);
+}
+</style>

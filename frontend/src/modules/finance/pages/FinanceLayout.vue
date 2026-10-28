@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import ModuleTabsPage from '@/shared/components/ModuleTabsPage.vue'
 
-const route = useRoute()
-const router = useRouter()
-const active = computed(() => route.path)
 const tabs = [
   { path: '/finance/monthly', label: '月度汇总' },
   { path: '/finance/daily-cash', label: '资金收付' },
@@ -17,22 +13,9 @@ const tabs = [
 </script>
 
 <template>
-  <el-tabs
-    :model-value="active"
-    class="finance-tabs"
-    @tab-change="(path: string | number) => router.push(String(path))"
-  >
-    <el-tab-pane v-for="tab in tabs" :key="tab.path" :label="tab.label" :name="tab.path" />
-  </el-tabs>
-  <RouterView />
+  <ModuleTabsPage
+    title="现金与成本"
+    hint="按月看实际收支与成本；工资逐人核定，付款单独登记"
+    :tabs="tabs"
+  />
 </template>
-
-<style scoped>
-.finance-tabs {
-  background: var(--yumi-surface);
-  border: 1px solid var(--yumi-border-color);
-  border-radius: var(--yumi-radius-lg);
-  padding: 0 var(--yumi-space-4);
-  margin-bottom: var(--yumi-space-3);
-}
-</style>
