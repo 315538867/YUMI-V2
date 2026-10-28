@@ -18,9 +18,9 @@ test('六模块、售后、设置与报表真实页面链路可操作', async ({
   await expect(page.getByRole('heading', { name: customerName })).toBeVisible()
 
   await page.goto('/products')
-  await expect(page.getByRole('heading', { name: '商品' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '商品', level: 1 })).toBeVisible()
   await page.goto('/workforce/employees')
-  await expect(page.getByRole('heading', { name: '员工与资格' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '员工与资格', level: 1 })).toBeVisible()
   await page.goto('/production/schedule')
   await expect(page.getByRole('button', { name: '安排任务' })).toBeVisible()
   await page.getByRole('tab', { name: '需求缺口' }).click()

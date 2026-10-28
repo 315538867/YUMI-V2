@@ -134,7 +134,7 @@ void load()
       </el-table-column>
     </el-table>
     <template #footer>
-      <p class="hint">成本合计不是现金支出；参考工资与处理金额不自动成为成本。</p>
+      <p class="yumi-hint">成本合计不是现金支出；参考工资与处理金额不自动成为成本。</p>
     </template>
   </ListPage>
 
@@ -175,11 +175,6 @@ void load()
   width: 260px;
 }
 .summary {
-  margin-bottom: 12px;
-}
-.hint {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  margin-bottom: var(--yumi-space-3);
 }
 </style>

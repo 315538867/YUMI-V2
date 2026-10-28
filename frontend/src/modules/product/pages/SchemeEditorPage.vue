@@ -191,7 +191,7 @@ onMounted(load)
       />
     </template>
     <el-form v-if="!loading" label-width="150px">
-      <FormErrorAlert :error="formAlert" class="alert" />
+      <FormErrorAlert :error="formAlert" class="yumi-alert" />
       <el-form-item label="方案名称" required :error="validationErrors.name || fieldError('name')">
         <el-input v-model="form.name" />
       </el-form-item>
@@ -250,7 +250,7 @@ onMounted(load)
     </el-form>
 
     <template #preview>
-      <p v-if="previewLoading" class="hint">正在计算…</p>
+      <p v-if="previewLoading" class="yumi-hint">正在计算…</p>
       <el-alert v-else-if="previewError" type="error" :closable="false" :title="previewError" />
       <template v-else-if="budgetPreview">
         <dl>
@@ -269,9 +269,9 @@ onMounted(load)
             }}
           </dd>
         </dl>
-        <p class="hint">只读预览，保存后以服务端预算结果为准。</p>
+        <p class="yumi-hint">只读预览，保存后以服务端预算结果为准。</p>
       </template>
-      <p v-else class="hint">填写目标工序和销售价后显示预算预览。</p>
+      <p v-else class="yumi-hint">填写目标工序和销售价后显示预算预览。</p>
     </template>
   </EditorPage>
 </template>

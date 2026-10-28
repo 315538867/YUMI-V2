@@ -16,6 +16,7 @@ import CodeLabel from '@/shared/components/CodeLabel.vue'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import PageShell from '@/shared/components/PageShell.vue'
 
 type CreateTaskType = Extract<
   TaskType,
@@ -224,184 +225,156 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage class="task-create-page">
-    <header class="head">
-      <div>
-        <h1>新建任务</h1>
-        <span class="meta">正常生产与超额生产从可安排来源进入；其他任务不关联来源。</span>
-      </div>
-      <div class="actions">
-        <el-button @click="router.push('/production/schedule')">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存并查看任务</el-button>
-      </div>
-    </header>
-
-    <PageState :loading="loading" :error="errorText" @retry="load">
-      <el-form label-width="120px" class="form">
-        <el-form-item label="任务类型">
-          <el-select v-model="taskType" class="medium" @change="changeTaskType">
-            <el-option label="其他任务" value="OTHER_TASK" />
-            <el-option label="正常生产" value="NORMAL_PRODUCTION" />
-            <el-option label="制作超额" value="EXTRA_PRODUCTION" />
-            <el-option label="返工" value="REPAIR" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="执行主体类型">
-          <el-radio-group v-model="subjectType" @change="changeSubjectType">
-            <el-radio value="EMPLOYEE">员工</el-radio>
-            <el-radio value="TEAM">小组</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="执行主体">
-          <el-select v-model="subjectBusinessId" filterable class="medium">
-            <el-option
-              v-for="subject in subjectOptions"
-              :key="
-                'employeeBusinessId' in subject
-                  ? subject.employeeBusinessId
-                  : subject.teamBusinessId
-              "
-              :label="
-                'employeeBusinessId' in subject
-                  ? `${subject.name}（${subject.employeeNo}）`
-                  : `${subject.name}（${subject.teamNo}）`
-              "
-              :value="
-                'employeeBusinessId' in subject
-                  ? subject.employeeBusinessId
-                  : subject.teamBusinessId
-              "
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="工作日期">
-          <el-date-picker v-model="workDate" type="date" value-format="YYYY-MM-DD" />
-        </el-form-item>
-
-        <template v-if="isOtherTask">
-          <el-form-item label="工作内容">
-            <el-input v-model="other.workContent" type="textarea" :rows="2" />
+  <PageShell title="新建任务" hint="正常生产与超额生产从可安排来源进入；其他任务不关联来源。">
+    <template #actions>
+      <el-button @click="router.push('/production/schedule')">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="save">保存并查看任务</el-button>
+    </template>
+    <WorkspacePage class="task-create-page">
+      <PageState :loading="loading" :error="errorText" @retry="load">
+        <el-form label-width="120px" class="form">
+          <el-form-item label="任务类型">
+            <el-select v-model="taskType" class="medium" @change="changeTaskType">
+              <el-option label="其他任务" value="OTHER_TASK" />
+              <el-option label="正常生产" value="NORMAL_PRODUCTION" />
+              <el-option label="制作超额" value="EXTRA_PRODUCTION" />
+              <el-option label="返工" value="REPAIR" />
+            </el-select>
           </el-form-item>
-          <el-form-item label="整体标准分钟">
-            <el-input v-model.number="other.enteredStandardMinutes" type="number" class="short" />
+          <el-form-item label="执行主体类型">
+            <el-radio-group v-model="subjectType" @change="changeSubjectType">
+              <el-radio value="EMPLOYEE">员工</el-radio>
+              <el-radio value="TEAM">小组</el-radio>
+            </el-radio-group>
           </el-form-item>
-          <el-form-item label="关联商品">
-            <el-input v-model="other.relatedProductBusinessId" placeholder="可选，商品业务标识" />
+          <el-form-item label="执行主体">
+            <el-select v-model="subjectBusinessId" filterable class="medium">
+              <el-option
+                v-for="subject in subjectOptions"
+                :key="
+                  'employeeBusinessId' in subject
+                    ? subject.employeeBusinessId
+                    : subject.teamBusinessId
+                "
+                :label="
+                  'employeeBusinessId' in subject
+                    ? `${subject.name}（${subject.employeeNo}）`
+                    : `${subject.name}（${subject.teamNo}）`
+                "
+                :value="
+                  'employeeBusinessId' in subject
+                    ? subject.employeeBusinessId
+                    : subject.teamBusinessId
+                "
+              />
+            </el-select>
           </el-form-item>
-          <el-form-item v-if="other.relatedProductBusinessId.trim() !== ''" label="计划数量">
-            <el-input v-model.number="other.plannedQuantity" type="number" class="short" />
+          <el-form-item label="工作日期">
+            <el-date-picker v-model="workDate" type="date" value-format="YYYY-MM-DD" />
           </el-form-item>
-        </template>
 
-        <el-form-item v-else label="执行工序">
-          <el-select
-            v-model="processCode"
-            class="medium"
-            :disabled="taskType === 'EXTRA_PRODUCTION'"
-            @change="loadSources"
-          >
-            <el-option label="制作" value="MAKING" />
-            <el-option label="捏毛装袋" value="BAGGING" />
-            <el-option label="缝边剪袋" value="SEAM_CUTTING" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+          <template v-if="isOtherTask">
+            <el-form-item label="工作内容">
+              <el-input v-model="other.workContent" type="textarea" :rows="2" />
+            </el-form-item>
+            <el-form-item label="整体标准分钟">
+              <el-input v-model.number="other.enteredStandardMinutes" type="number" class="short" />
+            </el-form-item>
+            <el-form-item label="关联商品">
+              <el-input v-model="other.relatedProductBusinessId" placeholder="可选，商品业务标识" />
+            </el-form-item>
+            <el-form-item v-if="other.relatedProductBusinessId.trim() !== ''" label="计划数量">
+              <el-input v-model.number="other.plannedQuantity" type="number" class="short" />
+            </el-form-item>
+          </template>
 
-      <template v-if="!isOtherTask">
-        <el-alert
-          v-if="sourceError"
-          type="error"
-          :closable="false"
-          :title="sourceError"
-          class="alert"
-        />
-        <div class="source-layout">
-          <section class="source-panel">
-            <h2>可安排来源</h2>
-            <el-table
-              v-loading="sourceLoading"
-              :data="visibleSources"
-              empty-text="当前工序没有可安排来源"
-              border
-              size="small"
+          <el-form-item v-else label="执行工序">
+            <el-select
+              v-model="processCode"
+              class="medium"
+              :disabled="taskType === 'EXTRA_PRODUCTION'"
+              @change="loadSources"
             >
-              <el-table-column label="商品 / 方案" min-width="200">
-                <template #default="{ row }">{{ sourceLabel(row) }}</template>
-              </el-table-column>
-              <el-table-column label="需求类型" width="140">
-                <template #default="{ row }">
-                  <CodeLabel
-                    category="production.demandType"
-                    :code="row.demandType"
-                    fallback="其他需求"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="需求工序" width="120">
-                <template #default="{ row }">
-                  <CodeTag category="production.targetProcess" :code="row.targetProcess" />
-                </template>
-              </el-table-column>
-              <el-table-column prop="availableQuantity" label="可安排" width="90" />
-              <el-table-column label="操作" width="90">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="addSource(row)">添加</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </section>
+              <el-option label="制作" value="MAKING" />
+              <el-option label="捏毛装袋" value="BAGGING" />
+              <el-option label="缝边剪袋" value="SEAM_CUTTING" />
+            </el-select>
+          </el-form-item>
+        </el-form>
 
-          <section class="source-panel">
-            <h2>已选来源（{{ selected.length }}）</h2>
-            <el-table :data="selected" empty-text="从左侧添加来源" border size="small">
-              <el-table-column label="商品 / 方案" min-width="200">
-                <template #default="{ row }">{{ sourceLabel(row.source) }}</template>
-              </el-table-column>
-              <el-table-column label="本次数量" width="140">
-                <template #default="{ row }">
-                  <el-input v-model.number="row.quantity" type="number" />
-                </template>
-              </el-table-column>
-              <el-table-column label="可用" width="80">
-                <template #default="{ row }">{{ row.source.availableQuantity }}</template>
-              </el-table-column>
-              <el-table-column label="操作" width="80">
-                <template #default="{ index }">
-                  <el-button link type="danger" @click="removeSource(index)">移除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </section>
-        </div>
-      </template>
-    </PageState>
-  </WorkspacePage>
+        <template v-if="!isOtherTask">
+          <el-alert
+            v-if="sourceError"
+            type="error"
+            :closable="false"
+            :title="sourceError"
+            class="yumi-alert"
+          />
+          <div class="yumi-card-grid yumi-card-grid--2">
+            <section class="source-panel">
+              <h2>可安排来源</h2>
+              <el-table
+                v-loading="sourceLoading"
+                :data="visibleSources"
+                empty-text="当前工序没有可安排来源"
+                border
+                size="small"
+              >
+                <el-table-column label="商品 / 方案" min-width="200">
+                  <template #default="{ row }">{{ sourceLabel(row) }}</template>
+                </el-table-column>
+                <el-table-column label="需求类型" width="140">
+                  <template #default="{ row }">
+                    <CodeLabel
+                      category="production.demandType"
+                      :code="row.demandType"
+                      fallback="其他需求"
+                    />
+                  </template>
+                </el-table-column>
+                <el-table-column label="需求工序" width="120">
+                  <template #default="{ row }">
+                    <CodeTag category="production.targetProcess" :code="row.targetProcess" />
+                  </template>
+                </el-table-column>
+                <el-table-column prop="availableQuantity" label="可安排" width="90" />
+                <el-table-column label="操作" width="90">
+                  <template #default="{ row }">
+                    <el-button link type="primary" @click="addSource(row)">添加</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </section>
+
+            <section class="source-panel">
+              <h2>已选来源（{{ selected.length }}）</h2>
+              <el-table :data="selected" empty-text="从左侧添加来源" border size="small">
+                <el-table-column label="商品 / 方案" min-width="200">
+                  <template #default="{ row }">{{ sourceLabel(row.source) }}</template>
+                </el-table-column>
+                <el-table-column label="本次数量" width="140">
+                  <template #default="{ row }">
+                    <el-input v-model.number="row.quantity" type="number" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="可用" width="80">
+                  <template #default="{ row }">{{ row.source.availableQuantity }}</template>
+                </el-table-column>
+                <el-table-column label="操作" width="80">
+                  <template #default="{ index }">
+                    <el-button link type="danger" @click="removeSource(index)">移除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </section>
+          </div>
+        </template>
+      </PageState>
+    </WorkspacePage>
+  </PageShell>
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.meta {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-}
-
 .form {
   max-width: 760px;
 }
@@ -414,28 +387,7 @@ h1 {
   width: 260px;
 }
 
-.alert {
-  margin-bottom: 12px;
-}
-
-.source-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .source-panel {
   min-width: 0;
-}
-
-h2 {
-  margin: 0 0 10px;
-  font-size: 16px;
-}
-
-@media (max-width: 1100px) {
-  .source-layout {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

@@ -18,6 +18,7 @@ import type {
 import { orderService } from '@/modules/orders/services/orderService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import PageShell from '@/shared/components/PageShell.vue'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 
 const { loading, errorText, run } = useAsyncLoad(true)
@@ -296,253 +297,223 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage v-loading="loading" class="order-editor">
-    <header class="head">
-      <div>
-        <h1>新增订单</h1>
-        <span class="meta">填写本次成交约定，核对后一次确认</span>
-      </div>
-      <div>
-        <el-button @click="router.back()">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="requestPreview">确认建单</el-button>
-      </div>
-    </header>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
+  <PageShell title="新增订单" hint="填写本次成交约定，核对后一次确认">
+    <template #actions>
+      <el-button @click="router.back()">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="requestPreview">确认建单</el-button>
+    </template>
+    <WorkspacePage v-loading="loading" class="order-editor">
+      <el-alert
+        v-if="errorText"
+        type="error"
+        :closable="false"
+        :title="errorText"
+        class="yumi-alert"
+      />
 
-    <el-form v-if="!loading" label-width="110px" class="form">
-      <FormErrorAlert :error="formAlert" class="alert" />
-      <h2>1. 客户与交付</h2>
-      <el-form-item
-        label="客户"
-        :error="validationErrors.customerBusinessId || fieldError('customerBusinessId')"
-      >
-        <el-select v-model="form.customerBusinessId" filterable @change="applyCustomer">
-          <el-option
-            v-for="customer in customers"
-            :key="customer.customerBusinessId"
-            :label="customer.name"
-            :value="customer.customerBusinessId"
+      <el-form v-if="!loading" label-width="110px" class="form">
+        <FormErrorAlert :error="formAlert" class="yumi-alert" />
+        <h2>1. 客户与交付</h2>
+        <el-form-item
+          label="客户"
+          :error="validationErrors.customerBusinessId || fieldError('customerBusinessId')"
+        >
+          <el-select v-model="form.customerBusinessId" filterable @change="applyCustomer">
+            <el-option
+              v-for="customer in customers"
+              :key="customer.customerBusinessId"
+              :label="customer.name"
+              :value="customer.customerBusinessId"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          label="订单日期"
+          :error="validationErrors.orderDate || fieldError('orderDate')"
+        >
+          <el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item
+          label="预计交付"
+          :error="validationErrors.expectedDeliveryDate || fieldError('expectedDeliveryDate')"
+        >
+          <el-date-picker
+            v-model="form.expectedDeliveryDate"
+            type="date"
+            value-format="YYYY-MM-DD"
           />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="订单日期" :error="validationErrors.orderDate || fieldError('orderDate')">
-        <el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD" />
-      </el-form-item>
-      <el-form-item
-        label="预计交付"
-        :error="validationErrors.expectedDeliveryDate || fieldError('expectedDeliveryDate')"
-      >
-        <el-date-picker v-model="form.expectedDeliveryDate" type="date" value-format="YYYY-MM-DD" />
-      </el-form-item>
-      <el-form-item label="收货人" :error="validationErrors.recName">
-        <el-input v-model="recipient.name" />
-      </el-form-item>
-      <el-form-item label="电话" :error="validationErrors.recPhone">
-        <el-input v-model="recipient.phone" />
-      </el-form-item>
-      <el-form-item label="地址" :error="validationErrors.recAddress">
-        <el-input v-model="recipient.address" type="textarea" :rows="2" />
-      </el-form-item>
-      <el-form-item label="订单说明">
-        <el-input
-          v-model="note"
-          type="textarea"
-          :rows="2"
-          maxlength="500"
-          show-word-limit
-          aria-label="订单说明"
-          placeholder="选填，例如交付约定或客户特别要求"
-        />
-      </el-form-item>
-      <p class="hint">本页所有明细共用上方收货信息与订单说明。</p>
+        </el-form-item>
+        <el-form-item label="收货人" :error="validationErrors.recName">
+          <el-input v-model="recipient.name" />
+        </el-form-item>
+        <el-form-item label="电话" :error="validationErrors.recPhone">
+          <el-input v-model="recipient.phone" />
+        </el-form-item>
+        <el-form-item label="地址" :error="validationErrors.recAddress">
+          <el-input v-model="recipient.address" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="订单说明">
+          <el-input
+            v-model="note"
+            type="textarea"
+            :rows="2"
+            maxlength="500"
+            show-word-limit
+            aria-label="订单说明"
+            placeholder="选填，例如交付约定或客户特别要求"
+          />
+        </el-form-item>
+        <p class="yumi-hint">本页所有明细共用上方收货信息与订单说明。</p>
 
-      <div class="section-head">
-        <h2>2. 商品与成交约定</h2>
-        <el-button @click="addItem">新增明细</el-button>
-      </div>
-      <div v-for="(item, index) in items" :key="item.key" class="item-card">
-        <div class="item-head">
-          <strong>明细 {{ index + 1 }}</strong>
-          <el-button v-if="items.length > 1" link type="danger" @click="removeItem(index)">
-            删除
-          </el-button>
+        <div class="yumi-section-head">
+          <h2>2. 商品与成交约定</h2>
+          <el-button @click="addItem">新增明细</el-button>
         </div>
-        <el-form label-width="110px">
-          <el-form-item label="商品" :error="itemError(index, 'product')">
-            <el-select v-model="item.productBusinessId" filterable @change="loadSchemes(item)">
-              <el-option
-                v-for="product in products"
-                :key="product.productBusinessId"
-                :label="product.name"
-                :value="product.productBusinessId"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="方案" :error="itemError(index, 'scheme')">
-            <el-select v-model="item.schemeBusinessId" filterable @change="applyScheme(item)">
-              <el-option
-                v-for="scheme in item.schemes"
-                :key="scheme.schemeBusinessId"
-                :label="`${scheme.name}（${scheme.schemeType === 'SYSTEM_STANDARD' ? '标准' : '自定义'}）`"
-                :value="scheme.schemeBusinessId"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="目标工序">
-            <el-select v-model="item.targetProcess">
-              <el-option label="制作" value="MAKING" />
-              <el-option label="捏毛装袋" value="BAGGING" />
-              <el-option label="缝边剪袋" value="SEAM_CUTTING" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="订购数量" :error="itemError(index, 'quantity')">
-            <el-input v-model.number="item.quantity" type="number" />
-          </el-form-item>
-          <el-form-item label="单件成交价" :error="itemError(index, 'unitPrice')">
-            <el-input v-model="item.unitPrice" />
-          </el-form-item>
-          <el-form-item label="胶水来源">
-            <el-select v-model="item.glue">
-              <el-option label="工作室" value="STUDIO" />
-              <el-option label="客户" value="CUSTOMER" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="色浆来源">
-            <el-select v-model="item.colorPaste">
-              <el-option label="工作室" value="STUDIO" />
-              <el-option label="客户" value="CUSTOMER" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="袋子女来源">
-            <el-select v-model="item.bag">
-              <el-option label="工作室" value="STUDIO" />
-              <el-option label="客户" value="CUSTOMER" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="装饰品来源">
-            <el-select v-model="item.decoration">
-              <el-option label="工作室" value="STUDIO" />
-              <el-option label="客户" value="CUSTOMER" />
-            </el-select>
-          </el-form-item>
-        </el-form>
-      </div>
+        <div v-for="(item, index) in items" :key="item.key" class="item-card">
+          <div class="item-head">
+            <strong>明细 {{ index + 1 }}</strong>
+            <el-button v-if="items.length > 1" link type="danger" @click="removeItem(index)">
+              删除
+            </el-button>
+          </div>
+          <el-form label-width="110px">
+            <el-form-item label="商品" :error="itemError(index, 'product')">
+              <el-select v-model="item.productBusinessId" filterable @change="loadSchemes(item)">
+                <el-option
+                  v-for="product in products"
+                  :key="product.productBusinessId"
+                  :label="product.name"
+                  :value="product.productBusinessId"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="方案" :error="itemError(index, 'scheme')">
+              <el-select v-model="item.schemeBusinessId" filterable @change="applyScheme(item)">
+                <el-option
+                  v-for="scheme in item.schemes"
+                  :key="scheme.schemeBusinessId"
+                  :label="`${scheme.name}（${scheme.schemeType === 'SYSTEM_STANDARD' ? '标准' : '自定义'}）`"
+                  :value="scheme.schemeBusinessId"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="目标工序">
+              <el-select v-model="item.targetProcess">
+                <el-option label="制作" value="MAKING" />
+                <el-option label="捏毛装袋" value="BAGGING" />
+                <el-option label="缝边剪袋" value="SEAM_CUTTING" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="订购数量" :error="itemError(index, 'quantity')">
+              <el-input v-model.number="item.quantity" type="number" />
+            </el-form-item>
+            <el-form-item label="单件成交价" :error="itemError(index, 'unitPrice')">
+              <el-input v-model="item.unitPrice" />
+            </el-form-item>
+            <el-form-item label="胶水来源">
+              <el-select v-model="item.glue">
+                <el-option label="工作室" value="STUDIO" />
+                <el-option label="客户" value="CUSTOMER" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="色浆来源">
+              <el-select v-model="item.colorPaste">
+                <el-option label="工作室" value="STUDIO" />
+                <el-option label="客户" value="CUSTOMER" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="袋子女来源">
+              <el-select v-model="item.bag">
+                <el-option label="工作室" value="STUDIO" />
+                <el-option label="客户" value="CUSTOMER" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="装饰品来源">
+              <el-select v-model="item.decoration">
+                <el-option label="工作室" value="STUDIO" />
+                <el-option label="客户" value="CUSTOMER" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+        </div>
 
-      <h2>3. 本次订单</h2>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="明细数">{{ items.length }}</el-descriptions-item>
-        <el-descriptions-item label="订购数量">{{ totalQuantity }}</el-descriptions-item>
-        <el-descriptions-item label="金额合计"
-          >{{ totalAmount.toFixed(2) }} CNY</el-descriptions-item
-        >
-      </el-descriptions>
-    </el-form>
+        <h2>3. 本次订单</h2>
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="明细数">{{ items.length }}</el-descriptions-item>
+          <el-descriptions-item label="订购数量">{{ totalQuantity }}</el-descriptions-item>
+          <el-descriptions-item label="金额合计"
+            >{{ totalAmount.toFixed(2) }} CNY</el-descriptions-item
+          >
+        </el-descriptions>
+      </el-form>
 
-    <el-dialog v-model="previewVisible" title="确认本次订单" width="680px">
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="客户">
-          {{ customers.find((row) => row.customerBusinessId === form.customerBusinessId)?.name }}
-        </el-descriptions-item>
-        <el-descriptions-item label="订单 / 预计交付">
-          {{ form.orderDate }} → {{ form.expectedDeliveryDate }}
-        </el-descriptions-item>
-        <el-descriptions-item label="收货人"
-          >{{ recipient.name }} · {{ recipient.phone }}</el-descriptions-item
-        >
-        <el-descriptions-item label="地址">{{ recipient.address }}</el-descriptions-item>
-        <el-descriptions-item v-if="note.trim() !== ''" label="订单说明" :span="2">
-          {{ note }}
-        </el-descriptions-item>
-      </el-descriptions>
-      <el-table :data="items" border size="small" class="preview-table">
-        <el-table-column label="商品" min-width="150">
-          <template #default="{ row }">{{ productName(row.productBusinessId) }}</template>
-        </el-table-column>
-        <el-table-column label="方案" min-width="140">
-          <template #default="{ row }">{{ schemeName(row) }}</template>
-        </el-table-column>
-        <el-table-column label="目标工序" width="120">
-          <template #default="{ row }"
-            ><CodeTag category="production.targetProcess" :code="row.targetProcess"
-          /></template>
-        </el-table-column>
-        <el-table-column prop="quantity" label="数量" width="80" />
-        <el-table-column prop="unitPrice" label="单价" width="100" />
-      </el-table>
-      <p class="preview-total">合计 {{ totalAmount.toFixed(2) }} CNY</p>
-      <template #footer>
-        <el-button @click="previewVisible = false">返回修改</el-button>
-        <el-button type="primary" :loading="saving" @click="confirmCreate">确认建单</el-button>
-      </template>
-    </el-dialog>
-  </WorkspacePage>
+      <el-dialog v-model="previewVisible" title="确认本次订单" width="680px">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="客户">
+            {{ customers.find((row) => row.customerBusinessId === form.customerBusinessId)?.name }}
+          </el-descriptions-item>
+          <el-descriptions-item label="订单 / 预计交付">
+            {{ form.orderDate }} → {{ form.expectedDeliveryDate }}
+          </el-descriptions-item>
+          <el-descriptions-item label="收货人"
+            >{{ recipient.name }} · {{ recipient.phone }}</el-descriptions-item
+          >
+          <el-descriptions-item label="地址">{{ recipient.address }}</el-descriptions-item>
+          <el-descriptions-item v-if="note.trim() !== ''" label="订单说明" :span="2">
+            {{ note }}
+          </el-descriptions-item>
+        </el-descriptions>
+        <el-table :data="items" border size="small" class="preview-table">
+          <el-table-column label="商品" min-width="150">
+            <template #default="{ row }">{{ productName(row.productBusinessId) }}</template>
+          </el-table-column>
+          <el-table-column label="方案" min-width="140">
+            <template #default="{ row }">{{ schemeName(row) }}</template>
+          </el-table-column>
+          <el-table-column label="目标工序" width="120">
+            <template #default="{ row }"
+              ><CodeTag category="production.targetProcess" :code="row.targetProcess"
+            /></template>
+          </el-table-column>
+          <el-table-column prop="quantity" label="数量" width="80" />
+          <el-table-column prop="unitPrice" label="单价" width="100" />
+        </el-table>
+        <p class="preview-total">合计 {{ totalAmount.toFixed(2) }} CNY</p>
+        <template #footer>
+          <el-button @click="previewVisible = false">返回修改</el-button>
+          <el-button type="primary" :loading="saving" @click="confirmCreate">确认建单</el-button>
+        </template>
+      </el-dialog>
+    </WorkspacePage>
+  </PageShell>
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-h1 {
-  margin: 0 0 4px;
-  font-size: 20px;
-}
-
-.meta {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-h2 {
-  margin: 20px 0 10px;
-  font-size: 16px;
-}
-
 .form {
   max-width: 860px;
 }
 
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 20px;
-}
-
 .item-card {
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 12px 16px 4px;
-  margin-bottom: 12px;
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-lg);
+  padding: var(--yumi-space-3) var(--yumi-space-4) var(--yumi-space-1);
+  margin-bottom: var(--yumi-space-3);
 }
 
 .item-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.hint {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  margin: 4px 0 0 110px;
+  margin-bottom: var(--yumi-space-2);
 }
 
 .preview-table {
-  margin-top: 12px;
+  margin-top: var(--yumi-space-3);
 }
 
 .preview-total {
   text-align: right;
-  font-weight: 600;
-  margin-top: 10px;
-}
-
-.alert {
-  margin-bottom: 12px;
+  font-weight: var(--yumi-font-weight-semibold);
+  margin-top: var(--yumi-space-3);
 }
 </style>

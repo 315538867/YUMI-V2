@@ -15,7 +15,7 @@ export interface CashFactView {
   direction: 'IN' | 'OUT'
   cashType: string
   businessDate: string
-  amount: string
+  amount: string | number
   valid: boolean
 }
 
@@ -33,7 +33,7 @@ export interface CashFactDetailView {
   direction: 'IN' | 'OUT'
   cashType: string
   businessDate: string
-  amount: string
+  amount: string | number
   currencyCode: string
   valid: boolean
   reversesFactBusinessId: string | null

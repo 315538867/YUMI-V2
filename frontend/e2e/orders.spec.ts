@@ -18,7 +18,9 @@ test('新订单确认、收款与刷新恢复使用真实接口', async ({ page 
   await page.getByRole('dialog').getByRole('button', { name: '确认建单' }).click()
 
   await expect(page).toHaveURL(/\/orders\/ORD-/)
-  const orderNo = await page.locator('.order-detail h1').innerText()
+  const orderHeading = page.getByRole('heading', { level: 1 })
+  await expect(orderHeading).not.toHaveText('订单详情')
+  const orderNo = await orderHeading.innerText()
   await expect(page.getByText('当前应收')).toBeVisible()
   await expect(page.getByText(note)).toBeVisible()
 
@@ -31,7 +33,7 @@ test('新订单确认、收款与刷新恢复使用真实接口', async ({ page 
 
   await page.reload()
   await expect(page.getByRole('cell', { name: '已收', exact: true })).toBeVisible()
-  await expect(page.locator('.order-detail h1')).toHaveText(orderNo)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(orderNo)
 
   await page.goto('/orders')
   await page.getByPlaceholder('订单号、客户或商品').fill(orderNo)

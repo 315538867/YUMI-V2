@@ -55,6 +55,25 @@ export const administrationService = {
     return api.query<AccountView[]>('/api/platform/identity/accounts')
   },
 
+  createAccount(input: {
+    loginName: string
+    initialPassword: string
+    displayName: string
+  }): Promise<{
+    accountBusinessId: string
+    loginName: string
+    status: string
+    rowVersion: number
+  }> {
+    return api.command<
+      { accountBusinessId: string; loginName: string; status: string; rowVersion: number },
+      typeof input
+    >('/api/platform/identity/accounts', {
+      idempotencyKey: newIdempotencyKey('account-create'),
+      body: input,
+    })
+  },
+
   changeAccountStatus(
     accountBusinessId: string,
     targetStatus: 'ACTIVE' | 'DISABLED',

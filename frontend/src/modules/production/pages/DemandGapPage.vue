@@ -82,7 +82,7 @@ onMounted(loadProducts)
       <el-table-column prop="consumedQuantity" label="已消费" width="90" />
     </el-table>
     <template #footer>
-      <p class="hint">报废与转线下分列，不相加为“总损失”；四个物理分量相互独立。</p>
+      <p class="yumi-hint">报废与转线下分列，不相加为“总损失”；四个物理分量相互独立。</p>
     </template>
   </ListPage>
 </template>
@@ -90,11 +90,5 @@ onMounted(loadProducts)
 <style scoped>
 .product {
   width: 260px;
-}
-
-.hint {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
 }
 </style>

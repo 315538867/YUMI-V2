@@ -29,8 +29,8 @@ defineEmits<{ retry: [] }>()
 .page-state__error {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--yumi-space-2);
+  margin-bottom: var(--yumi-space-3);
 }
 
 .page-state__error :deep(.el-alert) {

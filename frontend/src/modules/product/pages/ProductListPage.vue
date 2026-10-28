@@ -30,7 +30,16 @@ void load()
 </script>
 
 <template>
-  <ListPage class="product-list" title="商品" :loading="loading" :error="errorText" @retry="load">
+  <ListPage
+    class="product-list"
+    title="商品"
+    hint="管理商品规格、工序参数与预算方案"
+    panel-title="商品列表"
+    panel-hint="商品是生产、订单和预算使用的主数据"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
     <template #filters>
       <el-input
         v-model="filters.keyword"
@@ -53,7 +62,11 @@ void load()
       <el-button @click="reset">重置</el-button>
     </template>
     <template #actions>
-      <PermissionButton permission="product.create" @click="router.push('/products/new')">
+      <PermissionButton
+        permission="product.create"
+        type="primary"
+        @click="router.push('/products/new')"
+      >
         新增商品
       </PermissionButton>
       <el-button @click="router.push('/products/entry-settings')">录入设置</el-button>

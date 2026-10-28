@@ -34,7 +34,16 @@ void load()
 </script>
 
 <template>
-  <ListPage class="team-page" title="小组" :loading="loading" :error="errorText" @retry="load">
+  <ListPage
+    class="team-page"
+    title="小组"
+    hint="小组成员与人数效率标准"
+    panel-title="小组列表"
+    panel-hint="小组成员在小组编辑中维护"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
     <template #filters>
       <el-input
         v-model="filters.keyword"
@@ -107,6 +116,6 @@ void load()
 }
 
 .tag {
-  margin-right: 4px;
+  margin-right: var(--yumi-space-1);
 }
 </style>

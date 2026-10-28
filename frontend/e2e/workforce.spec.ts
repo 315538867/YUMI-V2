@@ -126,7 +126,13 @@ test('小组详情、整页编辑与人员标准', async ({ page, request }) => 
   await expect(page.getByText('创建').first()).toBeVisible()
 
   await page.locator('.workforce-tabs').getByRole('tab', { name: '人员标准' }).click()
-  const memberCount = 10 + (Date.now() % 80)
+  await expect(page.locator('.efficiency-table .el-table__row').first()).toBeVisible()
+  const existingCounts = (
+    await page.locator('.efficiency-table .el-table__row td:first-child').allInnerTexts()
+  )
+    .map((text) => Number(text.trim()))
+    .filter((value) => Number.isFinite(value))
+  const memberCount = Math.max(2, ...existingCounts) + 1
   await page.getByRole('button', { name: '新增人数标准' }).click()
   const standardDialog = page.locator('.el-dialog')
   await standardDialog

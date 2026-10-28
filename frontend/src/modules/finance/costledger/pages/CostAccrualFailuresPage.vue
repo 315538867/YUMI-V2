@@ -76,15 +76,7 @@ onMounted(load)
       </el-table-column>
     </el-table>
     <template #footer>
-      <p class="hint">失败不推进来源水位；重试沿用原命令，不重复归集。</p>
+      <p class="yumi-hint">失败不推进来源水位；重试沿用原命令，不重复归集。</p>
     </template>
   </ListPage>
 </template>
-
-<style scoped>
-.hint {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-</style>

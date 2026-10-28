@@ -1,24 +1,211 @@
 /**
- * YUMI 设计令牌：覆盖 Element Plus 默认色，保证 WCAG AA 文本对比度。
- * 规则见 docs/frontend/DESIGN.md；业务页面不得再写死色值。
+ * YUMI 设计令牌：从一期 HTML 原型提取，页面与组件只消费令牌，不写死视觉值。
+ * 规则见 docs/frontend/DESIGN.md；业务页面不得直接使用色值、字号、间距或圆角字面量。
  */
 :root {
-  --el-color-primary: #2563eb;
-  --el-color-primary-light-3: #6692f1;
-  --el-color-primary-light-5: #92b1f5;
-  --el-color-primary-light-7: #bed0f9;
-  --el-color-primary-light-8: #d3e0fb;
-  --el-color-primary-light-9: #e9effd;
-  --el-color-primary-dark-2: #1e4fbc;
+  /* ===== 基础色 ===== */
+  --yumi-color-brand: #2f6f57;
+  --yumi-color-brand-strong: #245541;
+  --yumi-color-brand-soft: #e7f1eb;
+  --yumi-color-ink: #20352d;
+  --yumi-color-text: #375441;
+  --yumi-color-muted: #65746c;
+  --yumi-color-placeholder: #65746c;
+  --yumi-color-disabled: #a0aca5;
+  --yumi-color-line: #e5ebe7;
+  --yumi-color-line-soft: #eaf0ec;
+  --yumi-color-line-faint: #f0f4f1;
+  --yumi-color-canvas: #f5f7f5;
+  --yumi-color-surface: #ffffff;
+  --yumi-color-surface-subtle: #f5f8f6;
+  --yumi-color-surface-muted: #f7faf8;
+  --yumi-color-gold: #8b5e2b;
+  --yumi-color-danger: #a85b50;
+  --yumi-color-info: #5f6e66;
+  --yumi-color-blue: #4c7597;
+  --yumi-color-success-soft: #e7f1eb;
+  --yumi-color-warning-soft: #fbf4e8;
+  --yumi-color-danger-soft: #f7eeec;
+  --yumi-color-info-soft: #f0f2f1;
+  --yumi-color-rail: #1d3028;
+  --yumi-color-rail-hover: #2b493c;
+  --yumi-color-rail-text: #91a79b;
+  --yumi-color-rail-brand: #b8d3c2;
+  --yumi-color-on-dark: #ffffff;
 
-  --el-color-success: #15803d;
-  --el-color-warning: #b45309;
-  --el-color-danger: #b91c1c;
-  --el-color-info: #5f6673;
+  /* ===== 语义色 ===== */
+  --yumi-text-primary: var(--yumi-color-ink);
+  --yumi-surface: var(--yumi-bg-surface);
+  --yumi-canvas: var(--yumi-bg-page);
+  --yumi-text-regular: var(--yumi-color-text);
+  --yumi-text-secondary: var(--yumi-color-muted);
+  --yumi-text-placeholder: var(--yumi-color-placeholder);
+  --yumi-text-disabled: var(--yumi-color-disabled);
+  --yumi-bg-page: var(--yumi-color-canvas);
+  --yumi-bg-surface: var(--yumi-color-surface);
+  --yumi-bg-subtle: var(--yumi-color-surface-subtle);
+  --yumi-bg-muted: var(--yumi-color-surface-muted);
+  --yumi-border-color: var(--yumi-color-line);
+  --yumi-border-color-light: var(--yumi-color-line-soft);
+  --yumi-border-color-faint: var(--yumi-color-line-faint);
+  --yumi-table-header-bg: #f5f8f6;
+  --yumi-table-header-text: #5f6e66;
+  --yumi-table-text: #30483b;
+  --yumi-table-border: #eaf0ec;
+  --yumi-table-row-hover: #f1f6f2;
+  --yumi-table-row-current: var(--yumi-color-brand-soft);
 
-  --el-text-color-secondary: #5f6673;
-  --el-text-color-placeholder: #6b7280;
+  /* ===== 间距 ===== */
+  --yumi-space-1: 4px;
+  --yumi-space-2: 8px;
+  --yumi-space-3: 12px;
+  --yumi-space-4: 16px;
+  --yumi-space-5: 20px;
+  --yumi-space-6: 24px;
+  --yumi-space-8: 32px;
+  --yumi-space-10: 40px;
+  --yumi-space-12: 48px;
 
-  --yumi-surface: var(--el-bg-color);
-  --yumi-canvas: #f7f8fa;
+  /* ===== 圆角 ===== */
+  --yumi-radius-xs: 4px;
+  --yumi-radius-sm: 5px;
+  --yumi-radius-md: 6px;
+  --yumi-radius-lg: 8px;
+  --yumi-radius-xl: 10px;
+  --yumi-radius-pill: 999px;
+
+  /* ===== 字体 ===== */
+  --yumi-font-family:
+    Inter, 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+  --yumi-font-size-xs: 11px;
+  --yumi-font-size-sm: 12px;
+  --yumi-font-size-base: 13px;
+  --yumi-font-size-md: 14px;
+  --yumi-font-size-lg: 16px;
+  --yumi-font-size-xl: 18px;
+  --yumi-font-size-subtitle: 15px;
+  --yumi-font-size-2xl: 20px;
+  --yumi-font-size-page: 23px;
+  --yumi-font-weight-normal: 400;
+  --yumi-font-weight-medium: 500;
+  --yumi-font-weight-semibold: 600;
+  --yumi-font-weight-bold: 650;
+  --yumi-line-height-tight: 1.5;
+  --yumi-line-height-base: 1.6;
+  --yumi-line-height-relaxed: 1.8;
+
+  /* ===== 布局 ===== */
+  --yumi-content-max-width: 1600px;
+  --yumi-content-padding: var(--yumi-space-6) var(--yumi-space-8) var(--yumi-space-12);
+  --yumi-sidebar-width: 216px;
+  --yumi-header-height: 70px;
+  --yumi-card-padding: var(--yumi-space-4);
+  --yumi-toolbar-gap: var(--yumi-space-2);
+  --yumi-section-gap: var(--yumi-space-5);
+  --yumi-control-height: 32px;
+  --yumi-shadow-none: none;
+  --yumi-shadow-popover: 0 8px 24px rgba(32, 53, 45, 0.12);
+  --yumi-form-label-offset: 110px;
+
+  /* ===== Element Plus 映射 ===== */
+  --el-color-primary: var(--yumi-color-brand);
+  --el-color-primary-light-3: #5f9079;
+  --el-color-primary-light-5: #8ab09d;
+  --el-color-primary-light-7: #b8cfbf;
+  --el-color-primary-light-8: #d7e6dc;
+  --el-color-primary-light-9: #eaf3ed;
+  --el-color-primary-dark-2: var(--yumi-color-brand-strong);
+
+  --el-color-success: var(--yumi-color-brand);
+  --el-color-success-light-3: #5f9079;
+  --el-color-success-light-5: #8ab09d;
+  --el-color-success-light-7: #b8cfbf;
+  --el-color-success-light-8: #d7e6dc;
+  --el-color-success-light-9: var(--yumi-color-success-soft);
+  --el-color-success-dark-2: var(--yumi-color-brand-strong);
+
+  --el-color-warning: var(--yumi-color-gold);
+  --el-color-warning-light-3: #c18c4d;
+  --el-color-warning-light-5: #d8b07f;
+  --el-color-warning-light-7: #f0d6b0;
+  --el-color-warning-light-8: #f7e8cf;
+  --el-color-warning-light-9: var(--yumi-color-warning-soft);
+  --el-color-warning-dark-2: #8f5f2a;
+
+  --el-color-danger: var(--yumi-color-danger);
+  --el-color-danger-light-3: #bc7469;
+  --el-color-danger-light-5: #cf978f;
+  --el-color-danger-light-7: #e3bdb8;
+  --el-color-danger-light-8: #efd9d6;
+  --el-color-danger-light-9: var(--yumi-color-danger-soft);
+  --el-color-danger-dark-2: #86473e;
+
+  --el-color-info: var(--yumi-color-info);
+  --el-color-info-light-3: #8d9992;
+  --el-color-info-light-5: #a8b1ac;
+  --el-color-info-light-7: #c6ccc8;
+  --el-color-info-light-8: #d8dcda;
+  --el-color-info-light-9: var(--yumi-color-info-soft);
+  --el-color-info-dark-2: #5a665f;
+
+  --el-text-color-primary: var(--yumi-text-primary);
+  --el-text-color-regular: var(--yumi-text-regular);
+  --el-text-color-secondary: var(--yumi-text-secondary);
+  --el-text-color-placeholder: var(--yumi-text-placeholder);
+  --el-text-color-disabled: var(--yumi-text-disabled);
+
+  --el-border-color: var(--yumi-border-color);
+  --el-border-color-light: var(--yumi-border-color);
+  --el-border-color-lighter: var(--yumi-border-color-light);
+  --el-border-color-extra-light: var(--yumi-border-color-faint);
+  --el-border-radius-base: var(--yumi-radius-sm);
+  --el-border-radius-small: var(--yumi-radius-xs);
+  --el-border-radius-round: 20px;
+
+  --el-bg-color: var(--yumi-bg-surface);
+  --el-bg-color-page: var(--yumi-bg-page);
+  --el-bg-color-overlay: var(--yumi-bg-surface);
+  --el-fill-color: var(--yumi-bg-subtle);
+  --el-fill-color-light: var(--yumi-bg-subtle);
+  --el-fill-color-lighter: var(--yumi-bg-muted);
+  --el-fill-color-extra-light: var(--yumi-bg-muted);
+  --el-fill-color-blank: var(--yumi-bg-surface);
+
+  --el-font-family: var(--yumi-font-family);
+  --el-font-size-extra-small: var(--yumi-font-size-xs);
+  --el-font-size-small: var(--yumi-font-size-sm);
+  --el-font-size-base: var(--yumi-font-size-base);
+  --el-font-size-medium: var(--yumi-font-size-md);
+  --el-font-size-large: var(--yumi-font-size-lg);
+
+  --el-table-header-bg-color: var(--yumi-table-header-bg);
+  --el-table-header-text-color: var(--yumi-table-header-text);
+  --el-table-text-color: var(--yumi-table-text);
+  --el-table-border-color: var(--yumi-table-border);
+  --el-table-row-hover-bg-color: var(--yumi-table-row-hover);
+  --el-table-current-row-bg-color: var(--yumi-table-row-current);
+  --el-table-bg-color: var(--yumi-bg-surface);
+  --el-table-tr-bg-color: var(--yumi-bg-surface);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--yumi-bg-page);
+  color: var(--yumi-text-primary);
+  font-family: var(--yumi-font-family);
+  font-size: var(--yumi-font-size-base);
+  line-height: var(--yumi-line-height-base);
+  -webkit-font-smoothing: antialiased;
 }

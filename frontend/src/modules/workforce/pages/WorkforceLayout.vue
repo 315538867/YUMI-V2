@@ -28,9 +28,9 @@ const tabs = [
 <style scoped>
 .workforce-tabs {
   background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 0 16px;
-  margin-bottom: 12px;
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-lg);
+  padding: 0 var(--yumi-space-4);
+  margin-bottom: var(--yumi-space-3);
 }
 </style>

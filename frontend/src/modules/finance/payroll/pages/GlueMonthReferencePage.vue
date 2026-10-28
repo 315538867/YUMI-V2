@@ -11,6 +11,7 @@ import { payrollService } from '@/modules/finance/payroll/services/payrollServic
 import CodeTag from '@/shared/components/CodeTag.vue'
 import PageState from '@/shared/components/PageState.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import PageShell from '@/shared/components/PageShell.vue'
 
 const policy = ref<GluePolicyView | null>(null)
 const employees = ref<EmployeeView[]>([])
@@ -127,109 +128,114 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage class="glue-page">
-    <h1>胶水自然月参考</h1>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert
-      v-if="successText"
-      type="success"
-      :closable="false"
-      :title="successText"
-      class="alert"
-    />
-    <el-form inline>
-      <el-form-item label="月份">
-        <el-input
-          v-model="filters.month"
-          type="month"
-          class="month"
-          aria-label="月份"
-          @change="applyMonth"
-        />
-      </el-form-item>
-      <el-form-item label="每人免扣重量">
-        <el-input v-model="form.exemptWeightGrams" class="weight" />
-      </el-form-item>
-      <el-form-item label="发布原因">
-        <el-input v-model="form.reasonText" class="reason" />
-      </el-form-item>
-      <el-button type="primary" :loading="saving" @click="publish">发布设置</el-button>
-    </el-form>
-    <p v-if="policy" class="meta">
-      当前版本 v{{ policy.version }}，生效月 {{ policy.effectiveMonth }}，免扣
-      {{ policy.exemptWeightGrams }} 克
-    </p>
-    <el-alert
-      v-if="policyMissing"
-      type="info"
-      :closable="false"
-      title="该月尚未配置胶水减免；填写上方表单并发布即可。"
-      class="alert"
-    />
-
-    <el-form inline class="employee-row">
-      <el-form-item label="员工">
-        <el-select
-          v-model="filters.employeeId"
-          filterable
-          class="employee"
-          aria-label="员工"
-          @change="applyEmployee"
-        >
-          <el-option
-            v-for="employee in employees"
-            :key="employee.employeeBusinessId"
-            :label="employee.name"
-            :value="employee.employeeBusinessId"
+  <PageShell title="胶水自然月参考">
+    <WorkspacePage class="glue-page">
+      <el-alert
+        v-if="errorText"
+        type="error"
+        :closable="false"
+        :title="errorText"
+        class="yumi-alert"
+      />
+      <el-alert
+        v-if="successText"
+        type="success"
+        :closable="false"
+        :title="successText"
+        class="yumi-alert"
+      />
+      <el-form inline>
+        <el-form-item label="月份">
+          <el-input
+            v-model="filters.month"
+            type="month"
+            class="month"
+            aria-label="月份"
+            @change="applyMonth"
           />
-        </el-select>
-      </el-form-item>
-      <el-button @click="query">查询参考</el-button>
-      <el-button type="primary" :loading="saving" @click="generate">生成当月参考</el-button>
-    </el-form>
+        </el-form-item>
+        <el-form-item label="每人免扣重量">
+          <el-input v-model="form.exemptWeightGrams" class="weight" />
+        </el-form-item>
+        <el-form-item label="发布原因">
+          <el-input v-model="form.reasonText" class="reason" />
+        </el-form-item>
+        <el-button type="primary" :loading="saving" @click="publish">发布设置</el-button>
+      </el-form>
+      <p v-if="policy" class="yumi-meta">
+        当前版本 v{{ policy.version }}，生效月 {{ policy.effectiveMonth }}，免扣
+        {{ policy.exemptWeightGrams }} 克
+      </p>
+      <el-alert
+        v-if="policyMissing"
+        type="info"
+        :closable="false"
+        title="该月尚未配置胶水减免；填写上方表单并发布即可。"
+        class="yumi-alert"
+      />
 
-    <PageState
-      :loading="loading"
-      :error="errorText"
-      :empty="!loading && errorText === '' && reference === null"
-      empty-text="选择员工后查询胶水月参考"
-      @retry="query"
-    >
-      <template v-if="reference">
-        <el-descriptions :column="3" border>
-          <el-descriptions-item label="状态"
-            ><CodeTag category="finance.glueReferenceStatus" :code="reference.status"
-          /></el-descriptions-item>
-          <el-descriptions-item label="分配重量">{{
-            reference.allocatedWeight
-          }}</el-descriptions-item>
-          <el-descriptions-item label="免扣重量">{{ reference.exemptWeight }}</el-descriptions-item>
-          <el-descriptions-item label="不完整原因" :span="2">{{
-            reference.incompleteReason ?? '无'
-          }}</el-descriptions-item>
-          <el-descriptions-item label="是否过期">{{
-            reference.stale ? '是' : '否'
-          }}</el-descriptions-item>
-        </el-descriptions>
-        <el-table :data="reference.lines" border size="small" class="lines">
-          <el-table-column prop="businessDate" label="日期" width="120" />
-          <el-table-column prop="allocatedWeight" label="分配重量" width="120" />
-          <el-table-column prop="exemptWeight" label="免扣" width="100" />
-          <el-table-column prop="chargeableWeight" label="应扣" width="100" />
-          <el-table-column prop="glueUnitPrice" label="单价" width="100" />
-          <el-table-column prop="preAmount" label="调整前" width="110" />
-          <el-table-column prop="postAmount" label="调整后" width="110" />
-        </el-table>
-      </template>
-    </PageState>
-  </WorkspacePage>
+      <el-form inline class="employee-row">
+        <el-form-item label="员工">
+          <el-select
+            v-model="filters.employeeId"
+            filterable
+            class="employee"
+            aria-label="员工"
+            @change="applyEmployee"
+          >
+            <el-option
+              v-for="employee in employees"
+              :key="employee.employeeBusinessId"
+              :label="employee.name"
+              :value="employee.employeeBusinessId"
+            />
+          </el-select>
+        </el-form-item>
+        <el-button @click="query">查询参考</el-button>
+        <el-button type="primary" :loading="saving" @click="generate">生成当月参考</el-button>
+      </el-form>
+
+      <PageState
+        :loading="loading"
+        :error="errorText"
+        :empty="!loading && errorText === '' && reference === null"
+        empty-text="选择员工后查询胶水月参考"
+        @retry="query"
+      >
+        <template v-if="reference">
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="状态"
+              ><CodeTag category="finance.glueReferenceStatus" :code="reference.status"
+            /></el-descriptions-item>
+            <el-descriptions-item label="分配重量">{{
+              reference.allocatedWeight
+            }}</el-descriptions-item>
+            <el-descriptions-item label="免扣重量">{{
+              reference.exemptWeight
+            }}</el-descriptions-item>
+            <el-descriptions-item label="不完整原因" :span="2">{{
+              reference.incompleteReason ?? '无'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="是否过期">{{
+              reference.stale ? '是' : '否'
+            }}</el-descriptions-item>
+          </el-descriptions>
+          <el-table :data="reference.lines" border size="small" class="lines">
+            <el-table-column prop="businessDate" label="日期" width="120" />
+            <el-table-column prop="allocatedWeight" label="分配重量" width="120" />
+            <el-table-column prop="exemptWeight" label="免扣" width="100" />
+            <el-table-column prop="chargeableWeight" label="应扣" width="100" />
+            <el-table-column prop="glueUnitPrice" label="单价" width="100" />
+            <el-table-column prop="preAmount" label="调整前" width="110" />
+            <el-table-column prop="postAmount" label="调整后" width="110" />
+          </el-table>
+        </template>
+      </PageState>
+    </WorkspacePage>
+  </PageShell>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
 .month {
   width: 150px;
 }
@@ -243,16 +249,9 @@ h1 {
   width: 260px;
 }
 .employee-row {
-  margin-top: 16px;
-}
-.meta {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+  margin-top: var(--yumi-space-4);
 }
 .lines {
-  margin-top: 12px;
-}
-.alert {
-  margin-bottom: 12px;
+  margin-top: var(--yumi-space-3);
 }
 </style>

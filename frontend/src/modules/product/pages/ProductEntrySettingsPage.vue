@@ -7,6 +7,7 @@ import type { EntryConfiguration } from '@/modules/product/contracts'
 import { productService } from '@/modules/product/services/productService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import PageShell from '@/shared/components/PageShell.vue'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 
@@ -176,140 +177,131 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage v-loading="loading" class="entry-settings">
-    <header class="head">
-      <h1>商品录入设置</h1>
+  <PageShell title="商品录入设置" hint="维护录入默认值、制作星级与工序标准时间">
+    <template #actions>
       <el-button @click="router.push('/products')">返回商品列表</el-button>
-    </header>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-
-    <template v-if="configuration">
-      <h2>胶水与色浆默认值</h2>
-      <el-form inline label-width="110px">
-        <el-form-item label="胶水损耗率">
-          <el-input v-model="defaults.glueLossRate" class="short" />
-        </el-form-item>
-        <el-form-item label="胶水单价/克">
-          <el-input v-model="defaults.glueUnitPrice" class="short" />
-        </el-form-item>
-        <el-form-item label="色浆单价/克">
-          <el-input v-model="defaults.colorPasteUnitPrice" class="short" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="saveDefaults">保存默认值</el-button>
-        </el-form-item>
-      </el-form>
-
-      <h2>制作星级选项</h2>
-      <el-table :data="configuration.makingStars" border size="small">
-        <el-table-column prop="starCode" label="星级代码" width="120" />
-        <el-table-column label="名称" min-width="150">
-          <template #default="{ row }"><el-input v-model="row.name" /></template>
-        </el-table-column>
-        <el-table-column label="标准分钟" width="130">
-          <template #default="{ row }">
-            <el-input v-model.number="row.standardMinutes" type="number" />
-          </template>
-        </el-table-column>
-        <el-table-column label="排序" width="100">
-          <template #default="{ row }">
-            <el-input v-model.number="row.sortOrder" type="number" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="90">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="saveStar(row)">保存</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-form inline class="add-row">
-        <el-input v-model="newStar.starCode" placeholder="星级代码" class="short" />
-        <el-input v-model="newStar.name" placeholder="名称" class="short" />
-        <el-input
-          v-model.number="newStar.standardMinutes"
-          type="number"
-          placeholder="分钟"
-          class="tiny"
-        />
-        <el-input
-          v-model.number="newStar.sortOrder"
-          type="number"
-          placeholder="排序"
-          class="tiny"
-        />
-        <el-button @click="addStar">新增星级</el-button>
-      </el-form>
-
-      <h2>工序标准时间选项</h2>
-      <el-table :data="configuration.processTimeOptions" border size="small">
-        <el-table-column label="工序" width="130">
-          <template #default="{ row }"
-            ><CodeTag category="product.targetProcess" :code="row.processCode"
-          /></template>
-        </el-table-column>
-        <el-table-column prop="optionCode" label="选项代码" width="150" />
-        <el-table-column label="名称" min-width="140">
-          <template #default="{ row }"><el-input v-model="row.name" /></template>
-        </el-table-column>
-        <el-table-column label="标准分钟" width="130">
-          <template #default="{ row }">
-            <el-input v-model.number="row.standardMinutes" type="number" />
-          </template>
-        </el-table-column>
-        <el-table-column label="排序" width="100">
-          <template #default="{ row }">
-            <el-input v-model.number="row.sortOrder" type="number" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="90">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="saveOption(row)">保存</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-form inline class="add-row">
-        <el-select v-model="newOption.processCode" class="short">
-          <el-option label="制作" value="MAKING" />
-          <el-option label="捏毛装袋" value="BAGGING" />
-          <el-option label="缝边剪袋" value="SEAM_CUTTING" />
-        </el-select>
-        <el-input v-model="newOption.optionCode" placeholder="选项代码" class="short" />
-        <el-input v-model="newOption.name" placeholder="名称" class="short" />
-        <el-input
-          v-model.number="newOption.standardMinutes"
-          type="number"
-          placeholder="分钟"
-          class="tiny"
-        />
-        <el-input
-          v-model.number="newOption.sortOrder"
-          type="number"
-          placeholder="排序"
-          class="tiny"
-        />
-        <el-button @click="addOption">新增选项</el-button>
-      </el-form>
     </template>
-  </WorkspacePage>
+    <WorkspacePage v-loading="loading" class="entry-settings">
+      <el-alert
+        v-if="errorText"
+        type="error"
+        :closable="false"
+        :title="errorText"
+        class="yumi-alert"
+      />
+
+      <template v-if="configuration">
+        <h2>胶水与色浆默认值</h2>
+        <el-form inline label-width="110px">
+          <el-form-item label="胶水损耗率">
+            <el-input v-model="defaults.glueLossRate" class="short" />
+          </el-form-item>
+          <el-form-item label="胶水单价/克">
+            <el-input v-model="defaults.glueUnitPrice" class="short" />
+          </el-form-item>
+          <el-form-item label="色浆单价/克">
+            <el-input v-model="defaults.colorPasteUnitPrice" class="short" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="saveDefaults">保存默认值</el-button>
+          </el-form-item>
+        </el-form>
+
+        <h2>制作星级选项</h2>
+        <el-table :data="configuration.makingStars" border size="small">
+          <el-table-column prop="starCode" label="星级代码" width="120" />
+          <el-table-column label="名称" min-width="150">
+            <template #default="{ row }"><el-input v-model="row.name" /></template>
+          </el-table-column>
+          <el-table-column label="标准分钟" width="130">
+            <template #default="{ row }">
+              <el-input v-model.number="row.standardMinutes" type="number" />
+            </template>
+          </el-table-column>
+          <el-table-column label="排序" width="100">
+            <template #default="{ row }">
+              <el-input v-model.number="row.sortOrder" type="number" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="90">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="saveStar(row)">保存</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-form inline class="add-row">
+          <el-input v-model="newStar.starCode" placeholder="星级代码" class="short" />
+          <el-input v-model="newStar.name" placeholder="名称" class="short" />
+          <el-input
+            v-model.number="newStar.standardMinutes"
+            type="number"
+            placeholder="分钟"
+            class="tiny"
+          />
+          <el-input
+            v-model.number="newStar.sortOrder"
+            type="number"
+            placeholder="排序"
+            class="tiny"
+          />
+          <el-button @click="addStar">新增星级</el-button>
+        </el-form>
+
+        <h2>工序标准时间选项</h2>
+        <el-table :data="configuration.processTimeOptions" border size="small">
+          <el-table-column label="工序" width="130">
+            <template #default="{ row }"
+              ><CodeTag category="product.targetProcess" :code="row.processCode"
+            /></template>
+          </el-table-column>
+          <el-table-column prop="optionCode" label="选项代码" width="150" />
+          <el-table-column label="名称" min-width="140">
+            <template #default="{ row }"><el-input v-model="row.name" /></template>
+          </el-table-column>
+          <el-table-column label="标准分钟" width="130">
+            <template #default="{ row }">
+              <el-input v-model.number="row.standardMinutes" type="number" />
+            </template>
+          </el-table-column>
+          <el-table-column label="排序" width="100">
+            <template #default="{ row }">
+              <el-input v-model.number="row.sortOrder" type="number" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="90">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="saveOption(row)">保存</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-form inline class="add-row">
+          <el-select v-model="newOption.processCode" class="short">
+            <el-option label="制作" value="MAKING" />
+            <el-option label="捏毛装袋" value="BAGGING" />
+            <el-option label="缝边剪袋" value="SEAM_CUTTING" />
+          </el-select>
+          <el-input v-model="newOption.optionCode" placeholder="选项代码" class="short" />
+          <el-input v-model="newOption.name" placeholder="名称" class="short" />
+          <el-input
+            v-model.number="newOption.standardMinutes"
+            type="number"
+            placeholder="分钟"
+            class="tiny"
+          />
+          <el-input
+            v-model.number="newOption.sortOrder"
+            type="number"
+            placeholder="排序"
+            class="tiny"
+          />
+          <el-button @click="addOption">新增选项</el-button>
+        </el-form>
+      </template>
+    </WorkspacePage>
+  </PageShell>
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-h1 {
-  margin: 0;
-  font-size: 20px;
-}
-
-h2 {
-  margin: 24px 0 10px;
-  font-size: 16px;
-}
-
 .short {
   width: 150px;
 }
@@ -319,10 +311,6 @@ h2 {
 }
 
 .add-row {
-  margin-top: 10px;
-}
-
-.alert {
-  margin-top: 12px;
+  margin-top: var(--yumi-space-3);
 }
 </style>

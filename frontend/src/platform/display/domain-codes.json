@@ -710,10 +710,6 @@
         "label": "启用",
         "tag": "success"
       },
-      "LOCKED": {
-        "label": "锁定",
-        "tag": "danger"
-      },
       "DISABLED": {
         "label": "已停用",
         "tag": "info"

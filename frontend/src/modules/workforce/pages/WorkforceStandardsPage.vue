@@ -6,6 +6,7 @@ import { workforceService } from '@/modules/workforce/services/workforceService'
 import DateTimeText from '@/shared/components/DateTimeText.vue'
 import PermissionButton from '@/shared/components/PermissionButton.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import PageShell from '@/shared/components/PageShell.vue'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 
@@ -139,168 +140,167 @@ onMounted(load)
 </script>
 
 <template>
-  <WorkspacePage v-loading="loading" class="standards-page">
-    <h1>人员标准</h1>
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <template v-if="standards">
-      <el-form inline class="reason-form">
-        <el-form-item label="调整说明">
-          <el-input
-            v-model="reasonText"
-            placeholder="可选，写入版本记录"
-            class="reason"
-            :disabled="!canManage"
-          />
-        </el-form-item>
-      </el-form>
-
-      <h2>每日有效时间</h2>
-      <el-form inline>
-        <el-form-item label="有效分钟">
-          <el-input
-            v-model.number="effectiveMinutes"
-            type="number"
-            class="short"
-            :disabled="!canManage"
-          />
-        </el-form-item>
-        <el-form-item label="当前版本">V{{ standards.dailyContentVersion }}</el-form-item>
-        <el-form-item label="活动引用">{{ standards.dailyActiveReferenceCount }}</el-form-item>
-        <PermissionButton
-          permission="workforce.standard.manage"
-          type="primary"
-          @click="saveWorkTime"
-          >保存</PermissionButton
-        >
-        <el-button
-          class="history-button"
-          @click="
-            openVersions('DAILY_WORK_TIME', standards.dailyStandardBusinessId, '每日有效时间')
-          "
-        >
-          版本记录
-        </el-button>
-      </el-form>
-
-      <div class="section-head">
-        <h2>小组人数效率标准</h2>
-        <PermissionButton permission="workforce.standard.manage" type="primary" @click="openCreate">
-          新增人数标准
-        </PermissionButton>
-      </div>
-      <el-table class="efficiency-table" :data="standards.efficiencyStandards" border size="small">
-        <el-table-column prop="memberCount" label="人数" width="100" />
-        <el-table-column label="效率因子" width="180">
-          <template #default="{ row }">
-            <el-input v-model="rowText[row.standardBusinessId]" :disabled="!canManage" />
-          </template>
-        </el-table-column>
-        <el-table-column label="版本" width="80">
-          <template #default="{ row }">V{{ row.contentVersion }}</template>
-        </el-table-column>
-        <el-table-column label="活动引用" width="100">
-          <template #default="{ row }">{{ row.activeReferenceCount }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="190">
-          <template #default="{ row }">
-            <PermissionButton
-              permission="workforce.standard.manage"
-              link
-              type="primary"
-              @click="saveEfficiency(row.standardBusinessId)"
-            >
-              保存
-            </PermissionButton>
-            <el-button
-              link
-              type="primary"
-              @click="
-                openVersions('EFFICIENCY', row.standardBusinessId, `${row.memberCount} 人效率标准`)
-              "
-            >
-              版本记录
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </template>
-
-    <el-dialog v-model="createVisible" title="新增人数效率标准" width="440px">
-      <el-form label-width="100px">
-        <el-form-item label="人数">
-          <el-input v-model.number="createForm.memberCount" type="number" />
-        </el-form-item>
-        <el-form-item label="效率因子">
-          <el-input v-model="createForm.efficiencyFactor" placeholder="必须大于 1" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" @click="createStandard">创建</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="versionVisible" :title="`${versionTitle} · 版本记录`" width="640px">
+  <PageShell title="人员标准">
+    <WorkspacePage v-loading="loading" class="standards-page">
       <el-alert
-        v-if="versionError"
+        v-if="errorText"
         type="error"
         :closable="false"
-        :title="versionError"
-        class="alert"
+        :title="errorText"
+        class="yumi-alert"
       />
-      <el-table
-        v-loading="versionLoading"
-        :data="versions"
-        empty-text="暂无版本记录"
-        border
-        size="small"
-      >
-        <el-table-column label="版本" width="80">
-          <template #default="{ row }">V{{ row.contentVersion }}</template>
-        </el-table-column>
-        <el-table-column label="值" width="140">
-          <template #default="{ row }">{{ versionValue(row) }}</template>
-        </el-table-column>
-        <el-table-column label="说明" min-width="160">
-          <template #default="{ row }">{{ row.reason || '—' }}</template>
-        </el-table-column>
-        <el-table-column prop="operatorId" label="操作人" width="140" />
-        <el-table-column label="时间" width="200">
-          <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
-  </WorkspacePage>
+      <template v-if="standards">
+        <el-form inline class="reason-form">
+          <el-form-item label="调整说明">
+            <el-input
+              v-model="reasonText"
+              placeholder="可选，写入版本记录"
+              class="reason"
+              :disabled="!canManage"
+            />
+          </el-form-item>
+        </el-form>
+
+        <h2>每日有效时间</h2>
+        <el-form inline>
+          <el-form-item label="有效分钟">
+            <el-input
+              v-model.number="effectiveMinutes"
+              type="number"
+              class="short"
+              :disabled="!canManage"
+            />
+          </el-form-item>
+          <el-form-item label="当前版本">V{{ standards.dailyContentVersion }}</el-form-item>
+          <el-form-item label="活动引用">{{ standards.dailyActiveReferenceCount }}</el-form-item>
+          <PermissionButton
+            permission="workforce.standard.manage"
+            type="primary"
+            @click="saveWorkTime"
+            >保存</PermissionButton
+          >
+          <el-button
+            class="history-button"
+            @click="
+              openVersions('DAILY_WORK_TIME', standards.dailyStandardBusinessId, '每日有效时间')
+            "
+          >
+            版本记录
+          </el-button>
+        </el-form>
+
+        <div class="yumi-section-head">
+          <h2>小组人数效率标准</h2>
+          <PermissionButton
+            permission="workforce.standard.manage"
+            type="primary"
+            @click="openCreate"
+          >
+            新增人数标准
+          </PermissionButton>
+        </div>
+        <el-table
+          class="efficiency-table"
+          :data="standards.efficiencyStandards"
+          border
+          size="small"
+        >
+          <el-table-column prop="memberCount" label="人数" width="100" />
+          <el-table-column label="效率因子" width="180">
+            <template #default="{ row }">
+              <el-input v-model="rowText[row.standardBusinessId]" :disabled="!canManage" />
+            </template>
+          </el-table-column>
+          <el-table-column label="版本" width="80">
+            <template #default="{ row }">V{{ row.contentVersion }}</template>
+          </el-table-column>
+          <el-table-column label="活动引用" width="100">
+            <template #default="{ row }">{{ row.activeReferenceCount }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="190">
+            <template #default="{ row }">
+              <PermissionButton
+                permission="workforce.standard.manage"
+                link
+                type="primary"
+                @click="saveEfficiency(row.standardBusinessId)"
+              >
+                保存
+              </PermissionButton>
+              <el-button
+                link
+                type="primary"
+                @click="
+                  openVersions(
+                    'EFFICIENCY',
+                    row.standardBusinessId,
+                    `${row.memberCount} 人效率标准`,
+                  )
+                "
+              >
+                版本记录
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <el-dialog v-model="createVisible" title="新增人数效率标准" width="440px">
+        <el-form label-width="100px">
+          <el-form-item label="人数">
+            <el-input v-model.number="createForm.memberCount" type="number" />
+          </el-form-item>
+          <el-form-item label="效率因子">
+            <el-input v-model="createForm.efficiencyFactor" placeholder="必须大于 1" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="createVisible = false">取消</el-button>
+          <el-button type="primary" @click="createStandard">创建</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="versionVisible" :title="`${versionTitle} · 版本记录`" width="640px">
+        <el-alert
+          v-if="versionError"
+          type="error"
+          :closable="false"
+          :title="versionError"
+          class="yumi-alert"
+        />
+        <el-table
+          v-loading="versionLoading"
+          :data="versions"
+          empty-text="暂无版本记录"
+          border
+          size="small"
+        >
+          <el-table-column label="版本" width="80">
+            <template #default="{ row }">V{{ row.contentVersion }}</template>
+          </el-table-column>
+          <el-table-column label="值" width="140">
+            <template #default="{ row }">{{ versionValue(row) }}</template>
+          </el-table-column>
+          <el-table-column label="说明" min-width="160">
+            <template #default="{ row }">{{ row.reason || '—' }}</template>
+          </el-table-column>
+          <el-table-column prop="operatorId" label="操作人" width="140" />
+          <el-table-column label="时间" width="200">
+            <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
+          </el-table-column>
+        </el-table>
+      </el-dialog>
+    </WorkspacePage>
+  </PageShell>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 8px;
-  font-size: 18px;
-}
-
-h2 {
-  margin: 20px 0 10px;
-  font-size: 16px;
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.section-head h2 {
-  margin-bottom: 10px;
-}
-
 .short {
   width: 140px;
 }
 
 .reason-form {
-  margin-bottom: 4px;
+  margin-bottom: var(--yumi-space-1);
 }
 
 .reason {
@@ -308,10 +308,6 @@ h2 {
 }
 
 .history-button {
-  margin-left: 8px;
-}
-
-.alert {
-  margin-bottom: 12px;
+  margin-left: var(--yumi-space-2);
 }
 </style>

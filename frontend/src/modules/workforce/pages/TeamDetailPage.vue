@@ -220,10 +220,10 @@ void load()
 
 <style scoped>
 .history-tabs {
-  margin-top: 20px;
+  margin-top: var(--yumi-space-5);
 }
 
 .muted {
-  color: var(--el-text-color-secondary);
+  color: var(--yumi-text-secondary);
 }
 </style>

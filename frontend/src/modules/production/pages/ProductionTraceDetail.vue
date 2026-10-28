@@ -45,7 +45,7 @@ onMounted(loadOffline)
 
 <template>
   <div class="trace-detail">
-    <p class="meta">
+    <p class="yumi-meta">
       订单项 {{ trace.orderItemBusinessId }}
       <template v-if="trace.productNames">· {{ trace.productNames }}</template>
     </p>
@@ -54,17 +54,17 @@ onMounted(loadOffline)
       type="error"
       :closable="false"
       :title="offlineError"
-      class="alert"
+      class="yumi-alert"
     />
     <el-card v-for="demand in trace.demands" :key="demand.demandBusinessId" class="demand">
       <template #header>
         <strong>{{ demand.demandBusinessId }}</strong>
-        <span class="meta">
+        <span class="yumi-meta">
           · <CodeTag category="production.demandType" :code="demand.demandType" /> ·
           <CodeTag category="production.demandStatus" :code="demand.status" />
         </span>
       </template>
-      <p class="meta">
+      <p class="yumi-meta">
         来源 {{ demand.productionSourceBusinessId }} · 物理根
         {{ demand.physicalRootSourceBusinessId }}
       </p>
@@ -155,34 +155,25 @@ onMounted(loadOffline)
 .trace-detail {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.meta {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+  gap: var(--yumi-space-3);
 }
 
 .demand {
-  margin-bottom: 4px;
+  margin-bottom: var(--yumi-space-1);
 }
 
 .reasons {
-  margin: 8px 0;
-  color: var(--el-color-warning);
-  font-size: 13px;
+  margin: var(--yumi-space-2) 0;
+  color: var(--yumi-color-gold);
+  font-size: var(--yumi-font-size-base);
 }
 
 .facts {
-  margin-top: 10px;
+  margin-top: var(--yumi-space-3);
 }
 
 h3 {
-  margin: 14px 0 8px;
-  font-size: 14px;
-}
-
-.alert {
-  margin-bottom: 12px;
+  margin: var(--yumi-space-4) 0 var(--yumi-space-2);
+  font-size: var(--yumi-font-size-md);
 }
 </style>

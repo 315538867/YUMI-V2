@@ -124,7 +124,9 @@ onMounted(load)
       </el-table-column>
     </el-table>
     <template #footer>
-      <p class="hint">只能选择已核定员工付款；部分付款与多人付款由 cash 在同一事务校验上限。</p>
+      <p class="yumi-hint">
+        只能选择已核定员工付款；部分付款与多人付款由 cash 在同一事务校验上限。
+      </p>
     </template>
   </ListPage>
 </template>
@@ -132,10 +134,5 @@ onMounted(load)
 <style scoped>
 .period {
   width: 240px;
-}
-.hint {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
 }
 </style>

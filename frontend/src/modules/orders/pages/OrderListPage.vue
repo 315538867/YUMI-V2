@@ -30,7 +30,16 @@ void load()
 </script>
 
 <template>
-  <ListPage class="order-list" title="订单" :loading="loading" :error="errorText" @retry="load">
+  <ListPage
+    class="order-list"
+    title="订单"
+    hint="客户约定、交付与收款"
+    panel-title="订单列表"
+    panel-hint="交付履约与付款履约分别查看"
+    :loading="loading"
+    :error="errorText"
+    @retry="load"
+  >
     <template #filters>
       <el-input
         v-model="filters.keyword"
@@ -55,7 +64,7 @@ void load()
       <el-button @click="reset">重置</el-button>
     </template>
     <template #actions>
-      <PermissionButton permission="order.create" @click="router.push('/orders/new')"
+      <PermissionButton permission="order.create" type="primary" @click="router.push('/orders/new')"
         >新增订单</PermissionButton
       >
       <PermissionButton permission="order.legacy.intake" @click="router.push('/orders/opening')">
@@ -63,9 +72,17 @@ void load()
       </PermissionButton>
     </template>
     <el-table :data="rows" empty-text="没有匹配的订单" border>
-      <el-table-column prop="orderNo" label="订单号" width="150" />
-      <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
-      <el-table-column prop="productNames" label="商品" min-width="160" show-overflow-tooltip />
+      <el-table-column label="订单 / 客户" min-width="220">
+        <template #default="{ row }">
+          <span class="yumi-cell-title">{{ row.orderNo }}</span>
+          <span class="yumi-cell-sub">{{ row.customerName }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="商品" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span class="yumi-cell-title">{{ row.productNames }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="来源" width="150">
         <template #default="{ row }"
           ><CodeTag category="order.origin" :code="row.origin"
@@ -84,10 +101,14 @@ void load()
       <el-table-column label="净收款" width="150">
         <template #default="{ row }"><MoneyText :value="row.netReceipts" /></template>
       </el-table-column>
-      <el-table-column label="交付/付款" width="130">
+      <el-table-column label="交付 / 付款" width="140">
         <template #default="{ row }">
-          {{ row.deliveryFulfilled ? '已交付' : '未交付' }} /
-          {{ row.paymentFulfilled ? '已收清' : '未收清' }}
+          <span class="yumi-cell-title">
+            {{ row.deliveryFulfilled ? '已交付' : '未交付' }}
+          </span>
+          <span class="yumi-cell-sub">
+            {{ row.paymentFulfilled ? '已收清' : '未收清' }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="90" fixed="right">

@@ -43,45 +43,50 @@ onMounted(load)
 <template>
   <el-card class="overview-card" shadow="never">
     <template #header>
-      <div class="head">
+      <div class="yumi-page-heading">
         <strong>整体进度</strong>
-        <span class="hint"
+        <span class="yumi-hint"
           >以首个工序排班与已处理数量统计；有效订单 {{ overview?.orderCount ?? 0 }} 个</span
         >
       </div>
     </template>
     <PageState :loading="loading" :error="errorText" @retry="load">
       <template v-if="overview">
-        <div class="metrics">
-          <div class="metric">
-            <small>真实需求</small>
-            <strong>{{ overview.requiredQuantity }}</strong>
-            <span>件</span>
-            <em>订单应交总量</em>
+        <div class="yumi-stat-grid yumi-stat-grid--5">
+          <div class="yumi-stat-card">
+            <span class="yumi-stat-card__label">真实需求</span>
+            <span class="yumi-stat-card__value">
+              {{ overview.requiredQuantity }}<small>件</small>
+            </span>
+            <span class="yumi-stat-card__note">订单应交总量</span>
           </div>
-          <div class="metric">
-            <small>已排班</small>
-            <strong>{{ overview.scheduledQuantity }}</strong>
-            <span>/ {{ overview.requiredQuantity }} 件</span>
-            <em>覆盖 {{ scheduledRate }}</em>
+          <div class="yumi-stat-card">
+            <span class="yumi-stat-card__label">已排班</span>
+            <span class="yumi-stat-card__value">
+              {{ overview.scheduledQuantity }}<small>/ {{ overview.requiredQuantity }} 件</small>
+            </span>
+            <span class="yumi-stat-card__note">覆盖 {{ scheduledRate }}</span>
           </div>
-          <div class="metric">
-            <small>生产事实</small>
-            <strong>{{ overview.productionFactQuantity }}</strong>
-            <span>件</span>
-            <em>首个工序已处理</em>
+          <div class="yumi-stat-card">
+            <span class="yumi-stat-card__label">生产事实</span>
+            <span class="yumi-stat-card__value">
+              {{ overview.productionFactQuantity }}<small>件</small>
+            </span>
+            <span class="yumi-stat-card__note">首个工序已处理</span>
           </div>
-          <div class="metric">
-            <small>已完成履约</small>
-            <strong>{{ overview.fulfilledQuantity }}</strong>
-            <span>/ {{ overview.requiredQuantity }} 件</span>
-            <em>完成 {{ fulfilledRate }}</em>
+          <div class="yumi-stat-card">
+            <span class="yumi-stat-card__label">已完成履约</span>
+            <span class="yumi-stat-card__value">
+              {{ overview.fulfilledQuantity }}<small>/ {{ overview.requiredQuantity }} 件</small>
+            </span>
+            <span class="yumi-stat-card__note">完成 {{ fulfilledRate }}</span>
           </div>
-          <div class="metric">
-            <small>待完成</small>
-            <strong>{{ overview.remainingQuantity }}</strong>
-            <span>件</span>
-            <em>含在制、就绪与缺口</em>
+          <div class="yumi-stat-card">
+            <span class="yumi-stat-card__label">待完成</span>
+            <span class="yumi-stat-card__value">
+              {{ overview.remainingQuantity }}<small>件</small>
+            </span>
+            <span class="yumi-stat-card__note">含在制、就绪与缺口</span>
           </div>
         </div>
         <div class="processes">
@@ -108,74 +113,25 @@ onMounted(load)
 
 <style scoped>
 .overview-card {
-  margin-bottom: 12px;
-}
-
-.head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.hint {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.metric {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: var(--el-fill-color-lighter);
-}
-
-.metric small {
-  display: block;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.metric strong {
-  font-size: 20px;
-  margin-right: 4px;
-}
-
-.metric span,
-.metric em {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.metric em {
-  display: block;
-  margin-top: 2px;
+  margin-bottom: var(--yumi-space-3);
 }
 
 .processes {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
-  gap: 12px;
+  gap: var(--yumi-space-3);
 }
 
 .process-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
-  gap: 8px;
+  margin-bottom: var(--yumi-space-2);
+  gap: var(--yumi-space-2);
 }
 
 .process-meta {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
 }
 </style>

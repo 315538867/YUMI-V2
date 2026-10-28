@@ -50,7 +50,7 @@ test('登录后统一导航可进入业务模块', async ({ page }) => {
 
   await page.getByRole('menuitem', { name: '客户' }).click()
   await expect(page).toHaveURL(/\/customers$/)
-  await expect(page.getByRole('heading', { name: '客户' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '客户', level: 1 })).toBeVisible()
 })
 
 test('金额契约保持十进制字符串，不经过浮点数', async ({ page, request }) => {

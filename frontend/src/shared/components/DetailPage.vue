@@ -15,69 +15,33 @@ defineEmits<{ retry: [] }>()
 </script>
 
 <template>
-  <WorkspacePage class="detail-page">
-    <header class="detail-page__head">
-      <div class="detail-page__title">
-        <h1>{{ title }}</h1>
-        <span v-if="$slots.meta" class="detail-page__meta"><slot name="meta" /></span>
+  <div class="detail-page">
+    <header class="yumi-page-heading">
+      <div class="yumi-page-heading__copy">
+        <h1 class="yumi-page-heading__title">{{ title }}</h1>
+        <span v-if="$slots.meta" class="yumi-page-heading__hint"><slot name="meta" /></span>
       </div>
-      <div class="detail-page__actions"><slot name="actions" /></div>
+      <div class="yumi-actions"><slot name="actions" /></div>
     </header>
-    <div class="detail-page__notice"><slot name="notice" /></div>
-    <PageState :loading="loading" :error="error" @retry="$emit('retry')">
-      <slot />
-    </PageState>
-  </WorkspacePage>
+
+    <WorkspacePage class="detail-page__panel" padding="lg">
+      <div class="detail-page__notice"><slot name="notice" /></div>
+      <PageState :loading="loading" :error="error" @retry="$emit('retry')">
+        <slot />
+      </PageState>
+    </WorkspacePage>
+  </div>
 </template>
 
 <style scoped>
-.detail-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.detail-page__title h1 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.detail-page__meta {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.detail-page__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .detail-page__notice:not(:empty) {
-  margin-bottom: 12px;
+  margin-bottom: var(--yumi-space-3);
 }
 
 .detail-page :deep(h2) {
-  margin: 20px 0 10px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.detail-page :deep(.detail-page__section-head) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 20px 0 10px;
-}
-
-.detail-page :deep(.detail-page__section-head h2) {
-  margin: 0;
+  margin: var(--yumi-section-gap) 0 var(--yumi-space-3);
+  font-size: var(--yumi-font-size-subtitle);
+  font-weight: var(--yumi-font-weight-semibold);
+  color: var(--yumi-text-primary);
 }
 </style>

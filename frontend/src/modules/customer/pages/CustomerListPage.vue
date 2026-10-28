@@ -38,6 +38,9 @@ void load()
   <ListPage
     class="customer-list"
     title="客户"
+    hint="客户身份与联系方式"
+    panel-title="客户列表"
+    panel-hint="客户资料用于新订单自动带入"
     :meta="`启用客户 ${activeCount ?? '—'}`"
     :loading="loading"
     :error="errorText"
@@ -65,7 +68,11 @@ void load()
       <el-button @click="reset">重置</el-button>
     </template>
     <template #actions>
-      <PermissionButton permission="customer.manage" @click="router.push('/customers/new')">
+      <PermissionButton
+        permission="customer.manage"
+        type="primary"
+        @click="router.push('/customers/new')"
+      >
         新增客户
       </PermissionButton>
     </template>

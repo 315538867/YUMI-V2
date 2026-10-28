@@ -1,0 +1,391 @@
+/**
+ * YUMI 组件样式层：页面只组合这些类，不重复写页头、工具条、面板、统计卡与表单网格。
+ * 所有值必须来自 tokens.css。
+ */
+
+/* ===== 业务页默认标题 ===== */
+.content h1 {
+  margin: 0 0 var(--yumi-space-3);
+  font-size: var(--yumi-font-size-page);
+  font-weight: var(--yumi-font-weight-bold);
+  letter-spacing: 0.5px;
+  color: var(--yumi-text-primary);
+}
+
+.content h2 {
+  margin: var(--yumi-section-gap) 0 var(--yumi-space-3);
+  font-size: var(--yumi-font-size-subtitle);
+  font-weight: var(--yumi-font-weight-semibold);
+  color: var(--yumi-text-primary);
+}
+
+/* ===== 页头 ===== */
+.yumi-page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--yumi-space-4);
+  margin-bottom: var(--yumi-space-5);
+}
+
+.yumi-page-heading__copy {
+  display: flex;
+  align-items: baseline;
+  gap: var(--yumi-space-3);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.yumi-page-heading__title {
+  margin: 0;
+  font-size: var(--yumi-font-size-page);
+  font-weight: var(--yumi-font-weight-bold);
+  letter-spacing: 0.5px;
+  color: var(--yumi-text-primary);
+}
+
+.yumi-page-heading__divider {
+  color: var(--yumi-color-line);
+  font-size: var(--yumi-font-size-2xl);
+}
+
+.yumi-page-heading__hint {
+  margin: 0;
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
+  line-height: var(--yumi-line-height-relaxed);
+}
+
+/* ===== 工具条与动作 ===== */
+.yumi-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--yumi-toolbar-gap);
+  flex-wrap: wrap;
+  margin-bottom: var(--yumi-space-3);
+}
+
+.yumi-toolbar > :where(.el-input) {
+  width: 240px;
+}
+
+.yumi-toolbar > :where(.el-select) {
+  width: 140px;
+}
+
+.yumi-toolbar > :where(.el-date-editor) {
+  width: 160px;
+}
+
+.yumi-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--yumi-space-2);
+  flex-wrap: wrap;
+}
+
+/* ===== 区块与面板 ===== */
+.yumi-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yumi-space-3);
+  margin: var(--yumi-section-gap) 0 var(--yumi-space-3);
+}
+
+.yumi-section-head:first-child {
+  margin-top: 0;
+}
+
+.yumi-section-title {
+  margin: 0;
+  font-size: var(--yumi-font-size-subtitle);
+  font-weight: var(--yumi-font-weight-semibold);
+  color: var(--yumi-text-primary);
+}
+
+.yumi-panel {
+  background: var(--yumi-bg-surface);
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-lg);
+}
+
+.yumi-panel + .yumi-panel {
+  margin-top: var(--yumi-space-4);
+}
+
+.yumi-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yumi-space-3);
+  padding: var(--yumi-space-4) var(--yumi-space-5);
+  border-bottom: 1px solid var(--yumi-border-color);
+}
+
+.yumi-panel__header h2,
+.yumi-panel__header h3 {
+  margin: 0;
+  font-size: var(--yumi-font-size-subtitle);
+  font-weight: var(--yumi-font-weight-semibold);
+}
+
+.yumi-panel__body {
+  padding: var(--yumi-space-5);
+}
+
+/* ===== 统计卡 ===== */
+.yumi-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--yumi-space-2);
+  margin-bottom: var(--yumi-space-4);
+}
+
+.yumi-stat-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.yumi-stat-grid--5 {
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+}
+
+.yumi-stat-card {
+  padding: var(--yumi-space-3) var(--yumi-space-4);
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-md);
+  background: var(--yumi-bg-muted);
+}
+
+.yumi-stat-card__label {
+  display: block;
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-xs);
+}
+
+.yumi-stat-card__value {
+  display: block;
+  margin-top: var(--yumi-space-1);
+  font-size: var(--yumi-font-size-2xl);
+  font-weight: var(--yumi-font-weight-semibold);
+  color: var(--yumi-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.yumi-stat-card__note {
+  display: block;
+  margin-top: var(--yumi-space-1);
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-xs);
+  line-height: var(--yumi-line-height-relaxed);
+}
+
+.yumi-stat-card__value small {
+  margin-left: var(--yumi-space-1);
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
+  font-weight: var(--yumi-font-weight-normal);
+}
+
+/* ===== 卡片网格 ===== */
+.yumi-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--yumi-space-3);
+}
+
+.yumi-card-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.yumi-card-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ===== 信息网格 ===== */
+.yumi-info-grid {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: var(--yumi-space-2) var(--yumi-space-3);
+  margin: 0;
+  font-size: var(--yumi-font-size-sm);
+  line-height: var(--yumi-line-height-relaxed);
+}
+
+.yumi-info-grid dt {
+  color: var(--yumi-text-secondary);
+}
+
+.yumi-info-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ===== 表单网格 ===== */
+.yumi-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--yumi-space-5);
+}
+
+.yumi-form-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.yumi-form-grid__wide {
+  grid-column: 1 / -1;
+}
+
+/* ===== 文本辅助 ===== */
+.yumi-hint {
+  margin: 0;
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
+  line-height: var(--yumi-line-height-relaxed);
+}
+
+.yumi-meta {
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
+}
+
+.yumi-alert {
+  margin-bottom: var(--yumi-space-3);
+}
+
+.yumi-cell-title {
+  display: block;
+  font-weight: var(--yumi-font-weight-semibold);
+}
+
+.yumi-cell-sub {
+  display: block;
+  margin-top: var(--yumi-space-1);
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-xs);
+}
+
+/* ===== Element Plus 统一外观 ===== */
+.el-button {
+  border-radius: var(--yumi-radius-sm);
+  font-weight: var(--yumi-font-weight-medium);
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner,
+.el-input-number,
+.el-date-editor .el-input__wrapper {
+  border-radius: var(--yumi-radius-sm);
+}
+
+.el-form-item {
+  margin-bottom: var(--yumi-space-5);
+}
+
+.el-form-item__label {
+  color: var(--yumi-text-regular);
+  font-size: var(--yumi-font-size-sm);
+}
+
+.el-table {
+  --el-table-header-bg-color: var(--yumi-table-header-bg);
+  --el-table-header-text-color: var(--yumi-table-header-text);
+  --el-table-text-color: var(--yumi-table-text);
+  --el-table-border-color: var(--yumi-table-border);
+  font-size: var(--yumi-font-size-base);
+}
+
+.el-table th.el-table__cell {
+  height: calc(var(--yumi-space-10) + 3px);
+  padding: 0;
+  font-size: var(--yumi-font-size-xs);
+  font-weight: var(--yumi-font-weight-medium);
+}
+
+.el-table td.el-table__cell {
+  padding: var(--yumi-space-4) 0;
+}
+
+.el-table .cell {
+  line-height: var(--yumi-line-height-base);
+}
+
+.el-table__empty-text {
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
+}
+
+.el-tabs__item {
+  font-size: var(--yumi-font-size-base);
+}
+
+.el-card {
+  border-color: var(--yumi-border-color);
+  border-radius: var(--yumi-radius-lg);
+}
+
+.el-card.is-always-shadow,
+.el-card.is-hover-shadow:hover {
+  box-shadow: var(--yumi-shadow-none);
+}
+
+.el-popper.is-light {
+  border-color: var(--yumi-border-color);
+  border-radius: var(--yumi-radius-md);
+  box-shadow: var(--yumi-shadow-popover);
+}
+
+.el-dialog {
+  border-radius: var(--yumi-radius-lg);
+}
+
+.el-dialog__header {
+  margin-right: 0;
+  padding: var(--yumi-space-5) var(--yumi-space-6) var(--yumi-space-4);
+  border-bottom: 1px solid var(--yumi-border-color);
+}
+
+.el-dialog__body {
+  padding: var(--yumi-space-5) var(--yumi-space-6);
+}
+
+.el-dialog__footer {
+  padding: var(--yumi-space-4) var(--yumi-space-6);
+  border-top: 1px solid var(--yumi-border-color);
+}
+
+.el-tag {
+  border-radius: var(--yumi-radius-xs);
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: var(--yumi-space-5) var(--yumi-space-6);
+  border-bottom: 1px solid var(--yumi-border-color);
+}
+
+.el-drawer__body {
+  padding: var(--yumi-space-5) var(--yumi-space-6);
+}
+
+@media (max-width: 1100px) {
+  .yumi-stat-grid,
+  .yumi-stat-grid--5,
+  .yumi-stat-grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .yumi-form-grid,
+  .yumi-form-grid--3,
+  .yumi-card-grid--2,
+  .yumi-card-grid--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .yumi-page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -1,33 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import { navigationGroups } from '@/app/navigation'
 import { useAuthStore } from '@/platform/stores/auth'
-
-const moduleRoutes: RouteRecordRaw[] = navigationGroups.flatMap((group) =>
-  group.items
-    .filter(
-      (item) =>
-        item.path !== '/customers' &&
-        item.path !== '/products' &&
-        item.path !== '/workforce' &&
-        item.path !== '/production' &&
-        item.path !== '/orders' &&
-        item.path !== '/after-sales' &&
-        item.path !== '/payroll' &&
-        item.path !== '/finance' &&
-        item.path !== '/reporting' &&
-        item.path !== '/settings',
-    )
-    .map((item) => ({
-      path: item.path.slice(1),
-      name: item.path.slice(1).replaceAll('/', '-'),
-      component: () => import('@/app/pages/ModulePlaceholderPage.vue'),
-      meta: {
-        requiresAuth: true,
-        title: item.title,
-        permission: item.permission,
-      },
-    })),
-)
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -480,7 +452,6 @@ export const routes: RouteRecordRaw[] = [
           },
         ],
       },
-      ...moduleRoutes,
     ],
   },
   {

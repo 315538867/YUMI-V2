@@ -53,7 +53,7 @@ async function load(): Promise<void> {
 function open(kind: 'reverse' | 'return', row: CashFactView): void {
   action.value = kind
   form.cashFactBusinessId = row.cashFactBusinessId
-  form.amount = row.amount
+  form.amount = String(row.amount)
   form.resultBusinessId = ''
   form.businessDate = new Date().toISOString().slice(0, 10)
   form.reasonText = ''
@@ -187,7 +187,7 @@ void load()
       </el-table-column>
     </el-table>
     <template #footer>
-      <p class="hint">现金净额不是利润；工资退回不充当经营收入。</p>
+      <p class="yumi-hint">现金净额不是利润；工资退回不充当经营收入。</p>
     </template>
   </ListPage>
 
@@ -197,7 +197,7 @@ void load()
       type="error"
       :closable="false"
       :title="detailError"
-      class="alert"
+      class="yumi-alert"
     />
     <div v-loading="detailLoading">
       <el-descriptions v-if="detail" :column="1" border>
@@ -265,11 +265,6 @@ void load()
   width: 220px;
 }
 .summary {
-  margin-bottom: 12px;
-}
-.hint {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  margin-bottom: var(--yumi-space-3);
 }
 </style>

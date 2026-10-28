@@ -163,7 +163,7 @@ void load()
 
 <template>
   <WorkspacePage class="schedule-page">
-    <div class="toolbar">
+    <div class="yumi-toolbar">
       <el-radio-group v-model="filters.view" @change="search">
         <el-radio-button value="week">周视图</el-radio-button>
         <el-radio-button value="list">全部列表</el-radio-button>
@@ -191,31 +191,30 @@ void load()
       >
     </div>
 
-    <div class="overview">
-      <div class="overview-item">
-        <small>{{ isWeekView ? '本周任务' : '全部任务' }}</small>
-        <strong>{{ overview.taskCount }}</strong>
-        <span>个</span>
+    <div class="yumi-stat-grid yumi-stat-grid--5">
+      <div class="yumi-stat-card">
+        <span class="yumi-stat-card__label">{{ isWeekView ? '本周任务' : '全部任务' }}</span>
+        <span class="yumi-stat-card__value">{{ overview.taskCount }}<small>个</small></span>
       </div>
-      <div class="overview-item">
-        <small>计划数量</small>
-        <strong>{{ overview.plannedQuantity }}</strong>
-        <span>件</span>
+      <div class="yumi-stat-card">
+        <span class="yumi-stat-card__label">计划数量</span>
+        <span class="yumi-stat-card__value">{{ overview.plannedQuantity }}<small>件</small></span>
       </div>
-      <div class="overview-item">
-        <small>执行主体</small>
-        <strong>{{ overview.subjectCount }}</strong>
-        <span>个</span>
+      <div class="yumi-stat-card">
+        <span class="yumi-stat-card__label">执行主体</span>
+        <span class="yumi-stat-card__value">{{ overview.subjectCount }}<small>个</small></span>
       </div>
-      <div class="overview-item">
-        <small>待核验</small>
-        <strong>{{ overview.pendingVerification }}</strong>
-        <span>个任务</span>
+      <div class="yumi-stat-card">
+        <span class="yumi-stat-card__label">待核验</span>
+        <span class="yumi-stat-card__value"
+          >{{ overview.pendingVerification }}<small>个任务</small></span
+        >
       </div>
-      <div class="overview-item">
-        <small>制作超额</small>
-        <strong>{{ overview.extraTaskCount }}</strong>
-        <span>个任务</span>
+      <div class="yumi-stat-card">
+        <span class="yumi-stat-card__label">制作超额</span>
+        <span class="yumi-stat-card__value"
+          >{{ overview.extraTaskCount }}<small>个任务</small></span
+        >
       </div>
     </div>
 
@@ -315,63 +314,25 @@ void load()
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
 .week-label {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-base);
 }
 
 .keyword {
   width: 220px;
 }
 
-.overview {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.overview-item {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: var(--el-fill-color-lighter);
-}
-
-.overview-item small {
-  display: block;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.overview-item strong {
-  font-size: 20px;
-  margin-right: 4px;
-}
-
-.overview-item span {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
 .week-board {
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-md);
   overflow-x: auto;
 }
 
 .week-row {
   display: grid;
   grid-template-columns: 140px repeat(7, minmax(150px, 1fr));
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--yumi-border-color-light);
 }
 
 .week-row:last-child {
@@ -379,14 +340,14 @@ void load()
 }
 
 .week-head {
-  background: var(--el-fill-color-lighter);
-  font-weight: 600;
+  background: var(--yumi-bg-muted);
+  font-weight: var(--yumi-font-weight-semibold);
 }
 
 .subject-cell,
 .day-cell {
-  padding: 8px;
-  border-right: 1px solid var(--el-border-color-lighter);
+  padding: var(--yumi-space-2);
+  border-right: 1px solid var(--yumi-border-color-light);
   min-height: 56px;
 }
 
@@ -402,36 +363,32 @@ void load()
 .day-cell {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--yumi-space-2);
 }
 
 .task-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--yumi-space-1);
   width: 100%;
-  padding: 8px;
+  padding: var(--yumi-space-2);
   text-align: left;
   background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-md);
   cursor: pointer;
 }
 
 .task-card:hover {
-  border-color: var(--el-color-primary);
+  border-color: var(--yumi-color-brand);
 }
 
 .task-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.alert {
-  margin-bottom: 12px;
+  gap: var(--yumi-space-1);
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
 }
 </style>

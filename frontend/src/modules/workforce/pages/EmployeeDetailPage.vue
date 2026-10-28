@@ -297,7 +297,7 @@ void load()
   </DetailPage>
 
   <el-dialog v-model="dialogVisible" :title="dialogTitle" width="460px">
-    <FormErrorAlert :error="formError" class="alert" />
+    <FormErrorAlert :error="formError" class="yumi-alert" />
     <el-form label-width="92px">
       <template v-if="dialog === 'qualification'">
         <el-form-item label="工种">
@@ -335,10 +335,6 @@ void load()
 
 <style scoped>
 .history-tabs {
-  margin-top: 20px;
-}
-
-.alert {
-  margin-bottom: 12px;
+  margin-top: var(--yumi-space-5);
 }
 </style>

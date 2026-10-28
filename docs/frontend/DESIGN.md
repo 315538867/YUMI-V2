@@ -9,68 +9,103 @@
 - 页面由“浅灰底 + 白色工作区”构成，不使用大面积品牌色块、渐变背景或装饰性插画。
 - 信息密度优先：一屏内优先呈现业务字段、金额、数量与状态，不用卡片堆叠代替表格。
 
-## 2. 色彩
+## 2. 令牌分层
+
+样式分三层，页面不得绕过：
+
+| 层 | 文件 | 内容 |
+|---|---|---|
+| 基础令牌 | `frontend/src/platform/theme/tokens.css` | 原型色板、字号、间距、圆角、阴影、Element Plus 变量映射 |
+| 组件样式 | `frontend/src/platform/theme/components.css` | `yumi-*` 页头/工具条/面板/统计卡/信息网格，以及 Element Plus 统一外观 |
+| 业务页面 | `src/modules/**/*.vue` | 只组合共享组件与 `yumi-*` 类，页面 scoped CSS 只保留该页独有布局 |
+
+## 3. 色彩
 
 | 令牌 | 值 | 用途 |
 |---|---|---|
-| `--el-color-primary` | `#2563eb` | 主按钮、链接、选中态 |
-| `--el-color-primary-light-9` | `#e9effd` | 选中行、轻量高亮底色 |
-| `--el-color-success` | `#15803d` | 成功、已完成、启用 |
-| `--el-color-warning` | `#b45309` | 待处理、部分完成、风险提醒 |
-| `--el-color-danger` | `#b91c1c` | 失败、报废、错误 |
-| `--el-color-info` | `#5f6673` | 中性、已取消、辅助信息 |
-| `--el-text-color-primary` | Element Plus 默认 | 正文与数值 |
-| `--el-text-color-secondary` | `#5f6673` | 说明、辅助字段 |
-| `--el-text-color-placeholder` | `#6b7280` | 输入占位 |
-| 页面背景 | `var(--yumi-canvas)`（`#f7f8fa`） | 内容区底色 |
-| 工作区背景 | `var(--yumi-surface)`（`--el-bg-color`） | 页面卡片、侧栏、顶栏 |
-
-规则：
+| `--yumi-color-brand` | `#2f6f57` | 主按钮、链接、选中态、品牌强调 |
+| `--yumi-color-brand-strong` | `#245541` | 主色按下态、深色强调 |
+| `--yumi-color-brand-soft` | `#e7f1eb` | 选中行、轻量高亮底色 |
+| `--yumi-color-ink` | `#20352d` | 正文与标题 |
+| `--yumi-color-text` | `#375441` | 表单标签、常规文字 |
+| `--yumi-color-muted` | `#65746c` | 说明、辅助字段、占位 |
+| `--yumi-color-line` | `#e5ebe7` | 卡片、表格、分隔线 |
+| `--yumi-color-canvas` | `#f5f7f5` | 内容区底色 |
+| `--yumi-color-surface` | `#ffffff` | 工作区、侧栏、顶栏 |
+| `--yumi-color-gold` | `#8b5e2b` | 待处理、部分完成、风险提醒 |
+| `--yumi-color-danger` | `#a85b50` | 失败、报废、错误 |
+| `--yumi-color-rail` | `#1d3028` | 侧栏底色 |
 
 - 状态色只用于标签、图标和小面积强调，不整行、整卡铺色。
-- 所有文字与背景对比度至少 4.5:1；主色、成功、警告、危险、辅助文字均已按此校验。
-- 业务页面禁止写死十六进制色值；白底用 `--yumi-surface`、内容区底色用 `--yumi-canvas`，新颜色先加到 `tokens.css`，再更新本表；`display.contract.test.ts` 扫描 `<style>` 并拦截色值。
+- 所有文字与背景对比度至少 4.5:1。
+- 页面禁止写死色值；`style.contract.test.ts` 扫描所有 `<style>` 并拦截十六进制、`rgb()`、`hsl()`。
 
-## 3. 字体与层级
+## 4. 字体与层级
 
-| 场景 | 字号 | 字重 |
+| 令牌 | 值 | 用途 |
 |---|---|---|
-| 首页大标题 | 20px | 600 |
-| 工作区页标题 `h1` | 18px | 600 |
-| 顶栏当前页名 | 15px | 600 |
-| 区块标题 `h2` | 16px | 600 |
-| 正文、表格、表单 | 14px | 400 |
-| 辅助说明、时间、单位 | 13px | 400 |
+| `--yumi-font-size-page` | `23px` | 工作区页标题 `h1` |
+| `--yumi-font-size-2xl` | `20px` | 统计卡主数值、首页大标题 |
+| `--yumi-font-size-xl` | `18px` | 强调数值 |
+| `--yumi-font-size-lg` | `16px` | 大正文、顶部当前页名 |
+| `--yumi-font-size-subtitle` | `15px` | 区块标题 `h2`、卡片头 |
+| `--yumi-font-size-md` | `14px` | 较大正文 |
+| `--yumi-font-size-base` | `13px` | 正文、表格、表单 |
+| `--yumi-font-size-sm` | `12px` | 标签、说明、辅助字段 |
+| `--yumi-font-size-xs` | `11px` | 表头、时间、单位、卡片注释 |
 
-- 中文使用系统默认无衬线字体，不引入第三方字体。
-- 金额、数量、日期使用等宽感呈现由组件负责，页面不自造格式。
-- 标题与正文之间不叠加多余空行；区块间距统一 20px。
+- 字重：`400 / 500 / 600 / 650` 分别使用 `--yumi-font-weight-normal/medium/semibold/bold`。
+- 中文使用系统无衬线字体，不引入第三方字体。
+- 金额、数量、日期使用等宽感呈现由 `MoneyText` / `DateTimeText` 负责，页面不自造格式。
 
-## 4. 间距与布局
+## 5. 间距、圆角与布局
 
-- 间距刻度：4 / 8 / 12 / 16 / 20 / 24px。
-- 应用外壳：侧栏 `216px`，顶栏 `56px`，内容区 padding `20px`。
-- 工作区卡片：统一使用 `WorkspacePage` 组件（白底、`1px` 浅边框、圆角 `8px`、默认内边距 `16px`），页面不再重复写外壳样式。
-- 编辑页布局：单记录新建/编辑统一使用 `EditorPage`（标题 + 操作、主表单 `minmax(0, 1fr)`、右侧 `300px` 预览、间距 `16px`），预览卡片随页面滚动吸顶。
-- 列表页布局：统一使用 `ListPage`（标题与数量、单行工具条、状态区与分页插槽）；工具条控件间距 `8px`，主操作排在筛选控件之后。
-- 详情页布局：统一使用 `DetailPage`（标题与元信息、右侧显式动作区、只读内容区），页面不自绘页头与动作间距。
-- 工具栏：横向单行，控件间距 `8px`，距表格 `12px`；窄屏才换行。
-- 表单：默认单列；商品设置等宽表单可用三列，列间距 `16px`，控件不拉伸填满。
-- 表格：撑满工作区宽度，`border` 样式；金额列右对齐，状态列居中或左对齐。
-- 弹窗：只用于短命令（收款、更正、确认），长表单必须使用整页。
-
-## 5. 组件规则
-
-| 组件 | 规则 |
+| 令牌 | 值 |
 |---|---|
-| `el-button` | 每个区域最多一个主按钮；删除/作废用危险色；权限入口用 `PermissionButton` |
-| `el-table` | 必须提供 `empty-text`；加载用 `v-loading`；不手写斑马纹 |
-| `el-tag` / `CodeTag` | 状态、类型、工序一律走码表，不直接输出编码 |
-| `el-form` | 字段校验内联展示；接口错误统一 toast；提交中禁用按钮 |
-| `el-empty` | 空态文案说明“为什么空、下一步做什么”，不只写“暂无数据” |
-| `el-alert` | 只用于页面级阻断或批量提示；字段错误不放进 alert |
-| `el-tabs` | 详情页关联内容用页签，不用多张卡片纵向堆叠 |
-| 金额/时间 | 只用 `MoneyText` / `DateTimeText` |
+| `--yumi-space-1..12` | `4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48px` |
+| `--yumi-radius-xs/sm/md/lg/xl` | `4 / 5 / 6 / 8 / 10px` |
+| `--yumi-radius-pill` | `999px` |
+| `--yumi-content-max-width` | `1600px` |
+| `--yumi-content-padding` | `24px 32px 48px` |
+| `--yumi-card-padding` | `16px` |
+
+- 应用外壳：侧栏 `216px` 深绿单栏导航，顶栏 `70px`；内容区最大宽度 `1600px`。保留单栏文字导航的信息架构，视觉采用原型的深绿侧栏、浅灰底和白卡片。
+- 页头在卡片外：标题左、说明紧随，主操作右；列表筛选与表格在卡片内。
+- 工作区卡片统一使用 `WorkspacePage`（白底、`1px` 浅边框、圆角 `8px`、默认内边距 `16px`）。
+- 列表页使用 `ListPage`：页头在卡片外，卡片头可选，筛选条在卡片内。
+- 编辑页使用 `EditorPage`：主表单 `minmax(0, 1fr)`、右侧 `300px` 预览、间距 `16px`。
+- 详情页使用 `DetailPage`：页头在卡片外，只读内容在卡片内。
+- 表格：撑满工作区宽度，`border` 样式；表头 `11px`，行内边距 `16px`，金额列右对齐。
+- 弹窗：只用于短命令；长表单必须使用整页。
+
+## 5.1 组件样式库
+
+页面优先组合以下共享组件与类，不重复写样式：
+
+| 组件/类 | 用途 |
+|---|---|
+| `PageShell` | 裸页面页头：标题、说明、右侧动作，卡片内容由页面自理 |
+| `WorkspacePage` | 白底工作区卡片外壳 |
+| `ListPage` | 列表页：页头、卡头、筛选条、PageState、分页 |
+| `EditorPage` | 编辑页：页头、表单与预览两栏 |
+| `DetailPage` | 详情页：页头、动作区、只读内容 |
+| `PageState` | 加载、失败重试、空态 |
+| `ListPager` | 上一页/下一页与每页条数 |
+| `.yumi-page-heading` | 页头布局与标题排版 |
+| `.yumi-toolbar` / `.yumi-actions` | 筛选条与动作组 |
+| `.yumi-panel` / `.yumi-panel__header/body` | 卡片及卡头 |
+| `.yumi-stat-grid` / `.yumi-stat-card` | 统计卡片组 |
+| `.yumi-card-grid` | 自适应卡片网格（可按 2/3 列） |
+| `.yumi-info-grid` | `dl/dt/dd` 信息网格 |
+| `.yumi-form-grid` | 两列/三列表单网格 |
+| `.yumi-hint` / `.yumi-meta` / `.yumi-cell-title` | 辅助文字与表格双层单元格 |
+
+### 页面样式规则
+
+- 页面 scoped CSS 只允许写该页独有的布局（如看板网格、时间轴），通用页头、工具条、卡片、统计卡、提示必须使用组件或 `yumi-*` 类。
+- 页面不得定义 `h1`、`.head`、`.toolbar`、`.alert`、`.hint`、`.meta`、`.actions`。
+- 字号、字重、圆角、颜色、`margin/padding/gap` 必须引用令牌；`style.contract.test.ts` 为结构门禁。
+- Element Plus 变量只在 `tokens.css` 和 `components.css` 中出现，页面只消费 `--yumi-*`。
 
 ## 6. 交互与状态
 

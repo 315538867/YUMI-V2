@@ -125,58 +125,36 @@ onMounted(load)
     </template>
 
     <template v-if="product">
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="标准售价">
-          <MoneyText :value="product.standardSalePrice" />
-        </el-descriptions-item>
-        <el-descriptions-item label="标准重量"
-          >{{ product.standardWeightGrams }} g</el-descriptions-item
-        >
-        <el-descriptions-item label="星级">{{ product.makingStarName }}</el-descriptions-item>
-        <el-descriptions-item label="胶水损耗率">{{ product.glueLossRate }}</el-descriptions-item>
-        <el-descriptions-item label="胶水单价">
-          <MoneyText :value="product.glueUnitPrice" />
-        </el-descriptions-item>
-        <el-descriptions-item label="色浆单价">
-          <MoneyText :value="product.colorPasteUnitPrice" />
-        </el-descriptions-item>
-        <el-descriptions-item label="制作分钟">
-          {{ product.makingStandardMinutes }}
-        </el-descriptions-item>
-        <el-descriptions-item label="制作提成">
-          <MoneyText :value="product.makingCommission" />
-        </el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <CodeTag category="common.status" :code="product.status" />
-        </el-descriptions-item>
-      </el-descriptions>
-
-      <div class="budget-strip">
-        <div class="budget-card">
-          <small>标准售价</small>
-          <strong><MoneyText :value="product.standardSalePrice" /></strong>
-          <em>商品标准方案</em>
+      <div class="yumi-stat-grid">
+        <div class="yumi-stat-card">
+          <span class="yumi-stat-card__label">标准售价</span>
+          <span class="yumi-stat-card__value"
+            ><MoneyText :value="product.standardSalePrice"
+          /></span>
+          <span class="yumi-stat-card__note">商品标准方案</span>
         </div>
-        <div class="budget-card">
-          <small>工作室承担成本</small>
-          <strong>
+        <div class="yumi-stat-card">
+          <span class="yumi-stat-card__label">工作室承担成本</span>
+          <span class="yumi-stat-card__value">
             <MoneyText v-if="standardBudget" :value="standardBudget.studioBorneUnitCost" />
             <span v-else>—</span>
-          </strong>
-          <em>按当前标准参数计算</em>
+          </span>
+          <span class="yumi-stat-card__note">按当前标准参数计算</span>
         </div>
-        <div class="budget-card">
-          <small>预计单件利润</small>
-          <strong>
+        <div class="yumi-stat-card">
+          <span class="yumi-stat-card__label">预计单件利润</span>
+          <span class="yumi-stat-card__value">
             <MoneyText v-if="standardBudget" :value="standardBudget.expectedUnitProfit" />
             <span v-else>—</span>
-          </strong>
-          <em>售价 − 工作室承担成本</em>
+          </span>
+          <span class="yumi-stat-card__note">售价 − 工作室承担成本</span>
         </div>
-        <div class="budget-card">
-          <small>单日最大产能</small>
-          <strong>{{ product.dailyCapacity }} 件</strong>
-          <em>{{ product.mouldCount }} 个模具 × {{ product.mouldDailyBatches }} 批 / 日</em>
+        <div class="yumi-stat-card">
+          <span class="yumi-stat-card__label">单日最大产能</span>
+          <span class="yumi-stat-card__value"> {{ product.dailyCapacity }}<small>件</small> </span>
+          <span class="yumi-stat-card__note">
+            {{ product.mouldCount }} 个模具 × {{ product.mouldDailyBatches }} 批 / 日
+          </span>
         </div>
       </div>
 
@@ -208,7 +186,7 @@ onMounted(load)
       </el-descriptions>
 
       <h2>工序参数</h2>
-      <div class="process-grid">
+      <div class="yumi-card-grid yumi-card-grid--3">
         <div class="process-card">
           <h3>制作</h3>
           <dl>
@@ -255,7 +233,7 @@ onMounted(load)
       </div>
 
       <h2>额外单件费用</h2>
-      <div class="fee-grid">
+      <div class="yumi-card-grid yumi-card-grid--3">
         <div class="fee-item">
           <small>其他任务人工费</small><MoneyText :value="product.extraCosts.otherTaskLaborCost" />
         </div>
@@ -277,7 +255,7 @@ onMounted(load)
         </div>
       </div>
 
-      <div class="detail-page__section-head">
+      <div class="yumi-section-head">
         <h2>方案与预算</h2>
         <PermissionButton
           permission="product.scheme.manage"
@@ -367,99 +345,44 @@ onMounted(load)
 </template>
 
 <style scoped>
-.budget-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.budget-card {
-  padding: 14px 16px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 7px;
-  background: var(--el-fill-color-lighter);
-}
-
-.budget-card small,
-.fee-item small {
-  display: block;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.budget-card strong {
-  display: block;
-  margin-top: 7px;
-  font-size: 20px;
-}
-
-.budget-card em {
-  display: block;
-  margin-top: 5px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.process-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
 .process-card {
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 7px;
-  padding: 14px;
-  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-md);
+  padding: var(--yumi-space-4);
+  background: var(--yumi-bg-muted);
 }
 
 .process-card h3 {
-  margin: 0 0 12px;
-  font-size: 14px;
+  margin: 0 0 var(--yumi-space-3);
+  font-size: var(--yumi-font-size-md);
 }
 
 .process-card dl {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 9px 12px;
+  gap: var(--yumi-space-2) var(--yumi-space-3);
   margin: 0;
 }
 
 .process-card dt {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-sm);
 }
 
 .process-card dd {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.fee-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  font-size: var(--yumi-font-size-base);
+  font-weight: var(--yumi-font-weight-semibold);
 }
 
 .fee-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 11px 13px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
-  background: var(--el-fill-color-lighter);
-}
-
-@media (max-width: 1100px) {
-  .budget-strip,
-  .process-grid,
-  .fee-grid {
-    grid-template-columns: 1fr;
-  }
+  gap: var(--yumi-space-3);
+  padding: var(--yumi-space-3);
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-md);
+  background: var(--yumi-bg-muted);
 }
 </style>

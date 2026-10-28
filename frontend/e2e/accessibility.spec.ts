@@ -72,7 +72,7 @@ test.describe('无障碍门禁', () => {
     const failures: string[] = []
     for (const [name, path] of BUSINESS_PAGES) {
       await page.goto(path)
-      await expect(page.locator('.page-title')).toBeVisible()
+      await expect(page.locator('.breadcrumb strong')).toBeVisible()
       await page.waitForLoadState('networkidle')
       const violations = seriousViolations(await new AxeBuilder({ page }).withTags(TAGS).analyze())
       for (const violation of violations) {

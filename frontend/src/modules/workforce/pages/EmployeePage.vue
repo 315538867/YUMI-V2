@@ -40,6 +40,9 @@ void load()
   <ListPage
     class="employee-page"
     title="员工与资格"
+    hint="管理在职、离职与工种资格"
+    panel-title="员工列表"
+    panel-hint="管理在职、离职与工种资格"
     :loading="loading"
     :error="errorText"
     @retry="load"
@@ -129,6 +132,6 @@ void load()
 }
 
 .tag {
-  margin-right: 4px;
+  margin-right: var(--yumi-space-1);
 }
 </style>

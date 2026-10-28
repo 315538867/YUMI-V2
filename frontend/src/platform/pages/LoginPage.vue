@@ -34,15 +34,21 @@ async function submit(): Promise<void> {
   <main class="login-page">
     <section class="login-card">
       <h1>YUMI 一期业务系统</h1>
-      <p class="hint">使用已授权账号登录；系统不提供匿名注册。</p>
+      <p class="yumi-hint">使用已授权账号登录；系统不提供匿名注册。</p>
       <el-alert
         v-if="expired"
         type="warning"
         :closable="false"
         title="登录已失效，请重新登录"
-        class="alert"
+        class="yumi-alert"
       />
-      <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
+      <el-alert
+        v-if="errorText"
+        type="error"
+        :closable="false"
+        :title="errorText"
+        class="yumi-alert"
+      />
       <el-form label-position="top" @submit.prevent="submit">
         <el-form-item label="登录名">
           <el-input v-model="form.loginName" placeholder="登录名" autocomplete="username" />
@@ -76,24 +82,9 @@ async function submit(): Promise<void> {
 .login-card {
   width: 360px;
   background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 28px;
-}
-
-h1 {
-  margin: 0 0 4px;
-  font-size: 20px;
-}
-
-.hint {
-  margin: 0 0 20px;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.alert {
-  margin-bottom: 12px;
+  border: 1px solid var(--yumi-border-color);
+  border-radius: var(--yumi-radius-lg);
+  padding: var(--yumi-space-6);
 }
 
 .submit {

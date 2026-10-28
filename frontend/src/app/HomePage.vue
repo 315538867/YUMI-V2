@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { navigationGroups } from '@/app/navigation'
 import { useAuthStore } from '@/platform/stores/auth'
+import PageShell from '@/shared/components/PageShell.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 const auth = useAuthStore()
@@ -16,53 +17,39 @@ const entries = computed(() =>
 </script>
 
 <template>
-  <WorkspacePage class="dashboard">
-    <h1>经营总览</h1>
-    <p class="hint">选择模块进入；所有数字以服务端接口为准。</p>
-    <div class="grid">
-      <button
-        v-for="entry in entries"
-        :key="entry.path"
-        type="button"
-        class="entry"
-        @click="router.push(entry.path)"
-      >
-        {{ entry.title }}
-      </button>
-    </div>
-  </WorkspacePage>
+  <PageShell title="经营总览" hint="选择模块进入；所有数字以服务端接口为准">
+    <WorkspacePage class="dashboard">
+      <div class="grid">
+        <button
+          v-for="entry in entries"
+          :key="entry.path"
+          type="button"
+          class="entry yumi-panel"
+          @click="router.push(entry.path)"
+        >
+          {{ entry.title }}
+        </button>
+      </div>
+    </WorkspacePage>
+  </PageShell>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 4px;
-  font-size: 20px;
-}
-
-.hint {
-  margin: 0 0 20px;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
+  gap: var(--yumi-space-3);
 }
 
 .entry {
-  padding: 18px;
+  padding: var(--yumi-space-5);
   text-align: left;
-  background: var(--yumi-surface);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--yumi-font-size-md);
 }
 
 .entry:hover {
-  border-color: var(--el-color-primary);
-  color: var(--el-color-primary);
+  border-color: var(--yumi-color-brand);
+  color: var(--yumi-color-brand);
 }
 </style>

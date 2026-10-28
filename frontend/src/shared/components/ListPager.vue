@@ -44,14 +44,14 @@ const sizeOptions = computed(() => props.sizes)
 .list-pager {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--yumi-space-2);
+  margin-top: var(--yumi-space-3);
 }
 
 .summary {
   margin-right: auto;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+  color: var(--yumi-text-secondary);
+  font-size: var(--yumi-font-size-base);
 }
 
 .size {

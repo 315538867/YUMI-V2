@@ -108,7 +108,7 @@ onMounted(load)
       <el-button type="primary" :loading="saving" @click="save">保存</el-button>
     </template>
     <el-form v-if="!loading" label-width="96px" @submit.prevent>
-      <FormErrorAlert :error="formAlert" class="alert" />
+      <FormErrorAlert :error="formAlert" class="yumi-alert" />
       <h2>基本资料</h2>
       <el-form-item label="客户名称" required :error="validationErrors.name || fieldError('name')">
         <el-input v-model="form.name" aria-label="客户名称" />

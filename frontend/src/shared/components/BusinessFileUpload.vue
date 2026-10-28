@@ -121,7 +121,7 @@ function clear(): void {
 .business-file-upload {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--yumi-space-2);
   flex-wrap: wrap;
 }
 
@@ -142,7 +142,7 @@ function clear(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
+  color: var(--yumi-text-regular);
+  font-size: var(--yumi-font-size-sm);
 }
 </style>

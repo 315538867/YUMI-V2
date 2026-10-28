@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { payrollService } from '@/modules/finance/payroll/services/payrollService'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
+import PageShell from '@/shared/components/PageShell.vue'
 
 const resultId = ref('')
 const { loading: saving, run: runAction } = useAsyncAction()
@@ -25,40 +26,40 @@ async function review(): Promise<void> {
 </script>
 
 <template>
-  <WorkspacePage class="review-page">
-    <h1>已核定工资只读复核</h1>
-    <el-alert
-      type="info"
-      :closable="false"
-      title="复核运行只供查看迟到来源与配置变化，不能用于再次确认工资。"
-      class="alert"
-    />
-    <el-alert v-if="errorText" type="error" :closable="false" :title="errorText" class="alert" />
-    <el-alert
-      v-if="successText"
-      type="success"
-      :closable="false"
-      :title="successText"
-      class="alert"
-    />
-    <el-form inline>
-      <el-form-item label="工资结果">
-        <el-input v-model="resultId" class="input" />
-      </el-form-item>
-      <el-button type="primary" :loading="saving" @click="review">生成复核运行</el-button>
-    </el-form>
-  </WorkspacePage>
+  <PageShell title="已核定工资只读复核">
+    <WorkspacePage class="review-page">
+      <el-alert
+        type="info"
+        :closable="false"
+        title="复核运行只供查看迟到来源与配置变化，不能用于再次确认工资。"
+        class="yumi-alert"
+      />
+      <el-alert
+        v-if="errorText"
+        type="error"
+        :closable="false"
+        :title="errorText"
+        class="yumi-alert"
+      />
+      <el-alert
+        v-if="successText"
+        type="success"
+        :closable="false"
+        :title="successText"
+        class="yumi-alert"
+      />
+      <el-form inline>
+        <el-form-item label="工资结果">
+          <el-input v-model="resultId" class="input" />
+        </el-form-item>
+        <el-button type="primary" :loading="saving" @click="review">生成复核运行</el-button>
+      </el-form>
+    </WorkspacePage>
+  </PageShell>
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
 .input {
   width: 300px;
-}
-.alert {
-  margin-bottom: 12px;
 }
 </style>
