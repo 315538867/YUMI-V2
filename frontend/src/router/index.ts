@@ -15,6 +15,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/design-system',
+    name: 'design-system',
+    component: () => import('@/app/pages/DesignSystemPage.vue'),
+    // 设计系统预览只展示组件，不读取业务数据，评审阶段允许未登录访问
+    meta: { requiresAuth: false, title: '设计系统' },
+  },
+  {
     path: '/',
     component: () => import('@/app/AppLayout.vue'),
     meta: { requiresAuth: true },
@@ -189,6 +196,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: '生产', permission: 'production.read' },
         redirect: '/production/schedule',
         children: [
+          {
+            path: 'overview',
+            name: 'production-overview',
+            component: () => import('@/modules/production/pages/ProductionOverviewPage.vue'),
+            meta: { requiresAuth: true, title: '生产总览', permission: 'production.read' },
+          },
           {
             path: 'schedule',
             name: 'production-schedule',

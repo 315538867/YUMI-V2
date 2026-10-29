@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiPageBar from '@/shared/ui/UiPageBar.vue'
+
 withDefaults(
   defineProps<{
     title: string
@@ -10,14 +12,25 @@ withDefaults(
 
 <template>
   <div class="page-shell">
-    <header class="yumi-page-heading">
-      <div class="yumi-page-heading__copy">
-        <h1 class="yumi-page-heading__title">{{ title }}</h1>
-        <span v-if="hint" class="yumi-page-heading__hint">{{ hint }}</span>
-        <slot name="meta" />
-      </div>
-      <div class="yumi-actions"><slot name="actions" /></div>
-    </header>
+    <h1 class="yumi-sr-only">{{ title }}</h1>
+    <UiPageBar :breadcrumb="[title]" :meta="hint">
+      <template #actions><slot name="actions" /></template>
+    </UiPageBar>
+    <div v-if="$slots.meta" class="page-shell__meta"><slot name="meta" /></div>
     <slot />
   </div>
 </template>
+
+<style scoped>
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yumi-ds-space-xl);
+}
+
+.page-shell__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--yumi-ds-space-sm);
+}
+</style>

@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { userMessageOf } from '@/platform/services/errorMessage'
+import { codeLabel } from '@/platform/display/codeCatalog'
 import type {
   OrderView,
   OrderWorkspacePayment,
@@ -25,6 +26,12 @@ import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 import PageShell from '@/shared/components/PageShell.vue'
+import type { DetailFact, SectionTab, TableColumn, TimelineItem } from '@/shared/ui/types'
+import UiDataTable from '@/shared/ui/UiDataTable.vue'
+import UiDetailFacts from '@/shared/ui/UiDetailFacts.vue'
+import UiSectionTabs from '@/shared/ui/UiSectionTabs.vue'
+import UiTimeline from '@/shared/ui/UiTimeline.vue'
+import UiButton from '@/shared/ui/UiButton.vue'
 
 const { loading, errorText, run } = useAsyncLoad(true)
 const { loading: paying, run: runPayment } = useAsyncAction()
@@ -110,6 +117,114 @@ const progressRows = computed(() =>
     })),
   ),
 )
+
+const orderTabs: SectionTab[] = [
+  { key: 'agreements', label: '成交约定' },
+  { key: 'production', label: '生产进度' },
+  { key: 'shipments', label: '发货记录' },
+  { key: 'payments', label: '收退款记录' },
+  { key: 'history', label: '订单记录' },
+]
+
+const orderFacts = computed<DetailFact[]>(() => [
+  { label: '客户', value: customerName.value },
+  { label: '当前应收', value: moneyText(order.value?.fulfillment.currentReceivable) },
+  { label: '已收', value: moneyText(order.value?.fulfillment.receivedAmount) },
+  { label: '已退', value: moneyText(order.value?.fulfillment.refundedAmount) },
+  {
+    label: '交付履约',
+    value: order.value?.fulfillment.deliveryFulfilled ? '已满足' : '未满足',
+  },
+  {
+    label: '付款履约',
+    value: order.value?.fulfillment.paymentFulfilled ? '已满足' : '未满足',
+  },
+])
+
+const blockingText = computed(() => {
+  const reasons = order.value?.fulfillment.blockingReasons ?? []
+  return reasons.length === 0
+    ? '无'
+    : reasons.map((reason) => blockingLabel(reason)).join('；')
+})
+
+const agreementRows = computed<Record<string, unknown>[]>(() =>
+  (order.value?.items ?? []).map((item) => ({ ...item })),
+)
+
+const progressTableRows = computed<Record<string, unknown>[]>(() =>
+  progressRows.value.map((row) => ({ ...row })),
+)
+
+const paymentRows = computed<Record<string, unknown>[]>(() =>
+  payments.value.map((row) => ({ ...row })),
+)
+
+const agreementColumns: TableColumn[] = [
+  { key: 'product', label: '商品', minWidth: 180 },
+  { key: 'targetProcess', label: '目标工序', width: 120 },
+  { key: 'quantity', label: '数量 / 已交付', width: 130 },
+  { key: 'unitPrice', label: '单价', width: 120, align: 'right' },
+  { key: 'materials', label: '供料', minWidth: 240 },
+  { key: 'recipient', label: '收货信息', minWidth: 220 },
+  { key: 'actions', label: '操作', width: 180, align: 'right' },
+]
+
+const progressColumns: TableColumn[] = [
+  { key: 'productName', label: '商品', minWidth: 160 },
+  { key: 'demandBusinessId', label: '需求', minWidth: 200 },
+  { key: 'targetProcess', label: '目标工序', width: 120 },
+  { key: 'required', label: '需求数量', width: 100, align: 'right' },
+  { key: 'qualified', label: '合格完成', width: 100, align: 'right' },
+  { key: 'shipped', label: '有效已发货', width: 110, align: 'right' },
+  { key: 'status', label: '需求状态', width: 140, align: 'right' },
+]
+
+const paymentColumns: TableColumn[] = [
+  { key: 'financeCashFactBusinessId', label: '现金流水', minWidth: 180 },
+  { key: 'type', label: '类型', width: 100 },
+  { key: 'amount', label: '金额', width: 130, align: 'right' },
+  { key: 'occurredAt', label: '发生时间', width: 200 },
+  { key: 'valid', label: '有效性', width: 100 },
+  { key: 'vouchers', label: '凭证', width: 120, align: 'right' },
+]
+
+const historyItems = computed<TimelineItem[]>(() =>
+  events.value.map((event) => ({
+    title: event.title,
+    description:
+      event.kind === 'CHANGE' && event.code
+        ? `${codeLabel('order.changeKind', event.code)} · ${event.description}`
+        : event.description,
+    time: formatDateTime(event.occurredAt),
+    tone: 'neutral',
+  })),
+)
+
+function blockingLabel(reason: string): string {
+  return (
+    {
+      DELIVERY_PENDING: '交付未完成',
+      PAYMENT_PENDING: '付款未结清',
+    }[reason] ?? reason
+  )
+}
+
+function moneyText(value: { amount: string; currency: string } | undefined): string {
+  return value ? `${value.amount} ${value.currency}` : '—'
+}
+
+function itemOf(row: Record<string, unknown>): OrderView['items'][number] {
+  return row as unknown as OrderView['items'][number]
+}
+
+function progressOf(row: Record<string, unknown>): ProgressRow {
+  return row as unknown as ProgressRow
+}
+
+function paymentOf(row: Record<string, unknown>): OrderWorkspacePayment {
+  return row as unknown as OrderWorkspacePayment
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -502,79 +617,56 @@ onMounted(load)
     <WorkspacePage class="order-detail">
       <PageState :loading="loading" :error="errorText" @retry="load">
         <template v-if="order">
-          <el-descriptions :column="3" border>
-            <el-descriptions-item label="客户">{{ customerName }}</el-descriptions-item>
-            <el-descriptions-item label="当前应收"
-              ><MoneyText :value="order.fulfillment.currentReceivable"
-            /></el-descriptions-item>
-            <el-descriptions-item label="已收"
-              ><MoneyText :value="order.fulfillment.receivedAmount"
-            /></el-descriptions-item>
-            <el-descriptions-item label="已退"
-              ><MoneyText :value="order.fulfillment.refundedAmount"
-            /></el-descriptions-item>
-            <el-descriptions-item label="交付履约">{{
-              order.fulfillment.deliveryFulfilled ? '已满足' : '未满足'
-            }}</el-descriptions-item>
-            <el-descriptions-item label="付款履约">{{
-              order.fulfillment.paymentFulfilled ? '已满足' : '未满足'
-            }}</el-descriptions-item>
-            <el-descriptions-item label="阻断原因" :span="3">
-              {{ order.fulfillment.blockingReasons.join('；') || '无' }}
-            </el-descriptions-item>
-          </el-descriptions>
+          <UiDetailFacts :items="orderFacts" :columns="3" />
+          <div class="order-blocking">
+            <span>阻断原因</span>
+            <p>{{ blockingText }}</p>
+          </div>
 
-          <el-tabs v-model="activeTab" class="tabs">
-            <el-tab-pane label="成交约定" name="agreements">
+          <UiSectionTabs v-model="activeTab" :items="orderTabs" class="order-tabs" />
+          <div v-if="activeTab === 'agreements'" class="order-tab-panel">
               <el-descriptions v-if="order.note" :column="1" border class="order-note">
                 <el-descriptions-item label="订单说明">{{ order.note }}</el-descriptions-item>
               </el-descriptions>
-              <el-table :data="order.items" border>
-                <el-table-column label="商品" min-width="180">
-                  <template #default="{ row }">
-                    {{ productNames[row.productBusinessId] ?? row.productBusinessId }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="目标工序" width="120">
-                  <template #default="{ row }">
-                    <CodeTag
-                      category="production.targetProcess"
-                      :code="row.agreement.targetProcess"
-                    />
-                  </template>
-                </el-table-column>
-                <el-table-column label="数量 / 已交付" width="130">
-                  <template #default="{ row }">
-                    {{ row.activeQuantity }} / {{ row.agreement.fulfilledQuantity }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="单价" width="120">
-                  <template #default="{ row }"
-                    ><MoneyText :value="row.agreement.unitPrice"
-                  /></template>
-                </el-table-column>
-                <el-table-column label="供料" min-width="200">
-                  <template #default="{ row }">
-                    胶水 {{ sourceLabel(row.agreement.glueSource) }} · 色浆
-                    {{ sourceLabel(row.agreement.colorPasteSource) }} · 袋子
-                    {{ sourceLabel(row.agreement.bagSource) }} · 装饰
-                    {{ sourceLabel(row.agreement.decorationSource) }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="收货信息" min-width="220">
-                  <template #default="{ row }">
-                    {{ row.agreement.recipient.customerName }} ·
-                    {{ row.agreement.recipient.phone }} ·
-                    {{ row.agreement.recipient.address }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="操作" width="180" fixed="right">
-                  <template #default="{ row }">
+              <UiDataTable
+                :columns="agreementColumns"
+                :rows="agreementRows"
+                row-key="orderItemBusinessId"
+                empty-text="暂无订单明细"
+              >
+                <template #product="{ row }">
+                  {{ productNames[itemOf(row).productBusinessId] ?? itemOf(row).productBusinessId }}
+                </template>
+                <template #targetProcess="{ row }">
+                  <CodeTag
+                    category="production.targetProcess"
+                    :code="itemOf(row).agreement.targetProcess"
+                  />
+                </template>
+                <template #quantity="{ row }">
+                  {{ itemOf(row).activeQuantity }} / {{ itemOf(row).agreement.fulfilledQuantity }}
+                </template>
+                <template #unitPrice="{ row }">
+                  <MoneyText :value="itemOf(row).agreement.unitPrice" />
+                </template>
+                <template #materials="{ row }">
+                  胶水 {{ sourceLabel(itemOf(row).agreement.glueSource) }} · 色浆
+                  {{ sourceLabel(itemOf(row).agreement.colorPasteSource) }} · 袋子
+                  {{ sourceLabel(itemOf(row).agreement.bagSource) }} · 装饰
+                  {{ sourceLabel(itemOf(row).agreement.decorationSource) }}
+                </template>
+                <template #recipient="{ row }">
+                  {{ itemOf(row).agreement.recipient.customerName }} ·
+                  {{ itemOf(row).agreement.recipient.phone }} ·
+                  {{ itemOf(row).agreement.recipient.address }}
+                </template>
+                <template #actions="{ row }">
+                  <div class="order-row-actions">
                     <PermissionButton
                       permission="order.ship"
                       link
                       type="primary"
-                      @click="openShipment(row.orderItemBusinessId)"
+                      @click="openShipment(itemOf(row).orderItemBusinessId)"
                     >
                       发货
                     </PermissionButton>
@@ -582,7 +674,7 @@ onMounted(load)
                       permission="order.change"
                       link
                       type="primary"
-                      @click="openChange(row.orderItemBusinessId, 'price')"
+                      @click="openChange(itemOf(row).orderItemBusinessId, 'price')"
                     >
                       改价
                     </PermissionButton>
@@ -590,36 +682,32 @@ onMounted(load)
                       permission="order.change"
                       link
                       type="primary"
-                      @click="openChange(row.orderItemBusinessId, 'quantity')"
+                      @click="openChange(itemOf(row).orderItemBusinessId, 'quantity')"
                     >
                       改量
                     </PermissionButton>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </el-tab-pane>
+                  </div>
+                </template>
+              </UiDataTable>
+          </div>
 
-            <el-tab-pane label="生产进度" name="production">
-              <el-table :data="progressRows" border empty-text="暂无生产需求">
-                <el-table-column prop="productName" label="商品" min-width="160" />
-                <el-table-column prop="demandBusinessId" label="需求" min-width="200" />
-                <el-table-column label="目标工序" width="120">
-                  <template #default="{ row }"
-                    ><CodeTag category="production.targetProcess" :code="row.targetProcess"
-                  /></template>
-                </el-table-column>
-                <el-table-column prop="required" label="需求数量" width="100" />
-                <el-table-column prop="qualified" label="合格完成" width="100" />
-                <el-table-column prop="shipped" label="有效已发货" width="110" />
-                <el-table-column label="需求状态" width="140">
-                  <template #default="{ row }">
-                    <CodeTag category="production.demandStatus" :code="row.status" />
-                  </template>
-                </el-table-column>
-              </el-table>
-            </el-tab-pane>
+          <div v-if="activeTab === 'production'" class="order-tab-panel">
+              <UiDataTable
+                :columns="progressColumns"
+                :rows="progressTableRows"
+                row-key="demandBusinessId"
+                empty-text="暂无生产需求"
+              >
+                <template #targetProcess="{ row }">
+                  <CodeTag category="production.targetProcess" :code="progressOf(row).targetProcess" />
+                </template>
+                <template #status="{ row }">
+                  <CodeTag category="production.demandStatus" :code="progressOf(row).status" />
+                </template>
+              </UiDataTable>
+          </div>
 
-            <el-tab-pane label="发货记录" name="shipments">
+          <div v-if="activeTab === 'shipments'" class="order-tab-panel">
               <el-empty v-if="shipments.length === 0" description="尚无发货记录" />
               <el-card
                 v-for="shipment in shipments"
@@ -679,60 +767,40 @@ onMounted(load)
                   </el-table-column>
                 </el-table>
               </el-card>
-            </el-tab-pane>
+          </div>
 
-            <el-tab-pane label="收退款记录" name="payments">
-              <el-table :data="payments" border empty-text="尚无收退款记录">
-                <el-table-column label="现金流水" min-width="180">
-                  <template #default="{ row }">{{ row.financeCashFactBusinessId }}</template>
-                </el-table-column>
-                <el-table-column label="类型" width="100">
-                  <template #default="{ row }">{{ paymentLabel(row) }}</template>
-                </el-table-column>
-                <el-table-column label="金额" width="130">
-                  <template #default="{ row }"><MoneyText :value="row.amount" /></template>
-                </el-table-column>
-                <el-table-column label="发生时间" width="200">
-                  <template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template>
-                </el-table-column>
-                <el-table-column label="有效性" width="100">
-                  <template #default="{ row }">{{ row.valid ? '有效' : '已更正' }}</template>
-                </el-table-column>
-                <el-table-column label="凭证" width="120">
-                  <template #default="{ row }">
-                    <el-button
-                      link
-                      type="primary"
-                      :loading="voucherLoading"
-                      @click="viewVouchers(row)"
-                    >
-                      查看凭证
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </el-tab-pane>
+          <div v-if="activeTab === 'payments'" class="order-tab-panel">
+              <UiDataTable
+                :columns="paymentColumns"
+                :rows="paymentRows"
+                row-key="financeCashFactBusinessId"
+                empty-text="尚无收退款记录"
+              >
+                <template #type="{ row }">{{ paymentLabel(paymentOf(row)) }}</template>
+                <template #amount="{ row }">
+                  <MoneyText :value="paymentOf(row).amount" />
+                </template>
+                <template #occurredAt="{ row }">
+                  <DateTimeText :value="paymentOf(row).occurredAt" />
+                </template>
+                <template #valid="{ row }">{{ paymentOf(row).valid ? '有效' : '已更正' }}</template>
+                <template #vouchers="{ row }">
+                  <UiButton
+                    size="sm"
+                    variant="ghost"
+                    :loading="voucherLoading"
+                    @click="viewVouchers(paymentOf(row))"
+                  >
+                    查看凭证
+                  </UiButton>
+                </template>
+              </UiDataTable>
+          </div>
 
-            <el-tab-pane label="订单记录" name="history">
-              <el-empty v-if="events.length === 0" description="暂无订单记录" />
-              <el-timeline v-else>
-                <el-timeline-item
-                  v-for="(event, index) in events"
-                  :key="`${event.kind}-${index}-${event.occurredAt}`"
-                  :timestamp="formatDateTime(event.occurredAt)"
-                  placement="top"
-                >
-                  <strong>{{ event.title }}</strong>
-                  <CodeTag
-                    v-if="event.kind === 'CHANGE' && event.code"
-                    category="order.changeKind"
-                    :code="event.code"
-                  />
-                  <p class="event-description">{{ event.description }}</p>
-                </el-timeline-item>
-              </el-timeline>
-            </el-tab-pane>
-          </el-tabs>
+          <div v-if="activeTab === 'history'" class="order-tab-panel">
+              <UiTimeline v-if="historyItems.length" :items="historyItems" />
+              <el-empty v-else description="暂无订单记录" />
+          </div>
 
           <el-button class="back" @click="router.push('/orders')">返回列表</el-button>
         </template>
@@ -889,8 +957,35 @@ onMounted(load)
 </template>
 
 <style scoped>
-.tabs {
-  margin-top: var(--yumi-space-4);
+.order-tabs {
+  margin-top: var(--yumi-ds-space-2xl);
+}
+
+.order-tab-panel {
+  margin-top: var(--yumi-ds-space-xl);
+}
+
+.order-blocking {
+  display: flex;
+  gap: var(--yumi-ds-space-md);
+  margin-top: var(--yumi-ds-space-md);
+  padding: var(--yumi-ds-space-md) var(--yumi-ds-space-xl);
+  border: 1px solid var(--yumi-ds-line);
+  border-radius: var(--yumi-ds-radius-control);
+  background: var(--yumi-ds-surface-subtle);
+  color: var(--yumi-ds-muted);
+  font-size: var(--yumi-ds-font-size-label);
+}
+
+.order-blocking p {
+  margin: 0;
+  color: var(--yumi-ds-text);
+}
+
+.order-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--yumi-ds-space-md);
 }
 
 .record-card {

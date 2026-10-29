@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import PageState from '@/shared/components/PageState.vue'
+import UiPageBar from '@/shared/ui/UiPageBar.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title: string
     hint?: string
@@ -29,18 +31,16 @@ withDefaults(
 )
 
 defineEmits<{ retry: [] }>()
+
+const pageMeta = computed(() => [props.hint, props.meta].filter(Boolean).join(' · '))
 </script>
 
 <template>
   <div class="list-page">
-    <header v-if="heading" class="yumi-page-heading">
-      <div class="yumi-page-heading__copy">
-        <h1 class="yumi-page-heading__title">{{ title }}</h1>
-        <span v-if="hint" class="yumi-page-heading__hint">{{ hint }}</span>
-        <span v-if="meta" class="yumi-page-heading__hint">{{ meta }}</span>
-      </div>
-      <div class="yumi-actions"><slot name="actions" /></div>
-    </header>
+    <h1 v-if="heading" class="yumi-sr-only">{{ title }}</h1>
+    <UiPageBar v-if="heading" :breadcrumb="[title]" :meta="pageMeta">
+      <template #actions><slot name="actions" /></template>
+    </UiPageBar>
 
     <WorkspacePage class="list-page__panel" padding="none">
       <div v-if="panelTitle || panelHint" class="yumi-panel__header">
@@ -72,6 +72,12 @@ defineEmits<{ retry: [] }>()
 </template>
 
 <style scoped>
+.list-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yumi-ds-space-md);
+}
+
 .list-page__panel-copy {
   display: flex;
   align-items: baseline;

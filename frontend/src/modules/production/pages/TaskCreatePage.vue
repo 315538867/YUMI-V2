@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
@@ -46,10 +46,15 @@ interface SelectedSource {
 }
 
 const router = useRouter()
+const route = useRoute()
 const taskType = ref<CreateTaskType>('OTHER_TASK')
 const subjectType = ref<'EMPLOYEE' | 'TEAM'>('EMPLOYEE')
 const subjectBusinessId = ref('')
-const workDate = ref(new Date().toISOString().slice(0, 10))
+const initialDate =
+  typeof route.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date)
+    ? route.query.date
+    : new Date().toISOString().slice(0, 10)
+const workDate = ref(initialDate)
 const processCode = ref<TargetProcess>('MAKING')
 const overrideReason = ref('')
 const selected = ref<SelectedSource[]>([])

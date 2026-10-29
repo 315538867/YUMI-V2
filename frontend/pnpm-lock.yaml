@@ -11,6 +11,9 @@ importers:
       '@element-plus/icons-vue':
         specifier: 2.3.2
         version: 2.3.2(vue@3.5.44(typescript@5.9.3))
+      '@fontsource/noto-sans-sc':
+        specifier: 5.3.1
+        version: 5.3.1
       element-plus:
         specifier: 2.14.7
         version: 2.14.7(vue@3.5.44(typescript@5.9.3))
@@ -218,6 +221,9 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@fontsource/noto-sans-sc@5.3.1':
+    resolution: {integrity: sha512-YxZ/VWAWo9FWzH08Q6fGTzIW6vYNP2TMhUFCnfhlimbhdXnWrxJLrzX3KWt2FKnV0s8XiM5vjpGHQiyFRlTj0w==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1740,6 +1746,8 @@ snapshots:
       '@floating-ui/utils': 0.2.12
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@fontsource/noto-sans-sc@5.3.1': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

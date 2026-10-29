@@ -42,7 +42,7 @@ describe('模块页签外壳', () => {
     const html = wrapper.html()
     expect(wrapper.get('h1').text()).toBe('报表')
     expect(wrapper.text()).toContain('月度、主题、来源对账与影子重建')
-    expect(html.indexOf('yumi-page-heading')).toBeLessThan(html.indexOf('yumi-module-tabs'))
+    expect(html.indexOf('yui-pagebar')).toBeLessThan(html.indexOf('yui-section-tabs'))
     expect(wrapper.find('.overview').exists()).toBe(true)
     expect(wrapper.find('.create').exists()).toBe(true)
     expect(wrapper.find('.route-view').exists()).toBe(true)
@@ -50,7 +50,7 @@ describe('模块页签外壳', () => {
 
   it('切换页签时跳转到对应路径', async () => {
     const wrapper = mountModule()
-    const tabs = wrapper.findAll('.el-tabs__item')
+    const tabs = wrapper.findAll('.yui-section-tabs__item')
     expect(tabs.length).toBe(2)
     const [firstTab] = tabs
     if (!firstTab) throw new Error('缺少页签')

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PageState from '@/shared/components/PageState.vue'
+import UiPageBar from '@/shared/ui/UiPageBar.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 withDefaults(
@@ -16,13 +17,11 @@ defineEmits<{ retry: [] }>()
 
 <template>
   <div class="detail-page">
-    <header class="yumi-page-heading">
-      <div class="yumi-page-heading__copy">
-        <h1 class="yumi-page-heading__title">{{ title }}</h1>
-        <span v-if="$slots.meta" class="yumi-page-heading__hint"><slot name="meta" /></span>
-      </div>
-      <div class="yumi-actions"><slot name="actions" /></div>
-    </header>
+    <h1 class="yumi-sr-only">{{ title }}</h1>
+    <UiPageBar :breadcrumb="[title]">
+      <template #actions><slot name="actions" /></template>
+    </UiPageBar>
+    <div v-if="$slots.meta" class="detail-page__meta"><slot name="meta" /></div>
 
     <WorkspacePage class="detail-page__panel" padding="lg">
       <div class="detail-page__notice"><slot name="notice" /></div>
@@ -34,6 +33,18 @@ defineEmits<{ retry: [] }>()
 </template>
 
 <style scoped>
+.detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yumi-ds-space-md);
+}
+
+.detail-page__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--yumi-ds-space-sm);
+}
+
 .detail-page__notice:not(:empty) {
   margin-bottom: var(--yumi-space-3);
 }

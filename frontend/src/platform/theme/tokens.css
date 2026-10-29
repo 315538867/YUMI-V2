@@ -76,7 +76,7 @@
 
   /* ===== 字体 ===== */
   --yumi-font-family:
-    Inter, 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+    'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
   --yumi-font-size-xs: 11px;
   --yumi-font-size-sm: 12px;
   --yumi-font-size-base: 13px;
@@ -196,6 +196,54 @@
   --el-table-tr-bg-color: var(--yumi-bg-surface);
 }
 
+/* ===== Element Plus v2 映射：控件跟随 1600 工作区语言 ===== */
+:root {
+  --el-color-primary: var(--yumi-ds-ink);
+  --el-color-primary-light-3: #4b554f;
+  --el-color-primary-light-5: #7d8780;
+  --el-color-primary-light-7: #b9c1bb;
+  --el-color-primary-light-8: #dfe4df;
+  --el-color-primary-light-9: var(--yumi-ds-ink-soft);
+  --el-color-primary-dark-2: var(--yumi-ds-ink-strong);
+  --el-color-success: var(--yumi-ds-emp-green);
+  --el-color-warning: var(--yumi-ds-emp-amber);
+  --el-color-danger: var(--yumi-ds-status-repair);
+  --el-color-info: var(--yumi-ds-muted);
+  --el-text-color-primary: var(--yumi-ds-ink);
+  --el-text-color-regular: var(--yumi-ds-text);
+  --el-text-color-secondary: var(--yumi-ds-muted);
+  --el-text-color-placeholder: var(--yumi-ds-faint);
+  --el-text-color-disabled: var(--yumi-ds-disabled);
+  --el-border-color: var(--yumi-ds-line);
+  --el-border-color-light: var(--yumi-ds-line);
+  --el-border-color-lighter: var(--yumi-ds-line-soft);
+  --el-border-color-extra-light: var(--yumi-ds-line-soft);
+  --el-border-radius-base: var(--yumi-ds-radius-control);
+  --el-border-radius-small: var(--yumi-ds-radius-sm);
+  --el-border-radius-round: var(--yumi-ds-radius-pill);
+  --el-bg-color: var(--yumi-ds-surface);
+  --el-bg-color-page: var(--yumi-ds-canvas);
+  --el-bg-color-overlay: var(--yumi-ds-surface);
+  --el-fill-color: var(--yumi-ds-surface-subtle);
+  --el-fill-color-light: var(--yumi-ds-surface-subtle);
+  --el-fill-color-lighter: var(--yumi-ds-canvas);
+  --el-fill-color-extra-light: var(--yumi-ds-canvas);
+  --el-fill-color-blank: var(--yumi-ds-surface);
+  --el-font-size-extra-small: var(--yumi-ds-font-size-meta);
+  --el-font-size-small: var(--yumi-ds-font-size-label);
+  --el-font-size-base: var(--yumi-ds-font-size-table);
+  --el-font-size-medium: var(--yumi-ds-font-size-input);
+  --el-font-size-large: var(--yumi-ds-font-size-body);
+  --el-table-header-bg-color: var(--yumi-ds-surface-subtle);
+  --el-table-header-text-color: var(--yumi-ds-muted);
+  --el-table-text-color: var(--yumi-ds-text);
+  --el-table-border-color: var(--yumi-ds-line-soft);
+  --el-table-row-hover-bg-color: var(--yumi-ds-hover);
+  --el-table-current-row-bg-color: var(--yumi-ds-ink-soft);
+  --el-table-bg-color: var(--yumi-ds-surface);
+  --el-table-tr-bg-color: var(--yumi-ds-surface);
+}
+
 *,
 *::before,
 *::after {
@@ -216,4 +264,115 @@ body {
   font-size: var(--yumi-font-size-base);
   line-height: var(--yumi-line-height-base);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Design system v2: 1600×900 工作区基线 ===== */
+:root {
+  --yumi-ds-font-ui:
+    'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+  --yumi-ds-font-numeric: var(--yumi-ds-font-ui);
+
+  --yumi-ds-font-size-body: 15px;
+  --yumi-ds-font-size-card-title: 14px;
+  --yumi-ds-font-size-date: 26px;
+  --yumi-ds-font-size-table: 13px;
+  --yumi-ds-font-size-control: 12px;
+  --yumi-ds-font-size-input: 13px;
+  --yumi-ds-font-size-label: 11px;
+  --yumi-ds-font-size-form-label: 12px;
+  --yumi-ds-font-size-caption: 10.5px;
+  --yumi-ds-font-size-meta: 10px;
+
+  --yumi-ds-font-weight-regular: 400;
+  --yumi-ds-font-weight-medium: 500;
+  --yumi-ds-font-weight-semibold: 600;
+  --yumi-ds-font-weight-bold: 700;
+
+  --yumi-ds-line-height-ui: 1.55;
+  --yumi-ds-line-height-card: 1.45;
+
+  --yumi-ds-ink: #161b18;
+  --yumi-ds-ink-strong: #0c110e;
+  --yumi-ds-text: #3f4a44;
+  --yumi-ds-muted: #5b675f;
+  --yumi-ds-faint: #66726a;
+  --yumi-ds-disabled: #b0b8b2;
+
+  --yumi-ds-canvas: #f7f7f4;
+  --yumi-ds-surface: #ffffff;
+  --yumi-ds-surface-subtle: #fbfbf8;
+  --yumi-ds-hover: #fafbf7;
+  --yumi-ds-today: #fff8f3;
+  --yumi-ds-today-border: #f1d6c8;
+  --yumi-ds-ink-soft: #f1f2ed;
+
+  --yumi-ds-line: #e7eae5;
+  --yumi-ds-line-soft: #eef0ec;
+  --yumi-ds-line-strong: #d9dfd9;
+
+  --yumi-ds-accent: #ef6a3a;
+  --yumi-ds-accent-strong: #e15c2e;
+  --yumi-ds-accent-soft: #fff0e8;
+  --yumi-ds-accent-border: #f1d6c8;
+
+  --yumi-ds-emp-green: #2f7d5f;
+  --yumi-ds-emp-green-soft: #edf8f2;
+  --yumi-ds-emp-amber: #8f6623;
+  --yumi-ds-emp-amber-soft: #fff6e6;
+  --yumi-ds-emp-blue: #4b6d88;
+  --yumi-ds-emp-blue-soft: #edf4fa;
+  --yumi-ds-emp-rose: #9c5578;
+  --yumi-ds-emp-rose-soft: #fbecf4;
+  --yumi-ds-emp-violet: #6f5bb5;
+  --yumi-ds-emp-violet-soft: #f2efff;
+
+  --yumi-ds-status-pending: #b14a22;
+  --yumi-ds-status-pending-soft: #fff3ec;
+  --yumi-ds-status-pending-border: #f1d6c8;
+  --yumi-ds-status-done: #4f6758;
+  --yumi-ds-status-done-soft: #f3f8f5;
+  --yumi-ds-status-done-border: #e2ebe4;
+  --yumi-ds-status-neutral: #5b675f;
+  --yumi-ds-status-neutral-soft: #f3f5f2;
+  --yumi-ds-status-neutral-border: #e7eae5;
+  --yumi-ds-status-extra: #6f5bb5;
+  --yumi-ds-status-extra-soft: #f2efff;
+  --yumi-ds-status-extra-border: #ddd6f7;
+  --yumi-ds-status-repair: #ad3f36;
+  --yumi-ds-status-repair-soft: #ffefec;
+  --yumi-ds-status-repair-border: #f2d2cc;
+
+  --yumi-ds-space-2xs: 2px;
+  --yumi-ds-space-xs: 4px;
+  --yumi-ds-space-sm: 6px;
+  --yumi-ds-space-md: 8px;
+  --yumi-ds-space-lg: 10px;
+  --yumi-ds-space-xl: 12px;
+  --yumi-ds-space-2xl: 16px;
+  --yumi-ds-space-3xl: 20px;
+  --yumi-ds-space-4xl: 24px;
+  --yumi-ds-space-5xl: 32px;
+
+  --yumi-ds-radius-sm: 6px;
+  --yumi-ds-radius-control: 9px;
+  --yumi-ds-radius-card: 10px;
+  --yumi-ds-radius-panel: 17px;
+  --yumi-ds-radius-pill: 999px;
+
+  --yumi-ds-shadow-card-hover: 0 7px 16px rgba(25, 35, 30, 0.07);
+  --yumi-ds-shadow-popover: 0 24px 60px rgba(25, 35, 30, 0.18);
+
+  --yumi-ds-control-height-sm: 28px;
+  --yumi-ds-control-height: 34px;
+  --yumi-ds-control-height-lg: 40px;
+  --yumi-ds-topnav-height: 60px;
+  --yumi-ds-pagebar-height: 34px;
+  --yumi-ds-week-gap: 10px;
+  --yumi-ds-week-column-min: 200px;
+  --yumi-ds-content-width: 1600px;
+  --yumi-ds-layout-min-width: 1600px;
+  --yumi-ds-board-preview-height: 380px;
+  --yumi-ds-swatch-width: 56px;
+  --yumi-ds-swatch-height: 28px;
+  --yumi-ds-emp-node-min: 120px;
 }

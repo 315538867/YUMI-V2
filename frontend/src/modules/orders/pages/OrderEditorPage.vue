@@ -19,6 +19,10 @@ import { orderService } from '@/modules/orders/services/orderService'
 import CodeTag from '@/shared/components/CodeTag.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 import PageShell from '@/shared/components/PageShell.vue'
+import type { DetailFact } from '@/shared/ui/types'
+import UiButton from '@/shared/ui/UiButton.vue'
+import UiDetailFacts from '@/shared/ui/UiDetailFacts.vue'
+import UiFormSection from '@/shared/ui/UiFormSection.vue'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 
 const { loading, errorText, run } = useAsyncLoad(true)
@@ -81,6 +85,12 @@ const totalAmount = computed(() =>
     0,
   ),
 )
+
+const summaryFacts = computed<DetailFact[]>(() => [
+  { label: '明细数', value: String(items.value.length) },
+  { label: '订购数量', value: String(totalQuantity.value) },
+  { label: '金额合计', value: `${totalAmount.value.toFixed(2)} CNY` },
+])
 
 function nextKey(): string {
   return `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -319,7 +329,8 @@ onMounted(load)
 
       <el-form v-if="!loading" label-width="110px" class="form">
         <FormErrorAlert :error="formAlert" class="yumi-alert" />
-        <h2>1. 客户与交付</h2>
+        <UiFormSection title="1. 客户与交付" hint="客户资料会冻结到本次订单">
+          <div class="form-grid form-grid--2">
         <el-form-item
           label="客户"
           :error="validationErrors.customerBusinessId || fieldError('customerBusinessId')"
@@ -355,10 +366,10 @@ onMounted(load)
         <el-form-item label="电话" :error="validationErrors.recPhone">
           <el-input v-model="recipient.phone" />
         </el-form-item>
-        <el-form-item label="地址" :error="validationErrors.recAddress">
+        <el-form-item label="地址" :error="validationErrors.recAddress" class="form-span-2">
           <el-input v-model="recipient.address" type="textarea" :rows="2" />
         </el-form-item>
-        <el-form-item label="订单说明">
+        <el-form-item label="订单说明" class="form-span-2">
           <el-input
             v-model="note"
             type="textarea"
@@ -370,11 +381,13 @@ onMounted(load)
           />
         </el-form-item>
         <p class="yumi-hint">本页所有明细共用上方收货信息与订单说明。</p>
+          </div>
+        </UiFormSection>
 
-        <div class="yumi-section-head">
-          <h2>2. 商品与成交约定</h2>
-          <el-button @click="addItem">新增明细</el-button>
-        </div>
+        <UiFormSection title="2. 商品与成交约定" hint="每条明细使用自己的商品方案与供料约定">
+          <template #actions>
+            <UiButton size="sm" @click="addItem">新增明细</UiButton>
+          </template>
         <div v-for="(item, index) in items" :key="item.key" class="item-card">
           <div class="item-head">
             <strong>明细 {{ index + 1 }}</strong>
@@ -383,6 +396,7 @@ onMounted(load)
             </el-button>
           </div>
           <el-form label-width="110px">
+            <div class="form-grid form-grid--3">
             <el-form-item label="商品" :error="itemError(index, 'product')">
               <el-select v-model="item.productBusinessId" filterable @change="loadSchemes(item)">
                 <el-option
@@ -440,17 +454,15 @@ onMounted(load)
                 <el-option label="客户" value="CUSTOMER" />
               </el-select>
             </el-form-item>
+            </div>
           </el-form>
         </div>
 
-        <h2>3. 本次订单</h2>
-        <el-descriptions :column="3" border>
-          <el-descriptions-item label="明细数">{{ items.length }}</el-descriptions-item>
-          <el-descriptions-item label="订购数量">{{ totalQuantity }}</el-descriptions-item>
-          <el-descriptions-item label="金额合计"
-            >{{ totalAmount.toFixed(2) }} CNY</el-descriptions-item
-          >
-        </el-descriptions>
+        </UiFormSection>
+
+        <UiFormSection title="3. 本次订单" hint="确认后一次提交">
+          <UiDetailFacts :items="summaryFacts" :columns="3" />
+        </UiFormSection>
       </el-form>
 
       <el-dialog v-model="previewVisible" title="确认本次订单" width="680px">
@@ -496,7 +508,24 @@ onMounted(load)
 
 <style scoped>
 .form {
-  max-width: 860px;
+  max-width: 1120px;
+}
+
+.form-grid {
+  display: grid;
+  gap: var(--yumi-ds-space-2xl);
+}
+
+.form-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-span-2 {
+  grid-column: span 2;
 }
 
 .item-card {

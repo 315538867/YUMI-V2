@@ -2,25 +2,40 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import { codeLabel } from '@/platform/display/codeCatalog'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import { useAsyncAction } from '@/platform/composables/useAsyncAction'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
+import { useAuthStore } from '@/platform/stores/auth'
 import type { EmployeeView, TeamView } from '@/modules/workforce/contracts'
 import { workforceService } from '@/modules/workforce/services/workforceService'
-import type { TaskView } from '@/modules/production/contracts'
+import type { TaskStatus, TaskView } from '@/modules/production/contracts'
 import { productionService } from '@/modules/production/services/productionService'
-import CodeTag from '@/shared/components/CodeTag.vue'
+import { productService } from '@/modules/product/services/productService'
+import type { TableColumn } from '@/shared/ui/types'
+import UiButton from '@/shared/ui/UiButton.vue'
+import UiDataTable from '@/shared/ui/UiDataTable.vue'
+import UiDateColumn from '@/shared/ui/UiDateColumn.vue'
+import UiFilterChip from '@/shared/ui/UiFilterChip.vue'
+import UiIconButton from '@/shared/ui/UiIconButton.vue'
+import UiPageBar from '@/shared/ui/UiPageBar.vue'
+import UiSearchField from '@/shared/ui/UiSearchField.vue'
+import UiStatusPill from '@/shared/ui/UiStatusPill.vue'
+import UiTaskCard from '@/shared/ui/UiTaskCard.vue'
 import PageState from '@/shared/components/PageState.vue'
-import PermissionButton from '@/shared/components/PermissionButton.vue'
-import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
+type FilterKey = 'all' | 'pending' | 'extra' | 'repair'
+
+const auth = useAuthStore()
+const router = useRouter()
 const { loading, errorText, run } = useAsyncLoad()
 const { run: runAction } = useAsyncAction()
 
-const router = useRouter()
 const tasks = ref<TaskView[]>([])
 const employees = ref<EmployeeView[]>([])
 const teams = ref<TeamView[]>([])
+const productNames = ref<Record<string, string>>({})
+const activeFilter = ref<FilterKey>('all')
 
 function isoDate(value: Date): string {
   const month = String(value.getMonth() + 1).padStart(2, '0')
@@ -39,8 +54,12 @@ function mondayOf(value: string): string {
   return isoDate(date)
 }
 
+function shortDate(value: string): string {
+  return `${value.slice(5, 7)}/${value.slice(8, 10)}`
+}
+
 const today = isoDate(new Date())
-const { filters, search, reset } = useListQuery(
+const { filters, search } = useListQuery(
   { weekStart: mondayOf(today), view: 'week', keyword: '' },
   { paged: false, onSearch: () => void load() },
 )
@@ -53,24 +72,45 @@ const weekDates = computed(() =>
   }),
 )
 
-const weekLabel = computed(() => `${weekDates.value[0]} ~ ${weekDates.value[6]}`)
+const weekLabel = computed(
+  () => `${shortDate(weekDates.value[0] ?? today)} — ${shortDate(weekDates.value[6] ?? today)}`,
+)
 const isWeekView = computed(() => filters.view === 'week')
+
+const canSchedule = computed(() => auth.hasPermission('production.schedule'))
+const canVerify = computed(() => auth.hasPermission('production.verify'))
 
 const filteredTasks = computed(() => {
   const keyword = filters.keyword.trim().toLowerCase()
-  if (keyword === '') {
-    return tasks.value
-  }
-  return tasks.value.filter(
-    (task) =>
-      task.taskNo.toLowerCase().includes(keyword) ||
-      task.items.some((item) => item.productBusinessId.toLowerCase().includes(keyword)),
-  )
+  return tasks.value.filter((task) => {
+    if (keyword !== '' && !task.taskNo.toLowerCase().includes(keyword)) {
+      return false
+    }
+    if (activeFilter.value === 'pending') {
+      return task.status === 'ARRANGED' || task.status === 'PARTIALLY_VERIFIED'
+    }
+    if (activeFilter.value === 'extra') {
+      return task.taskType === 'EXTRA_PRODUCTION'
+    }
+    if (activeFilter.value === 'repair') {
+      return task.taskType === 'REPAIR'
+    }
+    return true
+  })
 })
 
-function subjectKey(task: TaskView): string {
-  return `${task.subject.subjectType}:${task.subject.subjectBusinessId}`
-}
+const totalQuantity = computed(() =>
+  filteredTasks.value.reduce((sum, task) => sum + task.plannedWorkQuantity, 0),
+)
+
+const filterCounts = computed(() => ({
+  all: tasks.value.length,
+  pending: tasks.value.filter(
+    (task) => task.status === 'ARRANGED' || task.status === 'PARTIALLY_VERIFIED',
+  ).length,
+  extra: tasks.value.filter((task) => task.taskType === 'EXTRA_PRODUCTION').length,
+  repair: tasks.value.filter((task) => task.taskType === 'REPAIR').length,
+}))
 
 function subjectName(task: TaskView): string {
   if (task.subject.subjectType === 'EMPLOYEE') {
@@ -85,48 +125,82 @@ function subjectName(task: TaskView): string {
   )
 }
 
-const subjectRows = computed(() => {
-  const rows = new Map<string, string>()
-  for (const task of filteredTasks.value) {
-    rows.set(subjectKey(task), subjectName(task))
+function productOf(task: TaskView): string {
+  const first = task.items[0]?.productBusinessId ?? task.otherTask?.relatedProductBusinessId ?? ''
+  if (first === '') {
+    return task.otherTask?.workContent ?? task.taskNo
   }
-  return [...rows.entries()]
-    .map(([key, label]) => ({ key, label }))
-    .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'))
-})
+  const name = productNames.value[first] ?? first
+  return task.items.length > 1 ? `${name} 等 ${task.items.length} 项` : name
+}
 
-function tasksOfDay(subject: string, date: string): TaskView[] {
-  return filteredTasks.value.filter(
-    (task) => subjectKey(task) === subject && task.workDate === date,
+function processOf(task: TaskView): string {
+  return task.processCode ? codeLabel('production.targetProcess', task.processCode) : '整体'
+}
+
+function typeOf(task: TaskView): string {
+  return (
+    {
+      NORMAL_PRODUCTION: '正常',
+      EXTRA_PRODUCTION: '超额',
+      REPAIR: '返工',
+      OTHER_TASK: '其他',
+    }[task.taskType] ?? codeLabel('production.taskType', task.taskType)
   )
 }
 
-const overview = computed(() => ({
-  taskCount: filteredTasks.value.length,
-  plannedQuantity: filteredTasks.value.reduce((sum, task) => sum + task.plannedWorkQuantity, 0),
-  subjectCount: subjectRows.value.length,
-  pendingVerification: filteredTasks.value.filter(
-    (task) => task.status === 'ARRANGED' || task.status === 'PARTIALLY_VERIFIED',
-  ).length,
-  extraTaskCount: filteredTasks.value.filter((task) => task.taskType === 'EXTRA_PRODUCTION').length,
-}))
-
-function dayLabel(date: string): string {
-  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][parseDate(date).getDay()]
-  return `${date.slice(5)} ${weekday}`
+function quantityOf(task: TaskView): string {
+  const quantity = task.otherTask?.plannedQuantity ?? task.plannedWorkQuantity
+  return quantity > 0 ? String(quantity) : '—'
 }
 
-async function load(): Promise<void> {
-  await run(async () => {
-    const range = isWeekView.value
-      ? productionService.tasksBetween(weekDates.value[0], weekDates.value[6])
-      : productionService.tasksBetween()
-    ;[tasks.value, employees.value, teams.value] = await Promise.all([
-      range,
-      workforceService.employees(),
-      workforceService.teams(),
-    ])
-  }, '排班加载失败')
+function unitOf(task: TaskView): string {
+  return (task.otherTask?.plannedQuantity ?? task.plannedWorkQuantity) > 0 ? '件' : ''
+}
+
+function cardStatusOf(task: TaskView): 'pending' | 'done' | 'arranged' {
+  if (task.status === 'VERIFIED') {
+    return 'done'
+  }
+  if (task.status === 'PARTIALLY_VERIFIED') {
+    return 'pending'
+  }
+  return 'arranged'
+}
+
+function statusLabelOf(taskStatus: unknown): string {
+  const value = String(taskStatus ?? '')
+  return value === 'ARRANGED' ? '已排' : codeLabel('production.taskStatus', value, '—')
+}
+
+function tasksOfDay(date: string): TaskView[] {
+  return filteredTasks.value.filter((task) => task.workDate === date)
+}
+
+function quantityOfDay(date: string): number {
+  return tasksOfDay(date).reduce((sum, task) => sum + task.plannedWorkQuantity, 0)
+}
+
+function planOfDay(date: string): string {
+  const tasksOfDayItems = tasksOfDay(date)
+  if (tasksOfDayItems.length === 0) {
+    return '无任务'
+  }
+  const seconds = tasksOfDayItems.reduce((sum, task) => sum + task.taskStandardSeconds, 0)
+  return `计划 ${(seconds / 3600).toFixed(1)} 小时`
+}
+
+function weekdayOf(date: string): string {
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][parseDate(date).getDay()] ?? '周日'
+}
+
+function isToday(date: string): boolean {
+  return date === today
+}
+
+function setView(view: 'week' | 'list'): void {
+  filters.view = view
+  void search()
 }
 
 function shiftWeek(days: number): void {
@@ -141,254 +215,307 @@ function goToday(): void {
   void search()
 }
 
-async function cancelTask(task: TaskView): Promise<void> {
+function openTask(task: TaskView): void {
+  void router.push(`/production/tasks/${task.taskBusinessId}`)
+}
+
+function openCreate(date?: string): void {
+  void router.push({ path: '/production/tasks/new', query: date ? { date } : {} })
+}
+
+function openVerify(task: TaskView): void {
+  void router.push(`/production/verify?task=${task.taskBusinessId}`)
+}
+
+async function cancelTask(taskBusinessId: string, taskNo: string): Promise<void> {
   let reason = ''
   try {
-    const result = await ElMessageBox.prompt('请输入取消原因', `取消任务 ${task.taskNo}`, {
+    const result = await ElMessageBox.prompt('请输入取消原因', `取消任务 ${taskNo}`, {
       inputValidator: (value) => (value.trim() === '' ? '取消原因不能为空' : true),
     })
     reason = result.value
   } catch {
     return
   }
-  await runAction(() => productionService.cancelTask(task.taskBusinessId, reason), {
+  await runAction(() => productionService.cancelTask(taskBusinessId, reason), {
     success: '任务已取消；未核验计划占用已释放',
     fallback: '任务取消失败',
     onSuccess: load,
   })
 }
 
+const tableColumns: TableColumn[] = [
+  { key: 'workDate', label: '计划日期', width: 120 },
+  { key: 'taskNo', label: '任务编号', width: 140 },
+  { key: 'subject', label: '执行主体', minWidth: 140 },
+  { key: 'process', label: '工序', width: 100 },
+  { key: 'quantity', label: '计划数量', width: 100, align: 'right' },
+  { key: 'status', label: '状态', width: 110, align: 'right' },
+  { key: 'actions', label: '操作', width: 170, align: 'right' },
+]
+
+const tableRows = computed<Record<string, unknown>[]>(() =>
+  filteredTasks.value.map((task) => ({
+    taskBusinessId: task.taskBusinessId,
+    workDate: task.workDate,
+    taskNo: task.taskNo,
+    subject: subjectName(task),
+    process: processOf(task),
+    quantity: task.plannedWorkQuantity,
+    status: task.status,
+    task,
+  })),
+)
+
+async function loadProductNames(items: TaskView[]): Promise<void> {
+  const ids = new Set<string>()
+  for (const task of items) {
+    for (const item of task.items) {
+      ids.add(item.productBusinessId)
+    }
+    if (task.otherTask?.relatedProductBusinessId) {
+      ids.add(task.otherTask.relatedProductBusinessId)
+    }
+  }
+  const names: Record<string, string> = {}
+  await Promise.all(
+    [...ids].map(async (id) => {
+      try {
+        names[id] = (await productService.get(id)).name
+      } catch {
+        names[id] = id
+      }
+    }),
+  )
+  productNames.value = names
+}
+
+async function load(): Promise<void> {
+  await run(async () => {
+    const range = isWeekView.value
+      ? productionService.tasksBetween(weekDates.value[0], weekDates.value[6])
+      : productionService.tasksBetween()
+    const [taskList, employeeList, teamList] = await Promise.all([
+      range,
+      workforceService.employees(),
+      workforceService.teams(),
+    ])
+    tasks.value = taskList
+    employees.value = employeeList
+    teams.value = teamList
+    await loadProductNames(taskList)
+  }, '排班加载失败')
+}
+
+function rowTask(row: Record<string, unknown>): TaskView {
+  return row.task as TaskView
+}
+
+function rowStatus(row: Record<string, unknown>): TaskStatus {
+  return String(row.status ?? '') as TaskStatus
+}
+
 void load()
 </script>
 
 <template>
-  <WorkspacePage class="schedule-page">
-    <div class="yumi-toolbar">
-      <el-radio-group v-model="filters.view" @change="search">
-        <el-radio-button value="week">周视图</el-radio-button>
-        <el-radio-button value="list">全部列表</el-radio-button>
-      </el-radio-group>
-      <template v-if="isWeekView">
-        <el-button @click="shiftWeek(-7)">上周</el-button>
-        <el-button @click="goToday">今天</el-button>
-        <el-button @click="shiftWeek(7)">下周</el-button>
-        <span class="week-label">{{ weekLabel }}</span>
+  <div class="schedule-page">
+    <UiPageBar
+      :breadcrumb="['排班']"
+      :range="weekLabel"
+      :meta="`${filteredTasks.length} 个任务 · ${totalQuantity} 件`"
+    >
+      <template #actions>
+        <UiButton v-if="canSchedule" variant="primary" @click="openCreate()">安排任务</UiButton>
       </template>
-      <el-input
-        v-model="filters.keyword"
-        placeholder="搜索任务或商品"
-        clearable
-        class="keyword"
-        aria-label="搜索任务或商品"
-        @keyup.enter="search"
-      />
-      <el-button type="primary" @click="search">查询</el-button>
-      <el-button @click="reset">重置</el-button>
-      <PermissionButton
-        permission="production.schedule"
-        @click="router.push('/production/tasks/new')"
-        >安排任务</PermissionButton
-      >
-    </div>
+    </UiPageBar>
 
-    <div class="yumi-stat-grid yumi-stat-grid--5">
-      <div class="yumi-stat-card">
-        <span class="yumi-stat-card__label">{{ isWeekView ? '本周任务' : '全部任务' }}</span>
-        <span class="yumi-stat-card__value">{{ overview.taskCount }}<small>个</small></span>
-      </div>
-      <div class="yumi-stat-card">
-        <span class="yumi-stat-card__label">计划数量</span>
-        <span class="yumi-stat-card__value">{{ overview.plannedQuantity }}<small>件</small></span>
-      </div>
-      <div class="yumi-stat-card">
-        <span class="yumi-stat-card__label">执行主体</span>
-        <span class="yumi-stat-card__value">{{ overview.subjectCount }}<small>个</small></span>
-      </div>
-      <div class="yumi-stat-card">
-        <span class="yumi-stat-card__label">待核验</span>
-        <span class="yumi-stat-card__value"
-          >{{ overview.pendingVerification }}<small>个任务</small></span
+    <div class="yui-toolbar">
+      <div class="yui-seg">
+        <button
+          type="button"
+          class="yui-seg__item"
+          :class="{ 'yui-seg__item--active': isWeekView }"
+          @click="setView('week')"
         >
-      </div>
-      <div class="yumi-stat-card">
-        <span class="yumi-stat-card__label">制作超额</span>
-        <span class="yumi-stat-card__value"
-          >{{ overview.extraTaskCount }}<small>个任务</small></span
+          周
+        </button>
+        <button
+          type="button"
+          class="yui-seg__item"
+          :class="{ 'yui-seg__item--active': !isWeekView }"
+          @click="setView('list')"
         >
+          全部列表
+        </button>
       </div>
-    </div>
 
-    <PageState :loading="loading" :error="errorText" @retry="load">
       <template v-if="isWeekView">
-        <el-empty v-if="subjectRows.length === 0" description="本周没有匹配的任务" />
-        <div v-else class="week-board">
-          <div class="week-row week-head">
-            <div class="subject-cell">执行主体</div>
-            <div v-for="date in weekDates" :key="date" class="day-cell">{{ dayLabel(date) }}</div>
-          </div>
-          <div v-for="row in subjectRows" :key="row.key" class="week-row">
-            <div class="subject-cell">{{ row.label }}</div>
-            <div v-for="date in weekDates" :key="`${row.key}-${date}`" class="day-cell">
-              <button
-                v-for="task in tasksOfDay(row.key, date)"
-                :key="task.taskBusinessId"
-                type="button"
-                class="task-card"
-                @click="router.push(`/production/tasks/${task.taskBusinessId}`)"
-              >
-                <strong>{{ task.taskNo }}</strong>
-                <span class="task-meta">
-                  <CodeTag category="production.taskType" :code="task.taskType" />
-                  <CodeTag
-                    v-if="task.processCode"
-                    category="production.targetProcess"
-                    :code="task.processCode"
-                  />
-                </span>
-                <span class="task-meta">
-                  <span>{{ task.plannedWorkQuantity }} 件</span>
-                  <CodeTag category="production.taskStatus" :code="task.status" />
-                </span>
-              </button>
-            </div>
-          </div>
+        <div class="yui-weeknav">
+          <UiIconButton label="上一周" @click="shiftWeek(-7)">‹</UiIconButton>
+          <UiIconButton label="下一周" @click="shiftWeek(7)">›</UiIconButton>
         </div>
+        <span class="yui-weeknav__label">{{ weekLabel }}</span>
+        <UiButton size="sm" variant="ghost" @click="goToday">本周</UiButton>
       </template>
 
-      <el-table v-else :data="filteredTasks" empty-text="没有匹配的任务" border>
-        <el-table-column prop="workDate" label="计划日期" width="120" />
-        <el-table-column prop="taskNo" label="任务编号" width="140" />
-        <el-table-column label="类型" width="150">
-          <template #default="{ row }">
-            <CodeTag category="production.taskType" :code="row.taskType" />
-          </template>
-        </el-table-column>
-        <el-table-column label="执行主体" min-width="150">
-          <template #default="{ row }">{{ subjectName(row) }}</template>
-        </el-table-column>
-        <el-table-column label="工序" width="120">
-          <template #default="{ row }">
-            <CodeTag
-              v-if="row.processCode"
-              category="production.targetProcess"
-              :code="row.processCode"
+      <UiFilterChip
+        label="全部"
+        :count="filterCounts.all"
+        :active="activeFilter === 'all'"
+        @click="activeFilter = 'all'"
+      />
+      <UiFilterChip
+        label="待核验"
+        :count="filterCounts.pending"
+        :active="activeFilter === 'pending'"
+        @click="activeFilter = 'pending'"
+      />
+      <UiFilterChip
+        label="超额"
+        :count="filterCounts.extra"
+        :active="activeFilter === 'extra'"
+        @click="activeFilter = 'extra'"
+      />
+      <UiFilterChip
+        label="返工"
+        :count="filterCounts.repair"
+        :active="activeFilter === 'repair'"
+        @click="activeFilter = 'repair'"
+      />
+
+      <div class="yui-toolbar__right">
+        <UiSearchField v-model="filters.keyword" placeholder="搜索任务编号" class="schedule-search" />
+      </div>
+    </div>
+
+    <PageState class="schedule-body" :loading="loading" :error="errorText" @retry="load">
+      <div v-if="isWeekView" class="yui-weekboard">
+        <UiDateColumn
+          v-for="date in weekDates"
+          :key="date"
+          :weekday="isToday(date) ? `${weekdayOf(date)} · 今天` : weekdayOf(date)"
+          :date="date.slice(8, 10)"
+          :today="isToday(date)"
+          :meta="`${tasksOfDay(date).length} 项 · ${quantityOfDay(date)} 件`"
+          :capacity-label="planOfDay(date)"
+          :show-drop="false"
+          @add="openCreate(date)"
+        >
+          <UiTaskCard
+            v-for="task in tasksOfDay(date)"
+            :key="task.taskBusinessId"
+            :task-no="task.taskNo"
+            :product="productOf(task)"
+            :variant="processOf(task)"
+            :employee-name="subjectName(task)"
+            :employee-id="task.subject.subjectBusinessId"
+            :type-label="typeOf(task)"
+            :quantity="quantityOf(task)"
+            :unit="unitOf(task)"
+            :status="cardStatusOf(task)"
+            :status-label="statusLabelOf(task.status)"
+            @click="openTask(task)"
+          />
+          <div v-if="tasksOfDay(date).length === 0" class="schedule-empty-day">
+            {{ isToday(date) ? '今天还没有安排' : '暂无安排' }}
+          </div>
+        </UiDateColumn>
+      </div>
+
+      <div v-else class="schedule-list">
+        <UiDataTable
+          :columns="tableColumns"
+          :rows="tableRows"
+          row-key="taskBusinessId"
+          empty-text="没有匹配的任务"
+        >
+          <template #status="{ row }">
+            <UiStatusPill
+              :status="cardStatusOf(rowTask(row))"
+              :label="statusLabelOf(row.status)"
             />
-            <span v-else>—</span>
           </template>
-        </el-table-column>
-        <el-table-column prop="plannedWorkQuantity" label="计划量" width="90" />
-        <el-table-column label="状态" width="150">
-          <template #default="{ row }">
-            <CodeTag category="production.taskStatus" :code="row.status" />
+          <template #actions="{ row }">
+            <div class="schedule-row-actions">
+              <UiButton size="sm" variant="ghost" @click="openTask(rowTask(row))">详情</UiButton>
+              <UiButton
+                v-if="canVerify && rowStatus(row) !== 'CANCELLED'"
+                size="sm"
+                variant="ghost"
+                @click="openVerify(rowTask(row))"
+              >
+                核验
+              </UiButton>
+              <UiButton
+                v-if="
+                  canSchedule &&
+                  rowStatus(row) !== 'CANCELLED' &&
+                  rowStatus(row) !== 'VERIFIED'
+                "
+                size="sm"
+                variant="ghost"
+                @click="cancelTask(String(row.taskBusinessId), String(row.taskNo))"
+              >
+                取消
+              </UiButton>
+            </div>
           </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              @click="router.push(`/production/tasks/${row.taskBusinessId}`)"
-            >
-              详情
-            </el-button>
-            <el-button
-              link
-              type="primary"
-              @click="router.push(`/production/verify?task=${row.taskBusinessId}`)"
-            >
-              核验
-            </el-button>
-            <el-button
-              v-if="row.status === 'ARRANGED' || row.status === 'PARTIALLY_VERIFIED'"
-              link
-              type="danger"
-              @click="cancelTask(row)"
-            >
-              取消
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        </UiDataTable>
+      </div>
     </PageState>
-  </WorkspacePage>
+  </div>
 </template>
 
 <style scoped>
-.week-label {
-  color: var(--yumi-text-secondary);
-  font-size: var(--yumi-font-size-base);
+.schedule-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yumi-ds-space-md);
+  height: 100%;
+  min-height: 0;
 }
 
-.keyword {
+.schedule-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-body :deep(.page-state__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.yui-weekboard {
+  flex: 1;
+  min-height: 0;
+}
+
+.schedule-search {
   width: 220px;
 }
 
-.week-board {
-  border: 1px solid var(--yumi-border-color);
-  border-radius: var(--yumi-radius-md);
-  overflow-x: auto;
-}
-
-.week-row {
+.schedule-empty-day {
   display: grid;
-  grid-template-columns: 140px repeat(7, minmax(150px, 1fr));
-  border-bottom: 1px solid var(--yumi-border-color-light);
+  place-items: center;
+  min-height: var(--yumi-ds-space-5xl);
+  color: var(--yumi-ds-faint);
+  font-size: var(--yumi-ds-font-size-meta);
 }
 
-.week-row:last-child {
-  border-bottom: none;
+.schedule-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
-.week-head {
-  background: var(--yumi-bg-muted);
-  font-weight: var(--yumi-font-weight-semibold);
-}
-
-.subject-cell,
-.day-cell {
-  padding: var(--yumi-space-2);
-  border-right: 1px solid var(--yumi-border-color-light);
-  min-height: 56px;
-}
-
-.day-cell:last-child {
-  border-right: none;
-}
-
-.subject-cell {
+.schedule-row-actions {
   display: flex;
-  align-items: center;
-}
-
-.day-cell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yumi-space-2);
-}
-
-.task-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yumi-space-1);
-  width: 100%;
-  padding: var(--yumi-space-2);
-  text-align: left;
-  background: var(--yumi-surface);
-  border: 1px solid var(--yumi-border-color);
-  border-radius: var(--yumi-radius-md);
-  cursor: pointer;
-}
-
-.task-card:hover {
-  border-color: var(--yumi-color-brand);
-}
-
-.task-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--yumi-space-1);
-  color: var(--yumi-text-secondary);
-  font-size: var(--yumi-font-size-sm);
+  justify-content: flex-end;
+  gap: var(--yumi-ds-space-2xs);
 }
 </style>

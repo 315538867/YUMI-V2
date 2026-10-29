@@ -140,6 +140,8 @@ test('缺陷原因维护与需求缺口分列展示', async ({ page }) => {
 test('整体进度与默认全部订单追溯可查看', async ({ page }) => {
   await login(page)
   await page.goto('/production/schedule')
+  await page.getByRole('tab', { name: '总览' }).click()
+  await expect(page).toHaveURL(/\/production\/overview$/)
   await expect(page.getByText('整体进度', { exact: true })).toBeVisible()
   await expect(page.getByText('真实需求')).toBeVisible()
   await expect(page.getByText('生产事实')).toBeVisible()

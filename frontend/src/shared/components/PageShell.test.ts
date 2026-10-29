@@ -15,11 +15,11 @@ describe('裸页面页头外壳', () => {
     expect(wrapper.text()).toContain('整体进度、周排班与核验')
     expect(wrapper.find('.action').exists()).toBe(true)
     expect(wrapper.find('.body').exists()).toBe(true)
-    expect(wrapper.find('header').classes()).toContain('yumi-page-heading')
+    expect(wrapper.find('.yui-pagebar').exists()).toBe(true)
   })
 
   it('无说明时不渲染说明节点', () => {
     const wrapper = mount(PageShell, { props: { title: '来源对账' } })
-    expect(wrapper.find('.yumi-page-heading__hint').exists()).toBe(false)
+    expect(wrapper.find('.yui-pagebar__meta').exists()).toBe(false)
   })
 })

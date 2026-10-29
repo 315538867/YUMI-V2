@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PageState from '@/shared/components/PageState.vue'
+import UiPageBar from '@/shared/ui/UiPageBar.vue'
 import WorkspacePage from '@/shared/components/WorkspacePage.vue'
 
 withDefaults(
@@ -18,12 +19,10 @@ defineEmits<{ retry: [] }>()
 
 <template>
   <div class="editor-page">
-    <header class="yumi-page-heading">
-      <div class="yumi-page-heading__copy">
-        <h1 class="yumi-page-heading__title">{{ title }}</h1>
-      </div>
-      <div class="yumi-actions"><slot name="actions" /></div>
-    </header>
+    <h1 class="yumi-sr-only">{{ title }}</h1>
+    <UiPageBar :breadcrumb="[title]">
+      <template #actions><slot name="actions" /></template>
+    </UiPageBar>
 
     <WorkspacePage class="editor-page__panel" padding="lg">
       <div class="editor-page__notice"><slot name="notice" /></div>
@@ -42,6 +41,12 @@ defineEmits<{ retry: [] }>()
 </template>
 
 <style scoped>
+.editor-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yumi-ds-space-md);
+}
+
 .editor-page__notice:not(:empty) {
   margin-bottom: var(--yumi-space-3);
 }

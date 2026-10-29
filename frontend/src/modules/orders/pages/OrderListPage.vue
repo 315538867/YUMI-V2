@@ -1,30 +1,63 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { codeLabel, codesOf } from '@/platform/display/codeCatalog'
+import { useAuthStore } from '@/platform/stores/auth'
 import { useListQuery } from '@/platform/composables/useListQuery'
 import { useAsyncLoad } from '@/platform/composables/useAsyncLoad'
 import type { OrderStatus, OrderSummaryView } from '@/modules/orders/contracts'
 import { orderService } from '@/modules/orders/services/orderService'
 import CodeTag from '@/shared/components/CodeTag.vue'
-import ListPage from '@/shared/components/ListPage.vue'
 import ListPager from '@/shared/components/ListPager.vue'
 import MoneyText from '@/shared/components/MoneyText.vue'
-import PermissionButton from '@/shared/components/PermissionButton.vue'
+import type { SelectOption, TableColumn } from '@/shared/ui/types'
+import UiButton from '@/shared/ui/UiButton.vue'
+import UiCapacityBar from '@/shared/ui/UiCapacityBar.vue'
+import UiDataTable from '@/shared/ui/UiDataTable.vue'
+import UiPageBar from '@/shared/ui/UiPageBar.vue'
+import UiSearchField from '@/shared/ui/UiSearchField.vue'
+import UiSelectField from '@/shared/ui/UiSelectField.vue'
 
+const auth = useAuthStore()
+const router = useRouter()
 const { loading, errorText, run } = useAsyncLoad()
 
-const router = useRouter()
 const rows = ref<OrderSummaryView[]>([])
-function deliveryPercent(row: OrderSummaryView): number {
-  return row.requiredQuantity === 0
-    ? 0
-    : Math.min(100, Math.round((row.shippedQuantity / row.requiredQuantity) * 100))
-}
+const canCreate = computed(() => auth.hasPermission('order.create'))
+const canIntake = computed(() => auth.hasPermission('order.legacy.intake'))
+
+const statusOptions: SelectOption[] = codesOf('order.status').map((code) => ({
+  value: code,
+  label: codeLabel('order.status', code),
+}))
 
 const { filters, page, size, sizes, search, reset, goPage, changeSize } = useListQuery(
   { keyword: '', status: '' as OrderStatus | '' },
   { onSearch: () => void load() },
 )
+
+const columns: TableColumn[] = [
+  { key: 'orderNo', label: '订单 / 客户', minWidth: 220 },
+  { key: 'productNames', label: '商品', minWidth: 160 },
+  { key: 'expectedDeliveryDate', label: '预计交付', width: 120 },
+  { key: 'currentReceivable', label: '当前应收', width: 130, align: 'right' },
+  { key: 'delivery', label: '交付 / 付款', width: 190 },
+  { key: 'netReceipts', label: '净收款', width: 130, align: 'right' },
+  { key: 'status', label: '状态', width: 110, align: 'right' },
+  { key: 'actions', label: '操作', width: 90, align: 'right' },
+]
+
+const tableRows = computed<Record<string, unknown>[]>(() =>
+  rows.value.map((row) => ({ ...row })),
+)
+
+function orderOf(row: Record<string, unknown>): OrderSummaryView {
+  return row as unknown as OrderSummaryView
+}
+
+function moneyOf(value: unknown): string | number | null {
+  return value as string | number | null
+}
 
 async function load(): Promise<void> {
   await run(async () => {
@@ -32,101 +65,83 @@ async function load(): Promise<void> {
   }, '订单列表加载失败')
 }
 
+function runSearch(): void {
+  void search()
+}
+
 void load()
 </script>
 
 <template>
-  <ListPage
-    class="order-list"
-    title="订单"
-    hint="客户约定、交付与收款"
-    panel-title="订单列表"
-    panel-hint="交付履约与付款履约分别查看"
-    :loading="loading"
-    :error="errorText"
-    @retry="load"
-  >
-    <template #filters>
-      <el-input
+  <div class="order-list">
+    <UiPageBar
+      :breadcrumb="['订单']"
+      :meta="`本页 ${rows.length} 个订单`"
+    >
+      <template #actions>
+        <UiButton v-if="canIntake" @click="router.push('/orders/opening')">已有订单接管</UiButton>
+        <UiButton v-if="canCreate" variant="primary" @click="router.push('/orders/new')">
+          新增订单
+        </UiButton>
+      </template>
+    </UiPageBar>
+
+    <div class="order-filters">
+      <UiSearchField
         v-model="filters.keyword"
         placeholder="订单号、客户或商品"
-        clearable
-        class="keyword"
-        @keyup.enter="search"
+        class="order-keyword"
+        @search="runSearch"
       />
-      <el-select
+      <UiSelectField
         v-model="filters.status"
+        :options="statusOptions"
         placeholder="全部状态"
-        clearable
-        class="status"
         aria-label="订单状态筛选"
+        class="order-status"
+      />
+      <UiButton size="sm" variant="primary" @click="runSearch">查询</UiButton>
+      <UiButton size="sm" @click="reset">重置</UiButton>
+    </div>
+
+    <div class="order-table">
+      <UiDataTable
+        :columns="columns"
+        :rows="tableRows"
+        row-key="orderBusinessId"
+        :loading="loading"
+        empty-text="没有匹配的订单"
       >
-        <el-option label="已确认" value="CONFIRMED" />
-        <el-option label="履约中" value="IN_FULFILLMENT" />
-        <el-option label="已完成" value="COMPLETED" />
-        <el-option label="已取消" value="CANCELLED" />
-      </el-select>
-      <el-button type="primary" @click="search">查询</el-button>
-      <el-button @click="reset">重置</el-button>
-    </template>
-    <template #actions>
-      <PermissionButton permission="order.create" type="primary" @click="router.push('/orders/new')"
-        >新增订单</PermissionButton
-      >
-      <PermissionButton permission="order.legacy.intake" @click="router.push('/orders/opening')">
-        已有订单接管
-      </PermissionButton>
-    </template>
-    <el-table :data="rows" empty-text="没有匹配的订单" border>
-      <el-table-column label="订单 / 客户" min-width="220">
-        <template #default="{ row }">
-          <span class="yumi-cell-title">{{ row.orderNo }}</span>
-          <span class="yumi-cell-sub">{{ row.customerName }}</span>
+        <template #orderNo="{ row }">
+          <span class="order-no">{{ orderOf(row).orderNo }}</span>
+          <span class="order-customer">{{ orderOf(row).customerName }}</span>
         </template>
-      </el-table-column>
-      <el-table-column label="商品" min-width="150" show-overflow-tooltip>
-        <template #default="{ row }">
-          <span class="yumi-cell-title">{{ row.productNames }}</span>
+        <template #currentReceivable="{ row }">
+          <MoneyText :value="moneyOf(row.currentReceivable)" />
         </template>
-      </el-table-column>
-      <el-table-column prop="expectedDeliveryDate" label="预计交付" width="120" />
-      <el-table-column label="当前应收" width="130">
-        <template #default="{ row }"><MoneyText :value="row.currentReceivable" /></template>
-      </el-table-column>
-      <el-table-column label="交付 / 付款" width="180">
-        <template #default="{ row }">
-          <div class="progress-meta">
-            <span :class="row.deliveryFulfilled ? 'yumi-text-positive' : 'yumi-text-pending'">
-              {{ row.deliveryFulfilled ? '已交付' : '待交付' }}
-            </span>
-            <span>{{ row.shippedQuantity }} / {{ row.requiredQuantity }}</span>
-          </div>
-          <el-progress
-            :percentage="deliveryPercent(row)"
-            :show-text="false"
-            :stroke-width="6"
-            :aria-label="`订单 ${row.orderNo} 交付进度`"
+        <template #delivery="{ row }">
+          <UiCapacityBar
+            :value="orderOf(row).shippedQuantity"
+            :max="Math.max(orderOf(row).requiredQuantity, 1)"
+            :label="`已交付 ${orderOf(row).shippedQuantity} / ${orderOf(row).requiredQuantity}`"
           />
-          <span class="yumi-cell-sub"> 付款{{ row.paymentFulfilled ? '已收清' : '未收清' }} </span>
+          <span class="order-payment">
+            付款{{ orderOf(row).paymentFulfilled ? '已收清' : '未收清' }}
+          </span>
         </template>
-      </el-table-column>
-      <el-table-column label="净收款" width="130">
-        <template #default="{ row }"><MoneyText :value="row.netReceipts" /></template>
-      </el-table-column>
-      <el-table-column label="状态" width="110">
-        <template #default="{ row }"
-          ><CodeTag category="order.status" :code="row.status"
-        /></template>
-      </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="router.push(`/orders/${row.orderBusinessId}`)"
-            >查看</el-button
-          >
+        <template #netReceipts="{ row }">
+          <MoneyText :value="moneyOf(row.netReceipts)" />
         </template>
-      </el-table-column>
-    </el-table>
-    <template #pager>
+        <template #status="{ row }">
+          <CodeTag category="order.status" :code="orderOf(row).status" />
+        </template>
+        <template #actions="{ row }">
+          <UiButton size="sm" variant="ghost" @click="router.push(`/orders/${orderOf(row).orderBusinessId}`)">
+            查看
+          </UiButton>
+        </template>
+      </UiDataTable>
+      <div v-if="errorText" class="order-error">{{ errorText }}</div>
       <ListPager
         :page="page"
         :size="size"
@@ -135,29 +150,53 @@ void load()
         @update:page="goPage"
         @update:size="changeSize"
       />
-    </template>
-  </ListPage>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.progress-meta {
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yumi-ds-space-md);
+}
+
+.order-filters {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--yumi-space-2);
-  margin-bottom: var(--yumi-space-1);
-  color: var(--yumi-text-secondary);
-  font-size: var(--yumi-font-size-xs);
+  gap: var(--yumi-ds-space-sm);
+  flex-wrap: wrap;
 }
 
-.progress-meta + :deep(.el-progress) {
-  margin-bottom: var(--yumi-space-1);
-}
-
-.keyword {
+.order-keyword {
   width: 240px;
 }
-.status {
-  width: 130px;
+
+.order-status {
+  width: 150px;
+}
+
+.order-table {
+  min-height: 0;
+}
+
+.order-no {
+  display: block;
+  color: var(--yumi-ds-ink);
+  font-weight: var(--yumi-ds-font-weight-semibold);
+}
+
+.order-customer,
+.order-payment {
+  display: block;
+  margin-top: var(--yumi-ds-space-2xs);
+  color: var(--yumi-ds-muted);
+  font-size: var(--yumi-ds-font-size-meta);
+}
+
+.order-error {
+  margin-top: var(--yumi-ds-space-md);
+  color: var(--yumi-ds-status-repair);
+  font-size: var(--yumi-ds-font-size-label);
 }
 </style>
